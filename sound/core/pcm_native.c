@@ -2454,7 +2454,7 @@ static int snd_pcm_hw_rule_sample_bits(struct snd_pcm_hw_params *params,
 }
 
 #if SNDRV_PCM_RATE_5512 != 1 << 0 || SNDRV_PCM_RATE_192000 != 1 << 12 ||\
-	SNDRV_PCM_RATE_128000 != 1 << 19
+	SNDRV_PCM_RATE_128000 != 1 << 19 || SNDRV_PCM_RATE_3072000 != 1 << 23
 #error "Change this table"
 #endif
 
@@ -2463,7 +2463,9 @@ static const unsigned int rates[] = {
 	5512, 8000, 11025, 16000, 22050, 32000, 44100,
 	48000, 64000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000,
 	/* extended */
-	12000, 24000, 128000
+	12000, 24000, 128000,
+	/* extended sue */
+	1411200, 1536000, 2822400, 3072000
 };
 
 const struct snd_pcm_hw_constraint_list snd_pcm_known_rates = {

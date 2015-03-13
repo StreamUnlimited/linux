@@ -127,6 +127,11 @@ struct snd_pcm_ops {
 #define SNDRV_PCM_RATE_12000		(1U<<17)	/* 12000Hz */
 #define SNDRV_PCM_RATE_24000		(1U<<18)	/* 24000Hz */
 #define SNDRV_PCM_RATE_128000		(1U<<19)	/* 128000Hz */
+/* extended rates for SUE */
+#define SNDRV_PCM_RATE_1411200		(1U<<20)		/* 1411200Hz */
+#define SNDRV_PCM_RATE_1536000		(1U<<21)		/* 1536000Hz */
+#define SNDRV_PCM_RATE_2822400		(1U<<22)		/* 2822400Hz */
+#define SNDRV_PCM_RATE_3072000		(1U<<23)		/* 3072000Hz */
 
 #define SNDRV_PCM_RATE_CONTINUOUS	(1U<<30)	/* continuous range */
 #define SNDRV_PCM_RATE_KNOT		(1U<<31)	/* supports more non-continuous rates */
@@ -145,6 +150,12 @@ struct snd_pcm_ops {
 #define SNDRV_PCM_RATE_8000_768000	(SNDRV_PCM_RATE_8000_384000|\
 					 SNDRV_PCM_RATE_705600|\
 					 SNDRV_PCM_RATE_768000)
+#define SNDRV_PCM_RATE_8000_1536000	(SNDRV_PCM_RATE_8000_768000|\
+					 SNDRV_PCM_RATE_1411200|\
+					 SNDRV_PCM_RATE_1536000)
+#define SNDRV_PCM_RATE_8000_3072000	(SNDRV_PCM_RATE_8000_1536000|\
+					 SNDRV_PCM_RATE_2822400|\
+					 SNDRV_PCM_RATE_3072000)
 #define _SNDRV_PCM_FMTBIT(fmt)		(1ULL << (__force int)SNDRV_PCM_FORMAT_##fmt)
 #define SNDRV_PCM_FMTBIT_S8		_SNDRV_PCM_FMTBIT(S8)
 #define SNDRV_PCM_FMTBIT_U8		_SNDRV_PCM_FMTBIT(U8)
