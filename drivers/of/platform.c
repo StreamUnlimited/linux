@@ -456,6 +456,40 @@ int of_platform_populate(struct device_node *root,
 }
 EXPORT_SYMBOL_GPL(of_platform_populate);
 
+int of_platform_default_populate(struct device_node *root,
+				 const struct of_dev_auxdata *lookup,
+				 struct device *parent)
+{
+	return of_platform_populate(root, of_default_bus_match_table, lookup,
+				    parent);
+}
+EXPORT_SYMBOL_GPL(of_platform_default_populate);
+
+static int __init of_platform_default_populate_init(void)
+{
+	struct device_node *node;
+
+	if (!of_have_populated_dt())
+		return -ENODEV;
+
+	/*
+	 * Handle ramoops explicitly, since it is inside /reserved-memory,
+	 * which lacks a "compatible" property.
+	 */
+	node = of_find_node_by_path("/reserved-memory");
+	if (node) {
+		node = of_find_compatible_node(node, NULL, "ramoops");
+		if (node)
+			of_platform_device_create(node, NULL, NULL);
+	}
+
+	/* Populate everything else. */
+	of_platform_default_populate(NULL, NULL, NULL);
+
+	return 0;
+}
+arch_initcall_sync(of_platform_default_populate_init);
+
 static int of_platform_device_destroy(struct device *dev, void *data)
 {
 	/* Do not touch devices not populated from the device tree */
