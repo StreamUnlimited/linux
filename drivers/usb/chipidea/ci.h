@@ -263,8 +263,10 @@ struct ci_hdrc {
 	bool				supports_runtime_pm;
 	bool				in_lpm;
 	bool				wakeup_int;
+	bool				vbus_overcurrent;
 	enum ci_revision		rev;
 	struct mutex                    mutex;
+	struct delayed_work		check_vbus_work;
 };
 
 static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
