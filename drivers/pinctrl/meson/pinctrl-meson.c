@@ -43,6 +43,7 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/of_irq.h>
 #include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinconf.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -584,6 +585,58 @@ static void meson_gpio_set(struct gpio_chip *chip, unsigned gpio, int value)
 	meson_pinconf_set_drive(gpiochip_get_data(chip), gpio, value);
 }
 
+static int meson_gpio_to_hwirq(struct meson_bank *bank, unsigned int offset)
+{
+	unsigned int hwirq;
+
+	if (bank->irq_first < 0)
+		/* this bank cannot generate irqs */
+		return -1;
+
+	hwirq = offset - bank->first + bank->irq_first;
+
+	if (hwirq > bank->irq_last)
+		/* this pin cannot generate irqs */
+		return -1;
+
+	return hwirq;
+}
+
+static int meson_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
+{
+	struct meson_pinctrl *pc = gpiochip_get_data(chip);
+	struct meson_bank *bank;
+	struct irq_fwspec fwspec;
+	unsigned int hwirq;
+	int ret;
+
+	ret = meson_get_bank(pc, offset, &bank);
+	if (ret)
+		return ret;
+
+	/*
+	 * The interrupt controller might be missing, in such case we can't
+	 * provide an interrupt for a pin
+	 */
+	if (is_fwnode_irqchip(pc->fwnode_parent)) {
+		dev_info(pc->dev, "interrupt controller not found\n");
+		return 0;
+	}
+
+	hwirq = meson_gpio_to_hwirq(bank, offset);
+	if (hwirq < 0) {
+		dev_info(pc->dev, "no interrupt for pin %u\n", offset);
+		return 0;
+	}
+
+	fwspec.fwnode = pc->fwnode_parent;
+	fwspec.param_count = 2;
+	fwspec.param[0] = hwirq;
+	fwspec.param[1] = IRQ_TYPE_NONE;
+
+	return irq_create_fwspec_mapping(&fwspec);
+}
+
 static int meson_gpio_get(struct gpio_chip *chip, unsigned gpio)
 {
 	struct meson_pinctrl *pc = gpiochip_get_data(chip);
@@ -618,8 +671,10 @@ static int meson_gpiolib_register(struct meson_pinctrl *pc)
 	pc->chip.set = meson_gpio_set;
 	pc->chip.base = -1;
 	of_property_read_u32(to_of_node(pc->fwnode), "sysfs-base", &pc->chip.base);
+	pc->chip.to_irq = meson_gpio_to_irq;
 	pc->chip.ngpio = pc->data->num_pins;
 	pc->chip.can_sleep = false;
+	pc->chip.of_gpio_n_cells = 2;
 
 	ret = gpiochip_add_data(&pc->chip, pc);
 	if (ret) {
@@ -660,6 +715,27 @@ static struct regmap *meson_map_resource(struct meson_pinctrl *pc,
 		return ERR_PTR(-ENOMEM);
 
 	return devm_regmap_init_mmio(pc->dev, base, &meson_regmap_config);
+}
+
+static int meson_pinctrl_get_irq_gpio_intc(struct meson_pinctrl *pc,
+					   struct device_node *node)
+{
+	struct device_node *np;
+
+	np = of_irq_find_parent(node);
+	if (unlikely(!np)) {
+		dev_err(pc->dev, "interrupt parent not found\n");
+		return -EINVAL;
+	}
+
+	if (!of_device_is_compatible(np, pc->data->irq_compat)) {
+		dev_info(pc->dev, "gpio interrupt disabled\n");
+		pc->fwnode_parent = NULL;
+	}
+
+	pc->fwnode_parent = of_node_to_fwnode(np);
+
+	return 0;
 }
 
 static int meson_pinctrl_parse_dt(struct meson_pinctrl *pc)
@@ -705,6 +781,9 @@ static int meson_pinctrl_parse_dt(struct meson_pinctrl *pc)
 		dev_dbg(pc->dev, "ds registers not found - skipping\n");
 		pc->reg_ds = NULL;
 	}
+
+	if (meson_pinctrl_get_irq_gpio_intc(pc, gpio_np))
+		dev_warn(pc->dev, "meson gpio interrupt dts parse error\n");
 
 	if (pc->data->parse_dt)
 		return pc->data->parse_dt(pc);

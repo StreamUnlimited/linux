@@ -1042,6 +1042,7 @@ static struct meson_axg_pmx_data meson_axg_aobus_pmx_banks_data = {
 
 static struct meson_pinctrl_data meson_axg_periphs_pinctrl_data = {
 	.name		= "periphs-banks",
+	.irq_compat	= "amlogic,meson-axg-gpio-intc",
 	.pins		= meson_axg_periphs_pins,
 	.groups		= meson_axg_periphs_groups,
 	.funcs		= meson_axg_periphs_functions,
@@ -1056,6 +1057,7 @@ static struct meson_pinctrl_data meson_axg_periphs_pinctrl_data = {
 
 static struct meson_pinctrl_data meson_axg_aobus_pinctrl_data = {
 	.name		= "aobus-banks",
+	.irq_compat	= "amlogic,meson-axg-gpio-intc",
 	.pins		= meson_axg_aobus_pins,
 	.groups		= meson_axg_aobus_groups,
 	.funcs		= meson_axg_aobus_functions,

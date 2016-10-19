@@ -109,6 +109,7 @@ struct meson_bank {
 
 struct meson_pinctrl_data {
 	const char *name;
+	const char *irq_compat;
 	const struct pinctrl_pin_desc *pins;
 	struct meson_pmx_group *groups;
 	struct meson_pmx_func *funcs;
@@ -134,6 +135,7 @@ struct meson_pinctrl {
 	struct regmap *reg_ds;
 	struct gpio_chip chip;
 	struct fwnode_handle *fwnode;
+	struct fwnode_handle *fwnode_parent;
 };
 
 #define FUNCTION(fn)							\
