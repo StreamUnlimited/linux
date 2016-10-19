@@ -10,6 +10,8 @@ menuconfig PINCTRL_MESON
 	select GPIOLIB
 	select OF_GPIO
 	select REGMAP_MMIO
+	select IRQ_DOMAIN
+	select OF_IRQ
 
 if PINCTRL_MESON
 
