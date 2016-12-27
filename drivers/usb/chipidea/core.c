@@ -1311,6 +1311,9 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	device_set_wakeup_capable(&pdev->dev, true);
 	dbg_create_files(ci);
 
+	/* Set the VBUS-valid threshold voltage to 4.75V - 6% = 4.465V */
+	hw_write_id_reg(ci, 0x230, (7 << 10), (0 << 10));
+
 	/* Init workqueue for checking VBUS overcurrent & start it. */
 	ci->vbus_overcurrent = false;
 	INIT_DELAYED_WORK(&ci->check_vbus_work,
