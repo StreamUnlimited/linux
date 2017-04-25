@@ -277,6 +277,10 @@ properties:
     type: boolean
     description: Some chipidea hardware need to disable low power mode
 
+  disable-vbus-oc-protection:
+    type: boolean
+    description: this disables the over current protection of the VBUS supply
+
   samsung,picophy-pre-emp-curr-control:
     description:
       HS Transmitter Pre-Emphasis Current Control. This signal controls
