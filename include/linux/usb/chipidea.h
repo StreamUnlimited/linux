@@ -98,6 +98,8 @@ struct ci_hdrc_platform_data {
 			   u16 wIndex, char *buf, u16 wLength,
 			   bool *done, unsigned long *flags);
 	void (*enter_lpm)(struct ci_hdrc *ci, bool enable);
+
+	bool 			vbus_oc_protection_disabled;
 };
 
 /* Default offset of capability registers */
