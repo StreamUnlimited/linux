@@ -91,6 +91,8 @@ Optional properties:
   and the "active" state needs to pull up the strobe pin.
 - pinctrl-n: alternate pin modes
 - ci-disable-lpm: Some chipidea hardware need to disable low power mode
+- disable-vbus-oc-protection: this disables the over current protection of
+  the VBUS supply.
 
 i.mx specific properties
 - fsl,usbmisc: phandler of non-core register device, with one
