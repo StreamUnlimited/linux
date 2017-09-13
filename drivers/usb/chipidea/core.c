@@ -1070,7 +1070,6 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 	const int overcurrent_disabled_time = 5000;
 	const int overcurrent_reenabled_time = 200;
 
-	spin_lock_irqsave(&ci->lock, flags);
 	/*
 	 * According to the reference manual for the SOC, setting or
 	 * clearing the PP bit in PORTSC should enable or disable
@@ -1097,7 +1096,9 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 		check_interval = overcurrent_reenabled_time;
 	} else {
 		/* check if vbus is valid */
+		spin_lock_irqsave(&ci->lock, flags);
 		reg = hw_read_id_reg(ci, 0x23c, 0xff);
+		spin_unlock_irqrestore(&ci->lock, flags);
 		if (!(reg & BIT(3))) {
 			dev_err(ci->dev, "vbus overcurrent detected, disabling port power!\n");
 			/* See comment in reenable code. */
@@ -1107,7 +1108,6 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 			ci->vbus_overcurrent = true;
 		}
 	}
-	spin_unlock_irqrestore(&ci->lock, flags);
 
 	queue_delayed_work(
 		system_wq,
