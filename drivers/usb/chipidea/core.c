@@ -1064,7 +1064,6 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct ci_hdrc *ci =
 		container_of(dwork, struct ci_hdrc, check_vbus_work);
-	unsigned long flags = 0;
 	u32 reg;
 	int check_interval = 1000; /* Normal check interval in ms. */
 	const int overcurrent_disabled_time = 5000;
@@ -1096,9 +1095,7 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 		check_interval = overcurrent_reenabled_time;
 	} else {
 		/* check if vbus is valid */
-		spin_lock_irqsave(&ci->lock, flags);
 		reg = hw_read_id_reg(ci, 0x23c, 0xff);
-		spin_unlock_irqrestore(&ci->lock, flags);
 		if (!(reg & BIT(3))) {
 			dev_err(ci->dev, "vbus overcurrent detected, disabling port power!\n");
 			/* See comment in reenable code. */
