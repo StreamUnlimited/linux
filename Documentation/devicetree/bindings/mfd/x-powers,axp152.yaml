@@ -259,6 +259,10 @@ properties:
   usb-power:
     $ref: /schemas/power/supply/x-powers,axp20x-usb-power-supply.yaml#
 
+  no-irq: 
+    description: >
+      Specify when the IRQ line is not connected to any GPIO
+
   regulators:
     type: object
 

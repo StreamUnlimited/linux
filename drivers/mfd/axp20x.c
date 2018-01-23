@@ -1325,7 +1325,10 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
 
 	if (ret) {
 		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
-		regmap_del_irq_chip(axp20x->irq, axp20x->regmap_irqc);
+
+		if (axp20x->irq != -1)
+			regmap_del_irq_chip(axp20x->irq, axp20x->regmap_irqc);
+
 		return ret;
 	}
 

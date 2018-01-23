@@ -25,14 +25,19 @@
 static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
 {
 	struct axp20x_dev *axp20x;
+	struct device_node *np = rdev->dev.of_node;
 	int ret;
 
 	axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
 	if (!axp20x)
 		return -ENOMEM;
 
+	if (of_property_read_bool(np, "no-irq"))
+		axp20x->irq = -1;
+	else
+		axp20x->irq = rdev->irq;
+
 	axp20x->dev = &rdev->dev;
-	axp20x->irq = rdev->irq;
 	dev_set_drvdata(&rdev->dev, axp20x);
 
 	ret = axp20x_match_device(axp20x);
