@@ -25,14 +25,19 @@
 static int axp20x_i2c_probe(struct i2c_client *i2c)
 {
 	struct axp20x_dev *axp20x;
+	struct device_node *np = i2c->dev.of_node;
 	int ret;
 
 	axp20x = devm_kzalloc(&i2c->dev, sizeof(*axp20x), GFP_KERNEL);
 	if (!axp20x)
 		return -ENOMEM;
 
+	if (of_property_read_bool(np, "no-irq"))
+		axp20x->irq = -1;
+	else
+		axp20x->irq = i2c->irq;
+
 	axp20x->dev = &i2c->dev;
-	axp20x->irq = i2c->irq;
 	dev_set_drvdata(axp20x->dev, axp20x);
 
 	ret = axp20x_match_device(axp20x);
