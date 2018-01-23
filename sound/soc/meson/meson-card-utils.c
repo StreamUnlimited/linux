@@ -9,19 +9,23 @@
 
 #include "meson-card.h"
 
+#define MCLK_48k	(24576000UL)
+#define MCLK_44k1	(22579200UL)
+
 int meson_card_i2s_set_sysclk(struct snd_pcm_substream *substream,
 			      struct snd_pcm_hw_params *params,
 			      unsigned int mclk_fs)
 {
 	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
 	struct snd_soc_dai *codec_dai;
-	unsigned int mclk;
+	unsigned int mclk, rate;
 	int ret, i;
+	rate = params_rate(params);
 
 	if (!mclk_fs)
-		return 0;
-
-	mclk = params_rate(params) * mclk_fs;
+		mclk = ((rate % 8000) == 0) ? MCLK_48k : MCLK_44k1;
+	else
+		mclk = params_rate(params) * mclk_fs;
 
 	for_each_rtd_codec_dais(rtd, i, codec_dai) {
 		ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
