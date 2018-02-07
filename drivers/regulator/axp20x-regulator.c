@@ -565,6 +565,8 @@ static const struct regulator_ops axp20x_ops_range = {
 	.enable			= regulator_enable_regmap,
 	.disable		= regulator_disable_regmap,
 	.is_enabled		= regulator_is_enabled_regmap,
+	.set_suspend_enable	= regulator_enable_regmap,
+	.set_suspend_disable	= regulator_disable_regmap,
 };
 
 static const struct regulator_ops axp20x_ops = {
@@ -575,12 +577,16 @@ static const struct regulator_ops axp20x_ops = {
 	.disable		= regulator_disable_regmap,
 	.is_enabled		= regulator_is_enabled_regmap,
 	.set_ramp_delay		= axp20x_set_ramp_delay,
+	.set_suspend_enable	= regulator_enable_regmap,
+	.set_suspend_disable	= regulator_disable_regmap,
 };
 
 static const struct regulator_ops axp20x_ops_sw = {
 	.enable			= regulator_enable_regmap,
 	.disable		= regulator_disable_regmap,
 	.is_enabled		= regulator_is_enabled_regmap,
+	.set_suspend_enable	= regulator_enable_regmap,
+	.set_suspend_disable	= regulator_disable_regmap,
 };
 
 static const struct linear_range axp152_ldo0_ranges[] = {
@@ -1478,10 +1484,16 @@ static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
 	return false;
 }
 
+struct axp20x_pdata {
+	int nregulators;
+	struct regulator_dev **regs;
+};
+
 static int axp20x_regulator_probe(struct platform_device *pdev)
 {
 	struct regulator_dev *rdev;
 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+	struct axp20x_pdata *pdata;
 	const struct regulator_desc *regulators;
 	struct regulator_config config = {
 		.dev = pdev->dev.parent,
@@ -1548,6 +1560,11 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 
 	/* This only sets the dcdc freq. Ignore any errors */
 	axp20x_regulator_parse_dt(pdev);
+
+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+	pdata->nregulators = nregulators;
+	pdata->regs = devm_kzalloc(&pdev->dev, sizeof(*pdata->regs) * nregulators, GFP_KERNEL);
+	dev_set_drvdata(&pdev->dev, pdata);
 
 	for (i = 0; i < nregulators; i++) {
 		const struct regulator_desc *desc = &regulators[i];
@@ -1621,6 +1638,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 
 			return PTR_ERR(rdev);
 		}
+		pdata->regs[i] = rdev;
 
 		ret = of_property_read_u32(rdev->dev.of_node,
 					   "x-powers,dcdc-workmode",
@@ -1670,11 +1688,67 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int axp20x_suspend(struct device *dev)
+{
+	struct axp20x_pdata *pdata = dev_get_drvdata(dev);
+	int i, ret;
+
+	for (i = 0; i < pdata->nregulators; i++) {
+		struct regulator_dev *rdev = pdata->regs[i];
+
+		regulator_lock(rdev);
+		if (rdev->constraints->state_mem.enabled == DISABLE_IN_SUSPEND 
+			&& rdev->desc->ops->set_suspend_disable) {
+			dev_info(dev, "disabling %s\n", rdev->desc->name);
+			ret = rdev->desc->ops->set_suspend_disable(rdev);
+			if (ret)
+				dev_err(dev, "failed to disable regulator %s\n", rdev->desc->name);
+		}
+		regulator_unlock(rdev);
+	}
+
+	return 0;
+}
+
+static int axp20x_resume(struct device *dev)
+{
+	struct axp20x_pdata *pdata = dev_get_drvdata(dev);
+	int i, ret;
+
+
+	for (i = 0; i < pdata->nregulators; i++) {
+		struct regulator_dev *rdev = pdata->regs[i];
+
+		regulator_lock(rdev);
+		if (rdev->use_count > 0 || rdev->constraints->always_on) {
+			if (!rdev->desc->ops->is_enabled(rdev)) {
+				dev_info(dev, "enabling %s\n", rdev->desc->name);
+				ret = rdev->desc->ops->set_suspend_enable(rdev);
+				if (ret)
+					dev_err(dev, "failed to enable regulator %s\n", rdev->desc->name);
+			}
+		}
+		regulator_unlock(rdev);
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops axp20x_pm_ops = {
+	.suspend = axp20x_suspend,
+	.resume = axp20x_resume,
+};
+#endif
+
 static struct platform_driver axp20x_regulator_driver = {
 	.probe	= axp20x_regulator_probe,
 	.driver	= {
 		.name		= "axp20x-regulator",
 		.probe_type	= PROBE_PREFER_ASYNCHRONOUS,
+#ifdef CONFIG_PM_SLEEP
+		.pm		= &axp20x_pm_ops,
+#endif
 	},
 };
 
