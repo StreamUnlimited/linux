@@ -70,6 +70,7 @@
 						"TODDR_A IN 4", "PDM Capture";
 
 		mute-gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
+		pdown-gpios = <&gpio GPIOZ_4 GPIO_ACTIVE_LOW>;
 
 		dai-link-0 {
 			sound-dai = <&frddr_a>;
