@@ -360,6 +360,10 @@ int meson_card_probe(struct platform_device *pdev)
 		}
 	}
 
+	priv->pdown = devm_gpiod_get_optional(dev, "pdown", GPIOD_OUT_LOW);
+	if (IS_ERR_OR_NULL(priv->pdown))
+		dev_warn(dev, "could not get pdown GPIO\n");
+
 	return 0;
 
 out_err:
@@ -372,6 +376,7 @@ int meson_card_remove(struct platform_device *pdev)
 {
 	struct meson_card *priv = platform_get_drvdata(pdev);
 
+	gpiod_set_value(priv->pdown, 1);
 	meson_card_clean_references(priv);
 
 	return 0;
