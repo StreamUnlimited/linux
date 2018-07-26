@@ -30,6 +30,10 @@
 #include <linux/usb/role.h>
 #include <linux/regulator/consumer.h>
 
+static int forceid = -1;
+module_param(forceid, int, 0);
+MODULE_PARM_DESC(forceid, "Override the status of the ID pin to 1 or 0, -1 to use the physical hardware pin (default=-1)");
+
 /* USB2 Ports Control Registers, offsets are per-port */
 
 #define U2P_REG_SIZE						0x20
@@ -471,7 +475,10 @@ static enum phy_mode dwc3_meson_g12a_get_id(struct dwc3_meson_g12a *priv)
 {
 	u32 reg;
 
-	regmap_read(priv->usb_glue_regmap, USB_R5, &reg);
+	if (forceid == -1)
+		regmap_read(priv->usb_glue_regmap, USB_R5, &reg);
+	else
+		reg = forceid;
 
 	if (reg & (USB_R5_ID_DIG_SYNC | USB_R5_ID_DIG_REG))
 		return PHY_MODE_USB_DEVICE;
