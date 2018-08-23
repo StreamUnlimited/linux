@@ -546,7 +546,7 @@ static const struct axg_pdm_filters axg_default_filters = {
 	},
 	.hpf = {
 		.out_factor = 0x8000,
-		.steps = 13,
+		.steps = 0,
 	},
 	.lpf = {
 		[0] = {
