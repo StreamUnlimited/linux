@@ -1361,6 +1361,13 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
 
 	switch (axp20x->variant) {
 	case AXP152_ID:
+		if (id < AXP152_DCDC1 || id > AXP152_DCDC4)
+			return -EINVAL;
+
+		mask = AXP22X_WORKMODE_DCDCX_MASK(AXP152_DCDC4 - id);
+		workmode <<= AXP152_DCDC4 - id;
+		break;
+
 	case AXP202_ID:
 	case AXP209_ID:
 		if ((id != AXP20X_DCDC2) && (id != AXP20X_DCDC3))
