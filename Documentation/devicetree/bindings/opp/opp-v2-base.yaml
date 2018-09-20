@@ -118,6 +118,20 @@ patternProperties:
         minItems: 1
         maxItems: 8   # Should be enough regulators
 
+      opp-workmode:
+        description: |
+          The regulator workmode which will be selected on transition to/from
+          this opp. Valid values are:
+            1: REGULATOR_MODE_FAST
+            2: REGULATOR_MODE_NORMAL
+            4: REGULATOR_MODE_IDLE
+            8: REGULATOR_MODE_STANDBY
+          See include/linux/regulator/consumer.h for a description of those constants, note
+          that not all regulators implement all modes. If not opp-workmode is specified the
+          REGULATOR_MODE_NORMAL is assumed.
+        $ref: "/schemas/types.yaml#/definitions/uint32"
+        enum: [1, 2, 4, 8]
+
       opp-level:
         description:
           A value representing the performance level of the device.

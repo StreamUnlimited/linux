@@ -1181,10 +1181,11 @@ static int _set_opp(struct device *dev, struct opp_table *opp_table,
 		return 0;
 	}
 
-	dev_dbg(dev, "%s: switching OPP: Freq %lu -> %lu Hz, Level %u -> %u, Bw %u -> %u\n",
+	dev_dbg(dev, "%s: switching OPP: Freq %lu -> %lu Hz, Level %u -> %u, Bw %u -> %u, Workmode %u -> %u\n",
 		__func__, old_opp->rates[0], opp->rates[0], old_opp->level,
 		opp->level, old_opp->bandwidth ? old_opp->bandwidth[0].peak : 0,
-		opp->bandwidth ? opp->bandwidth[0].peak : 0);
+		opp->bandwidth ? opp->bandwidth[0].peak : 0,
+		old_opp->workmode, opp->workmode);
 
 	scaling_down = _opp_compare_key(opp_table, old_opp, opp);
 	if (scaling_down == -1)

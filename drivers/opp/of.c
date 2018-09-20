@@ -681,11 +681,31 @@ static u32 *opp_parse_microvolt(struct dev_pm_opp *opp, struct device *dev,
 	return microvolt;
 }
 
+static int _parse_workmode(struct dev_pm_opp *opp, struct device *dev)
+{
+	struct property *prop = NULL;
+	const char* name = "opp-workmode";
+
+	prop = of_find_property(opp->np, name, NULL);
+	if (prop) {
+		int ret, workmode;
+		ret = of_property_read_u32(opp->np, name, &workmode);
+		if (ret) {
+			dev_err(dev, "%s could not be parsed for %s\n", name, opp->np->full_name);
+			return ret;
+		}
+		return workmode;
+	} else {
+		dev_dbg(dev, "%s missing for %s\n", name, opp->np->full_name);
+		return 0;
+	}
+}
+
 static int opp_parse_supplies(struct dev_pm_opp *opp, struct device *dev,
 			      struct opp_table *opp_table)
 {
 	u32 *microvolt, *microamp, *microwatt;
-	int ret = 0, i, j;
+	int ret = 0, i, j, workmode;
 	bool triplet;
 
 	microvolt = opp_parse_microvolt(opp, dev, opp_table, &triplet);
@@ -703,6 +723,10 @@ static int opp_parse_supplies(struct dev_pm_opp *opp, struct device *dev,
 		ret = PTR_ERR(microwatt);
 		goto free_microamp;
 	}
+
+	workmode = _parse_workmode(opp, dev);
+	if (workmode > 0)
+		opp->workmode = workmode;
 
 	/*
 	 * Initialize regulator_count if it is uninitialized and no properties

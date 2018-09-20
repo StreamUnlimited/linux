@@ -107,6 +107,7 @@ struct dev_pm_opp {
 	struct dev_pm_opp_icc_bw *bandwidth;
 
 	unsigned long clock_latency_ns;
+	unsigned int workmode;
 
 	struct dev_pm_opp **required_opps;
 	struct opp_table *opp_table;
