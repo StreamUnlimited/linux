@@ -1193,6 +1193,15 @@ static int _set_opp(struct device *dev, struct opp_table *opp_table,
 
 	/* Scaling up? Configure required OPPs before frequency */
 	if (!scaling_down) {
+		if (old_opp->workmode != opp->workmode && opp_table->regulators) {
+			for (int i = 0; i < opp_table->regulator_count; i++) {
+				ret = regulator_set_mode(opp_table->regulators[i], opp->workmode == 0 ? REGULATOR_MODE_NORMAL : opp->workmode);
+				if (ret) {
+					dev_err(dev, "Failed to set workmode: %d\n", ret);
+					return ret;
+				}
+			}
+		}
 		ret = _set_required_opps(dev, opp_table, opp, true);
 		if (ret) {
 			dev_err(dev, "Failed to set required opps: %d\n", ret);
@@ -1246,6 +1255,15 @@ static int _set_opp(struct device *dev, struct opp_table *opp_table,
 		if (ret) {
 			dev_err(dev, "Failed to set required opps: %d\n", ret);
 			return ret;
+		}
+		if (old_opp->workmode != opp->workmode && opp_table->regulators) {
+			for (int i = 0; i < opp_table->regulator_count; i++) {
+				ret = regulator_set_mode(opp_table->regulators[i], opp->workmode == 0 ? REGULATOR_MODE_NORMAL : opp->workmode);
+				if (ret) {
+					dev_err(dev, "Failed to set workmode: %d\n", ret);
+					return ret;
+				}
+			}
 		}
 	}
 
