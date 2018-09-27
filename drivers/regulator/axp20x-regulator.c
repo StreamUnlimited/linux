@@ -1366,7 +1366,7 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
 	unsigned int reg = AXP20X_DCDC_MODE;
 	unsigned int mask;
 
-	dev_info(&rdev->dev, "Setting workmode for %s to %s\b", rdev->desc->name, workmode == 1 ? "PWM" : "auto");
+	dev_dbg(&rdev->dev, "Setting workmode for %s to %s\b", rdev->desc->name, workmode == 1 ? "PWM" : "auto");
 
 	switch (axp20x->variant) {
 	case AXP152_ID:
