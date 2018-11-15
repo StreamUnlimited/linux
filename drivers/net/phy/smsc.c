@@ -35,7 +35,7 @@
 #define SPECIAL_CTRL_STS_AMDIX_ENABLE_	0x4000
 #define SPECIAL_CTRL_STS_AMDIX_STATE_	0x2000
 
-#define EDPD_MAX_WAIT_DFLT_MS		640
+#define EDPD_MAX_WAIT_DFLT_MS		64
 /* interval between phylib state machine runs in ms */
 #define PHY_STATE_MACH_MS		1000
 
@@ -236,7 +236,7 @@ int lan87xx_read_status(struct phy_device *phydev)
 		if (rc < 0)
 			return rc;
 
-		/* Wait max 640 ms to detect energy and the timeout is not
+		/* Wait max 64 ms (~5 link test) to detect energy and the timeout is not
 		 * an actual error.
 		 */
 		read_poll_timeout(phy_read, rc,
