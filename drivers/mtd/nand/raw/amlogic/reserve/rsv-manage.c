@@ -41,19 +41,19 @@ static struct free_node_t *get_free_node(struct meson_rsv_info_t *rsv_info)
 	struct meson_rsv_handler_t *handler = rsv_info->handler;
 	unsigned long index;
 
-	pr_info("%s %d: bitmap=%llx\n", __func__, __LINE__,
+	pr_debug("%s %d: bitmap=%llx\n", __func__, __LINE__,
 		handler->freeNodeBitmask);
 
 	index = find_first_zero_bit((void *)&handler->freeNodeBitmask,
 				    NAND_RSV_BLOCK_NUM);
 	if (index >= NAND_RSV_BLOCK_NUM) {
-		pr_info("%s %d: index is greater than max! error",
+		pr_debug("%s %d: index is greater than max! error",
 			__func__, __LINE__);
 		return NULL;
 	}
 	WARN_ON(test_and_set_bit(index, (void *)&handler->freeNodeBitmask));
 
-	pr_info("%s %d: bitmap=%llx\n", __func__, __LINE__,
+	pr_debug("%s %d: bitmap=%llx\n", __func__, __LINE__,
 		handler->freeNodeBitmask);
 
 	return handler->free_node[index];
