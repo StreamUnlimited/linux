@@ -33,6 +33,7 @@ subdir-y += socionext
 subdir-y += sophgo
 subdir-y += sprd
 subdir-y += st
+subdir-y += streamunlimited
 subdir-y += synaptics
 subdir-y += tesla
 subdir-y += ti
