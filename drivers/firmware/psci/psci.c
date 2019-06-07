@@ -418,7 +418,7 @@ static void __init psci_init_smccc(void)
 
 }
 
-static void __init psci_0_2_set_functions(void)
+static void __init psci_0_2_set_functions(const struct device_node *np)
 {
 	pr_info("Using standard PSCI v0.2 function IDs\n");
 	psci_ops.get_version = psci_get_version;
@@ -442,13 +442,14 @@ static void __init psci_0_2_set_functions(void)
 
 	arm_pm_restart = psci_sys_reset;
 
-	pm_power_off = psci_sys_poweroff;
+	if (!of_property_read_bool(np, "disable-poweroff"))
+		pm_power_off = psci_sys_poweroff;
 }
 
 /*
  * Probe function for PSCI firmware versions >= 0.2
  */
-static int __init psci_probe(void)
+static int __init psci_probe(const struct device_node *np)
 {
 	u32 ver = psci_get_version();
 
@@ -461,7 +462,7 @@ static int __init psci_probe(void)
 		return -EINVAL;
 	}
 
-	psci_0_2_set_functions();
+	psci_0_2_set_functions(np);
 
 	psci_init_migrate();
 
@@ -497,7 +498,7 @@ static int __init psci_0_2_init(struct device_node *np)
 	 * can be carried out according to the specific version reported
 	 * by firmware
 	 */
-	return psci_probe();
+	return psci_probe(np);
 }
 
 /*
@@ -600,6 +601,6 @@ int __init psci_acpi_init(void)
 	else
 		set_conduit(SMCCC_CONDUIT_SMC);
 
-	return psci_probe();
+	return psci_probe(NULL);
 }
 #endif
