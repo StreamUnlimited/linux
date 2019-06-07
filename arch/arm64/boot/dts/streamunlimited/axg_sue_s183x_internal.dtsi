@@ -325,6 +325,10 @@
 	#cooling-cells = <2>;
 };
 
+&psci {
+	disable-poweroff;
+};
+
 &i2c_AO {
 	status = "okay";
 	pinctrl-0 = <&i2c_ao_sck_10_pins>, <&i2c_ao_sda_11_pins>;
