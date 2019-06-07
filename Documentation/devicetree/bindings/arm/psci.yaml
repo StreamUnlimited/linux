@@ -86,6 +86,9 @@ properties:
     $ref: /schemas/types.yaml#/definitions/uint32
     description: Function ID for MIGRATE operation
 
+  disable-poweroff:
+    description: Prevents the PSCI v0.2 driver from registering a power-off handler
+
   arm,psci-suspend-param:
     $ref: /schemas/types.yaml#/definitions/uint32
     description: |
