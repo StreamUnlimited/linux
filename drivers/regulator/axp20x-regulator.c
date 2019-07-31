@@ -21,10 +21,13 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/of_regulator.h>
+
+#define AXP20X_OFF	BIT(7)
 
 #define AXP20X_GPIO0_FUNC_MASK		GENMASK(3, 0)
 #define AXP20X_GPIO1_FUNC_MASK		GENMASK(3, 0)
@@ -1515,6 +1518,28 @@ static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
 	return false;
 }
 
+static int axp20x_power_off(struct sys_off_data *data)
+{
+	struct axp20x_dev *axp20x = data->cb_data;
+	unsigned int shutdown_reg;
+
+	switch (axp20x->variant) {
+	case AXP313A_ID:
+		shutdown_reg = AXP313A_SHUTDOWN_CTRL;
+		break;
+	default:
+		shutdown_reg = AXP20X_OFF_CTRL;
+		break;
+	}
+
+	regmap_write(axp20x->regmap, shutdown_reg, AXP20X_OFF);
+
+	/* Give capacitors etc. time to drain to avoid kernel panic msg. */
+	mdelay(500);
+
+	return NOTIFY_DONE;
+}
+
 struct axp20x_pdata {
 	int nregulators;
 	struct regulator_dev **regs;
@@ -1715,6 +1740,12 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 			return PTR_ERR(rdev);
 		}
 	}
+
+	if (axp20x->variant != AXP288_ID)
+	devm_register_sys_off_handler(axp20x->dev,
+						SYS_OFF_MODE_POWER_OFF,
+						SYS_OFF_PRIO_DEFAULT,
+						axp20x_power_off, axp20x);
 
 	return 0;
 }
