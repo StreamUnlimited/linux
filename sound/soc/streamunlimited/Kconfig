@@ -1,0 +1,8 @@
+config SND_SOC_STREAM195X
+	tristate "Audio support for Stream195x based board designs"
+	select SND_SOC_IMX_PCM_DMA
+	select SND_SOC_FSL_SAI
+	select SND_SOC_FSL_UTILS
+	depends on OF_GPIO && GPIOLIB && SND_SIMPLE_CARD_UTILS
+	help
+	  Audio support for Stream195x based board designs.
