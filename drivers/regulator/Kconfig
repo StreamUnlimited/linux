@@ -186,6 +186,14 @@ config REGULATOR_AW37503
 	  This driver supports AW37503 single inductor - dual output
 	  power supply specifically designed for display panels.
 
+config REGULATOR_AXP15060
+	tristate "X-POWERS AXP15060 PMIC Regulators"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  This driver provides support for the voltage regulators on the
+	  AXP15060 PMIC.
+
 config REGULATOR_AXP20X
 	tristate "X-POWERS AXP20X PMIC Regulators"
 	depends on MFD_AXP20X
