@@ -24,11 +24,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/property.h>
-#include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
-
-#define AXP20X_OFF	BIT(7)
 
 #define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
 #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
@@ -1238,29 +1235,6 @@ static const struct mfd_cell axp_regulator_only_cells[] = {
 	MFD_CELL_BASIC("axp20x-regulator", NULL, NULL, 0, 1),
 };
 
-static int axp20x_power_off(struct sys_off_data *data)
-{
-	struct axp20x_dev *axp20x = data->cb_data;
-	unsigned int shutdown_reg;
-
-	switch (axp20x->variant) {
-	case AXP323_ID:
-	case AXP313A_ID:
-		shutdown_reg = AXP313A_SHUTDOWN_CTRL;
-		break;
-	default:
-		shutdown_reg = AXP20X_OFF_CTRL;
-		break;
-	}
-
-	regmap_write(axp20x->regmap, shutdown_reg, AXP20X_OFF);
-
-	/* Give capacitors etc. time to drain to avoid kernel panic msg. */
-	mdelay(500);
-
-	return NOTIFY_DONE;
-}
-
 int axp20x_match_device(struct axp20x_dev *axp20x)
 {
 	struct device *dev = axp20x->dev;
@@ -1460,9 +1434,6 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
 
 		return ret;
 	}
-
-	if (axp20x->variant != AXP288_ID)
-		devm_register_power_off_handler(axp20x->dev, axp20x_power_off, axp20x);
 
 	dev_info(axp20x->dev, "AXP20X driver loaded\n");
 
