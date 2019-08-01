@@ -300,6 +300,14 @@ properties:
               noise. This probably makes sense for HiFi audio related
               applications that aren't battery constrained.
 
+          x-powers,disable-before-poweroff:
+            type: boolean
+            description: >
+              Make sure to turn-off/disable this regulator before
+              completely powering off the AXP. This can be required
+              since not all regulators are automatically turned off
+              when powering down the AXP.
+
     additionalProperties: false
 
 required:

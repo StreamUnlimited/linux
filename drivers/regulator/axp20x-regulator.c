@@ -1518,9 +1518,17 @@ static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
 	return false;
 }
 
+struct axp20x_pdata {
+	int nregulators;
+	struct regulator_dev **regs;
+	bool *disable_before_poweroff;
+};
+
 static int axp20x_power_off(struct sys_off_data *data)
 {
-	struct axp20x_dev *axp20x = data->cb_data;
+	struct axp20x_pdata *pdata = data->cb_data;
+	struct axp20x_dev *axp20x = rdev_get_drvdata(pdata->regs[0]);
+	int i;
 	unsigned int shutdown_reg;
 
 	switch (axp20x->variant) {
@@ -1532,6 +1540,11 @@ static int axp20x_power_off(struct sys_off_data *data)
 		break;
 	}
 
+	for (i = 0; i < pdata->nregulators; i++) {
+		if (pdata->disable_before_poweroff[i])
+			regulator_disable_regmap(pdata->regs[i]);
+	}
+
 	regmap_write(axp20x->regmap, shutdown_reg, AXP20X_OFF);
 
 	/* Give capacitors etc. time to drain to avoid kernel panic msg. */
@@ -1539,11 +1552,6 @@ static int axp20x_power_off(struct sys_off_data *data)
 
 	return NOTIFY_DONE;
 }
-
-struct axp20x_pdata {
-	int nregulators;
-	struct regulator_dev **regs;
-};
 
 static int axp20x_regulator_probe(struct platform_device *pdev)
 {
@@ -1620,6 +1628,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	pdata->nregulators = nregulators;
 	pdata->regs = devm_kzalloc(&pdev->dev, sizeof(*pdata->regs) * nregulators, GFP_KERNEL);
+	pdata->disable_before_poweroff = devm_kzalloc(&pdev->dev, sizeof(*pdata->disable_before_poweroff) * nregulators, GFP_KERNEL);
 	dev_set_drvdata(&pdev->dev, pdata);
 
 	for (i = 0; i < nregulators; i++) {
@@ -1705,6 +1714,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 					rdev->desc->name);
 		}
 
+		pdata->disable_before_poweroff[i] = of_property_read_bool(rdev->dev.of_node, "x-powers,disable-before-poweroff");
+
 		/*
 		 * Save AXP22X DCDC1 / DCDC5 / AXP15060 ALDO1 regulator names for later.
 		 */
@@ -1745,7 +1756,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
 	devm_register_sys_off_handler(axp20x->dev,
 						SYS_OFF_MODE_POWER_OFF,
 						SYS_OFF_PRIO_DEFAULT,
-						axp20x_power_off, axp20x);
+						axp20x_power_off, pdata);
 
 	return 0;
 }
