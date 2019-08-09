@@ -1,0 +1,83 @@
+Stream195x ASoC card driver:
+
+This driver is mainly intended to be used on Stream195x (i.MX8) based devices. Generally
+the configuration is similar to `simple-card.txt`, however many features like DAMP and
+jack detection are not implemented (yet). And some additional properties were added to
+accommodate StreamUnlimited use cases.
+
+Required properties:
+
+- compatible				: "sue,stream195x-audio"
+- sue-card,name				: User specified sound card name, one string
+- clocks				: Must contain entries to two clocks, ideally different ones
+					  which can generate a rate that divides down to audio frequencies.
+- clock-names				: Must contain "pll8k" and "pll11k", the respective clock will
+					  be chosen based on the requested sample rate. E.g. for 48 kHz, the
+					  pll8k clock will be used and for 44.1 kHz the pll11k one will be
+					  used.
+- sue-card,dai-link			: Container for dai-link level properties and the CPU and CODEC
+					  sub-nodes.
+
+
+Optional properties:
+
+- powerdown-gpios			: General GPIO used to control power pins of DACs, AMPs, etc.
+
+
+Dai-link subnode properties and subnodes:
+
+Required dai-link subnodes:
+
+- format				: CPU/CODEC common audio format.
+					  "i2s", "right_j", "left_j" , "dsp_a" "dsp_b", "ac97", "pdm", "msb", "lsb"
+and at least one of:
+- cpu					: CPU   sub-node
+- codec					: CODEC sub-node
+
+Optional dai-link subnode properties:
+
+- frame-master				: Indicates dai-link frame master.  phandle to a cpu or codec subnode.
+- bitclock-master			: Indicates dai-link bit clock master.  phandle to a cpu or codec subnode.
+- bitclock-inversion			: bool property. Add this if the dai-link uses bit clock inversion.
+- frame-inversion			: bool property. Add this if the dai-link uses frame clock inversion.
+- continuous-clock			: bool property. Will set the SND_SOC_DAIFMT_CONT flag to not disable clocks.
+- mute-gpios				: GPIO generally connected to the mute pin of the respective codec
+- dai-tdm-slot-num			: Number of slots in use. (Channels)
+- dai-tdm-slot-width			: Width in bits for each slot.
+
+Required CPU/CODEC subnodes properties:
+
+- sound-dai				: phandle and port of CPU/CODEC
+
+NOTE: Only one of the above properties is required, if both are specified, the dummy codec takes precedence.
+
+
+Example:
+
+sound-pcm {
+	compatible = "sue,stream195x-audio";
+	sue-card,name = "Stream Audio on i.MX8MM";
+
+	clocks = <&clk IMX8MM_AUDIO_PLL1_OUT>, <&clk IMX8MM_AUDIO_PLL2_OUT>;
+	clock-names = "pll8k", "pll11k";
+
+	powerdown-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+
+	sue-card,dai-link@0 {
+		format = "i2s";
+
+		continuous-clock;
+
+		frame-master = <&dailink0_cpu>;
+		bitclock-master = <&dailink0_cpu>;
+
+		mute-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+
+		dailink0_cpu: cpu {
+			sound-dai = <&sai5>;
+			dai-tdm-slot-num = <2>;
+			dai-tdm-slot-width = <32>;
+		};
+	};
+};
+
