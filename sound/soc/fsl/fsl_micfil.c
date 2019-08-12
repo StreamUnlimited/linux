@@ -713,6 +713,15 @@ static int fsl_micfil_hw_params(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
+	/*
+	 * Disable DC filter as recommended by NXP to improve dynamic range.
+	 */
+	ret = regmap_write(micfil->regmap, REG_MICFIL_DC_CTRL, 0x0000FFFF);
+	if (ret < 0) {
+		dev_err(&micfil->pdev->dev, "Failed to disable DC filter [%d]\n", ret);
+		return ret;
+	}
+
 	ret = clk_set_rate(micfil->mclk, rate * clk_div * osr * 8);
 	if (ret)
 		return ret;
