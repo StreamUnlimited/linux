@@ -389,6 +389,7 @@ static int fsl_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 {
 	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
 	int ret;
+	int i;
 
 	if (sai->masterflag[FSL_FMT_TRANSMITTER])
 		fmt = (fmt & (~SND_SOC_DAIFMT_MASTER_MASK)) |
@@ -407,6 +408,45 @@ static int fsl_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 	ret = fsl_sai_set_dai_fmt_tr(cpu_dai, fmt, false);
 	if (ret)
 		dev_err(cpu_dai->dev, "Cannot set rx format: %d\n", ret);
+
+	/*
+	 * Since `fsl_sai_set_dai_fmt_tr` will be called for both directions
+	 * with the same format we can use only one value for `dai_fmt` in the
+	 * `fsl_sai` struct.
+	 */
+	sai->dai_fmt = fmt;
+
+	/*
+	 * Continuous MCLK is already enabled or not requested, so we are done here.
+	 *
+	 * NOTE: It is *not* a supported use case that `fsl_sai_set_dai_fmt()` will
+	 * be called with different settings for `SND_SOC_DAIFMT_CONT` multiple times.
+	 */
+	if (sai->cont_mclks_prepared || !(sai->dai_fmt & SND_SOC_DAIFMT_CONT))
+		return ret;
+
+
+	/*
+	 * Since we do not want to change the `mclk_streams` handling too much
+	 * we just `enable` (incrementing refcount) all possible MCLKs here
+	 * so they will always be enabled.
+	 */
+	for (i = 0; i < FSL_SAI_MCLK_MAX; i++) {
+		ret = clk_prepare_enable(sai->mclk_clk[i]);
+		if (ret) {
+			dev_err(cpu_dai->dev, "failed to enable MCLK %pC: %d\n", sai->mclk_clk[i], ret);
+			break;
+		}
+	}
+
+	/*
+	 * Even in the case of an error we want to set this flag just so that on any further
+	 * invocations of `fsl_sai_set_dai_fmt()` we do not try to enable the MCLKs again. In
+	 * any case failure to enable the MCLKs is an issue which is most likely not really
+	 * recoverable at runtime.
+	 */
+	sai->cont_mclks_prepared = true;
+
 
 	return ret;
 }
@@ -841,14 +881,19 @@ static int fsl_sai_trigger(struct snd_pcm_substream *substream, int cmd,
 		regmap_update_bits(sai->regmap, FSL_SAI_xCSR(tx, ofs),
 				   FSL_SAI_CSR_xIE_MASK, 0);
 
-		/* Check if the opposite FRDE is also disabled */
+		/*
+		 * Check if the opposite FRDE is also disabled
+		 *
+		 * Also do not disable anything if SND_SOC_DAIFMT_CONT
+		 * flag is set (continuous clocks).
+		 */
 		regmap_read(sai->regmap, FSL_SAI_xCSR(!tx, ofs), &xcsr);
 
 		/*
 		 * If opposite stream provides clocks for synchronous mode and
 		 * it is inactive, disable it before disabling the current one
 		 */
-		if (fsl_sai_dir_is_synced(sai, adir) && !(xcsr & FSL_SAI_CSR_FRDE))
+		if (fsl_sai_dir_is_synced(sai, adir) && !(xcsr & FSL_SAI_CSR_FRDE) && !(sai->dai_fmt & SND_SOC_DAIFMT_CONT))
 			fsl_sai_config_disable(sai, adir);
 
 		/*
@@ -857,7 +902,7 @@ static int fsl_sai_trigger(struct snd_pcm_substream *substream, int cmd,
 		 * 2. current stream provides clocks for synchronous mode but no
 		 *    more stream is active.
 		 */
-		if (!fsl_sai_dir_is_synced(sai, dir) || !(xcsr & FSL_SAI_CSR_FRDE))
+		if (!(sai->dai_fmt & SND_SOC_DAIFMT_CONT) && (!fsl_sai_dir_is_synced(sai, dir) || !(xcsr & FSL_SAI_CSR_FRDE)))
 			fsl_sai_config_disable(sai, dir);
 
 		break;
@@ -1479,6 +1524,7 @@ static int fsl_sai_probe(struct platform_device *pdev)
 		sai->cpu_dai_drv.symmetric_sample_bits = 0;
 	}
 
+	sai->suspended = true;
 	sai->mclk_direction_output = of_property_read_bool(np, "fsl,sai-mclk-direction-output");
 
 	if (sai->mclk_direction_output &&
@@ -1753,6 +1799,9 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 {
 	struct fsl_sai *sai = dev_get_drvdata(dev);
 
+	if (sai->dai_fmt & SND_SOC_DAIFMT_CONT)
+		return 0;
+
 	release_bus_freq(BUS_FREQ_AUDIO);
 
 	if (sai->mclk_streams & BIT(SNDRV_PCM_STREAM_CAPTURE))
@@ -1762,6 +1811,8 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 		clk_disable_unprepare(sai->mclk_clk[sai->mclk_id[1]]);
 
 	clk_disable_unprepare(sai->bus_clk);
+
+	sai->suspended = true;
 
 	if (sai->soc_data->flags & PMQOS_CPU_LATENCY)
 		cpu_latency_qos_remove_request(&sai->pm_qos_req);
@@ -1776,6 +1827,9 @@ static int fsl_sai_runtime_resume(struct device *dev)
 	struct fsl_sai *sai = dev_get_drvdata(dev);
 	unsigned int ofs = sai->soc_data->reg_offset;
 	int ret;
+
+	if (!sai->suspended)
+		return 0;
 
 	ret = clk_prepare_enable(sai->bus_clk);
 	if (ret) {
@@ -1816,6 +1870,7 @@ static int fsl_sai_runtime_resume(struct device *dev)
 		regmap_update_bits(sai->regmap, FSL_SAI_TCSR(ofs),
 				   FSL_SAI_CSR_TERE, FSL_SAI_CSR_TERE);
 
+	sai->suspended = false;
 	return 0;
 
 disable_rx_clk:

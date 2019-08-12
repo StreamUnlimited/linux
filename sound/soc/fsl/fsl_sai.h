@@ -322,6 +322,11 @@ struct fsl_sai {
 	struct sdma_peripheral_config audio_config[2];
 	struct snd_pcm_hw_constraint_list constraint_rates;
 	unsigned int constraint_rates_list[FAL_SAI_NUM_RATES];
+
+	unsigned int dai_fmt;
+
+	bool cont_mclks_prepared;
+	bool suspended;
 };
 
 const struct attribute_group *fsl_sai_get_dev_attribute_group(bool monitor_spdif);
