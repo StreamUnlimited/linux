@@ -130,6 +130,68 @@ static long pll14xx_calc_rate(struct clk_pll14xx *pll, int mdiv, int pdiv,
 	return rate ? (unsigned long) rate : (unsigned long)fvco;
 }
 
+/*
+ * This calculates the rate in the following way:
+ *
+ *                         m * 65536 + k
+ * fout = parent_rate * -------------------
+ *                        p * 65536 * 2^s
+ *
+ * NOTE: It is up to developer to make sure that m, p, and s will not lead to an
+ * overflow in the calculation. However this should generally not be the case because
+ * m should be in range of a few hundred and p and s are usually below 6.
+ */
+static long clk_pll1443x_calc_rate(u32 m, u32 p, u32 s, s16 k, unsigned long parent_rate)
+{
+	u64 fvco = parent_rate;
+
+	fvco *= (u64)((s64)m * 65536 + k);
+
+	return DIV_ROUND_CLOSEST(fvco,  (((u64)p * 65536) << s));
+}
+
+/*
+ * Calculates the fractional part k for a given rate, m and parent_rate:
+ *
+ *          rate * p * 65536 * 2^s
+ * frac = -------------------------- - m * 65536
+ *              parent_rate
+ *
+ * NOTE: It is up to developer to make sure that m, p, and s will not lead to an
+ * overflow in the calculation. However this should generally not be the case because
+ * m should be in range of a few hundred and p and s are usually below 6.
+ */
+static s32 clk_pll1443x_calc_k(u32 rate, u32 m, u32 p, u32 s, u32 parent_rate)
+{
+	return DIV_ROUND_CLOSEST(((u64)rate * p * (1 << s) * 65536), parent_rate) - ((s32)m * 65536);
+}
+
+static const struct imx_pll14xx_rate_table *clk_pll1443x_skewable_get_closest(struct clk_pll14xx *pll, unsigned long rate)
+{
+	const struct imx_pll14xx_rate_table *rate_table = pll->rate_table;
+	int i;
+
+	int closest = -1;
+	unsigned long cdiff = ULONG_MAX;
+
+	for (i = 0; i < pll->rate_count; i++) {
+		unsigned long diff = abs((long)rate_table[i].rate - (long)rate);
+
+		if (diff < cdiff) {
+			closest = i;
+			cdiff = diff;
+		}
+	}
+
+	if (cdiff > 1000000)
+		pr_warn("%s: closest frequency is off by more than 1 MHz, maybe a rate_table entry is missing\n", clk_hw_get_name(&pll->hw));
+
+	if (closest == -1)
+		return NULL;
+
+	return &rate_table[closest];
+}
+
 static long pll1443x_calc_kdiv(int mdiv, int pdiv, int sdiv,
 		unsigned long rate, unsigned long prate)
 {
@@ -254,6 +316,29 @@ static long clk_pll1443x_round_rate(struct clk_hw *hw, unsigned long rate,
 	imx_pll14xx_calc_settings(pll, rate, *prate, &t);
 
 	return t.rate;
+}
+
+static long clk_pll1443x_skewable_round_rate(struct clk_hw *hw, unsigned long rate, unsigned long *prate)
+{
+	struct clk_pll14xx *pll = to_clk_pll14xx(hw);
+	const struct imx_pll14xx_rate_table *rate_entry;
+	s32 frac;
+
+	rate_entry = clk_pll1443x_skewable_get_closest(pll, rate);
+	if (rate_entry == NULL)
+		return clk_pll1443x_round_rate(hw, rate, prate);
+
+	/*
+	 * At this point we have a close rate, so we try to recalc the fractional part to get closer
+	 * to the requested rate.
+	 */
+	frac = clk_pll1443x_calc_k(rate, rate_entry->mdiv, rate_entry->pdiv, rate_entry->sdiv, *prate);
+	if (frac < S16_MIN || frac > S16_MAX) {
+		pr_warn("%s: fractional part is outside of range\n", clk_hw_get_name(hw));
+		frac = (s16)rate_entry->kdiv;
+	}
+
+	return clk_pll1443x_calc_rate(rate_entry->mdiv, rate_entry->pdiv, rate_entry->sdiv, frac, *prate);
 }
 
 static unsigned long clk_pll14xx_recalc_rate(struct clk_hw *hw,
@@ -426,6 +511,80 @@ static int clk_pll1443x_set_rate(struct clk_hw *hw, unsigned long drate,
 	return 0;
 }
 
+static int clk_pll1443x_skewable_set_rate(struct clk_hw *hw, unsigned long drate, unsigned long prate)
+{
+	struct clk_pll14xx *pll = to_clk_pll14xx(hw);
+	const struct imx_pll14xx_rate_table *rate_entry;
+
+	int ret;
+	u32 tmp;
+	u32 m, p, s, k;
+	s32 frac;
+	u32 old_m, old_p, old_s, old_k;
+
+	rate_entry = clk_pll1443x_skewable_get_closest(pll, drate);
+	if (rate_entry == NULL)
+		return clk_pll1443x_set_rate(hw, drate, prate);
+
+	/* Get/calculate new m, p, s, k values */
+	m = rate_entry->mdiv;
+	p = rate_entry->pdiv;
+	s = rate_entry->sdiv;
+
+	/*
+	 * At this point we have a close rate, so we try to recalc the fractional part to get closer
+	 * to the requested rate.
+	 */
+	frac = clk_pll1443x_calc_k(drate, rate_entry->mdiv, rate_entry->pdiv, rate_entry->sdiv, prate);
+	if (frac < S16_MIN || frac > S16_MAX) {
+		pr_warn("%s: fractional part is outside of range\n", clk_hw_get_name(hw));
+		frac = (s16)rate_entry->kdiv;
+	}
+
+	k = frac & KDIV_MASK;
+
+	/* Get current m, p, s, k values */
+	tmp = readl_relaxed(pll->base + 4);
+	
+	old_m = FIELD_GET(MDIV_MASK, tmp);
+	old_p = FIELD_GET(PDIV_MASK, tmp);
+	old_s = FIELD_GET(SDIV_MASK, tmp);
+
+	tmp = readl_relaxed(pll->base + 8);
+	old_k = FIELD_GET(KDIV_MASK, tmp);
+
+
+	if (old_m != m || old_p != p || old_s != s) {
+		pr_info("%s: will perform reset\n", clk_hw_get_name(hw));
+		/* Enable RST */
+		tmp = readl_relaxed(pll->base);
+		tmp &= ~RST_MASK;
+		writel_relaxed(tmp, pll->base);
+		writel_relaxed(FIELD_PREP(MDIV_MASK, m) | FIELD_PREP(PDIV_MASK, p) | FIELD_PREP(SDIV_MASK, s), pll->base + DIV_CTL0);
+	}
+
+	if (old_k != k)
+		writel_relaxed(FIELD_PREP(KDIV_MASK, k), pll->base + DIV_CTL1);
+
+	if (old_m != m || old_p != p || old_s != s) {
+		/* Disable RST */
+		tmp |= RST_MASK;
+		writel_relaxed(tmp, pll->base);
+
+		/* Wait Lock*/
+		ret = clk_pll14xx_wait_lock(pll);
+		if (ret)
+			return ret;
+
+		/* Bypass */
+		tmp &= ~BYPASS_MASK;
+		writel_relaxed(tmp, pll->base);
+	}
+
+
+	return 0;
+}
+
 static int clk_pll14xx_prepare(struct clk_hw *hw)
 {
 	struct clk_pll14xx *pll = to_clk_pll14xx(hw);
@@ -520,6 +679,15 @@ static const struct clk_ops clk_pll1443x_ops = {
 	.set_rate	= clk_pll1443x_set_rate,
 };
 
+static const struct clk_ops clk_pll1443x_skewable_ops = {
+	.prepare	= clk_pll14xx_prepare,
+	.unprepare	= clk_pll14xx_unprepare,
+	.is_prepared	= clk_pll14xx_is_prepared,
+	.recalc_rate	= clk_pll14xx_recalc_rate,
+	.round_rate	= clk_pll1443x_skewable_round_rate,
+	.set_rate	= clk_pll1443x_skewable_set_rate,
+};
+
 struct clk_hw *imx_dev_clk_hw_pll14xx(struct device *dev, const char *name,
 				const char *parent_name, void __iomem *base,
 				const struct imx_pll14xx_clk *pll_clk)
@@ -548,6 +716,9 @@ struct clk_hw *imx_dev_clk_hw_pll14xx(struct device *dev, const char *name,
 		break;
 	case PLL_1443X:
 		init.ops = &clk_pll1443x_ops;
+		break;
+	case PLL_1443X_SKEWABLE:
+		init.ops = &clk_pll1443x_skewable_ops;
 		break;
 	default:
 		pr_err("Unknown pll type for pll clk %s\n", name);
