@@ -44,6 +44,7 @@ enum imx_sscg_pll_type {
 enum imx_pll14xx_type {
 	PLL_1416X,
 	PLL_1443X,
+	PLL_1443X_SKEWABLE,
 };
 
 enum imx_pllv4_type {
