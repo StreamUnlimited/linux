@@ -1,0 +1,18 @@
+Kingtech PV04005TD25E MIPI-DSI panel
+
+Required properties:
+  - compatible: "kingtech,pv04005td25e"
+  - reg: the virtual channel number of a DSI peripheral
+  - reset-gpios: The reset GPIO pin
+
+Optional properties:
+  - backlight: phandle to the backlight used
+
+Example:
+
+panel@0 {
+	compatible = "kingtech,pv04005td25e";
+	reg = <0>;
+	backlight = <&lcd_backlight>;
+	reset-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+};
