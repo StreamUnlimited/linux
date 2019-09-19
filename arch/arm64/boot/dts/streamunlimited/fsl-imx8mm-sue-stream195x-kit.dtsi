@@ -1,0 +1,298 @@
+#include <dt-bindings/net/mscc-phy-vsc8531.h>
+
+/ {
+	dummy_spdif_tx: spdif-transmitter {
+		#sound-dai-cells = <0>;
+		compatible = "linux,spdif-dit";
+	};
+
+	reg_usb1_drvvbus: regulator@0 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb1_drvvbus>;
+
+		regulator-name = "usb1_drvvbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+	};
+
+	sound-pcm {
+		compatible = "sue,stream195x-audio";
+		sue-card,name = "Multichannel Audio on i.MX8MM";
+
+		clocks = <&clk IMX8MM_AUDIO_PLL1_OUT>, <&clk IMX8MM_AUDIO_PLL2_OUT>;
+		clock-names = "pll8k", "pll11k";
+
+		sue-card,dai-link@0 {
+			format = "i2s";
+
+			frame-master = <&dailink0_cpu>;
+			bitclock-master = <&dailink0_cpu>;
+
+			mute-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+
+			continuous-clock;
+
+			dailink0_cpu: cpu {
+				sound-dai = <&sai5>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <32>;
+			};
+
+			dailink0_codec: codec {
+				/* use-dummy-codec; */
+				sound-dai = <&ak4458>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <32>;
+			};
+		};
+	};
+
+	sound-pdm {
+		compatible = "fsl,imx-audio-micfil";
+		model = "imx-audio-micfil";
+		cpu-dai = <&micfil>;
+	};
+};
+
+&clk {
+	assigned-clocks = <&clk IMX8MM_AUDIO_PLL1>, <&clk IMX8MM_AUDIO_PLL2>;
+	assigned-clock-rates = <786432000>, <722534400>;
+};
+
+&fec1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_fec1>;
+	phy-mode = "rgmii";
+	phy-handle = <&vsc8531_0>;
+	status = "okay";
+
+	phy-reset-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+	phy-reset-duration = <5>;
+	phy-reset-post-delay = <5>;
+
+	mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		vsc8531_0: ethernet-phy@0 {
+			reg = <0>;
+			compatible = "ethernet-phy-id0007.0570";
+			vsc8531,led-0-mode = <VSC8531_LINK_1000_ACTIVITY>;
+			vsc8531,led-1-mode = <VSC8531_LINK_100_ACTIVITY>;
+
+			vsc8531,vddmac = /bits/ 16 <1800>;
+			vsc8531,edge-slowdown = /bits/ 8 <0>;
+		};
+	};
+};
+
+&gpio1 {
+	/*
+	 * TODO: most of those GPIO hogs will be moved to it's own drivers
+	 * sooner or later.
+	 */
+	enet_pdown {
+		gpio-hog;
+		gpios = <9 GPIO_ACTIVE_LOW>;
+		output-low;
+		line-name = "enet_pdown";
+	};
+
+	fmt_dsd {
+		gpio-hog;
+		gpios = <11 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "fmt_dsd";
+	};
+
+	i2c_hdmi_en {
+		gpio-hog;
+		gpios = <10 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "i2c_hdmi_en";
+	};
+
+	pdown {
+		gpio-hog;
+		gpios = <6 GPIO_ACTIVE_LOW>;
+		output-low;
+		line-name = "pdown";
+	};
+};
+
+&i2c3 {
+	clock-frequency = <100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3>;
+	status = "okay";
+
+	ak4458: ak4458@10 {
+		#sound-dai-cells = <0>;
+		compatible = "asahi-kasei,ak4458";
+		reg = <0x10>;
+		reset-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&i2c4 {
+	/*
+	 * Workaround for:
+	 *   e7805: I2C: When the I2C clock speed is configured for 400 kHz, the SCL low period
+	 *   violates the I2C spec of 1.3 uS min
+	 */
+	clock-frequency = <384000>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c4>;
+	status = "okay";
+};
+
+&iomuxc {
+	imx8mm-s195x-kit {
+		pinctrl_fec1: fec1grp {
+			fsl,pins = <
+				MX8MM_IOMUXC_ENET_MDC_ENET1_MDC			(IOMUX_CONFIG_SION | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_ENET_MDIO_ENET1_MDIO		(PAD_CTL_DSE6x)
+
+				MX8MM_IOMUXC_ENET_TD0_ENET1_RGMII_TD0		(PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_ENET_TD1_ENET1_RGMII_TD1		(PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_ENET_TD2_ENET1_RGMII_TD2		(PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_ENET_TD3_ENET1_RGMII_TD3		(PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	(PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_ENET_TXC_ENET1_RGMII_TXC		(PAD_CTL_FAST | PAD_CTL_DSE6x)
+
+				MX8MM_IOMUXC_ENET_RD0_ENET1_RGMII_RD0		(PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_ENET_RD1_ENET1_RGMII_RD1		(PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_ENET_RD2_ENET1_RGMII_RD2		(PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_ENET_RD3_ENET1_RGMII_RD3		(PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	(PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_ENET_RXC_ENET1_RGMII_RXC		(PAD_CTL_HYS | PAD_CTL_FAST)
+
+				MX8MM_IOMUXC_GPIO1_IO00_GPIO1_IO0		(PAD_CTL_PE_UP)					/* ENET_RST_N */
+				MX8MM_IOMUXC_GPIO1_IO08_GPIO1_IO8		(PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST)	/* ENET_IRQ_N */
+				MX8MM_IOMUXC_GPIO1_IO09_GPIO1_IO9		(PAD_CTL_PE_DOWN)				/* ENET_PDONW_N */
+
+			>;
+		};
+
+		pinctrl_i2c3: i2c3grp {
+			fsl,pins = <
+				MX8MM_IOMUXC_I2C3_SCL_I2C3_SCL			(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_I2C3_SDA_I2C3_SDA			(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+			>;
+		};
+
+		pinctrl_i2c4: i2c4grp {
+			fsl,pins = <
+				MX8MM_IOMUXC_I2C4_SCL_I2C4_SCL			(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_I2C4_SDA_I2C4_SDA			(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+			>;
+		};
+
+		pinctrl_pdm: pdmgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI1_RXD0_PDM_DATA0		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI1_RXD1_PDM_DATA1		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI1_RXD2_PDM_DATA2		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI1_RXD3_PDM_DATA3		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI1_TXD7_PDM_CLK			(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+			>;
+		};
+
+		pinctrl_sai5_rx: sai5rxgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI5_RXFS_SAI5_RX_SYNC		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI5_RXC_SAI5_RX_BCLK		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+
+				MX8MM_IOMUXC_SAI5_RXD0_SAI5_RX_DATA0		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI5_RXD1_SAI5_RX_DATA1		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI5_RXD2_SAI5_RX_DATA2		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+				MX8MM_IOMUXC_SAI5_RXD3_SAI5_RX_DATA3		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
+			>;
+		};
+
+		pinctrl_sai5_tx: sai5txgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI5_MCLK_SAI5_MCLK		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+
+				MX8MM_IOMUXC_SAI2_RXFS_SAI5_TX_SYNC		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+				MX8MM_IOMUXC_SAI2_RXC_SAI5_TX_BCLK		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+				MX8MM_IOMUXC_SAI2_RXD0_SAI5_TX_DATA0		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+				MX8MM_IOMUXC_SAI2_TXFS_SAI5_TX_DATA1		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+				MX8MM_IOMUXC_SAI2_TXC_SAI5_TX_DATA2		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+				MX8MM_IOMUXC_SAI2_TXD0_SAI5_TX_DATA3		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+			>;
+		};
+
+		pinctrl_uart1: uart1grp {
+			fsl,pins = <
+				MX8MM_IOMUXC_UART1_RXD_UART1_DCE_RX	(PAD_CTL_PE_DOWN | PAD_CTL_HYS)
+				MX8MM_IOMUXC_UART1_TXD_UART1_DCE_TX	(PAD_CTL_PE_DOWN | PAD_CTL_HYS)
+			>;
+		};
+
+		pinctrl_usb1_drvvbus: usb1drvvbusgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_GPIO1_IO12_GPIO1_IO12	(PAD_CTL_PE_DOWN | PAD_CTL_HYS)
+			>;
+		};
+	};
+};
+
+&micfil {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pdm>;
+	assigned-clocks = <&clk IMX8MM_CLK_PDM>;
+	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <196608000>;
+	status = "okay";
+};
+
+&sai5 {
+	#sound-dai-cells = <0>;	/* This is required for the simple-audio-card to work */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sai5_tx &pinctrl_sai5_rx>;
+	assigned-clocks = <&clk IMX8MM_CLK_SAI5>;
+	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <24576000>;
+
+	/* This only adds the pll8k and the pll11k clock to the list */
+	clocks = <&clk IMX8MM_CLK_SAI5_IPG>, <&clk IMX8MM_CLK_DUMMY>,
+		 <&clk IMX8MM_CLK_SAI5_ROOT>, <&clk IMX8MM_CLK_DUMMY>,
+		 <&clk IMX8MM_CLK_DUMMY>,
+		 <&clk IMX8MM_AUDIO_PLL1_OUT>, <&clk IMX8MM_AUDIO_PLL2_OUT>;
+	clock-names = "bus", "mclk0",
+		      "mclk1", "mclk2",
+		      "mclk3",
+		      "pll8k", "pll11k";
+
+	status = "okay";
+
+	/*
+	 * This is conjunction with `dai-tdm-slot-num = <2>;` makes sure that
+	 * for 8 channel playback 8 ch / 2 slots = 4 pins are used with a mask of 0xf.
+	 * /
+	/* first number is pins, second is rx mask, third is tx mask */
+	fsl,dataline = <
+		1 0x1 0x1
+		2 0x3 0x3
+		3 0x7 0x7
+		4 0xf 0xf
+	>;
+	fsl,sai-asynchronous;
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart1>;
+	status = "okay";
+};
+
+&usbotg1 {
+	dr_mode = "otg";
+	status = "okay";
+	vbus-supply = <&reg_usb1_drvvbus>;
+};
