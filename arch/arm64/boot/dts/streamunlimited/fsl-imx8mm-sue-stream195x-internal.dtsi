@@ -50,7 +50,13 @@
 };
 
 &i2c1 {
-	clock-frequency = <400000>;
+	/*
+	 * Workaround for:
+	 *   e7805: I2C: When the I2C clock speed is configured for 400 kHz, the SCL low period
+	 *   violates the I2C spec of 1.3 uS min
+	 */
+	clock-frequency = <384000>;
+
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c1>;
 	status = "okay";
