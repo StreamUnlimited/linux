@@ -122,6 +122,11 @@ enum rgmii_clock_delay {
 #define PHY_S6G_PLL_FSM_CTRL_DATA_POS	  8
 #define PHY_S6G_PLL_FSM_ENA_POS		  7
 
+#define MSCC_PHY_LED_BEHAV		  30
+#define LED_BLINK_RATE_POS		  10
+#define LED_BLINK_RATE_MASK		  GENMASK(11, 10)
+#define LED_BLINK_RATE(x)		  (((x) << LED_BLINK_RATE_POS) & LED_BLINK_RATE_MASK)
+
 #define PHY_S6G_CFG2_FSM_DIS              1
 #define PHY_S6G_CFG2_FSM_CLK_BP          23
 
@@ -170,6 +175,10 @@ enum rgmii_clock_delay {
 /* Extended Page 2 Registers */
 #define MSCC_PHY_CU_PMD_TX_CNTL		  16
 
+#define MSCC_PHY_EEE_CNTL		  17
+#define LED_INVERT_SEL_POS(x)		  ((x) + 10)
+#define LED_INVERT_SEL_INVERT(x)	  BIT(LED_INVERT_SEL_POS(x))
+
 /* RGMII setting controls at address 18E2, for VSC8572 and similar */
 #define VSC8572_RGMII_CNTL		  18
 #define VSC8572_RGMII_RX_DELAY_MASK	  0x000E
@@ -214,6 +223,9 @@ enum rgmii_clock_delay {
 #define MICRO_CLK_EN			  0x0008
 #define MICRO_CLK_DIVIDE(x)		  ((x) >> 1)
 #define MSCC_DW8051_VLD_MASK		  0xf1ff
+
+#define MSCC_PHY_GPIO_CNTL2		  14
+#define GPIO_CNTL2_TRISTATE_EN		  BIT(9)
 
 /* x Address in range 1-4 */
 #define MSCC_TRAP_ROM_ADDR(x)		  ((x) * 2 + 1)
@@ -368,6 +380,7 @@ struct vsc8531_private {
 	int rate_magic;
 	u16 supp_led_modes;
 	u32 leds_mode[MAX_LEDS];
+	bool leds_inv_pol[MAX_LEDS];
 	u8 nleds;
 	const struct vsc85xx_hw_stat *hw_stats;
 	u64 *stats;
@@ -378,6 +391,9 @@ struct vsc8531_private {
 	 * package.
 	 */
 	unsigned int base_addr;
+
+	bool led_drive;
+	u8 led_blink_rate;
 
 #if IS_ENABLED(CONFIG_MACSEC)
 	/* MACsec fields:
