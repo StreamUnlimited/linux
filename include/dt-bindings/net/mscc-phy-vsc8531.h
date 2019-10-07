@@ -28,4 +28,10 @@
 #define VSC8531_FORCE_LED_OFF           14
 #define VSC8531_FORCE_LED_ON            15
 
+/* LED blink rates */
+#define VSC8531_LED_BLINK_RATE_2_5HZ	0
+#define VSC8531_LED_BLINK_RATE_5HZ	1
+#define VSC8531_LED_BLINK_RATE_10HZ	2
+#define VSC8531_LED_BLINK_RATE_20HZ	3
+
 #endif
