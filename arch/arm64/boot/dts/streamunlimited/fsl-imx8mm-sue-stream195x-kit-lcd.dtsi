@@ -1,0 +1,73 @@
+/ {
+	lcd_backlight: lcd_backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm1 0 100000 0>;
+
+		/*
+		 * Values taken from `imx7d-sue-streamkitprime-common-0.dtsi`.
+		 */
+		brightness-levels = <0 3 5 8 10 13 15 18 20 23 26 28 31 33 36 38 41 43 46 48 51 54 56 59 61 64 66 69 71 74
+			77 79 82 84 87 89 92 94 97 99 102 105 107 110 112 115 117 120 122 125 127 130 133 135 138 140 143 145 148 150
+			153 156 158 161 163 166 168 171 173 176 179 181 184 186 189 191 194 196 199 201 204 207 209 212 214 217 219 222 224 227
+			229 232 235 237 240 242 245 247 250 252 255>;
+		default-brightness-level = <100>;
+		status = "okay";
+	};
+};
+
+
+&iomuxc {
+	imx8mm-s195x-kit-lcd {
+		pinctrl_pwm1: pwm1grp {
+			fsl,pins = <
+				MX8MM_IOMUXC_GPIO1_IO01_PWM1_OUT		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE4x)
+			>;
+		};
+	};
+};
+
+&lcdif {
+	status = "okay";
+	/*
+	 * This is only used to override the first value which is the
+	 * IMX8MM_CLK_LCDIF_PIXEL_SRC rate. It should match the MIPI
+	 * clk because the MIPI clk should be a multiple (=bpp/mipi_lanes)
+	 * of the pixel clock.
+	 * The LCDIF will derive the pixelclock form this.
+	 */
+	assigned-clock-rate = <240000000>, <500000000>, <200000000>;
+};
+
+&mipi_dsi {
+	status = "okay";
+	/*
+	 * This is the MIPI clk which is the (pixel_clock * bpp / mipi_lanes) / 10000.
+	 * NOTE: To be able to set this rate, a table entry is required
+	 * in the `imx8mm_videopll_tbl` array inside `clk-imx8mm.c`.
+	 * To get all the apropriate values, the `Video-PLL-Calculation.ods`
+	 * file from shared can be used.
+	 */
+	pref-rate = <24000>;
+
+	/*
+	 * Append IMX8MM_VIDEO_PLL1 and set it (as well as the DSI PHY clock)
+	 * to match the `pref-rate`
+	 */
+	assigned-clocks = <&clk IMX8MM_CLK_DSI_CORE>,
+			  <&clk IMX8MM_CLK_DSI_PHY_REF>,
+			  <&clk IMX8MM_VIDEO_PLL1>;
+	assigned-clock-rates = <266000000>, <240000000>, <240000000>;
+
+	panel@0 {
+		compatible = "kingtech,pv04005td25e";
+		reg = <0>;
+		backlight = <&lcd_backlight>;
+		reset-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&pwm1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm1>;
+	status = "okay";
+};
