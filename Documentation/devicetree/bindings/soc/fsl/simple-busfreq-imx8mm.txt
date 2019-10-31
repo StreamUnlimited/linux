@@ -1,0 +1,32 @@
+Simple busfreq driver for the NXP i.MX8MM SoC:
+
+This driver is a simpler variant of the much more complicated driver from NXP.
+Compared to the complicated handling logic of the NXP driver, this driver only
+switches to the low busfrequency when requested from userspace.
+
+The current frequency settings are hardcoded to:
+
+
+Required properties:
+
+- compatible		: "sue,simple-busfreq-imx8mm"
+- clocks		: Must contain the list clocks use to control the operation,
+			  see the example below for the actual clocks.
+- clock-names		: Matching clock names, see example below.
+
+Example:
+
+simple-busfreq {
+	compatible = "sue,simple-busfreq-imx8mm";
+
+	clocks = <&clk IMX8MM_CLK_NOC_DIV>,
+		 <&clk IMX8MM_CLK_AHB_DIV>,
+		 <&clk IMX8MM_CLK_MAIN_AXI_SRC>,
+		 <&clk IMX8MM_CLK_24M>,
+		 <&clk IMX8MM_SYS_PLL2_333M>;
+	clock-names = "noc_div",
+		      "ahb_div",
+		      "main_axi_src",
+		      "osc_24m",
+		      "sys_pll2_333m";
+};

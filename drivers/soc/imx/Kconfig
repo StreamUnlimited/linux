@@ -47,6 +47,17 @@ config IMX8M_BLK_CTRL
 	depends on PM_GENERIC_DOMAINS
 	depends on COMMON_CLK
 
+config IMX8MM_SIMPLE_BUSFREQ
+	bool "Simple i.MX8MM busfreq driver"
+	depends on ARCH_MXC && ARM64
+	depends on OF
+	default y if ARCH_MXC && ARM64
+	help
+	  This is a simplified driver to allow the enabling and disabling
+	  of the low busfrequency mode from userspace via a sysfs file. The
+	  mode will change the DDR memory speed as well as the internal bus
+	  clocks.
+
 config IMX9_BLK_CTRL
 	bool
 	default SOC_IMX9 && IMX_GPCV2_PM_DOMAINS
