@@ -80,8 +80,20 @@
 		vsc8531_0: ethernet-phy@0 {
 			reg = <0>;
 			compatible = "ethernet-phy-id0007.0570";
-			vsc8531,led-0-mode = <VSC8531_LINK_1000_ACTIVITY>;
-			vsc8531,led-1-mode = <VSC8531_LINK_100_ACTIVITY>;
+
+			/* Display the link activity on right and 1 Gbit activity on the left */
+			vsc8531,led-0-mode = /bits/ 8 <VSC8531_LINK_1000_ACTIVITY>;
+			vsc8531,led-1-mode = /bits/ 8 <VSC8531_LINK_ACTIVITY>;
+
+			/* Drive the LED pins instead of relying on external pull-ups */
+			vsc8531,led-drive;
+
+			/* Invert polarity on both LEDs */
+			vsc8531,led-0-inv-pol;
+			vsc8531,led-1-inv-pol;
+
+			/* Set blink rate to 10 Hz to match common switches */
+			vsc8531,led-blink-rate = /bits/ 8 <VSC8531_LED_BLINK_RATE_10HZ>;
 
 			vsc8531,vddmac = /bits/ 16 <1800>;
 			vsc8531,edge-slowdown = /bits/ 8 <0>;
