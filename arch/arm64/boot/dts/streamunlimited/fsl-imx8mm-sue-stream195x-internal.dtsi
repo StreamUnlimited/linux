@@ -14,6 +14,16 @@
 		#reset-cells = <0>;
 	};
 
+	reserved-memory {
+		/*
+		 * The allocator settings inside fsl-imx8mm.dtsi are
+		 * for the NXP reference design which has 2 GiB of RAM.
+		 * And this reservation was failing for us, so remove
+		 * it to get rid of an error message on boot.
+		 */
+		/delete-node/linux,cma;
+	};
+
 	simple-busfreq {
 		compatible = "sue,simple-busfreq-imx8mm";
 		clocks = <&clk IMX8MM_CLK_NOC>,
