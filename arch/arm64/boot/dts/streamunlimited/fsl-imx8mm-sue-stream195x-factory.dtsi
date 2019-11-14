@@ -13,11 +13,69 @@
 	};
 };
 
+&gpio5 {
+	mipi_rst {
+		gpio-hog;
+		gpios = <7 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "mipi_rst";
+	};
+};
+
+&i2c2 {
+	/*
+	 * Workaround for:
+	 *   e7805: I2C: When the I2C clock speed is configured for 400 kHz, the SCL low period
+	 *   violates the I2C spec of 1.3 uS min
+	 */
+	clock-frequency = <384000>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2>;
+	status = "okay";
+
+	adv_bridge: adv7535@39 {
+		compatible = "adi,adv7533";
+		reg = <0x39>;
+		adi,addr-cec = <0x3c>;
+		adi,dsi-lanes = <4>;
+		status = "okay";
+		interrupt-parent = <&gpio5>;
+		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+		port {
+			adv7535_from_dsim: endpoint {
+				remote-endpoint = <&dsim_to_adv7535>;
+			};
+		};
+	};
+};
+
+&lcdif {
+	status = "okay";
+};
+
+&mipi_dsi {
+	status = "okay";
+
+	port@1 {
+		dsim_to_adv7535: endpoint {
+			remote-endpoint = <&adv7535_from_dsim>;
+		};
+	};
+};
+
 &iomuxc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_fec1_gpios>;
 
 	imx8mm-s195x-factory {
+		pinctrl_i2c2: i2c2grp {
+			fsl,pins = <
+				MX8MM_IOMUXC_I2C2_SCL_I2C2_SCL		(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+				MX8MM_IOMUXC_I2C2_SDA_I2C2_SDA		(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+			>;
+		};
+
 		pinctrl_uart1: uart1grp {
 			fsl,pins = <
 				MX8MM_IOMUXC_UART1_RXD_UART1_DCE_RX	(PAD_CTL_PE_DOWN | PAD_CTL_HYS)
