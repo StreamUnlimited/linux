@@ -55,6 +55,19 @@
 		model = "imx-audio-micfil";
 		cpu-dai = <&micfil>;
 	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_micmute>;
+
+		mic-mute {
+			label = "Mic-mute";
+			gpios = <&gpio4 17 GPIO_ACTIVE_HIGH>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_MICROPHONE_INSERT>;
+		};
+	};
 };
 
 &clk {
@@ -249,6 +262,12 @@
 		pinctrl_usb1_drvvbus: usb1drvvbusgrp {
 			fsl,pins = <
 				MX8MM_IOMUXC_GPIO1_IO12_GPIO1_IO12	(PAD_CTL_PE_DOWN | PAD_CTL_HYS)
+			>;
+		};
+
+		pinctrl_micmute: gpiogrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI1_TXD5_GPIO4_IO17	(PAD_CTL_PE_UP | PAD_CTL_HYS)
 			>;
 		};
 	};
