@@ -39,6 +39,7 @@ enum {
 	GPIO_SYSFS_LINE_CLASS_ATTR_VALUE,
 	GPIO_SYSFS_LINE_CLASS_ATTR_EDGE,
 	GPIO_SYSFS_LINE_CLASS_ATTR_ACTIVE_LOW,
+	GPIO_SYSFS_LINE_CLASS_ATTR_PULL,
 	GPIO_SYSFS_LINE_CLASS_ATTR_SENTINEL,
 	GPIO_SYSFS_LINE_CLASS_ATTR_SIZE,
 };
@@ -74,6 +75,7 @@ struct gpiod_data {
 #if IS_ENABLED(CONFIG_GPIO_SYSFS_LEGACY)
 	struct device_attribute edge_attr;
 	struct device_attribute active_low_attr;
+	struct device_attribute pull_attr;
 
 	struct attribute *class_attrs[GPIO_SYSFS_LINE_CLASS_ATTR_SIZE];
 	struct attribute_group class_attr_group;
@@ -394,6 +396,29 @@ static ssize_t active_low_store(struct device *dev,
 	guard(mutex)(&data->mutex);
 
 	return gpio_sysfs_set_active_low(data, value) ?: size;
+}
+
+static ssize_t pull_store(struct device *dev,
+			  struct device_attribute *attr, const char *buf,
+			  size_t size)
+{
+	struct gpiod_data  *data = container_of(attr, struct gpiod_data,
+					       pull_attr);
+	struct gpio_desc *desc = data->desc;
+	ssize_t    status;
+
+	mutex_lock(&data->mutex);
+	if (sysfs_streq(buf, "disable"))
+		status = gpiod_set_pull(desc, GPIOD_PULL_DIS);
+	else if (sysfs_streq(buf, "down"))
+		status = gpiod_set_pull(desc, GPIOD_PULL_DOWN);
+	else if (sysfs_streq(buf, "up"))
+		status = gpiod_set_pull(desc, GPIOD_PULL_UP);
+	else
+		status = -EINVAL;
+	mutex_unlock(&data->mutex);
+
+	return status ? : size;
 }
 #endif /* CONFIG_GPIO_SYSFS_LEGACY */
 
@@ -782,6 +807,8 @@ int gpiod_export(struct gpio_desc *desc, bool direction_may_change)
 	gpiod_attr_init(&desc_data->edge_attr, "edge", edge_show, edge_store);
 	gpiod_attr_init(&desc_data->active_low_attr, "active_low",
 			active_low_show, active_low_store);
+	gpiod_attr_init(&desc_data->pull_attr, "pull",
+			NULL, pull_store);
 
 	attrs = desc_data->class_attrs;
 	desc_data->class_attr_group.is_visible = gpio_is_visible;
@@ -789,6 +816,7 @@ int gpiod_export(struct gpio_desc *desc, bool direction_may_change)
 	attrs[GPIO_SYSFS_LINE_CLASS_ATTR_VALUE] = &desc_data->val_attr.attr;
 	attrs[GPIO_SYSFS_LINE_CLASS_ATTR_EDGE] = &desc_data->edge_attr.attr;
 	attrs[GPIO_SYSFS_LINE_CLASS_ATTR_ACTIVE_LOW] = &desc_data->active_low_attr.attr;
+	attrs[GPIO_SYSFS_LINE_CLASS_ATTR_PULL] = &desc_data->pull_attr.attr;
 
 	desc_data->class_attr_group.attrs = desc_data->class_attrs;
 	desc_data->class_attr_groups[0] = &desc_data->class_attr_group;

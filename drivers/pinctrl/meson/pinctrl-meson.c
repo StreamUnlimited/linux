@@ -670,6 +670,7 @@ static int meson_gpiolib_register(struct meson_pinctrl *pc)
 	pc->chip.direction_output = meson_gpio_direction_output;
 	pc->chip.get = meson_gpio_get;
 	pc->chip.set = meson_gpio_set;
+	pc->chip.set_config = gpiochip_generic_config;
 	pc->chip.base = -1;
 	of_property_read_u32(to_of_node(pc->fwnode), "sysfs-base", &pc->chip.base);
 	pc->chip.to_irq = meson_gpio_to_irq;

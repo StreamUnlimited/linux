@@ -56,6 +56,12 @@ enum gpiod_flags {
 	GPIOD_OUT_HIGH_OPEN_DRAIN = GPIOD_OUT_HIGH | GPIOD_FLAGS_BIT_OPEN_DRAIN,
 };
 
+enum gpiod_pull_type {
+	GPIOD_PULL_DIS = 0,
+	GPIOD_PULL_DOWN = 1,
+	GPIOD_PULL_UP = 2,
+};
+
 #ifdef CONFIG_GPIOLIB
 
 /* Return the number of GPIOs associated with a device / function */
@@ -160,6 +166,8 @@ int gpiod_set_raw_array_value_cansleep(unsigned int array_size,
 int gpiod_set_config(struct gpio_desc *desc, unsigned long config);
 int gpiod_set_debounce(struct gpio_desc *desc, unsigned int debounce);
 void gpiod_toggle_active_low(struct gpio_desc *desc);
+
+int gpiod_set_pull(struct gpio_desc *desc, unsigned int value);
 
 int gpiod_is_active_low(const struct gpio_desc *desc);
 int gpiod_cansleep(const struct gpio_desc *desc);
@@ -490,6 +498,13 @@ static inline void gpiod_toggle_active_low(struct gpio_desc *desc)
 {
 	/* GPIO can never have been requested */
 	WARN_ON(desc);
+}
+
+static inline int gpiod_set_pull(struct gpio_desc *desc, unsigned int value)
+{
+	/* GPIO can never have been requested */
+	WARN_ON(1);
+	return -EINVAL;
 }
 
 static inline int gpiod_is_active_low(const struct gpio_desc *desc)
