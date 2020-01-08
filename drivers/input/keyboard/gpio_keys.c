@@ -420,6 +420,14 @@ static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)
 
 	BUG_ON(irq != bdata->irq);
 
+	/* SoC HW limitation: doesn't support both edges
+	 * workaround: switch to interrupt on the next opposite edge
+	 */
+	if (gpiod_get_raw_value(bdata->gpiod))
+		irq_set_irq_type(bdata->irq, IRQF_TRIGGER_FALLING);
+	else
+		irq_set_irq_type(bdata->irq, IRQF_TRIGGER_RISING);
+
 	if (bdata->button->wakeup) {
 		const struct gpio_keys_button *button = bdata->button;
 
@@ -596,7 +604,13 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 		bdata->debounce_timer.function = gpio_keys_debounce_timer;
 
 		isr = gpio_keys_gpio_isr;
-		irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+		/* SoC HW limitation: doesn't support both edges
+		 * workaround: switch to interrupt on the next opposite edge
+		 */
+		if (gpiod_get_raw_value(bdata->gpiod))
+			irqflags = IRQF_TRIGGER_FALLING;
+		else
+			irqflags = IRQF_TRIGGER_RISING;
 
 		switch (button->wakeup_event_action) {
 		case EV_ACT_ASSERTED:
