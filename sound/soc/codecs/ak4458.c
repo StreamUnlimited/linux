@@ -228,15 +228,40 @@ static int set_digfil(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int ak4458_put_volsw(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	unsigned int mask = (1 << fls(mc->max)) - 1;
+	int val, val_mask;
+	unsigned int i = 0;
+
+	if (mc->sign_bit)
+		mask = BIT(mc->sign_bit + 1) - 1;
+
+	val = ((ucontrol->value.integer.value[0] + mc->min) & mask);
+
+	if (mc->invert)
+		val = mc->max - val;
+
+	val_mask = mask << mc->shift;
+	val = val << mc->shift;
+
+	snd_soc_component_update_bits(component, AK4458_03_LCHATT, val_mask, val);
+	snd_soc_component_update_bits(component, AK4458_04_RCHATT, val_mask, val);
+	for (i = AK4458_0F_L2CHATT; i <= AK4458_14_R4CHATT; ++i) {
+		snd_soc_component_update_bits(component, i, val_mask, val);
+	}
+	return 1;
+}
+
 static const struct snd_kcontrol_new ak4458_snd_controls[] = {
-	SOC_DOUBLE_R_TLV("DAC1 Playback Volume", AK4458_03_LCHATT,
-			 AK4458_04_RCHATT, 0, 0xFF, 0, dac_tlv),
-	SOC_DOUBLE_R_TLV("DAC2 Playback Volume", AK4458_0F_L2CHATT,
-			 AK4458_10_R2CHATT, 0, 0xFF, 0, dac_tlv),
-	SOC_DOUBLE_R_TLV("DAC3 Playback Volume", AK4458_11_L3CHATT,
-			 AK4458_12_R3CHATT, 0, 0xFF, 0, dac_tlv),
-	SOC_DOUBLE_R_TLV("DAC4 Playback Volume", AK4458_13_L4CHATT,
-			 AK4458_14_R4CHATT, 0, 0xFF, 0, dac_tlv),
+	SOC_SINGLE_EXT_TLV("Master Volume",
+		       AK4458_03_LCHATT/*reg*/, 0/*shift*/, 0xFF/*max value*/,
+		       0/*invert*/, snd_soc_get_volsw, ak4458_put_volsw,
+		       dac_tlv),
 	SOC_ENUM("AK4458 De-emphasis Response DAC1", ak4458_dac1_dem_enum),
 	SOC_ENUM("AK4458 De-emphasis Response DAC2", ak4458_dac2_dem_enum),
 	SOC_ENUM("AK4458 De-emphasis Response DAC3", ak4458_dac3_dem_enum),
