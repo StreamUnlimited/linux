@@ -473,7 +473,18 @@ int divider_get_val(unsigned long rate, unsigned long parent_rate,
 {
 	unsigned int div, value;
 
-	div = DIV_ROUND_UP_ULL((u64)parent_rate, rate);
+	if (flags & CLK_DIVIDER_ROUND_CLOSEST) {
+		/*
+		 * For whatever reason, the clock framework might request a rate here which
+		 * is not yet correctly rounded, so in some circumstances, when the divider
+		 * has the CLK_DIVIDER_ROUND_CLOSEST flag, it will not be honored by the
+		 * division in the else branch below. So instead we make sure that the
+		 * caluclation is correctly done here when said flag is set.
+		 */
+		div = DIV_ROUND_CLOSEST_ULL((u64)parent_rate, rate);
+	} else {
+		div = DIV_ROUND_UP_ULL((u64)parent_rate, rate);
+	}
 
 	if (!_is_valid_div(table, div, flags))
 		return -EINVAL;
