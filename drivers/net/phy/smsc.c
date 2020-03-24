@@ -63,10 +63,8 @@ struct smsc_phy_priv {
 	*/
 	u32 ontime;
 	u32 offtime;
-	unsigned long last_ontime;
-	/* We can't rely on phydev->link to know if the device's powered down */
-	bool powered_down;
 	bool dbg;
+	unsigned long last_transition;
 	struct dentry *debugfs;
 };
 
@@ -218,26 +216,48 @@ static int lan95xx_config_aneg_ext(struct phy_device *phydev)
 int lan87xx_read_status(struct phy_device *phydev)
 {
 	struct smsc_phy_priv *priv = phydev->priv;
-	int err;
+	int err = phy_read(phydev, MII_BMCR);
+	bool powered_down = !!(err & BMCR_PDOWN);
 
 	err = genphy_read_status(phydev);
-	if (err)
-		return err;
 
 	/*
 	 * If we are in the powered_down state, phydev->link will be true
 	 * for one reason or another, so we manually need to keep track of
 	 * that using the powered_down flag.
 	 */
-	if (phydev->link && !priv->powered_down)
+	if (phydev->link && !powered_down)
 		return err;
 
-	if (!priv->powered_down)
-		goto pdown;
+	if (!powered_down) {
+		/* Powersave mode disabled */
+		if (!priv->offtime)
+			return err;
 
-	/* Check if we passed at least offtime before powering up again. */
+		/* A resume has been done since last read, to guarantee the same
+		 * number of reads after a resume or in normal mode, it is reset
+		 * so we can have the same reference frame. */
+		if (!priv->last_transition)
+			priv->last_transition = jiffies;
+
+		/* PHY hasn't been enough time in active mode yet */
+		if (time_before(jiffies, msecs_to_jiffies(priv->ontime) +
+				priv->last_transition))
+			return err;
+
+		if (priv->dbg)
+			netdev_info(phydev->attached_dev, "powering down\n");
+
+		/* From datasheet, autoneg has to be disabled before PDOWN */
+		phy_modify(phydev, MII_BMCR, BMCR_ANENABLE, 0);
+		phy_modify(phydev, MII_BMCR, BMCR_PDOWN, BMCR_PDOWN);
+
+		goto out;
+	}
+
+	/* PHY hasn't been enough time in powerdown mode yet */
 	if (time_before(jiffies, msecs_to_jiffies(priv->offtime) +
-			priv->last_ontime)) {
+			priv->last_transition)) {
 		/* Make sure we report that the link is not up when we are
 		 * powered_down, for reasons, see above.
 		 */
@@ -248,31 +268,14 @@ int lan87xx_read_status(struct phy_device *phydev)
 	if (priv->dbg)
 		netdev_info(phydev->attached_dev, "powering up\n");
 
+	/* From datasheet, soft reset necessary before unsetting PDOWN */
 	if (phydev->drv->soft_reset)
 		phydev->drv->soft_reset(phydev);
 
 	phy_modify(phydev, MII_BMCR, BMCR_ANENABLE | BMCR_PDOWN, BMCR_ANENABLE);
-	priv->powered_down = false;
 
-	/* After power up, wait at least ontime to make sure the PHY has time to
-	 * fully detect a link up of even the worst links.
-	 */
-	msleep(priv->ontime);
-
-	err = genphy_read_status(phydev);
-
-	if (priv->dbg)
-		netdev_info(phydev->attached_dev, phydev->link ? "got link\n" :
-			    "powering down\n");
-
-pdown:
-	if (!phydev->link && priv->offtime) {
-		phy_modify(phydev, MII_BMCR, BMCR_ANENABLE, 0);
-		phy_modify(phydev, MII_BMCR, BMCR_PDOWN, BMCR_PDOWN);
-		priv->last_ontime = jiffies;
-		priv->powered_down = true;
-	}
-
+out:
+	priv->last_transition = jiffies;
 	return err;
 }
 EXPORT_SYMBOL_GPL(lan87xx_read_status);
@@ -666,6 +669,22 @@ int smsc_phy_probe(struct phy_device *phydev)
 }
 EXPORT_SYMBOL_GPL(smsc_phy_probe);
 
+int lan87xx_resume(struct phy_device *phydev)
+{
+	struct smsc_phy_priv *priv = phydev->priv;
+	int err = genphy_resume(phydev);
+
+	mutex_lock(&phydev->lock);
+	/* Since there is some time between the end of resume and the first
+	 * read_status, to guarantee the same number of reads after a resume or
+	 * in normal mode, it's reset so we can have the same reference frame.
+	 */
+	priv->last_transition = 0;
+	mutex_unlock(&phydev->lock);
+
+	return err;
+}
+
 static struct phy_driver smsc_phy_driver[] = {
 {
 	.phy_id		= 0x0007c0a0, /* OUI=0x00800f, Model#=0x0a */
@@ -858,7 +877,7 @@ static struct phy_driver smsc_phy_driver[] = {
 	.get_wol	= lan874x_get_wol,
 
 	.suspend	= genphy_suspend,
-	.resume		= genphy_resume,
+	.resume		= lan87xx_resume,
 } };
 
 module_phy_driver(smsc_phy_driver);
