@@ -89,6 +89,13 @@ config FB_TFT_ILI9486
 	help
 	  Generic Framebuffer support for ILI9486
 
+config FB_TFT_LT7381
+	tristate "FB driver for the LT7381 LCD Controller"
+	depends on OF && FB_TFT
+	help
+	  Generic Framebuffer support for LT7381
+	select VIDEOMODE_HELPERS
+
 config FB_TFT_PCD8544
 	tristate "FB driver for the PCD8544 LCD Controller"
 	depends on FB_TFT

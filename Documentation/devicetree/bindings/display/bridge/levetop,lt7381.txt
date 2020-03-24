@@ -1,0 +1,80 @@
+Levetop LT7381 SPI display bridge bindings
+
+Required properties:
+  - compatible: "levetop,lt7381"
+  - reg: Address of this bridge on the SPI bus.
+  - rotate: Panel installed orientation.
+  - width: Panel width [pixel counts] in accordance to its orientation.
+  - height: Panel height [pixel counts] in accordance to its orientation.
+  - reset-gpios: OF device-tree gpio specification for RST pin
+                (active low system reset)
+  - xtal-frequency: OF device-tree specification for XIN pins ref.
+                    (Typical value is 10 Mhz)
+  - pwm-count: = pwm period [clock cycles]
+    d presents the duty cycle [percentage], which is also the current brightness
+    level.
+
+    [Fig. 1]
+    0%              100%
+            +-------+
+            |       |
+     <----->|<----->|
+      100-d |   d   |
+    +-------+       +
+    <--------------->
+        pwm-count
+
+  - backlight-max-brightness: The maximum brightness [percentage].
+    It is also the maximum duty cycle [d-max] from [Fig. 1].
+  - backlight-default-brightness: The reset brightness on startup
+  - display-timings: timings for the connected display according to [1]
+
+The panel must obey rules for SPI slave device specified in document [2].
+
+Optional properties:
+  - bgr: when pixel format is bgr
+  - test-patern: Enables the test pattern. The panel will only display the
+                 generated test pattern, independent of the SDRAM.
+
+[1]: Documentation/devicetree/bindings/display/panel/display-timing.txt
+[2]: Documentation/devicetree/bindings/spi/spi-bus.txt
+
+Example:
+	lvtop-bridge: spi@0 {
+		compatible = "levetop,lt7381";
+		status = "okay";
+		reg = <0>;
+		spi-max-frequency = <32000000>;
+		spi-cpol;
+		spi-cpha;
+		buswidth = <8>;
+		rotate = <0>;
+		width = <320>;
+		height = <240>;
+		bgr;
+		reset-gpios = <&gpio GPIOA_18 GPIO_ACTIVE_LOW>;
+		xtal-frequency = <10000000>;
+		pwm-count = <1800>;
+		backlight-max-brightness = <90>;
+		backlight-default-brightness = <75>;
+		test-pattern;
+
+		display-timings {
+
+			display-panel: display-panel {
+				clock-frequency = <13700000>;
+				hactive = <320>;
+				vactive = <240>;
+				hback-porch = <38>;
+				hsync-len = <30>;
+				hfront-porch = <20>;
+				vback-porch = <15>;
+				vsync-len = <3>;
+				vfront-porch = <4>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <1>;
+				pixelclk-active = <0>;
+			};
+		};
+	};
