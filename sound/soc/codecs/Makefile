@@ -375,6 +375,7 @@ snd-soc-zl38060-objs := zl38060.o
 # Amp
 snd-soc-max9877-objs := max9877.o
 snd-soc-max98504-objs := max98504.o
+snd-soc-ma12040-objs := ma12040.o
 snd-soc-simple-amplifier-objs := simple-amplifier.o
 snd-soc-tpa6130a2-objs := tpa6130a2.o
 snd-soc-tas2552-objs := tas2552.o
@@ -762,6 +763,7 @@ obj-$(CONFIG_SND_SOC_ZL38060)	+= snd-soc-zl38060.o
 # Amp
 obj-$(CONFIG_SND_SOC_MAX9877)	+= snd-soc-max9877.o
 obj-$(CONFIG_SND_SOC_MAX98504)	+= snd-soc-max98504.o
+obj-$(CONFIG_SND_SOC_MA12040)	+= snd-soc-ma12040.o
 obj-$(CONFIG_SND_SOC_SIMPLE_AMPLIFIER)	+= snd-soc-simple-amplifier.o
 obj-$(CONFIG_SND_SOC_TPA6130A2)	+= snd-soc-tpa6130a2.o
 obj-$(CONFIG_SND_SOC_LPASS_MACRO_COMMON)	+= snd-soc-lpass-macro-common.o

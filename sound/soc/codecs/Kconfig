@@ -148,6 +148,7 @@ config SND_SOC_ALL_CODECS
 	imply SND_SOC_MAX9759
 	imply SND_SOC_MAX9768
 	imply SND_SOC_MAX9877
+	imply SND_SOC_MA12040
 	imply SND_SOC_MC13783
 	imply SND_SOC_ML26124
 	imply SND_SOC_MT6351
@@ -2304,6 +2305,10 @@ config SND_SOC_MAX9768
 
 config SND_SOC_MAX9877
 	tristate
+	depends on I2C
+
+config SND_SOC_MA12040
+	tristate "Infineon MA12040 amplifier"
 	depends on I2C
 
 config SND_SOC_MC13783
