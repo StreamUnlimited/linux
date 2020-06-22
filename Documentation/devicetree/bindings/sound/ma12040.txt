@@ -1,0 +1,26 @@
+Infineon MA12040 class-D amplifier
+
+The MA12040 serial control bus communicates through the I2C protocol.
+For more product information please see the links below:
+
+https://www.infineon.com/cms/en/product/power/class-d-audio-amplifier-solutions/
+integrated-class-d-audio-amplifier-ics/ma12040/
+
+NOTE: Linux does not list the MA12040 amplifier as a device, because it have
+      incomplete DAI properties, because it is not an actual codec, only an
+      analogue playback device.
+      It is therefor important to set this driver as a multi codec device in
+      the device tree e.g sound-dai = <&dummy_codec &ma12040_20>; Linux will
+      list the sound dai if one of the codecs have sufficient DAI parameters.
+
+Required properties:
+
+- compatible : "infineon,ma12040"
+- reg : I2C slave address
+
+Example:
+
+ma12040_20: ma12040@20 {
+	compatible = "infineon,ma12040";
+	reg = <0x20>;
+};
