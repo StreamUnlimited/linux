@@ -200,6 +200,14 @@
 	status = "okay";
 };
 
+&uart4 {
+	/*
+	 * To enable UART4 in Linux, you need to comment out
+	 * mmio_write_32(IMX_RDC_BASE + 0x518, 0xfc); (or set it to 0xff)
+	 * in plat/imx/imx8mm/imx8mm_bl31_setup.c in imx-atf
+	 */
+};
+
 &usdhc1 {
 	/* TODO: check if we maybe need different pinctrl settings for the different speeds */
 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
