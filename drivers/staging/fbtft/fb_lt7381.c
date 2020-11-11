@@ -268,6 +268,7 @@ struct lt7381_ctrl {
 	int pwm_cnt;
 	u32 max_brightness_perc;
 	u32 def_brightness_perc;
+	struct mutex spi_lock;
 };
 
 static u8 lt7381_read_val(struct fbtft_par *par)
@@ -707,10 +708,13 @@ static int lt7381_init_display(struct fbtft_par *par)
 	/* extra entry can be used as long as the SPI is not 9-bits */
 	par->extra = ltc;
 
+	mutex_init(&ltc->spi_lock);
+
 	disp_timings = of_get_display_timings(np);
 	if (!disp_timings) {
 		dev_err(par->info->device, "failed to find display phandle\n");
-		return -ENOENT;
+		ret = -ENOENT;
+		goto err_init_display;
 	}
 
 	par->fbtftops.reset(par);
@@ -718,7 +722,8 @@ static int lt7381_init_display(struct fbtft_par *par)
 	while (lt7381_read_status(par) & LT7381_STATUS_OM_INHIBIT_FLAG) {
 		if (++retry_count >= STARTUP_TIMEOUT_RETRIES) {
 			dev_err(par->info->device, "Could not read OK status\n");
-			return -EIO;
+			ret = -EIO;
+			goto err_init_display;
 		}
 		msleep(STARTUP_TIMEOUT);
 	}
@@ -729,14 +734,14 @@ static int lt7381_init_display(struct fbtft_par *par)
 	if ((ret = lt7381_setup_clocks(par, dt)) < 0)
 	{
 		dev_err(par->info->device, "Could not setup clocks\n");
-		return ret;
+		goto err_init_display;
 	}
 	lt7381_setup_timing(par, dt);
 	lt7381_setup_line_polarity(par, dt);
 
 	if ((ret = lt7381_setup_sdram(par)) < 0) {
 		dev_err(par->info->device, "Could not setup SDRAM\n");
-		return ret;
+		goto err_init_display;
 	}
 
 	lt7381_setup_pixel(par, dt);
@@ -761,6 +766,11 @@ static int lt7381_init_display(struct fbtft_par *par)
 	dev_dbg(par->info->device, "init ok\n");
 
 	return 0;
+
+err_init_display:
+	mutex_destroy(&ltc->spi_lock);
+	devm_kfree(par->info->device, ltc);
+	return ret;
 }
 
 static void lt7381_write_reg8_bus8(struct fbtft_par *par, int len, ...)
@@ -789,10 +799,13 @@ static void lt7381_write_reg8_bus8(struct fbtft_par *par, int len, ...)
 
 static int lt7381_write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 {
+	struct lt7381_ctrl *ltc = par->extra;
 	u8 *vmem = (u8 *)(par->info->screen_buffer + offset);
 	u8 *buf8 = par->txbuf.buf;
 	int tx_len = 0;
 	int tx_size;
+
+	mutex_lock(&ltc->spi_lock);
 
 	/* Set the display ram offset. It sets the mmap address of the display
 	 * ram on the device. It auto increments with every data write cycle */
@@ -882,6 +895,8 @@ static int lt7381_write_vmem(struct fbtft_par *par, size_t offset, size_t len)
 		tx_len += tx_size;
 	}
 
+	mutex_unlock(&ltc->spi_lock);
+
 	return 0;
 }
 
@@ -902,7 +917,9 @@ static int lt7381_backlight_chip_update_status(struct backlight_device *bd)
 	if (bd->props.fb_blank != FB_BLANK_UNBLANK)
 		brightness = MIN_BRIGHTNESS;
 
+	mutex_lock(&ltc->spi_lock);
 	lt7381_set_brightness(par, (u32)ltc->pwm_cnt, brightness);
+	mutex_unlock(&ltc->spi_lock);
 
 	return 0;
 }
