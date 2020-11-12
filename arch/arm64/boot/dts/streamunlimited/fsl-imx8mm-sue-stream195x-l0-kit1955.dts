@@ -1,0 +1,5 @@
+/dts-v1/;
+
+#include "fsl-imx8mm-sue-stream195x-internal.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit-lcd.dtsi"
