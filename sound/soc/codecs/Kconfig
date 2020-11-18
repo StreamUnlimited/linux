@@ -50,6 +50,7 @@ config SND_SOC_ALL_CODECS
 	imply SND_SOC_AK4671
 	imply SND_SOC_AK5386
 	imply SND_SOC_AK5558
+	imply SND_SOC_AK5704
 	imply SND_SOC_ALC5623
 	imply SND_SOC_ALC5632
 	imply SND_SOC_AUDIO_IIO_AUX
@@ -609,6 +610,11 @@ config SND_SOC_AK5386
 
 config SND_SOC_AK5558
 	tristate "AKM AK5558 CODEC"
+	depends on I2C
+	select REGMAP_I2C
+
+config SND_SOC_AK5704
+	tristate "AKM AK5704 CODEC"
 	depends on I2C
 	select REGMAP_I2C
 
