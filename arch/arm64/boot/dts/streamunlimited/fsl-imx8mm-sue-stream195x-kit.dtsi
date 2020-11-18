@@ -1,6 +1,10 @@
 #include <dt-bindings/net/mscc-phy-vsc8531.h>
 
 / {
+	sue {
+		carrierboard = "streamkit3d";
+	};
+
 	dummy_spdif_tx: spdif-transmitter {
 		#sound-dai-cells = <0>;
 		compatible = "linux,spdif-dit";
