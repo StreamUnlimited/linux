@@ -35,9 +35,9 @@
 #include "thermal_core.h"
 
 static void bang_bang_set_instance_target(struct thermal_instance *instance,
-					  unsigned int target)
+					  unsigned long target)
 {
-	if (instance->target != 0 && instance->target != 1 &&
+	if (instance->target != instance->lower && instance->target != instance->upper &&
 	    instance->target != THERMAL_NO_TARGET)
 		pr_debug("Unexpected state %ld of thermal instance %s in bang-bang\n",
 			 instance->target, instance->name);
@@ -74,7 +74,7 @@ static void bang_bang_trip_crossed(struct thermal_zone_device *tz,
 		tz->temperature, trip->hysteresis);
 
 	list_for_each_entry(instance, &td->thermal_instances, trip_node)
-		bang_bang_set_instance_target(instance, upward);
+		bang_bang_set_instance_target(instance, upward ? instance->upper : instance->lower);
 }
 
 static void bang_bang_manage(struct thermal_zone_device *tz)
@@ -102,7 +102,7 @@ static void bang_bang_manage(struct thermal_zone_device *tz)
 		turn_on = tz->temperature >= td->threshold;
 		list_for_each_entry(instance, &td->thermal_instances, trip_node) {
 			if (!instance->initialized)
-				bang_bang_set_instance_target(instance, turn_on);
+				bang_bang_set_instance_target(instance, turn_on ? instance->upper : instance->lower);
 		}
 	}
 
