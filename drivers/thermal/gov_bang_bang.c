@@ -32,24 +32,24 @@ static int thermal_zone_trip_update(struct thermal_zone_device *tz, int trip_ind
 
 		/* in case fan is in initial state, switch the fan off */
 		if (instance->target == THERMAL_NO_TARGET)
-			instance->target = 0;
+			instance->target = instance->lower;
 
 		/* in case fan is neither on nor off set the fan to active */
-		if (instance->target != 0 && instance->target != 1) {
+		if (instance->target != instance->lower && instance->target != instance->upper) {
 			pr_warn("Thermal instance %s controlled by bang-bang has unexpected state: %ld\n",
 					instance->name, instance->target);
-			instance->target = 1;
+			instance->target = instance->lower;
 		}
 
 		/*
 		 * enable fan when temperature exceeds trip_temp and disable
 		 * the fan in case it falls below trip_temp minus hysteresis
 		 */
-		if (instance->target == 0 && tz->temperature >= trip->temperature)
-			instance->target = 1;
-		else if (instance->target == 1 &&
+		if (instance->target != instance->upper && tz->temperature >= trip->temperature)
+			instance->target = instance->upper;
+		else if (instance->target != instance->lower &&
 			 tz->temperature <= trip->temperature - trip->hysteresis)
-			instance->target = 0;
+			instance->target = instance->lower;
 
 		dev_dbg(&instance->cdev->device, "target=%d\n",
 					(int)instance->target);
