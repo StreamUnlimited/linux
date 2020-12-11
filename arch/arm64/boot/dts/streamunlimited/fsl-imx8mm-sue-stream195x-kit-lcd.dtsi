@@ -1,7 +1,7 @@
 / {
 	lcd_backlight: lcd_backlight {
 		compatible = "pwm-backlight";
-		pwms = <&pwm1 0 100000 0>;
+		pwms = <&pwm1 0 5000000 0>;
 
 		/*
 		 * Values taken from `imx7d-sue-streamkitprime-common-0.dtsi`.
