@@ -145,13 +145,6 @@
 		output-high;
 		line-name = "i2c_hdmi_en";
 	};
-
-	pdown {
-		gpio-hog;
-		gpios = <6 GPIO_ACTIVE_LOW>;
-		output-low;
-		line-name = "pdown";
-	};
 };
 
 &i2c3 {
