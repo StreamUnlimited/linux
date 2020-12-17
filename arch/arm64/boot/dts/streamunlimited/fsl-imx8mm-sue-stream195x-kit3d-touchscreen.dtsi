@@ -1,0 +1,16 @@
+&touchscreen {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_irq_touch>;
+	interrupt-parent = <&gpio4>;
+	interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
+	irq-gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
+	/* reset-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>; */ /* shared with LCD */
+};
+
+&iomuxc {
+	imx8mm-s195x-kit3d-touchscreen {
+		pinctrl_irq_touch: gpio4io27grp {
+			fsl,pins = <MX8MM_IOMUXC_SAI2_MCLK_GPIO4_IO27 (PAD_CTL_PE_UP | PAD_CTL_HYS)>;
+		};
+	};
+};
