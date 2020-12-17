@@ -3,3 +3,4 @@
 #include "fsl-imx8mm-sue-stream195x-internal.dtsi"
 #include "fsl-imx8mm-sue-stream195x-kit3d.dtsi"
 #include "fsl-imx8mm-sue-stream195x-kit-lcd.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit3d-touchscreen.dtsi"
