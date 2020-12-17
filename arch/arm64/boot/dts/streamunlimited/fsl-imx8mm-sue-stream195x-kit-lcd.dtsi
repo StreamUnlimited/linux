@@ -15,6 +15,13 @@
 	};
 };
 
+&i2c4 {
+	touchscreen: gt5688@14 {
+		compatible = "goodix,gt5688";
+		reg = <0x14>;
+		status = "okay";
+	};
+};
 
 &iomuxc {
 	imx8mm-s195x-kit-lcd {
