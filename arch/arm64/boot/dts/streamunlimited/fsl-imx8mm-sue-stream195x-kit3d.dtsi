@@ -75,8 +75,13 @@
 };
 
 &clk {
-	assigned-clocks = <&clk IMX8MM_AUDIO_PLL1>, <&clk IMX8MM_AUDIO_PLL2>;
-	assigned-clock-rates = <786432000>, <722534400>;
+	assigned-clock-rates = <0>,
+				<400000000>,
+				<400000000>,
+				<750000000>,
+				<594000000>,
+				<786432000>, /* 2x rate from imx8mm.dtsi*/
+				<722534400>; /* 2x rate from imx8mm.dtsi */
 };
 
 &fec1 {
