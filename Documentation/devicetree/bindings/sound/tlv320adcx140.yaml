@@ -93,13 +93,13 @@ properties:
        1 - GPIX is configured as a general-purpose input (GPI)
        2 - GPIX is configured as a master clock input (MCLK)
        3 - GPIX is configured as an ASI input for daisy-chain (SDIN)
-       4 - GPIX is configured as a PDM data input for channel 1 and channel
+       4 - GPIX is configured as a PDM data input for channel 1 and channel 2
             (PDMDIN1)
-       5 - GPIX is configured as a PDM data input for channel 3 and channel
+       5 - GPIX is configured as a PDM data input for channel 3 and channel 4
             (PDMDIN2)
-       6 - GPIX is configured as a PDM data input for channel 5 and channel
+       6 - GPIX is configured as a PDM data input for channel 5 and channel 6
             (PDMDIN3)
-       7 - GPIX is configured as a PDM data input for channel 7 and channel
+       7 - GPIX is configured as a PDM data input for channel 7 and channel 8
             (PDMDIN4)
 
     $ref: /schemas/types.yaml#/definitions/uint32-array
