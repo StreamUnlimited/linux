@@ -965,6 +965,8 @@ static int adcx140_codec_probe(struct snd_soc_component *component)
 	int gpi_count;
 	u32 gpi_inputs[ADCX140_NUM_GPI_PINS];
 	u32 gpi_input_val = 0;
+	int chmap_count;
+	u32 chmap[ADCX140_MAX_CHANNELS * 2];
 	int i;
 	int ret;
 	bool tx_high_z;
@@ -1056,6 +1058,32 @@ static int adcx140_codec_probe(struct snd_soc_component *component)
 	ret = adcx140_configure_gpo(adcx140);
 	if (ret)
 		goto out;
+
+	chmap_count = device_property_count_u32(adcx140->dev, "sue,channel-mapping");
+	if (chmap_count <= (ADCX140_MAX_CHANNELS * 2) && chmap_count > 0) {
+		if (chmap_count > ADCX140_MAX_CHANNELS * 2) {
+			dev_err(adcx140->dev, "sue,channel-mapping should contain at most %d elements\n", ADCX140_MAX_CHANNELS * 2);
+			return -EINVAL;
+		}
+
+		if (chmap_count % 2) {
+			dev_err(adcx140->dev, "sue,channel-mapping should contain an even number of elements\n");
+			return -EINVAL;
+		}
+
+		ret = device_property_read_u32_array(adcx140->dev,
+						     "sue,channel-mapping",
+						     chmap, chmap_count);
+		if (ret)
+			return ret;
+
+		for (i = 0; i < chmap_count; i += 2) {
+			ret = regmap_write(adcx140->regmap, ADCX140_ASI_CH(chmap[i]),
+					   chmap[i + 1]);
+			if (ret)
+				return ret;
+		}
+	}
 
 	ret = regmap_update_bits(adcx140->regmap, ADCX140_BIAS_CFG,
 				ADCX140_MIC_BIAS_VAL_MSK |
