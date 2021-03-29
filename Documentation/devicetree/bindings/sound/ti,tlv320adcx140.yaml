@@ -109,6 +109,35 @@ properties:
       maximum: 7
     default: [0, 0, 0, 0]
 
+  sue,channel-mapping:
+    description: |
+       Defines the configuration for multi-slotting and multi-outputting
+       mappings for each input channel, as specified in ASI_CHx registers.
+
+       The array is defined as <[CHAN_NR SLOT_OUT_CONF] [[CHAN_NR SLOT_OUT_CONF]...]>.
+
+       CHAN_NR represents the channel to configure:
+       Its value is between 1 and 8 (included).
+
+       SLOT_OUT_CONF is a binary OR of two fields:
+       OUTPUT configuration:
+       0x00 - if the channel is to be output on SDOUT
+       0x40 - if the channel is to be output on SDOUT2
+
+       SLOT configuration (0-63):
+       0 - TDM is slot 0 or I2S, LJ is left slot 0
+       1 - TDM is slot 1 or I2S, LJ is left slot 1
+       32 - TDM is slot 32 or I2S, LJ is right slot 0
+       33 - TDM is slot 33 or I2S, LJ is right slot 1
+
+    allOf:
+      - $ref: /schemas/types.yaml#/definitions/uint32-array
+      - minItems: 2
+        maxItems: 16
+        items:
+          maximum: 0x7f
+        default: [1, 0x00, 2, 0x01, 3, 0x02, 4, 0x03, 5, 0x04, 6, 0x05, 7, 0x06, 8, 0x07]
+
   ti,gpio-config:
     description: |
        Defines the configuration and output drive for the General Purpose
