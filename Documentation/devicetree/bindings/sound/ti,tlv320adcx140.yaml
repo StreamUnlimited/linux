@@ -138,6 +138,24 @@ properties:
           maximum: 0x7f
         default: [1, 0x00, 2, 0x01, 3, 0x02, 4, 0x03, 5, 0x04, 6, 0x05, 7, 0x06, 8, 0x07]
 
+  sue,enabled-channels:
+    description: |
+       Defines which channels are enabled at probe. By default, all channels
+       are disabled.
+
+       The array is defined as <[CHAN_NR] [[CHAN_NR]...]>.
+
+       CHAN_NR represents the channel to configure:
+       Its value is between 1 and 8 (included).
+
+    allOf:
+      - $ref: /schemas/types.yaml#/definitions/uint32-array
+      - minItems: 1
+        maxItems: 8
+        items:
+          maximum: 8
+        default: []
+
   ti,gpio-config:
     description: |
        Defines the configuration and output drive for the General Purpose
