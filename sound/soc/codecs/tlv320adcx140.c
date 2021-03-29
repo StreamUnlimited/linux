@@ -970,6 +970,8 @@ static int adcx140_codec_probe(struct snd_soc_component *component)
 	int en_chan_count = 0;
 	u32 en_chan[8];
 	u8 en_chan_reg = 0;
+	int in_src_count = 0;
+	u32 in_src[4];
 	int i;
 	int ret;
 	bool tx_high_z;
@@ -1109,6 +1111,27 @@ static int adcx140_codec_probe(struct snd_soc_component *component)
 			return ret;
 	}
 
+	in_src_count = device_property_count_u32(adcx140->dev, "sue,input-source");
+	if (in_src_count > 0) {
+		if (in_src_count != 4) {
+			dev_err(adcx140->dev, "sue,input-source should contain 4 elements\n");
+			return -EINVAL;
+		}
+
+		ret = device_property_read_u32_array(adcx140->dev,
+						     "sue,input-source",
+						     in_src, in_src_count);
+		if (ret)
+			return ret;
+
+		for (i = 0; i < in_src_count; i++) {
+			ret = regmap_update_bits(adcx140->regmap, ADCX140_CHx_CFG0(i + 1),
+						 ADCX140_CHx_CFG0_IN_SRC_MASK,
+						 ADCX140_CHx_CFG0_IN_SRC(in_src[i]));
+			if (ret)
+				return ret;
+		}
+	}
 
 	ret = regmap_update_bits(adcx140->regmap, ADCX140_BIAS_CFG,
 				ADCX140_MIC_BIAS_VAL_MSK |
