@@ -95,6 +95,9 @@
 #define ADCX140_DEV_STS1	0x77
 #define ADCX140_PHASE_CALIB		0X7b
 
+/* works only for channels 1 to 4 */
+#define ADCX140_CHx_CFG0(x)	(ADCX140_CH1_CFG0 + ((x) - 1) * 5)
+
 #define ADCX140_RESET	BIT(0)
 
 #define ADCX140_WAKE_DEV	BIT(0)
@@ -158,5 +161,9 @@
 #define ADCX140_GPIO_DRV_MAX		5
 
 #define ADCX140_ASI_OUT_CHx_EN(x)	BIT(7 - ((x) - 1))
+
+#define ADCX140_CHx_CFG0_IN_SRC_MASK	GENMASK(6, 5)
+#define ADCX140_CHx_CFG0_IN_SRC_SHIFT	5
+#define ADCX140_CHx_CFG0_IN_SRC(x)	(((x) << ADCX140_CHx_CFG0_IN_SRC_SHIFT) & ADCX140_CHx_CFG0_IN_SRC_MASK)
 
 #endif /* _TLV320ADCX140_ */
