@@ -156,6 +156,29 @@ properties:
           maximum: 8
         default: []
 
+  sue,input-source:
+    description: |
+       Defines the input source configuration for each input channel.
+
+       The array is defined as <IN_CHAN1 IN_CHAN2 IN_CHAN3 IN_CHAN4>.
+
+       IN_CHANx is one of the following:
+       0 - Analog differential input for channel x
+       1 - Analog single-ended Input for channel x
+       2 - Digital PDM input for channel x
+
+       If 2 is selected, the output of up to 2 PDM microphones can be routed
+       through each PDMIN pin. The appropriate PDMCLK should be configured to
+       provide clock to the PDM microphones.
+
+    allOf:
+      - $ref: /schemas/types.yaml#/definitions/uint32-array
+      - minItems: 1
+        maxItems: 4
+        items:
+          maximum: 2
+        default: [0, 0, 0, 0]
+
   ti,gpio-config:
     description: |
        Defines the configuration and output drive for the General Purpose
