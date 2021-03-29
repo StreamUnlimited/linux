@@ -967,6 +967,9 @@ static int adcx140_codec_probe(struct snd_soc_component *component)
 	u32 gpi_input_val = 0;
 	int chmap_count;
 	u32 chmap[ADCX140_MAX_CHANNELS * 2];
+	int en_chan_count = 0;
+	u32 en_chan[8];
+	u8 en_chan_reg = 0;
 	int i;
 	int ret;
 	bool tx_high_z;
@@ -1084,6 +1087,28 @@ static int adcx140_codec_probe(struct snd_soc_component *component)
 				return ret;
 		}
 	}
+
+	en_chan_count = device_property_count_u32(adcx140->dev, "sue,enabled-channels");
+	if (en_chan_count > 0) {
+		if (en_chan_count > 8) {
+			dev_err(adcx140->dev, "sue,enabled-channels should contain at most 8 elements\n");
+			return -EINVAL;
+		}
+
+		ret = device_property_read_u32_array(adcx140->dev,
+						     "sue,enabled-channels",
+						     en_chan, en_chan_count);
+		if (ret)
+			return ret;
+
+		for (i = 0; i < en_chan_count; i++)
+			en_chan_reg |= ADCX140_ASI_OUT_CHx_EN(en_chan[i]);
+
+		ret = regmap_write(adcx140->regmap, ADCX140_ASI_OUT_CH_EN, en_chan_reg);
+		if (ret)
+			return ret;
+	}
+
 
 	ret = regmap_update_bits(adcx140->regmap, ADCX140_BIAS_CFG,
 				ADCX140_MIC_BIAS_VAL_MSK |
