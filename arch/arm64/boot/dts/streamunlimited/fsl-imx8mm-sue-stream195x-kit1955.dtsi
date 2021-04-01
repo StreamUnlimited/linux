@@ -52,27 +52,6 @@
 				dai-tdm-slot-width = <32>;
 			};
 		};
-
-		sue-card,dai-link@1 {
-			format = "i2s";
-
-			frame-master = <&dailink1_cpu>;
-			bitclock-master = <&dailink1_cpu>;
-
-			continuous-clock;
-
-			dailink1_cpu: cpu {
-				sound-dai = <&sai5>;
-				dai-tdm-slot-num = <2>;
-				dai-tdm-slot-width = <32>;
-			};
-
-			dailink1_codec: codec {
-				sound-dai = <&ak5704>;
-				dai-tdm-slot-num = <2>;
-				dai-tdm-slot-width = <32>;
-			};
-		};
 	};
 };
 
@@ -177,13 +156,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4>;
 	status = "okay";
-
-	ak5704: ak5704@11 {
-		compatible = "asahi-kasei,ak5704";
-		reg = <0x11>;
-		#sound-dai-cells = <0>;
-		status = "okay";
-	};
 };
 
 &iomuxc {
