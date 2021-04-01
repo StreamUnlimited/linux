@@ -1,0 +1,55 @@
+// DTSI for new 4-microphone board based on TI PCMD3180
+
+/ {
+	sound-pcm {
+		sue-card,dai-link@1 {
+			format = "i2s";
+
+			frame-master = <&dailink1_cpu>;
+			bitclock-master = <&dailink1_cpu>;
+
+			continuous-clock;
+
+			dailink1_cpu: cpu {
+				sound-dai = <&sai5>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <32>;
+			};
+
+			dailink1_codec: codec {
+				sound-dai = <&pcmd3180>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <32>;
+			};
+		};
+	};
+};
+
+&i2c4 {
+	pcmd3180: pcmd3180@4c {
+		compatible = "ti,tlv320adc3140";
+		reg = <0x4c>;
+		#sound-dai-cells = <0>;
+		/* Configure GPIO1 as SDOUT2 */
+		ti,gpio-config = <3 1>;
+		/* Configure GPIx as PDM inputs */
+		/* GPI1 as PDM channels 1 and 2; GPI3 as PDM channels 3 and 4 */
+		ti,gpi-config = <4 0 5 0>;
+		/* Source of input channels configured as Digital Input (PDM) */
+		sue,input-source = <2 2 2 2>;
+		/* Configure GPOx as PDM clock output */
+		ti,gpo-config-1 = <4 1>;
+		ti,gpo-config-2 = <4 1>;
+		ti,gpo-config-3 = <4 1>;
+		ti,gpo-config-4 = <4 1>;
+		/* Mapping:
+		 * - Channel 1 on SDOUT left slot 0
+		 * - Channel 2 on SDOUT right slot 0
+		 * - Channel 3 on SDOUT2 left slot 0
+		 * - Channel 4 on SDOUT2 right slot 0
+		 */
+		sue,channel-mapping = <1 0x00 2 0x20 3 0x40 4 0x60>;
+		sue,enabled-channels = <1 2 3 4>;
+		status = "okay";
+	};
+};
