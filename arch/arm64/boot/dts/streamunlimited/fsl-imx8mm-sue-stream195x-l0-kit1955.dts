@@ -4,3 +4,4 @@
 #include "fsl-imx8mm-sue-stream195x-kit1955.dtsi"
 #include "fsl-imx8mm-sue-stream195x-kit-lcd.dtsi"
 #include "fsl-imx8mm-sue-stream195x-kit1955-touchscreen.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-ak5704.dtsi"
