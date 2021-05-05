@@ -30,7 +30,6 @@ Required dai-link subnodes:
 
 - format				: CPU/CODEC common audio format.
 					  "i2s", "right_j", "left_j" , "dsp_a" "dsp_b", "ac97", "pdm", "msb", "lsb"
-and at least one of:
 - cpu					: CPU   sub-node
 - codec					: CODEC sub-node
 
@@ -46,10 +45,13 @@ Optional dai-link subnode properties:
 - dai-tdm-slot-width			: Width in bits for each slot.
 
 Required CPU/CODEC subnodes properties:
-
+one of:
 - sound-dai				: phandle and port of CPU/CODEC
+- use-dummy-codec			: specify that a dummy codec should be used; applies to CODEC subnodes
 
-NOTE: Only one of the above properties is required, if both are specified, the dummy codec takes precedence.
+NOTE: Only one of the above properties is required for CODEC subnodes, if both
+are specified and sound-dai points to a valid device, it takes precedence over
+the dummy codec.
 
 
 Example:
@@ -77,6 +79,10 @@ sound-pcm {
 			sound-dai = <&sai5>;
 			dai-tdm-slot-num = <2>;
 			dai-tdm-slot-width = <32>;
+		};
+
+		dailink0_codec: codec {
+			use-dummy-codec;
 		};
 	};
 };
