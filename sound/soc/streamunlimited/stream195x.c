@@ -284,8 +284,19 @@ static int simple_parse_dai(struct stream195x_simple_priv *priv,
 	 * it will be used as xxx_of_node on soc_bind_dai_link()
 	 */
 	ret = of_parse_phandle_with_args(node, DAI, CELL, 0, &args);
-	if (ret)
-		goto end;
+	/* START SUE addition */
+	//if (ret)
+	//	return end;
+	if (ret) {
+		if (!of_property_read_bool(node, "use-dummy-codec"))
+			return ret;
+
+		dlc->of_node		= NULL;
+		dlc->dai_name		= "snd-soc-dummy-dai";
+		dlc->name		= "snd-soc-dummy";
+		goto single_link;
+	}
+	/* END SUE addition */
 
 	/*
 	 * Try to find from DAI args
@@ -325,6 +336,11 @@ static int simple_parse_dai(struct stream195x_simple_priv *priv,
 		goto end;
 
 parse_dai_end:
+	dlc->of_node = args.np;
+
+	/* START SUE addition */
+single_link:
+	/* END SUE addition */
 	if (is_single_link)
 		*is_single_link = !args.args_count;
 	ret = 0;
