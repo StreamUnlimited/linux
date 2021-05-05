@@ -267,8 +267,19 @@ static int asoc_simple_parse_dai(struct device_node *node,
 	 * it will be used as xxx_of_node on soc_bind_dai_link()
 	 */
 	ret = of_parse_phandle_with_args(node, DAI, CELL, 0, &args);
-	if (ret)
-		return ret;
+	/* START SUE addition */
+	//if (ret)
+	//	return ret;
+	if (ret) {
+		if (!of_property_read_bool(node, "use-dummy-codec"))
+			return ret;
+
+		dlc->of_node		= NULL;
+		dlc->dai_name		= "snd-soc-dummy-dai";
+		dlc->name		= "snd-soc-dummy";
+		goto single_link;
+	}
+	/* END SUE addition */
 
 	/*
 	 * FIXME
@@ -295,6 +306,9 @@ static int asoc_simple_parse_dai(struct device_node *node,
 
 	dlc->of_node = args.np;
 
+	/* START SUE addition */
+single_link:
+	/* END SUE addition */
 	if (is_single_link)
 		*is_single_link = !args.args_count;
 
