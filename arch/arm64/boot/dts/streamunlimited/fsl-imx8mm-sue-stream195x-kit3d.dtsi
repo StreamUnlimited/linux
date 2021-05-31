@@ -27,7 +27,7 @@
 	 */
 	sound-pcm {
 		compatible = "sue,stream195x-audio";
-		sue-card,name = "Multichannel Audio on i.MX8MM";
+		sue-card,name = "Carrierboard";
 
 		clocks = <&clk IMX8MM_AUDIO_PLL1_OUT>, <&clk IMX8MM_AUDIO_PLL2_OUT>;
 		clock-names = "pll8k", "pll11k";
