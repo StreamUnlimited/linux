@@ -202,11 +202,19 @@ static struct snd_soc_dai_driver ak5704_dai = {
  */
 static int ak5704_component_probe(struct snd_soc_component *component)
 {
-	snd_soc_component_write(component, AK5704_FLOW_CTRL, AK5704_FLOW_CTRL_SDTO2_EN);
+	int ret;
 
-	snd_soc_component_write(component, AK5704_CLK_SRC, AK5704_CLK_SRC_PLL_BCLK);
+	ret = snd_soc_component_write(component, AK5704_FLOW_CTRL, AK5704_FLOW_CTRL_SDTO2_EN);
+	if (ret)
+		return ret;
 
-	snd_soc_component_write(component, AK5704_PWR_MGMT1, AK5704_PWR_MGMT1_PLL_UP);
+	ret = snd_soc_component_write(component, AK5704_CLK_SRC, AK5704_CLK_SRC_PLL_BCLK);
+	if (ret)
+		return ret;
+
+	ret = snd_soc_component_write(component, AK5704_PWR_MGMT1, AK5704_PWR_MGMT1_PLL_UP);
+	if (ret)
+		return ret;
 
 	return 0;
 }
