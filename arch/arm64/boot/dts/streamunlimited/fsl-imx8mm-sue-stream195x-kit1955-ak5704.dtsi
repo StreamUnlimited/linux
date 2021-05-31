@@ -1,8 +1,15 @@
 // DTSI for original 4-microphone board with AK5704
 
 / {
-	sound-pcm {
-		sue-card,dai-link@1 {
+	/* Create a new sound card per removable component */
+	sound-ext-mic {
+		compatible = "sue,stream195x-audio";
+		sue-card,name = "Microphones";
+
+		clocks = <&clk IMX8MM_AUDIO_PLL1_OUT>, <&clk IMX8MM_AUDIO_PLL2_OUT>;
+		clock-names = "pll8k", "pll11k";
+
+		sue-card,dai-link@0 {
 			format = "i2s";
 
 			frame-master = <&dailink1_cpu>;

@@ -22,6 +22,9 @@
 		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 	};
 
+	/* Sound card for non-removable components on carrierboard. For
+	 * removable components, add a new sound card per removable component.
+	 */
 	sound-pcm {
 		compatible = "sue,stream195x-audio";
 		sue-card,name = "Multichannel Audio on i.MX8MM";
