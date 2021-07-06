@@ -139,7 +139,13 @@ static long pll14xx_calc_rate(struct clk_pll14xx *pll, int mdiv, int pdiv,
 	const struct imx_pll14xx_rate_table *rate_table = pll->rate_table;
 	unsigned long rate = 0;
 	u64 fout = prate;
+	unsigned long fvco_match_rate = UINT_MAX;
+	int fvco_match_idx = -1;
 	int i;
+
+	/* fout = (m * 65536 + k) * Fin / (p * 65536) */
+	fout *= (mdiv * 65536 + kdiv);
+	do_div(fout, (pdiv * 65536) << sdiv);
 
 	/*
 	 * Sometimes, the recalculated rate has deviation due to
@@ -149,15 +155,28 @@ static long pll14xx_calc_rate(struct clk_pll14xx *pll, int mdiv, int pdiv,
 	 */
 	for (i = 0; i < pll->rate_count; i++) {
 		if (rate_table[i].pdiv == pdiv && rate_table[i].mdiv == mdiv &&
-		    rate_table[i].sdiv == sdiv && rate_table[i].kdiv == kdiv)
-			rate = rate_table[i].rate;
+				rate_table[i].sdiv == sdiv && rate_table[i].kdiv == kdiv) {
+
+			/*
+			 * To pick the optimal table entry (even if we have multiple entries with the same
+			 * pdiv/mdiv/sdiv/kdiv values), let's calculate the difference between fvco and table based rate
+			 * and pick the one that more closely matches the calculated fvco
+			 */
+			if ((rate_table[i].rate - fout) < (fvco_match_rate - fout)) {
+
+				/* possible candidate for perfect rate */
+				fvco_match_rate = rate_table[i].rate;
+
+				/* position of the candidate for perfect rate */
+				fvco_match_idx = i;
+			}
+		}
 	}
 
-	/* fout = (m * 65536 + k) * Fin / (p * 65536) / (1 << sdiv) */
-	fout *= ((u64)mdiv * 65536 + (u64)kdiv);
-	pdiv *= 65536;
-
-	do_div(fout, pdiv << sdiv);
+	/* did we find an entry in rate tables which matches our requirements? */
+	if (fvco_match_idx >= 0) {
+		rate = fvco_match_rate;
+	}
 
 	return rate ? (unsigned long) rate : (unsigned long)fout;
 }
