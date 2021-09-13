@@ -53,7 +53,8 @@
 #include "fbtft.h"
 
 #define DRVNAME				"fb_lt7381"
-#define TXBUFLEN			(32 * PAGE_SIZE)
+/* Allocations up to this size are practically guaranteed to succeed. */
+#define TXBUFLEN			(PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER)
 #define MIN_BRIGHTNESS			0   /* percentage */
 #define DEFAULT_BRIGHTNESS		75  /* percentage */
 #define MAX_BRIGHTNESS			100 /* percentage */
