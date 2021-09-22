@@ -1,0 +1,127 @@
+/*
+ * arch/arm64/boot/dts/streamunlimited/fsl-imx8mm-sue-stream195x-kit1955-dabfm.dtsi
+ *
+ * Copyright (C) 2021 StreamUnlimited, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ */
+
+/*
+ * DT for the removable dabfm module.
+ */
+
+/ {
+	sue {
+		daughterboard = "dabfm";
+	};
+
+	sound-dabfm {
+		compatible = "sue,stream195x-audio";
+		sue-card,name = "dabfm";
+
+		sue-card,dai-link@2 {
+			format = "i2s";
+
+			frame-master = <&dailink2_codec>;
+			bitclock-master = <&dailink2_codec>;
+
+			dailink2_cpu: cpu {
+				sound-dai = <&sai6>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <32>;
+			};
+
+			dailink2_codec: codec {
+				use-dummy-codec;
+			};
+		};
+	};
+
+	sound-sai2 {
+		compatible = "sue,stream195x-audio";
+		sue-card,name = "sai2card";
+
+		sue-card,dai-link@4 {
+			format = "i2s";
+
+			frame-master = <&dailink4_codec>;
+			bitclock-master = <&dailink4_codec>;
+
+			continuous-clock;
+
+			dailink4_cpu: cpu {
+				sound-dai = <&sai2>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <32>;
+			};
+
+			dailink4_codec: codec {
+				use-dummy-codec;
+			};
+		};
+	};
+
+};
+
+&ecspi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1_cs>;
+	num-cs = <1>;
+	cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
+	status = "okay";
+
+	dabfm: dabfm@0 {
+		status = "okay";
+		reg = <0>;
+		compatible = "sue,dabfm";
+		/* It's set to 10MHz which is 1MHz more than dabfm driver,
+		 * which is different from stream1832 where they are same
+		 */
+		spi-max-frequency = <10000000>;
+	};
+};
+
+&sai6 {
+	#sound-dai-cells = <0>;	/* This is required for the simple-audio-card to work */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sai6_rx>;
+	/* override interrupt since it's using same one as SAI5 by default */
+	interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+
+	status = "okay";
+
+	/*
+	 * This is conjunction with `dai-tdm-slot-num = <2>;` makes sure that
+	 * for 8 channel playback 8 ch / 2 slots = 4 pins are used with a mask
+	 * of 0xf.
+	 * /
+	/* first number is pins, second is rx mask, third is tx mask */
+	fsl,dataline = <
+		1 0x1 0x1
+		2 0x3 0x3
+		3 0x7 0x7
+		4 0xf 0xf
+	>;
+	fsl,sai-asynchronous;
+};
+
+&sai2 {
+	#sound-dai-cells = <0>;	/* This is required for the simple-audio-card to work */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sai2_rx &pinctrl_sai2_clk>;
+
+	assigned-clocks = <&clk IMX8MM_CLK_SAI2>;
+	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
+	assigned-clock-rates = <24576000>;
+
+	status = "okay";
+};
