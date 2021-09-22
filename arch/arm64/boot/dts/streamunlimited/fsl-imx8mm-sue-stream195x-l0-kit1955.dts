@@ -5,3 +5,4 @@
 #include "fsl-imx8mm-sue-stream195x-kit-lcd.dtsi"
 #include "fsl-imx8mm-sue-stream195x-kit1955-touchscreen.dtsi"
 #include "fsl-imx8mm-sue-stream195x-kit1955-pcmd3180.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-dabfm.dtsi"
