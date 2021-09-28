@@ -292,7 +292,7 @@
 &sai1 {
 	#sound-dai-cells = <0>;	/* This is required for the simple-audio-card to work */
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sai1_tx &pinctrl_sai1_rx>;
+	pinctrl-0 = <&pinctrl_sai1_tx>;
 	assigned-clocks = <&clk IMX8MM_CLK_SAI1>;
 	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
 	assigned-clock-rates = <24576000>;
