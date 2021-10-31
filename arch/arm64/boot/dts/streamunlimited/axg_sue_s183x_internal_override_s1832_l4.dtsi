@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+/ {
+	sue {
+		moduleversion = "1";
+	};
+};
+
+/*
+ * The first revisions of the stream1832 module L4 had the I2C address
+ * for the AXP313A 0x36.
+ */
+&i2c_AO {
+	/delete-node/axp152@32;
+
+	pmic: axp313a@36 {
+		compatible = "x-powers,axp313a";
+		reg = <0x36>;
+		no-irq;
+
+		regulators {
+			vdd_arm: dcdc1 {
+				regulator-name = "vdd_arm";
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <1150000>;
+				regulator-boot-on;
+				regulator-always-on;
+
+				/*
+				 * Allow the following workmodes (OR'ed together):
+				 *   1: REGULATOR_MODE_FAST	=> PWM only mode
+				 *   2: REGULATOR_MODE_NORMAL	=> Auto mode
+				 */
+				regulator-allowed-modes = <3>;
+			};
+		};
+	};
+};
+
+&cpu_opp_table{
+	opp1_3GHz: opp@1344000000 {
+		opp-hz = /bits/ 64 <1344000000>;
+		opp-microvolt = <1080000>;
+		clock-latency-ns = <200>;
+		opp-workmode = <1>; /* 1: REGULATOR_MODE_FAST => PWM only mode on AXP152 */
+	};
+};
