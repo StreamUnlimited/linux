@@ -37,6 +37,19 @@
 			      "osc_24m",
 			      "sys_pll2_333m";
 	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_onoff>;
+
+		wakeup {
+			label = "WAKEUP";
+			gpios = <&gpio5 27 GPIO_ACTIVE_LOW>;
+			wakeup-source;
+			linux,code = <KEY_WAKEUP>;
+		};
+	};
 };
 
 &A53_0 {
@@ -184,6 +197,12 @@
 				MX8MM_IOMUXC_SD1_DATA5_GPIO2_IO7	(PAD_CTL_PE_UP | PAD_CTL_HYS)	/* WIFI_IRQ (OOB) */
 				MX8MM_IOMUXC_SD1_DATA6_GPIO2_IO8	(PAD_CTL_PE_UP | PAD_CTL_HYS)	/* WLAN_WL_REG_ON */
 				MX8MM_IOMUXC_SD1_DATA7_GPIO2_IO9	(PAD_CTL_PE_UP | PAD_CTL_HYS)	/* WLAN_HOST_WAKE */
+			>;
+		};
+
+		pinctrl_onoff: gpiogrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_UART3_TXD_GPIO5_IO27	(PAD_CTL_PE_UP | PAD_CTL_HYS)
 			>;
 		};
 	};
