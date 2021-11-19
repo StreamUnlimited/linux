@@ -48,7 +48,7 @@
 
 	sound-sai2 {
 		compatible = "sue,stream195x-audio";
-		sue-card,name = "sai2card";
+		sue-card,name = "CarrierBoardAux";
 
 		sue-card,dai-link@4 {
 			format = "i2s";
