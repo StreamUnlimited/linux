@@ -6,7 +6,56 @@
 
 /*
  * DT for factory configuration of Stream183x external IOs.
- *
- * This file is empty for now, as all Stream183x outputs are by default GPIOs
- * which is exactly what we need.
  */
+
+ / {
+	dummy_codec: dummy{
+		#sound-dai-cells = <0>;
+		compatible = "meson,dummy-codec";
+		playback-rates = <44100 48000 64000 88200 96000 176400 192000>;
+		status = "okay";
+		sound-name-prefix = "DUMMY";
+	};
+
+	sound: sound {
+		compatible = "amlogic,axg-sound-card";
+		model = "AXG-S400";
+		assigned-clocks = <&clkc CLKID_HIFI_PLL>;
+		assigned-clock-parents = <0>;
+		assigned-clock-rates = <491520000>;
+		status = "okay";
+		audio-aux-devs = <&tdmout_b>;
+						/* "sink", 		"source" */
+		audio-routing = "TDM_B Playback", "TDMOUT_B OUT",
+						"TDMOUT_B IN 0", "FRDDR_A OUT 1";
+
+		dai-link-0 {
+			sound-dai = <&frddr_a>;
+		};
+
+		dai-link-1 {
+			sound-dai = <&tdmif_b>;
+			dai-format = "i2s";
+			dai-tdm-slot-tx-mask-0 = <1 1>;
+			dai-tdm-slot-num = <2>;
+			dai-tdm-slot-width = <32>;
+			mclk-fs = <0>;
+			system-clock-frequency = <24576000>;
+
+			codec {
+				sound-dai = <&dummy_codec>;
+			};
+		};
+	};
+};
+
+
+&tdmout_b {
+	status = "okay";
+};
+
+&tdmif_b {
+	status = "okay";
+	assigned-clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK_SEL>;
+	assigned-clock-parents = <&clkc CLKID_HIFI_PLL>;
+};
