@@ -15,6 +15,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
@@ -66,6 +67,7 @@
 #define AXP15060_BLDO_V_CTRL_MASK	0x1F
 #define AXP15060_CLDO_V_CTRL_MASK	0x1F
 #define AXP15060_CPUSLDO_V_CTRL_MASK	0x0F
+#define AXP15060_PWR_OFF_VAL		0xa4
 
 struct axp15060_data_buffer_attr_info {
 	struct device_attribute attr;
@@ -130,6 +132,7 @@ static const struct attribute_group axp15060_attribute_group = {
 
 static const struct regmap_range axp15060_volatile_ranges[] = {
 	regmap_reg_range(AXP15060_POWERON_SRC, AXP15060_POWERON_SRC),
+	regmap_reg_range(AXP15060_PWR_DIS_PWR_DWN, AXP15060_PWR_DIS_PWR_DWN),
 	regmap_reg_range(AXP15060_IRQ_STATUS_1, AXP15060_IRQ_STATUS_2),
 };
 
@@ -257,17 +260,53 @@ static const struct regulator_desc axp15060_regulators[] = {
 	AXP15060_REG(CPUSLDO, "cpusldo", 700, 1400, 50, AXP15060_CPUSLDO_V_CTRL, AXP15060_CPUSLDO_V_CTRL_MASK, AXP15060_PWR_CTRL_3, (1 << 6)),
 };
 
+static int axp15060_power_off(struct sys_off_data *data)
+{
+	struct device *axp15060_dev = data->cb_data;
+	if (axp15060_dev) {
+		struct regmap *regmap = dev_get_regmap(axp15060_dev, NULL);
+
+		dev_info(axp15060_dev, "power off\n");
+		regmap_write(regmap, AXP15060_PWR_DIS_PWR_DWN, AXP15060_PWR_OFF_VAL);
+	}
+
+	return NOTIFY_DONE;
+}
+
+static int axp15060_power_off_prepare(struct device *dev)
+{
+	int err;
+	err = devm_register_sys_off_handler(dev,
+					    SYS_OFF_MODE_POWER_OFF_PREPARE,
+					    SYS_OFF_PRIO_DEFAULT,
+					    axp15060_power_off,
+					    dev);
+	if (err) {
+		dev_err(dev, "failed to register sys-off handler: %d\n",
+			err);
+		return err;
+	}
+	dev_info(dev, "sys-off handler registered\n");
+
+	return 0;
+}
+
 static int axp15060_i2c_probe(struct i2c_client *client)
 {
 	struct regulator_config config = { };
 	struct regmap *regmap;
 	int i;
+	int err;
 
 	regmap = devm_regmap_init_i2c(client, &axp15060_regmap_config);
 
 	config.dev = &client->dev;
 	config.driver_data = NULL;
 	config.regmap = regmap;
+
+	err = axp15060_power_off_prepare(&client->dev);
+	if(err)
+		return err;
 
 	for (i = 0; i < ARRAY_SIZE(axp15060_regulators); i++) {
 		struct regulator_dev *rdev;
