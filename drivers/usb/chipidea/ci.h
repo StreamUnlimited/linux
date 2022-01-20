@@ -278,6 +278,7 @@ struct ci_hdrc {
 	u32				pm_portsc;
 	u32				pm_usbmode;
 	struct mutex			mutex;
+	struct workqueue_struct		*vbus_oc_wq;
 	struct delayed_work		check_vbus_work;
 };
 
