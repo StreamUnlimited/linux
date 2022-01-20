@@ -266,6 +266,7 @@ struct ci_hdrc {
 	bool				vbus_overcurrent;
 	enum ci_revision		rev;
 	struct mutex                    mutex;
+	struct workqueue_struct		*vbus_oc_wq;
 	struct delayed_work		check_vbus_work;
 };
 

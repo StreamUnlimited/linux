@@ -14,6 +14,7 @@
  * - Low power mode
  * - USB wakeup
  */
+
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
@@ -1069,6 +1070,10 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 	const int overcurrent_disabled_time = 5000;
 	const int overcurrent_reenabled_time = 200;
 
+	/* If in low power mode, OC cannot be detected anyway, so just return and wait for resume */
+	if (ci->in_lpm)
+		return;
+
 	/*
 	 * According to the reference manual for the SOC, setting or
 	 * clearing the PP bit in PORTSC should enable or disable
@@ -1092,9 +1097,12 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 		} else {
 			ci->vbus_overcurrent = false;
 		}
+		/* Overcurrent fixed, let device sleep if it wants to again. */
+		pm_runtime_mark_last_busy(ci->dev);
+		pm_request_autosuspend(ci->dev);
 		check_interval = overcurrent_reenabled_time;
 	} else {
-		/* check if vbus is valid */
+		/* check if vbus is valid, this blocks if device is in suspend */
 		reg = hw_read_id_reg(ci, 0x23c, 0xff);
 		if (!(reg & BIT(3))) {
 			dev_err(ci->dev, "vbus overcurrent detected, disabling port power!\n");
@@ -1107,7 +1115,7 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 	}
 
 	queue_delayed_work(
-		system_wq,
+		ci->vbus_oc_wq,
 		&ci->check_vbus_work,
 		msecs_to_jiffies(check_interval));
 }
@@ -1312,16 +1320,23 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 	hw_write_id_reg(ci, 0x230, (7 << 10), (0 << 10));
 
 	/* Init workqueue for checking VBUS overcurrent & start it. */
+	ci->vbus_oc_wq = create_freezable_workqueue("ci_vbus_oc");
+	if (!ci->vbus_oc_wq) {
+		dev_err(ci->dev, "can't create vbus_oc workqueue\n");
+		goto pm_stop;
+	}
 	ci->vbus_overcurrent = false;
 	INIT_DELAYED_WORK(&ci->check_vbus_work,
 			  imx8_check_vbus_overcurrent);
 	queue_delayed_work(
-		system_wq,
+		ci->vbus_oc_wq,
 		&ci->check_vbus_work,
 		msecs_to_jiffies(1000));
-
 	return 0;
 
+pm_stop:
+	dbg_remove_files(ci);
+	pm_runtime_disable(&pdev->dev);
 stop:
 	if (ci->role_switch)
 		usb_role_switch_unregister(ci->role_switch);
@@ -1353,6 +1368,8 @@ static void ci_hdrc_remove(struct platform_device *pdev)
 		pm_runtime_put_noidle(&pdev->dev);
 	}
 
+	flush_workqueue(ci->vbus_oc_wq);
+	destroy_workqueue(ci->vbus_oc_wq);
 	dbg_remove_files(ci);
 	ci_role_destroy(ci);
 	ci_hdrc_enter_lpm(ci, true);
@@ -1458,6 +1475,11 @@ static int ci_controller_resume(struct device *dev)
 		ci_extcon_wakeup_int(ci);
 	}
 
+	queue_delayed_work(
+		ci->vbus_oc_wq,
+		&ci->check_vbus_work,
+		msecs_to_jiffies(0));
+
 	return 0;
 }
 
@@ -1466,6 +1488,7 @@ static int ci_suspend(struct device *dev)
 {
 	struct ci_hdrc *ci = dev_get_drvdata(dev);
 
+	flush_workqueue(ci->vbus_oc_wq);
 	if (ci->wq)
 		flush_workqueue(ci->wq);
 	/*
@@ -1547,6 +1570,12 @@ static int ci_runtime_suspend(struct device *dev)
 	struct ci_hdrc *ci = dev_get_drvdata(dev);
 
 	dev_dbg(dev, "at %s\n", __func__);
+
+	/* Can't go to sleep while the overcurrent is happening, need to reset first */
+	if(ci->vbus_overcurrent)
+		return -EBUSY;
+
+	cancel_delayed_work_sync(&ci->check_vbus_work); 
 
 	if (ci->in_lpm)
 		return 0;
