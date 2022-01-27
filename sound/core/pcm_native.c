@@ -1425,9 +1425,15 @@ static int snd_pcm_do_start(struct snd_pcm_substream *substream,
 			    snd_pcm_state_t state)
 {
 	int err;
+	struct snd_pcm_runtime *runtime = substream->runtime;
 
 	if (substream->runtime->trigger_master != substream)
 		return 0;
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    runtime->silence_size > 0)
+		snd_pcm_playback_silence(substream, ULONG_MAX);
+
 	err = substream->ops->trigger(substream, SNDRV_PCM_TRIGGER_START);
 	/* XRUN happened during the start */
 	if (err == -EPIPE)
@@ -1453,9 +1459,6 @@ static void snd_pcm_post_start(struct snd_pcm_substream *substream,
 	runtime->hw_ptr_buffer_jiffies = (runtime->buffer_size * HZ) / 
 							    runtime->rate;
 	__snd_pcm_set_state(runtime, state);
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-	    runtime->silence_size > 0)
-		snd_pcm_playback_silence(substream, ULONG_MAX);
 	snd_pcm_timer_notify(substream, SNDRV_TIMER_EVENT_MSTART);
 }
 
