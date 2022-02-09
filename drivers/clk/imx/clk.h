@@ -77,6 +77,7 @@ struct imx_pll14xx_clk {
 extern struct imx_pll14xx_clk imx_1416x_pll;
 extern struct imx_pll14xx_clk imx_1443x_pll;
 extern struct imx_pll14xx_clk imx_1443x_dram_pll;
+extern struct imx_pll14xx_clk imx_1443x_audio_pll;
 
 #define CLK_FRACN_GPPLL_INTEGER	BIT(0)
 #define CLK_FRACN_GPPLL_FRACN	BIT(1)
