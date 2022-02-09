@@ -78,6 +78,7 @@ struct imx_pll14xx_clk {
 extern struct imx_pll14xx_clk imx_1416x_pll;
 extern struct imx_pll14xx_clk imx_1443x_pll;
 extern struct imx_pll14xx_clk imx_1443x_dram_pll;
+extern struct imx_pll14xx_clk imx_1443x_audio_pll;
 
 /* NOTE: Rate table should be kept sorted in descending order. */
 struct imx_fracn_gppll_rate_table {
