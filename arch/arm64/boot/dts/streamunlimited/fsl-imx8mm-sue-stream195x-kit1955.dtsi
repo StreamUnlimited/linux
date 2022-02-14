@@ -57,7 +57,7 @@
 };
 
 &clk {
-	assigned-clock-rates = <0>,
+	assigned-clock-rates = <0>, <0>, <0>,
 				<400000000>,
 				<400000000>,
 				<750000000>,
