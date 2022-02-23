@@ -706,7 +706,14 @@ static int __maybe_unused ak4458_runtime_resume(struct device *dev)
 	regcache_cache_only(ak4458->regmap, false);
 	regcache_mark_dirty(ak4458->regmap);
 
-	return regcache_sync(ak4458->regmap);
+	/* There is a tiny chance this fails on boot because of timing reasons, so try again in that case with a bit of a delay */
+	ret = regcache_sync(ak4458->regmap);
+	if (ret != 0) {
+		dev_warn(ak4458->dev, "regcache_sync failed, retrying... \n");
+		usleep_range(5000, 10000);
+		ret = regcache_sync(ak4458->regmap);
+	}
+	return ret;
 }
 #endif /* CONFIG_PM */
 
