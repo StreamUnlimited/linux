@@ -22,9 +22,3 @@
 		792000	980000
 	>;
 };
-
-&pinctrl_factory_test_gpios {
-			fsl,pins = <
-			MX7D_PAD_LCD_DATA16__GPIO3_IO21			0x30
-			>;
-};
