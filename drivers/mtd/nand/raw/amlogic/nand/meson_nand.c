@@ -18,7 +18,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/sched/task_stack.h>
-#include "aml_rsv.h"
+#include "../reserve/aml_rsv.h"
 #include "aml_mtd_nand.h"
 #include <linux/mtd/partitions.h>
 #include <linux/pinctrl/consumer.h>
@@ -147,7 +147,7 @@ static void meson_nfc_cmd_access(struct nand_chip *nand, int raw, bool dir,
 
 	if (raw) {
 		len = mtd->writesize + mtd->oobsize;
-		cmd = (len & GENMASK(5, 0)) | (scrambler << 19) | DMA_DIR(dir);
+		cmd = (len & NFC_CMD_RAW_LEN) | (scrambler << 19) | DMA_DIR(dir);
 		writel(cmd, nfc->reg_base + NFC_REG_CMD);
 		return;
 	}
@@ -1233,8 +1233,11 @@ static int meson_nfc_clk_init(struct meson_nfc *nfc)
 		return PTR_ERR(nfc->nand_div_clk);
 
 	ret = clk_prepare_enable(nfc->nand_div_clk);
-	if (ret)
+	if (ret) {
 		dev_err(nfc->dev, "pre enable NFC divider fail\n");
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -1611,8 +1614,9 @@ meson_nfc_nand_chip_init(struct device *dev,
 			pr_info("invalid nand bbt\n");
 			goto exit_err2;
 		}
-
+#ifndef CONFIG_MTD_ENV_IN_NAND
 		meson_rsv_check(nfc->rsv->env);
+#endif
 		meson_rsv_check(nfc->rsv->key);
 		meson_rsv_check(nfc->rsv->dtb);
 	}

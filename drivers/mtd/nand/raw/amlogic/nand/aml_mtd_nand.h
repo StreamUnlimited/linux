@@ -102,6 +102,8 @@
 
 #define PER_INFO_BYTE		8
 
+#define NFC_CMD_RAW_LEN	GENMASK(13, 0)
+
 #define NAND_BLOCK_GOOD	0
 #define NAND_BLOCK_BAD	1
 #define NAND_FACTORY_BAD	2

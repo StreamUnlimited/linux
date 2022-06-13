@@ -8,6 +8,7 @@
 
 #define NAND_RSV_BLOCK_NUM 48
 #define CONFIG_ENV_SIZE  (64 * 1024U)
+#define CONFIG_MTD_ENV_IN_NAND
 
 #define NAND_GAP_BLOCK_NUM 4
 #define NAND_BBT_BLOCK_NUM 4

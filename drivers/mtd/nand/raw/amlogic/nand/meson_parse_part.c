@@ -10,7 +10,7 @@
 #include <linux/slab.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/rawnand.h>
-#include "aml_rsv.h"
+#include "../reserve/aml_rsv.h"
 #include "aml_mtd_nand.h"
 //#include "linux/amlogic/cpu_version.h"
 

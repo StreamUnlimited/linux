@@ -11,7 +11,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/rawnand.h>
 #include <linux/mtd/partitions.h>
-#include <linux/mtd/nand_ecc.h>
+#include <linux/mtd/nand-ecc-sw-hamming.h>
 #include "aml_rsv.h"
 #include "../nand/aml_mtd_nand.h"
 #include <linux/slab.h>
