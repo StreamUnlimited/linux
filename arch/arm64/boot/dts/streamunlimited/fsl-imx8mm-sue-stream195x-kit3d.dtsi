@@ -168,7 +168,7 @@
 		#sound-dai-cells = <0>;
 		compatible = "asahi-kasei,ak4458";
 		reg = <0x10>;
-		reset-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio5 5 GPIO_ACTIVE_LOW>;
 		mute-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
 	};
 };
