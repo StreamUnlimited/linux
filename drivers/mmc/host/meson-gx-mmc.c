@@ -179,6 +179,8 @@ struct meson_host {
 	spinlock_t lock;
 };
 
+static struct mmc_host *sdio_host;
+
 #define CMD_CFG_LENGTH_MASK GENMASK(8, 0)
 #define CMD_CFG_BLOCK_MODE BIT(9)
 #define CMD_CFG_R1B BIT(10)
@@ -1121,6 +1123,36 @@ static void meson_mmc_ack_sdio_irq(struct mmc_host *mmc)
 {
 	meson_mmc_enable_sdio_irq(mmc, 1);
 }
+extern int sdio_reset_comm(struct mmc_card *card);
+
+static void sdio_rescan(struct mmc_host *mmc)
+{
+	int ret;
+
+	mmc->rescan_entered = 0;
+/*	mmc->host_rescan_disable = false;*/
+	mmc_detect_change(mmc, 0);
+	/* start the delayed_work */
+	ret = flush_work(&mmc->detect.work);
+	/* wait for the delayed_work to finish */
+	if (!ret)
+		pr_info("Error: delayed_work mmc_rescan() already idle!\n");
+}
+
+void sdio_reinit(void)
+{
+	if (sdio_host) {
+		if (sdio_host->card)
+			sdio_reset_comm(sdio_host->card);
+		else
+			sdio_rescan(sdio_host);
+	} else {
+		pr_info("Error: sdio_host is NULL\n");
+	}
+
+	pr_info("[%s] finish\n", __func__);
+}
+EXPORT_SYMBOL(sdio_reinit);
 
 static const struct mmc_host_ops meson_mmc_ops = {
 	.request	= meson_mmc_request,
@@ -1283,6 +1315,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
 	ret = mmc_add_host(mmc);
 	if (ret)
 		goto err_free_irq;
+	sdio_host = mmc;
 
 	return 0;
 
