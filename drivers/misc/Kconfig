@@ -50,6 +50,14 @@ config AD525X_DPOT_SPI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ad525x_dpot-spi.
 
+config AMLOGIC_WIFI
+	tristate "Amlogic WiFi reset support"
+	select WIRELESS_EXT
+	select WEXT_PRIV
+	default n
+	help
+		This module adds gpio reset controls on amlogic platforms.
+
 config DUMMY_IRQ
 	tristate "Dummy IRQ handler"
 	help
