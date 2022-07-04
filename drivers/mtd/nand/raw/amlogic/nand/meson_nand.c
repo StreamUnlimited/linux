@@ -626,7 +626,7 @@ static void meson_info_page0_prepare(struct nand_chip *nand, u8 *page0_buf)
 	}
 
 	memset(page0_buf, 0x0, mtd->writesize);
-	dir = 0;
+	dir = 1;
 
 	configure_data = CMDRWGEN(DMA_DIR(dir),
 				  nand->options & NAND_NEED_SCRAMBLING,
