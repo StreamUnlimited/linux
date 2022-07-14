@@ -617,6 +617,7 @@ static int meson_gpiolib_register(struct meson_pinctrl *pc)
 	pc->chip.get = meson_gpio_get;
 	pc->chip.set = meson_gpio_set;
 	pc->chip.base = -1;
+	of_property_read_u32(to_of_node(pc->fwnode), "sysfs-base", &pc->chip.base);
 	pc->chip.ngpio = pc->data->num_pins;
 	pc->chip.can_sleep = false;
 

@@ -41,6 +41,10 @@ $defs:
       gpio-ranges:
         maxItems: 1
 
+      sysfs-base:
+        $ref: /schemas/types.yaml#/definitions/uint32
+        description: Gpios will be numbered starting from this offset in sysfs.
+
     patternProperties:
       "^.+-hog(-[0-9]+)?$":
         type: object
