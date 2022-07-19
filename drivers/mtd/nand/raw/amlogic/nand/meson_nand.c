@@ -428,6 +428,15 @@ static int meson_nfc_dma_buffer_setup(struct nand_chip *nand, void *databuf,
 	return ret;
 }
 
+static void meson_nfc_dma_buffer_sync(struct nand_chip *nand,
+				      int datalen, int infolen,
+				      enum dma_data_direction dir)
+{
+	struct meson_nfc *nfc = nand_get_controller_data(nand);
+	dma_sync_single_for_cpu(nfc->dev, nfc->iaddr, infolen, dir);
+	dma_sync_single_for_cpu(nfc->dev, nfc->daddr, datalen, dir);
+}
+
 static void meson_nfc_dma_buffer_release(struct nand_chip *nand,
 					 int datalen, int infolen,
 					 enum dma_data_direction dir)
@@ -822,6 +831,7 @@ static int meson_nfc_read_page_sub(struct nand_chip *nand,
 	}
 
 	ret = meson_nfc_wait_dma_finish(nfc);
+	meson_nfc_dma_buffer_sync(nand, data_len, info_len, DMA_FROM_DEVICE);
 	meson_nfc_check_ecc_pages_valid(nfc, nand, raw);
 
 	meson_nfc_dma_buffer_release(nand, data_len, info_len, DMA_FROM_DEVICE);
