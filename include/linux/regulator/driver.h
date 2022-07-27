@@ -767,6 +767,9 @@ int regulator_find_closest_bigger(unsigned int target, const unsigned int *table
 int regulator_set_ramp_delay_regmap(struct regulator_dev *rdev, int ramp_delay);
 int regulator_sync_voltage_rdev(struct regulator_dev *rdev);
 
+void regulator_lock(struct regulator_dev *rdev);
+void regulator_unlock(struct regulator_dev *rdev);
+
 /*
  * Helper functions intended to be used by regulator drivers prior registering
  * their regulators.
