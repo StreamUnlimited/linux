@@ -193,9 +193,17 @@ static int imx2_wdt_set_timeout(struct watchdog_device *wdog,
 				unsigned int new_timeout)
 {
 	unsigned int actual;
+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
 
 	actual = min(new_timeout, IMX2_WDT_MAX_TIME);
 	__imx2_wdt_set_timeout(wdog, actual);
+
+	// If the watchdog is already running we need to ping it once
+	// to update it with the new timeout.
+	if (imx2_wdt_is_running(wdev)) {
+		imx2_wdt_ping(wdog);
+	}
+
 	wdog->timeout = new_timeout;
 	return 0;
 }
