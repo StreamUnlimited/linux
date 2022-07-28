@@ -36,6 +36,11 @@ struct axg_tdm_iface {
 
 	/* For component wide symmetry */
 	int rate;
+
+	/* For drift compensation */
+	s32 drift_comp_value;
+	u32 sysclk_nominal;
+	bool enable_drift_compensator;
 };
 
 static inline bool axg_tdm_lrclk_invert(unsigned int fmt)

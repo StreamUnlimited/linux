@@ -107,6 +107,19 @@ static int axg_tdm_iface_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 		if (!iface->mclk) {
 			dev_warn(dai->dev, "master clock not provided\n");
 		} else {
+			int sign;
+			unsigned int comp;
+
+			/* save nominal sysclk for drift_comp calculation */
+			iface->sysclk_nominal = freq;
+
+			sign = (iface->drift_comp_value < 0) ? -1 : 1;
+			comp = DIV_ROUND_CLOSEST_ULL((u64)freq * abs(iface->drift_comp_value),
+					1000000UL); /* compensation is in ppm */
+			freq -= sign * comp;
+			pr_debug("axg_tdm_iface_set_sysclk nominal_freq = %d, freq = %d\n",
+				iface->sysclk_nominal, freq);
+			
 			ret = clk_set_rate(iface->mclk, freq);
 			if (!ret)
 				iface->mclk_rate = freq;
@@ -277,14 +290,6 @@ static int axg_tdm_iface_set_sclk(struct snd_soc_dai *dai,
 	if (!iface->mclk_rate) {
 		/* If no specific mclk is requested, default to bit clock * 2 */
 		clk_set_rate(iface->mclk, 2 * srate);
-	} else {
-		/* Check if we can actually get the bit clock from mclk */
-		if (iface->mclk_rate % srate) {
-			dev_err(dai->dev,
-				"can't derive sclk %lu from mclk %lu\n",
-				srate, iface->mclk_rate);
-			return -EINVAL;
-		}
 	}
 
 	ret = clk_set_rate(iface->sclk, srate);
@@ -374,6 +379,46 @@ static int axg_tdm_iface_trigger(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int axg_tdm_iface_drift_info(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->value.integer.min = -500; /* +/- 500ppm */
+	uinfo->value.integer.max = 500;
+	uinfo->count = 1;
+
+	return 0;
+}
+
+static int axg_tdm_iface_drift_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dai *cpu_dai = snd_kcontrol_chip(kcontrol);
+	struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+
+	ucontrol->value.integer.value[0] = iface->drift_comp_value;
+
+	return 0;
+}
+
+static int axg_tdm_iface_drift_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dai *cpu_dai = snd_kcontrol_chip(kcontrol);
+	struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+
+	if (ucontrol->value.integer.value[0] == iface->drift_comp_value)
+		return 0;
+
+	iface->drift_comp_value = ucontrol->value.integer.value[0];
+
+	if (iface->sysclk_nominal == 0)
+		return 0;
+
+	return snd_soc_dai_set_sysclk(cpu_dai, 0, iface->sysclk_nominal,
+			SND_SOC_CLOCK_OUT);
+}
+
 static int axg_tdm_iface_remove_dai(struct snd_soc_dai *dai)
 {
 	int stream;
@@ -405,6 +450,26 @@ static int axg_tdm_iface_probe_dai(struct snd_soc_dai *dai)
 			return -ENOMEM;
 		}
 		snd_soc_dai_dma_data_set(dai, stream, ts);
+	}
+
+	/*
+	 * Only add the drift compensator control if it was exlicitly requested
+	 * for the TDM interface. The reason that we do not want to have this
+	 * control on all interfaces since it could happen that two or more interfaces
+	 * might share the same parent clock, so multiple dirft compensators would
+	 * be controlling the same PLL.
+	 */
+	if (iface->enable_drift_compensator) {
+		char name[128] = "Drift compensator ";
+		struct snd_kcontrol_new tdm_control = {
+			.name	= name,
+			.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info	= axg_tdm_iface_drift_info,
+			.get	= axg_tdm_iface_drift_get,
+			.put	= axg_tdm_iface_drift_put,
+		};
+		strncat(name, dai->component->name_prefix, ARRAY_SIZE(name));
+		snd_soc_add_dai_controls(dai, &tdm_control, 1);
 	}
 
 	return 0;
@@ -539,6 +604,8 @@ static int axg_tdm_iface_probe(struct platform_device *pdev)
 	iface->lrclk = devm_clk_get(dev, "lrclk");
 	if (IS_ERR(iface->lrclk))
 		return dev_err_probe(dev, PTR_ERR(iface->lrclk), "failed to get lrclk\n");
+
+	iface->enable_drift_compensator = of_property_read_bool(dev->of_node, "enable-drift-compensator");
 
 	/*
 	 * mclk maybe be missing when the cpu dai is in slave mode and
