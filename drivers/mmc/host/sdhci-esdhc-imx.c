@@ -30,6 +30,7 @@
 #include "sdhci-pltfm.h"
 #include "sdhci-esdhc.h"
 #include "cqhci.h"
+#include "../../base/base.h"
 
 #define ESDHC_SYS_CTRL_DTOCV_MASK	GENMASK(19, 16)
 #define ESDHC_SYS_CTRL_RST_FIFO		BIT(22)
@@ -2065,6 +2066,45 @@ static void sdhci_esdhc_imx_remove(struct platform_device *pdev)
 		release_bus_freq(BUS_FREQ_HIGH);
 }
 
+static struct device *stored_dev = NULL;
+static void do_rebind_function(struct work_struct *work)
+{
+	struct device_driver *drv;
+	int gpio_num = gpio_reg_on;
+	if (stored_dev && stored_dev->driver) {
+		drv = stored_dev->driver;
+		dev_info(stored_dev, "%s: reloading driver %s\n",
+		__FUNCTION__, drv->name);
+		device_driver_detach(stored_dev);
+		usleep_range(30000, 50000);
+		imx_wlan_reg_on_set(gpio_num, 1);
+		usleep_range(10000, 20000);
+		device_driver_attach(drv, stored_dev);
+	}
+}
+static DECLARE_DELAYED_WORK(rebind_work, do_rebind_function);
+
+void sdhci_esdhc_rebind_driver(struct device *dev)
+{
+	stored_dev = dev;
+	schedule_delayed_work(&rebind_work, 1*HZ);
+}
+EXPORT_SYMBOL(sdhci_esdhc_rebind_driver);
+
+static ssize_t rebind_store(struct device_driver *drv, const char *buf,
+			  size_t count)
+{
+	const struct bus_type *bus = drv->bus;
+	struct device *dev = bus_find_device_by_name(bus, NULL, buf);
+	if (!dev)
+		return -ENODEV;
+
+	sdhci_esdhc_rebind_driver(dev);
+	put_device(dev);
+	return count;
+}
+static struct driver_attribute driver_attr_rebind = __ATTR_IGNORE_LOCKDEP(rebind, S_IWUSR, NULL, rebind_store);
+
 static int sdhci_esdhc_suspend(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
@@ -2248,6 +2288,12 @@ remove_pm_qos_request:
 	return err;
 }
 
+static struct attribute *sdhci_esdhci_fs_attrs[] = {
+	&driver_attr_rebind.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(sdhci_esdhci_fs);
+
 static const struct dev_pm_ops sdhci_esdhc_pmops = {
 	SYSTEM_SLEEP_PM_OPS(sdhci_esdhc_suspend, sdhci_esdhc_resume)
 	RUNTIME_PM_OPS(sdhci_esdhc_runtime_suspend, sdhci_esdhc_runtime_resume, NULL)
@@ -2259,6 +2305,7 @@ static struct platform_driver sdhci_esdhc_imx_driver = {
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table = imx_esdhc_dt_ids,
 		.pm	= pm_ptr(&sdhci_esdhc_pmops),
+		.groups = sdhci_esdhci_fs_groups,
 	},
 	.probe		= sdhci_esdhc_imx_probe,
 	.remove		= sdhci_esdhc_imx_remove,
