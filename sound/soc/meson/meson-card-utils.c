@@ -7,10 +7,8 @@
 #include <linux/of_platform.h>
 #include <sound/soc.h>
 
+#include "axg-tdm.h"
 #include "meson-card.h"
-
-#define MCLK_48k	(24576000UL)
-#define MCLK_44k1	(22579200UL)
 
 int meson_card_i2s_set_sysclk(struct snd_pcm_substream *substream,
 			      struct snd_pcm_hw_params *params,

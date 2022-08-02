@@ -58,6 +58,8 @@ static int axg_card_tdm_dai_init(struct snd_soc_pcm_runtime *rtd)
 	struct axg_dai_link_tdm_data *be =
 		(struct axg_dai_link_tdm_data *)priv->link_data[rtd->num];
 	struct snd_soc_dai *codec_dai;
+	struct snd_soc_dai *cpu_dai;
+	bool idle_clk = false;
 	int ret, i;
 
 	for_each_rtd_codec_dais(rtd, i, codec_dai) {
@@ -79,7 +81,49 @@ static int axg_card_tdm_dai_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
+	/* enable dai-link mclk when CONTINUOUS clk is set */
+	idle_clk = !!(rtd->dai_link->dai_fmt & SND_SOC_DAIFMT_CONT);
+	if (idle_clk) {
+		for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
+			struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+			int rate = MCLK_48k;
+			ret = cpu_dai->driver->ops->set_sysclk(cpu_dai, 0, rate, SND_SOC_CLOCK_OUT);
+			/*
+			* Always set the BCLK to MCLK/8 and the WCLK to BCLK/64 for the
+			* early clocks.
+			*/
+			ret |= clk_set_rate(iface->sclk, rate/8);
+			ret |= clk_set_rate(iface->lrclk, rate/(64*8));
+			ret |= clk_set_duty_cycle(iface->lrclk, 1, 2);
+
+			ret |= clk_prepare_enable(iface->mclk);
+			ret |= clk_prepare_enable(iface->sclk);
+			ret |= clk_prepare_enable(iface->lrclk);
+
+			if (ret != 0)
+				dev_err(cpu_dai->dev, "enabling of continuous clocks failed\n");
+			}
+	}
+
 	return 0;
+}
+
+static void axg_card_tdm_dai_exit(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_dai *cpu_dai;
+	bool idle_clk = false;
+	int i;
+
+	idle_clk = !!(rtd->dai_link->dai_fmt & SND_SOC_DAIFMT_CONT);
+	if(idle_clk) {
+		for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
+			struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+
+			clk_disable_unprepare(iface->lrclk);
+			clk_disable_unprepare(iface->sclk);
+			clk_disable_unprepare(iface->mclk);
+		}
+	}
 }
 
 static int axg_card_tdm_dai_lb_init(struct snd_soc_pcm_runtime *rtd)
@@ -261,6 +305,7 @@ static int axg_card_parse_tdm(struct snd_soc_card *card,
 	/* Setup tdm link */
 	link->ops = &axg_card_tdm_be_ops;
 	link->init = axg_card_tdm_dai_init;
+	link->exit = axg_card_tdm_dai_exit;
 	link->dai_fmt = meson_card_parse_daifmt(node, link->cpus->of_node);
 
 	of_property_read_u32(node, "mclk-fs", &be->mclk_fs);
