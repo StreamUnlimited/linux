@@ -21,6 +21,9 @@
 				 SNDRV_PCM_FMTBIT_S24_LE |	\
 				 SNDRV_PCM_FMTBIT_S32_LE)
 
+#define MCLK_48k	(24576000UL)
+#define MCLK_44k1	(22579200UL)
+
 struct axg_tdm_iface {
 	struct clk *sclk;
 	struct clk *lrclk;
