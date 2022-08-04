@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+/dts-v1/;
+
+#include "axg_sue_s183x_internal.dtsi"
+#include "axg_sue_s183x_internal_override_s1832_l1.dtsi"
+#include "axg_sue_s183x_external_default.dtsi"
+#include "axg_sue_s183x_external_default_override_s1832_l1.dtsi"
+#include "axg_sue_prime.dtsi"
+

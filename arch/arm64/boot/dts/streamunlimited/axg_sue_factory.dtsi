@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+
+/*
+ * DT for components located on factory tester carrier board.
+ *
+ * This file is empty for now, as there is nothing on the factory module, which
+ * would require device tree entry.
+ */
+
+/ {
+	sue {
+		carrierboard = "factory";
+	};
+};

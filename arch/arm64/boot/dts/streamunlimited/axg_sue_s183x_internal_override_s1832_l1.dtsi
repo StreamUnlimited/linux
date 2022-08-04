@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+
+/*
+ * The first revisions of the stream1832 module had the wrong I2C address
+ * for the AXP152.
+ */
+&pmic {
+	reg = <0x30>;
+};

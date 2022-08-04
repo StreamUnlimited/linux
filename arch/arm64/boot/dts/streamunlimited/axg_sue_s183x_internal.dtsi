@@ -1,0 +1,485 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2017 Amlogic, Inc. All rights reserved.
+ */
+
+/dts-v1/;
+
+#include "../amlogic/meson-axg.dtsi"
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/thermal/thermal.h>
+
+/ {
+	compatible = "sue,stream1832", "amlogic,a113d", "amlogic,meson-axg";
+	model = "Amlogic";
+
+	aliases {
+		serial0 = &uart_AO;
+		serial1 = &uart_B;
+		i2c0 = &i2c1;
+		i2c1 = &i2c_AO;
+	};
+
+	cpu_opp_table: cpu_opp_table {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp96MHz: opp@96000000 {
+			opp-hz = /bits/ 64 <96000000>;
+			opp-microvolt = <850000>;
+			clock-latency-ns = <200>;
+		};
+		opp264MHz: opp@264000000 {
+			opp-hz = /bits/ 64 <264000000>;
+			opp-microvolt = <850000>;
+			clock-latency-ns = <200>;
+		};
+		opp504MHz: opp@504000000 {
+			opp-hz = /bits/ 64 <504000000>;
+			opp-microvolt = <850000>;
+			clock-latency-ns = <200>;
+		};
+		opp672MHz: opp@672000000 {
+			opp-hz = /bits/ 64 <672000000>;
+			opp-microvolt = <850000>;
+			clock-latency-ns = <200>;
+		};
+		opp768MHz: opp@768000000 {
+			opp-hz = /bits/ 64 <768000000>;
+			opp-microvolt = <950000>;
+			clock-latency-ns = <200>;
+		};
+		opp1_2GHz: opp@1176000000 {
+			opp-hz = /bits/ 64 <1176000000>;
+			opp-microvolt = <1050000>;
+			clock-latency-ns = <200>;
+			opp-workmode = <1>; /* 1: REGULATOR_MODE_FAST => PWM only mode on AXP152 */
+
+			/*
+			 * An operating point marked with opp-suspend will be set when the system
+			 * goes to suspend *or* reboot *or* shutdown.
+			 *
+			 * For Stream1832 we want to set the AXP152 back to the 1.2 GHz voltage, otherwise
+			 * the U-Boot will not be able to boot after a reboot since the vdd_arm voltage
+			 * might be too low from a previous frequency change to a lower operating point.
+			 */
+			opp-suspend;
+		};
+		opp1_3GHz: opp@1344000000 {
+			opp-hz = /bits/ 64 <1344000000>;
+			opp-microvolt = <1075000>;
+			clock-latency-ns = <200>;
+			opp-workmode = <1>; /* 1: REGULATOR_MODE_FAST => PWM only mode on AXP152 */
+		};
+
+		/*
+		 * The 1.5 GHz operating point is intentionally disabled since VDDCPU is above
+		 * the recommended operating conditions.
+		 */
+		/*
+		opp1_5GHz: opp@1512000000 {
+			opp-hz = /bits/ 64 <1416000000>;
+			opp-microvolt = <1150000>;
+			clock-latency-ns = <200>;
+			opp-workmode = <1>;
+		};
+		*/
+	};
+
+	thermal-zones {
+		soc_thermal {
+			polling-delay = <1000>;
+			polling-delay-passive = <100>;
+
+			thermal-sensors = <&scpi_sensors 0>;
+
+			trips {
+				passive: trip-point@0 {
+					temperature = <90000>;
+					hysteresis = <3000>;
+					type = "passive";
+				};
+				critical: trip-point@1 {
+					temperature = <110000>;
+					hysteresis = <1000>;
+					type = "critical";
+				};
+			};
+
+			cooling-maps {
+				cpufreq_cooling_map {
+					trip = <&passive>;
+					/* Corresponds to 768MHz in OPP table */
+					cooling-device = <&cpu0 0 2>, <&cpu1 0 2>,
+							<&cpu2 0 2>, <&cpu3 0 2>;
+				};
+			};
+		};
+	};
+
+	gpio_buttons: gpio-keys {
+		compatible = "gpio-keys";
+
+		button_sense {
+			label = "button_sense";
+			/* The BUTTON_SENSE is the inverted NPB_IN so it is becomes active high.  */
+			gpios = <&gpio_ao 3 GPIO_ACTIVE_HIGH>;
+			linux,code = <KEY_POWER>;
+			wakeup-source;
+		};
+	};
+
+	vddao_3v3: regulator-vddao_3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDAO_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	vddio_ao18: regulator-vddio_ao18 {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDIO_AO18";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vddao_3v3>;
+		regulator-always-on;
+	};
+
+	vddio_boot: regulator-vddio_boot {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDIO_BOOT";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0x0 0x000000 0x0 0x20000000>;
+		linux,usable-memory = <0x0 0x0000000 0x0 0x20000000>;
+	};
+
+	wifi_reset: wifi-reset {
+		compatible = "amlogic, aml_wifi";
+		status = "okay";
+
+		power_on_pin = <&gpio_ao GPIOAO_4 GPIO_ACTIVE_HIGH>;
+		vrf_pin = <&gpio GPIOZ_10 GPIO_OPEN_DRAIN>;
+	};
+
+	sdio_pwrseq: sdio-pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		clocks = <&wifi32k>;
+		clock-names = "ext_clock";
+	};
+
+	firmware  {
+		optee  {
+			compatible = "linaro,optee-tz";
+			method = "smc";
+		};
+	};
+
+	secmon {
+		compatible = "amlogic, secmon";
+		memory-region = <&secmon_reserved>;
+		in_base_func = <0x82000020>;
+		out_base_func = <0x82000021>;
+		reserve_mem_size = <0x00300000>;
+	};
+
+	reserved-memory {
+		secos_reserved:linux,secos {
+			status = "disable";
+			compatible = "amlogic, aml_secos_memory";
+			reg = <0x0 0x05300000 0x0 0x2000000>;
+			no-map;
+		};
+		/delete-node/ secmon@5000000;
+		secmon_reserved:linux,secmon {
+			compatible = "shared-dma-pool";
+			reusable;
+			/*
+			* Do not use "reg" property instead of "size, alignment, alloc-ranges" here,
+			* because u-boot can't handle the newer format. These values are set in u-boot
+			* to match the calculated size of bl31 and bl32.
+			*/
+			size = <0x0 0x400000>;
+			alignment = <0x0 0x400000>;
+			alloc-ranges = <0x0 0x05000000 0x0 0x400000>;
+		};
+	};
+
+	vrtc: rtc@a8 {
+		compatible = "amlogic,meson-vrtc";
+		reg = <0x0 0x000a8 0x0 0x4>;
+	};
+
+	wifi32k: wifi32k {
+		compatible = "pwm-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32768>;
+		pwms = <&pwm_ab 0 30518 0>; /* PWM_A at 32.768KHz */
+	};
+
+	mtd_nand: nfc@ffe07800 {
+		compatible = "amlogic,meson-nfc-single-ecc";
+		status = "okay";
+		reg = <0x0 0xffe07800 0x0 0x200>;
+		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
+
+		pinctrl-names = "nand_norb_mod", "nand_cs_only";
+		pinctrl-0 = <&all_nand_pins>;
+		pinctrl-1 = <&nand_cs_pins>;
+		clocks = <&clkc CLKID_SD_EMMC_C>,
+				<&clkc CLKID_FCLK_DIV2>;
+		clock-names = "gate", "fdiv2pll";
+
+		bl_mode = <1>;
+		fip_copies = <4>;
+		fip_size = <0x200000>;
+		nand_clk_ctrl = <0xffe07000>;
+		ship_bad_block = <1>;
+		disa_irq_flag = <1>;
+		/*partions defined in dts*/
+		#address-cells = <1>;
+		#size-cells = <0>;
+		nand@bootloader {
+			reg = <0>;
+			nand-ecc-maximize;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			partition@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				label = "bootloader";
+				reg = <0x0 0x0>;
+			};
+		};
+		nand@normal {
+			reg = <0>;
+			nand-ecc-maximize;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			partition@0 {
+				label = "tpl";
+				reg = <0x1000000 0x800000>;
+			};
+			partition@1{
+				label = "environment";
+				reg = <0x0 0x80000>;
+			};
+			partition@2{
+				label = "constants";
+				reg = <0x0 0x80000>;
+			};
+			partition@3{
+				label = "swufit";
+				reg = <0x0 0x2000000>;
+			};
+			partition@4{
+				label = "fit";
+				reg = <0x0 0xC00000>;
+			};
+			partition@5{
+				label = "data";
+				reg = <0x0 0xffffffff>;
+			};
+		};
+	};
+};
+
+&gpio_ao {
+	sysfs-base = <497>;
+	interrupt-parent = <&gpio_intc>;
+};
+
+&gpio {
+	sysfs-base = <411>;
+	interrupt-parent = <&gpio_intc>;
+};
+
+&cpu0 {
+	cpu-supply = <&vdd_arm>;
+	operating-points-v2 = <&cpu_opp_table>;
+	#cooling-cells = <2>;
+};
+
+&cpu1 {
+	operating-points-v2 = <&cpu_opp_table>;
+	#cooling-cells = <2>;
+};
+
+&cpu2 {
+	operating-points-v2 = <&cpu_opp_table>;
+	#cooling-cells = <2>;
+};
+
+&cpu3 {
+	operating-points-v2 = <&cpu_opp_table>;
+	#cooling-cells = <2>;
+};
+
+&i2c_AO {
+	status = "okay";
+	pinctrl-0 = <&i2c_ao_sck_10_pins>, <&i2c_ao_sda_11_pins>;
+	pinctrl-names = "default";
+
+	pmic: axp152@32 {
+		compatible = "x-powers,axp152";
+		reg = <0x32>;
+		no-irq;
+
+		regulators {
+			vdd_arm: dcdc2 {
+				regulator-name = "vdd_arm";
+				regulator-min-microvolt = <800000>;
+				regulator-max-microvolt = <1150000>;
+				regulator-boot-on;
+				regulator-always-on;
+
+				/*
+				 * Allow the following workmodes (OR'ed together):
+				 *   1: REGULATOR_MODE_FAST	=> PWM only mode
+				 *   2: REGULATOR_MODE_NORMAL	=> Auto mode
+				 */
+				regulator-allowed-modes = <3>;
+			};
+
+			out_3v3: ldo0 {
+				regulator-name = "3v3_out";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+				regulator-always-on;
+
+				x-powers,disable-before-poweroff;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+				};
+			};
+		};
+	};
+};
+
+&pwm_ab {
+	status = "okay";
+	pinctrl-0 = <&pwm_a_x20_pins>;
+	pinctrl-names = "default";
+};
+
+&saradc {
+	status = "okay";
+	vref-supply = <&vddio_ao18>;
+};
+
+&frddr_a {
+	status = "okay";
+};
+
+&frddr_b {
+	status = "okay";
+};
+
+&frddr_c {
+	status = "okay";
+};
+
+&toddr_a {
+	status = "okay";
+};
+
+&toddr_b {
+	status = "okay";
+};
+
+&toddr_c {
+	status = "okay";
+};
+
+/* wifi module */
+&sd_emmc_b {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default", "clk-gate";
+	pinctrl-0 = <&sdio_pins>;
+	pinctrl-1 = <&sdio_clk_gate_pins>;
+
+	mmc-pwrseq = <&sdio_pwrseq>;
+	vmmc-supply = <&vddao_3v3>;
+	vqmmc-supply = <&vddio_boot>;
+
+	bus-width = <4>;
+	cap-sd-highspeed;
+	cap-mmc-highspeed;
+	max-frequency = <200000000>;
+	non-removable;
+	disable-wp;
+	sd-uhs-sdr12;
+	sd-uhs-sdr25;
+	sd-uhs-sdr50;
+	sd-uhs-sdr104;
+	fixed-emmc-driver-type = <3>;
+};
+
+/* emmc storage */
+&sd_emmc_c {
+	status = "disabled";
+};
+
+&uart_B {
+	status = "okay";
+	pinctrl-0 = <&uart_b_x_pins>, <&uart_b_x_cts_rts_pins>;
+	pinctrl-names = "default";
+	uart-has-rtscts;
+	fifo-size = <64>;
+	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_UART1>, <&clkc CLKID_CLK81>;
+	clock-names = "xtal", "pclk", "baud";
+};
+
+&uart_AO {
+	status = "okay";
+	pinctrl-0 = <&uart_ao_a_pins>;
+	pinctrl-names = "default";
+};
+
+&usb {
+	status = "okay";
+	dr_mode = "otg";
+};
+
+&pinctrl_periphs {
+	all_nand_pins: all_nand_pins {
+		mux {
+			groups =  "emmc_nand_d0",
+				"emmc_nand_d1",
+				"emmc_nand_d2",
+				"emmc_nand_d3",
+				"emmc_nand_d4",
+				"emmc_nand_d5",
+				"emmc_nand_d6",
+				"emmc_nand_d7",
+				"nand_ce0",
+				"nand_ale",
+				"nand_cle",
+				"nand_wen_clk",
+				"nand_ren_wr",
+				"nand_rb0";
+			function = "nand";
+			input-enable;
+		};
+	};
+	nand_cs_pins:nand_cs {
+		mux {
+			groups = "nand_ce0";
+			function = "nand";
+		};
+	};
+};

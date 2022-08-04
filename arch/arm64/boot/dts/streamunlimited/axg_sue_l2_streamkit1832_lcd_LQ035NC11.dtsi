@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+
+/*
+ * DT for the LQ035NC11 display using the lt7381 SPI bridge chip and its
+ * components located on the daughter board. This is the default 3.5in display
+ * which fits in the StreamKit1832 case.
+ */
+
+&stream183x_display {
+	width = <320>;
+	height = <240>;
+	pwm-count = <1800>;
+	backlight-max-brightness = <90>;
+	backlight-default-brightness = <75>;
+
+	display-timings@1 {
+		reg = <1>;
+
+		LQ035NC11: LQ035NC11 {
+			clock-frequency = <13700000>;
+			hactive = <320>;
+			vactive = <240>;
+			hback-porch = <38>;
+			hsync-len = <30>;
+			hfront-porch = <20>;
+			vback-porch = <15>;
+			vsync-len = <3>;
+			vfront-porch = <4>;
+			hsync-active = <0>;
+			vsync-active = <0>;
+			de-active = <1>;
+			pixelclk-active = <0>;
+		};
+
+	};
+};

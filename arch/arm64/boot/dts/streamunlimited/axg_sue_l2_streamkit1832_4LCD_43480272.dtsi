@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+
+/*
+ * DT for the 4LCD_43480272 display using the lt7381 SPI bridge chip and its
+ * components located on the daughter board. This is an alternative 4.3in 16:9
+ * display which does not fit in the StreamKit1832 case.
+ */
+
+&stream183x_display {
+	width = <480>;
+	height = <272>;
+	pwm-count = <1800>;
+	backlight-max-brightness = <90>;
+	backlight-default-brightness = <75>;
+
+	display-timings {
+
+		FOUR_LCD_43480272: FOUR_LCD_43480272 {
+			clock-frequency = <14000000>;
+			hactive = <480>;
+			vactive = <272>;
+			hback-porch = <20>;
+			hsync-len = <20>;
+			hfront-porch = <20>;
+			vback-porch = <2>;
+			vsync-len = <10>;
+			vfront-porch = <40>;
+			hsync-active = <10>;
+			vsync-active = <30>;
+			de-active = <0>;
+			pixelclk-active = <1>;
+		};
+	};
+};
