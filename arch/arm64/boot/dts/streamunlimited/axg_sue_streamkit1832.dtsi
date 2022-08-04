@@ -1,0 +1,180 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+
+/*
+ * DT for default configuration of Stream183x external IOs.
+ */
+
+
+/ {
+	sue {
+		carrierboard = "streamkit1832";
+	};
+
+	aliases {
+		spi0 = &spicc0;
+	};
+
+	spdif_dit: audio-codec-2 {
+		#sound-dai-cells = <0>;
+		compatible = "linux,spdif-dit";
+		status = "okay";
+		sound-name-prefix = "DIT";
+	};
+
+	spdif_dir: audio-codec-4 {
+		#sound-dai-cells = <0>;
+		compatible = "linux,spdif-dir";
+		status = "okay";
+		sound-name-prefix = "DIR";
+	};
+
+	dummy_codec: dummy{
+		#sound-dai-cells = <0>;
+		compatible = "meson,dummy-codec";
+		playback-rates = <44100 48000 64000 88200 96000 176400 192000>;
+		status = "okay";
+		sound-name-prefix = "DUMMY";
+	};
+
+	sound: sound {
+		compatible = "amlogic,axg-sound-card";
+		model = "AXG-S400";
+		assigned-clocks = <&clkc CLKID_HIFI_PLL>,
+				  <&clkc CLKID_MPLL0>,
+				  <&clkc CLKID_MPLL1>;
+		assigned-clock-parents = <0>, <0>, <0>;
+		assigned-clock-rates = <491520000>,
+				       <270950400>,
+				       <393216000>;
+		status = "okay";
+
+		mute-gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
+
+		dai-link-0 {
+			sound-dai = <&frddr_a>;
+		};
+
+		dai-link-1 {
+			sound-dai = <&frddr_b>;
+		};
+
+		dai-link-2 {
+			sound-dai = <&frddr_c>;
+		};
+
+		dai-link-3 {
+			sound-dai = <&toddr_a>;
+		};
+
+		dai-link-4 {
+			sound-dai = <&toddr_b>;
+		};
+
+		dai-link-5 {
+			sound-dai = <&toddr_c>;
+		};
+	};
+};
+
+&ethmac {
+	status = "okay";
+	pinctrl-0 = <&eth_rmii_x_pins>;
+	pinctrl-names = "default";
+	phy-handle = <&eth_phy0>;
+	phy-mode = "rmii";
+
+	mdio {
+		compatible = "snps,dwmac-mdio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		snps,reset-gpio = <&gpio_ao GPIOAO_7 GPIO_ACTIVE_LOW>;
+		snps,reset-active-low = <1>;
+		snps,reset-delays-us = <1000 10000 1000>;
+
+		eth_phy0: ethernet-phy@0 {
+			reg = <0>;
+			interrupt-names = "macirq";
+			compatible = "ethernet-phy-id0007.c110";
+		};
+	};
+};
+
+&i2c1 {
+	status = "okay";
+	pinctrl-names="default";
+	pinctrl-0=<&i2c1_z_pins>;
+	clock-frequency = <400000>;
+
+	ma12040_20: ma12040@20 {
+		compatible = "infineon,ma12040";
+		#sound-dai-cells = <0>;
+		reg = <0x20>;
+		sound-name-prefix = "SPK1";
+	};
+};
+
+&tdmif_b {
+	pinctrl-0 = <&tdmb_sclk_pins>, <&tdmb_fs_pins>,
+		    <&tdmb_din0_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	assigned-clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK_SEL>;
+	assigned-clock-parents = <&clkc CLKID_HIFI_PLL>;
+};
+
+&tdmif_c {
+	pinctrl-0 = <&tdmc_sclk_pins>, <&tdmc_fs_pins>,
+		    <&tdmc_dout0_pins>, <&tdmc_din1_pins>,
+		    <&mclk_c_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+	enable-drift-compensator;
+
+	assigned-clocks = <&clkc_audio AUD_CLKID_MST_C_MCLK_SEL>;
+	assigned-clock-parents = <&clkc CLKID_HIFI_PLL>;
+};
+
+&spdifin {
+	pinctrl-0 = <&spdif_in_a19_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&spdifout {
+	pinctrl-0 = <&spdif_out_a20_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+
+&spicc0 {
+	status = "okay";
+	pinctrl-names= "default";
+	pinctrl-0=<&spi0_pins>;
+	num-cs = <2>;
+	cs-gpios = <0>, <&gpio GPIOZ_4 GPIO_ACTIVE_HIGH>;
+
+	stream183x_display: spi@1 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "levetop,lt7381";
+		status = "okay";
+		reg = <1>;
+		spi-max-frequency = <28700000>;
+		spi-cpol;
+		spi-cpha;
+		buswidth = <8>;
+		rotate = <0>;
+		width = <320>;
+		height = <240>;
+		bgr;
+		reset-gpios = <&gpio GPIOA_18 GPIO_ACTIVE_LOW>;
+		debug = <0>;
+		xtal-frequency = <10000000>;
+	};
+};

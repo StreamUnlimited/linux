@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+/*
+ * DT for components located on StreamKit1832 L0 carrier board that is used by
+ * the daughter board, which are selected with DIP switches, when the daughter
+ * board is present.
+ */
+
+/ {
+	sue {
+		daughterboard = "voice";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_gpioa_10>;
+
+		mic-mute {
+			label = "Mic-mute";
+			gpios = <&gpio GPIOA_10 GPIO_ACTIVE_HIGH>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_MICROPHONE_INSERT>;
+		};
+	};
+
+	dmics: audio-codec-3 {
+		#sound-dai-cells = <0>;
+		compatible = "dmic-codec";
+		num-channels = <4>;
+		wakeup-delay-ms = <50>;
+		status = "okay";
+		sound-name-prefix = "MIC";
+	};
+};
+
+/*
+ * For three mic board configuration, the line from tdmb is "shared" with
+ * PDM_DIN1 on the module's exposed pin so if TDMB is driven, the PDM_DIN1
+ * outputs nothing.
+ */
+&tdmif_b {
+	status = "disabled";
+};
+
+&tdmin_c {
+	status = "okay";
+};
+&tdmout_c {
+	status = "okay";
+};
+
+&pdm {
+	pinctrl-0 = <&pdm_dclk_a14_pins>, <&pdm_din0_pins>, <&pdm_din1_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+	assigned-clocks = <&clkc_audio AUD_CLKID_PDM_SYSCLK_SEL>, <&clkc_audio AUD_CLKID_PDM_DCLK_SEL>;
+	assigned-clock-parents = <&clkc CLKID_HIFI_PLL>, <&clkc CLKID_HIFI_PLL>;
+};
+
+&sound {
+	audio-aux-devs = <&tdmin_c>, <&tdmout_c>;
+					/* "sink", 		"source" */
+	audio-routing = "TDM_C Playback", "TDMOUT_C OUT",
+					"TDMOUT_C IN 1", "FRDDR_B OUT 2",
+					"SPDIFOUT IN 2", "FRDDR_C OUT 3",
+					"TODDR_C IN 3", "SPDIFIN Capture",
+					"TDMIN_C IN 2", "TDM_C Capture",
+					"TDMIN_C IN 5", "TDM_C Loopback",
+					"TODDR_B IN 2", "TDMIN_C OUT",
+					"TODDR_A IN 4", "PDM Capture";
+	
+	dai-link-6 {
+		sound-dai = <&pdm>;
+
+		codec {
+			sound-dai = <&dmics>;
+		};
+	};
+
+	dai-link-7 {
+		sound-dai = <&tdmif_c>;
+		dai-format = "i2s";
+		dai-tdm-slot-tx-mask-0 = <1 1>;
+		dai-tdm-slot-rx-mask-1 = <1 1>;
+		dai-tdm-slot-num = <2>;
+		dai-tdm-slot-width = <32>;
+		mclk-fs = <0>;
+		continuous-clock;
+		system-clock-frequency = <24576000>;
+
+		codec-0 {
+			/*
+			* TODO: complete ma12040_20 to be able to ditch dummy_codec
+			* Linux does not list the MA12040 amplifier as a
+			* device, because it have incomplete DAI properties,
+			* because it is not an actual codec, only an analogue
+			* playback device.
+			* It is therefor important to set this driver as a
+			* multi codec device in the device tree e.g
+			* sound-dai = <&dummy_codec &ma12040_20>; Linux will
+			* list the sound dai if one of the codecs have
+			* sufficient DAI parameters.
+			* This corresponds to the actual configuration on
+			* streamkit1832:
+			*   Stream1832 => bootstrapped AK4430ET => MA12040
+			*/
+			sound-dai = <&dummy_codec &ma12040_20>;
+		};
+	};
+
+	dai-link-8 {
+		sound-dai = <&spdifout>;
+
+		codec {
+			sound-dai = <&spdif_dit>;
+		};
+	};
+
+	dai-link-9 {
+		sound-dai = <&spdifin>;
+
+		codec {
+			sound-dai = <&spdif_dir>;
+		};
+	};
+};
+
+&pinctrl_periphs {
+	gpio_gpioa_10: gpio_gpioa_10 {
+		mux {
+			groups = "GPIOA_10";
+			function = "gpio_periphs";
+			bias-disable;
+		};
+	};
+};

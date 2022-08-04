@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+/*
+ * DT for components located on StreamKit1832 L0 daughter board which are
+ * selected with DIP switches, when the daughter board is present.
+ */
+
+/ {
+	sue {
+		daughterboard = "dabfm";
+	};
+};
+
+&tdmin_b {
+	status = "okay";
+};
+
+&tdmin_c {
+	status = "okay";
+};
+
+&tdmout_c {
+	status = "okay";
+};
+
+&sound {
+	audio-aux-devs = <&tdmin_b>, <&tdmin_c>, <&tdmout_c>;
+					/* "sink", 		"source" */
+	audio-routing = "TDM_C Playback", "TDMOUT_C OUT",
+					"TDMOUT_C IN 1", "FRDDR_B OUT 2",
+					"SPDIFOUT IN 2", "FRDDR_C OUT 3",
+					"TODDR_C IN 3", "SPDIFIN Capture",
+					"TDMIN_C IN 2", "TDM_C Capture",
+					"TDMIN_C IN 5", "TDM_C Loopback",
+					"TODDR_B IN 2", "TDMIN_C OUT",
+					"TDMIN_B IN 1", "TDM_B Capture",
+					"TODDR_A IN 1", "TDMIN_B OUT";
+	
+	dai-link-6 {
+		sound-dai = <&tdmif_b>;
+		dai-format = "i2s";
+		dai-tdm-slot-rx-mask-0 = <1 1>;
+		dai-tdm-slot-num = <2>;
+		dai-tdm-slot-width = <32>;
+		mclk-fs = <0>;
+		system-clock-frequency = <24576000>;
+
+		codec {
+			sound-dai = <&dummy_codec>;
+		};
+	};
+
+	dai-link-7 {
+		sound-dai = <&tdmif_c>;
+		dai-format = "i2s";
+		dai-tdm-slot-tx-mask-0 = <1 1>;
+		dai-tdm-slot-rx-mask-1 = <1 1>;
+		dai-tdm-slot-num = <2>;
+		dai-tdm-slot-width = <32>;
+		mclk-fs = <0>;
+		continuous-clock;
+		system-clock-frequency = <24576000>;
+
+		codec-0 {
+			/*
+			* TODO: complete ma12040_20 to be able to ditch dummy_codec
+			* Linux does not list the MA12040 amplifier as a
+			* device, because it have incomplete DAI properties,
+			* because it is not an actual codec, only an analogue
+			* playback device.
+			* It is therefor important to set this driver as a
+			* multi codec device in the device tree e.g
+			* sound-dai = <&dummy_codec &ma12040_20>; Linux will
+			* list the sound dai if one of the codecs have
+			* sufficient DAI parameters.
+			* This corresponds to the actual configuration on
+			* streamkit1832:
+			*   Stream1832 => bootstrapped AK4430ET => MA12040
+			*/
+			sound-dai = <&dummy_codec &ma12040_20>;
+		};
+	};
+
+	dai-link-8 {
+		sound-dai = <&spdifout>;
+
+		codec {
+			sound-dai = <&spdif_dit>;
+		};
+	};
+
+	dai-link-9 {
+		sound-dai = <&spdifin>;
+
+		codec {
+			sound-dai = <&spdif_dir>;
+		};
+	};
+};
+
+&spicc0 {
+	num-cs = <2>;
+	cs-gpios = <&gpio GPIOZ_3 GPIO_ACTIVE_HIGH>, <&gpio GPIOZ_4 GPIO_ACTIVE_HIGH>;
+	dabfm: spi@0 {
+		compatible = "sue,dabfm";
+		status = "okay";
+		reg = <0>;
+		spi-max-frequency = <9000000>;
+	};
+};

@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+
+/*
+ * DT for factory configuration of Stream183x external IOs.
+ *
+ * This file is empty for now, as all Stream183x outputs are by default GPIOs
+ * which is exactly what we need.
+ */
