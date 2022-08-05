@@ -11,6 +11,7 @@
 #include <linux/bitfield.h>
 #include <linux/busfreq-imx.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 #include <linux/iopoll.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -1516,6 +1517,47 @@ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
 	.ops = &sdhci_esdhc_ops,
 };
 
+static int gpio_reg_on = -1;
+
+int wlan_reg_on_init_gpio(int gpio_num)
+{
+	int err;
+	if (gpio_reg_on < 0) {
+		pr_info("%s: %d\n", __FUNCTION__, gpio_num);
+		err = gpio_request(gpio_num, "WL_REG_ON");
+		if (err >= 0) {
+			gpio_reg_on = gpio_num;
+		} else {
+			pr_err("%s: gpio_request(%d) failed: %d\n",
+				__FUNCTION__, gpio_num, err);
+		}
+	}
+	return gpio_reg_on;
+}
+
+static void wlan_reg_on_deinit_gpio(void)
+{
+	if (gpio_reg_on >= 0) {
+		pr_info("%s: %d\n", __FUNCTION__, gpio_reg_on);
+		gpio_free(gpio_reg_on);
+		gpio_reg_on = -1;
+	}
+}
+
+int imx_wlan_reg_on_set(int gpio_num, int on)
+{
+	if (gpio_reg_on < 0 && gpio_num >= 0)
+		wlan_reg_on_init_gpio(gpio_num);
+
+	pr_info("pull gpio %d to %d\n", gpio_reg_on, on);
+	if (gpio_reg_on >= 0 && gpio_direction_output(gpio_reg_on, on)) {
+		pr_err("%s: gpio_direction_output failed\n", __FUNCTION__);
+		return -EIO;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(imx_wlan_reg_on_set);
+
 static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
@@ -2016,6 +2058,8 @@ static void sdhci_esdhc_imx_remove(struct platform_device *pdev)
 		release_bus_freq(BUS_FREQ_HIGH);
 
 	sdhci_pltfm_free(pdev);
+
+	wlan_reg_on_deinit_gpio();
 }
 
 static struct device *stored_dev = NULL;
