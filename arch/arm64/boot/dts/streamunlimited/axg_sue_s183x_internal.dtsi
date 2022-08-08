@@ -453,6 +453,8 @@
 &usb {
 	status = "okay";
 	dr_mode = "otg";
+	vbus-gpios = <&gpio_ao GPIOAO_12 GPIO_ACTIVE_HIGH>;
+	sue,oc-detect;
 };
 
 &pinctrl_periphs {
