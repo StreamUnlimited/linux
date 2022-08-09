@@ -31,6 +31,11 @@ properties:
     description:
       GPIO used to mute all the outputs
 
+  pdown-gpios:
+    maxItems: 1
+    description:
+      GPIO used to control the power down pin
+
 patternProperties:
   "^dai-link-[0-9]+$":
     type: object
@@ -137,6 +142,7 @@ examples:
                         "Linein AINR", "Linein";
 
         mute-gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
+        pdown-gpios = <&gpio GPIOZ_4 GPIO_ACTIVE_LOW>;
 
         dai-link-0 {
             sound-dai = <&frddr_a>;
