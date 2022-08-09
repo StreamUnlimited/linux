@@ -24,6 +24,7 @@ struct meson_card_match_data {
 
 struct meson_card {
 	const struct meson_card_match_data *match_data;
+	struct gpio_desc *mute;
 	struct snd_soc_card card;
 	void **link_data;
 };

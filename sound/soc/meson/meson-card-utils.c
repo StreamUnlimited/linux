@@ -3,6 +3,7 @@
 // Copyright (c) 2020 BayLibre, SAS.
 // Author: Jerome Brunet <jbrunet@baylibre.com>
 
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <sound/soc.h>
@@ -266,6 +267,33 @@ static void meson_card_clean_references(struct meson_card *priv)
 	kfree(priv->link_data);
 }
 
+static int spk_mute_set(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *soc_card = snd_kcontrol_chip(kcontrol);
+	struct meson_card *priv = snd_soc_card_get_drvdata(soc_card);
+	bool mute = ucontrol->value.integer.value[0];
+	gpiod_set_value(priv->mute, mute);
+	dev_dbg(soc_card->dev, "spk_mute_set: mute flag = %d\n", mute);
+	return 0;
+}
+
+static int spk_mute_get(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *soc_card = snd_kcontrol_chip(kcontrol);
+	struct meson_card *priv = snd_soc_card_get_drvdata(soc_card);
+	bool value = gpiod_get_value(priv->mute);
+	ucontrol->value.integer.value[0] = value;
+	return 0;
+}
+
+static const struct snd_kcontrol_new card_controls[] = {
+	SOC_SINGLE_BOOL_EXT("SPK mute", 0,
+			    spk_mute_get,
+			    spk_mute_set),
+};
+
 int meson_card_probe(struct platform_device *pdev)
 {
 	const struct meson_card_match_data *data;
@@ -320,6 +348,17 @@ int meson_card_probe(struct platform_device *pdev)
 	ret = devm_snd_soc_register_card(dev, &priv->card);
 	if (ret)
 		goto out_err;
+
+	/* Fetch the MUTE control */
+	priv->mute = devm_gpiod_get_optional(dev, "mute", GPIOD_OUT_LOW);
+	if (!IS_ERR_OR_NULL(priv->mute)) {
+		ret = snd_soc_add_card_controls(&priv->card, card_controls,
+					ARRAY_SIZE(card_controls));
+		if (ret) {
+			dev_err(dev, "error while adding card controls\n");
+			goto out_err;
+		}
+	}
 
 	return 0;
 
