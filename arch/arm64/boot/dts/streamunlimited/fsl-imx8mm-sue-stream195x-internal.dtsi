@@ -51,6 +51,17 @@
 			wakeup-source;
 		};
 	};
+
+	/*
+	 * This is used by the new Ampak/Broadcom out-of-tree driver.
+	 * Older driver versions will just ignore this node and have
+	 * the GPIOs hardcoded.
+	 */
+	bcmdhd {
+		compatible = "android,bcmdhd_wlan";
+		gpio_wl_reg_on = <&gpio2 8 GPIO_ACTIVE_HIGH>;
+		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &A53_0 {
