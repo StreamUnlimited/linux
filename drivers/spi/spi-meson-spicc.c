@@ -933,7 +933,7 @@ static const struct meson_spicc_data meson_spicc_axg_data = {
 	.min_speed_hz		= 325000,
 	.fifo_size		= 16,
 	.has_oen		= true,
-	.has_enhance_clk_div	= true,
+	.has_enhance_clk_div	= false,
 };
 
 static const struct meson_spicc_data meson_spicc_g12a_data = {
