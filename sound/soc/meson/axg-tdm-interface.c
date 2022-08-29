@@ -123,6 +123,7 @@ static int axg_tdm_iface_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 			ret = clk_set_rate(iface->mclk, freq);
 			if (!ret)
 				iface->mclk_rate = freq;
+			pr_debug("axg_tdm_iface_set_sysclk actual_freq = %ld\n", iface->mclk_rate);
 		}
 	}
 
