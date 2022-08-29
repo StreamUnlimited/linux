@@ -250,7 +250,14 @@ static struct clk_regmap axg_gp0_pll = {
 	},
 };
 
+static const struct pll_params_table axg_hifi_pll_params_table[] = {
+	PLL_PARAMS(452, 6),		/* For 22.5792 MHz MCLK */
+	PLL_PARAMS(492, 6),		/* For 24.576 MHz MCLK */
+	{ /* sentinel */ },
+};
+
 static const struct reg_sequence axg_hifi_init_regs[] = {
+	{ .reg = HHI_HIFI_PLL_CNTL,	.def = 0xC0020DEC },
 	{ .reg = HHI_HIFI_PLL_CNTL1,	.def = 0xc084b000 },
 	{ .reg = HHI_HIFI_PLL_CNTL2,	.def = 0xb75020be },
 	{ .reg = HHI_HIFI_PLL_CNTL3,	.def = 0x0a6a3a88 },
@@ -278,7 +285,7 @@ static struct clk_regmap axg_hifi_pll_dco = {
 		.frac = {
 			.reg_off = HHI_HIFI_PLL_CNTL5,
 			.shift   = 0,
-			.width   = 13,
+			.width   = 15,
 		},
 		.l = {
 			.reg_off = HHI_HIFI_PLL_CNTL,
@@ -290,10 +297,10 @@ static struct clk_regmap axg_hifi_pll_dco = {
 			.shift   = 29,
 			.width   = 1,
 		},
-		.table = axg_gp0_pll_params_table,
+		.table = axg_hifi_pll_params_table,
 		.init_regs = axg_hifi_init_regs,
 		.init_count = ARRAY_SIZE(axg_hifi_init_regs),
-		.flags = CLK_MESON_PLL_ROUND_CLOSEST,
+		.flags = CLK_MESON_PLL_ROUND_CLOSEST | CLK_MESON_PLL_SIGNED_FRACTION,
 	},
 	.hw.init = &(struct clk_init_data){
 		.name = "hifi_pll_dco",
@@ -310,7 +317,11 @@ static struct clk_regmap axg_hifi_pll = {
 		.offset = HHI_HIFI_PLL_CNTL,
 		.shift = 16,
 		.width = 2,
-		.flags = CLK_DIVIDER_POWER_OF_TWO,
+		/*
+		* This divider is initialized to divide by 4 in axg_hifi_init_regs
+		* Making it read only prevents the clk_fw to try new values for it
+		*/
+		.flags = CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_READ_ONLY,
 	},
 	.hw.init = &(struct clk_init_data){
 		.name = "hifi_pll",

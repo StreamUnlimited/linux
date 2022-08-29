@@ -187,7 +187,7 @@ static const struct clk_parent_data mst_mux_parent_data[] = {
 
 #define AUD_MST_MUX(_name, _reg, _flag)					\
 	AUD_MUX(_name##_sel, _reg, 0x7, 24, _flag,			\
-		mst_mux_parent_data, CLK_SET_RATE_NO_REPARENT)
+		mst_mux_parent_data, CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT)
 #define AUD_MST_DIV(_name, _reg, _flag)					\
 	AUD_DIV(_name##_div, _reg, 0, 16, _flag,			\
 		aud_##_name##_sel, CLK_SET_RATE_PARENT)

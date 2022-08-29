@@ -45,13 +45,27 @@ meson_clk_pll_data(struct clk_regmap *clk)
 static int __pll_round_closest_mult(struct meson_clk_pll_data *pll)
 {
 	if ((pll->flags & CLK_MESON_PLL_ROUND_CLOSEST) &&
-	    !MESON_PARM_APPLICABLE(&pll->frac))
+	    MESON_PARM_APPLICABLE(&pll->frac))
 		return 1;
 
 	return 0;
 }
 
-static unsigned long __pll_params_to_rate(unsigned long parent_rate,
+/*
+ * This calculates the rate for a given parent_rate, m, n, and frac value:
+ *
+ *        /                      parent_rate * frac  \    1
+ * rate = | parent_rate * m +  --------------------- | * ---
+ *        \                             8192         /    n
+ */
+static unsigned long __pll_params_to_rate_signed(unsigned long parent_rate,
+					  unsigned int m, unsigned int n,
+					  s16 frac)
+{
+	return ((((u64)parent_rate * m) + ((s64)parent_rate * frac) / 8192) / n);
+}
+
+static unsigned long __pll_params_to_rate_unsigned(unsigned long parent_rate,
 					  unsigned int m, unsigned int n,
 					  unsigned int frac,
 					  struct meson_clk_pll_data *pll)
@@ -91,10 +105,41 @@ static unsigned long meson_clk_pll_recalc_rate(struct clk_hw *hw,
 		meson_parm_read(clk->map, &pll->frac) :
 		0;
 
-	return __pll_params_to_rate(parent_rate, m, n, frac, pll);
+	if(pll->flags & CLK_MESON_PLL_SIGNED_FRACTION) {
+		s16 frac_signed;
+		/*
+		* On AXG the hifi_pll has a 15 bit long fractional register
+		* This register stores the sign bit in bit 14.
+		* To be able to work with it more easily we extend this register to signed 16 bit (s16)
+		*/
+		BUG_ON(pll->frac.width != 15);
+		if (frac & BIT(14))
+			frac |= BIT(15);
+
+		frac_signed = (s16)frac;
+
+		return __pll_params_to_rate_signed(parent_rate, m, n, frac);
+	} else {
+		return __pll_params_to_rate_unsigned(parent_rate, m, n, frac, pll);
+	}
 }
 
-static unsigned int __pll_params_with_frac(unsigned long rate,
+/*
+ * This calculates the fractional part based on the formula:
+ *
+ *            (rate * n - parent_rate * m) * 8192
+ *  frac = -----------------------------------------
+ *                        parent_rate
+ */
+static s16 __pll_params_with_frac_signed(unsigned long rate,
+					   unsigned long parent_rate,
+					   unsigned int m,
+					   unsigned int n)
+{
+	return DIV_ROUND_CLOSEST(((((s64)rate * n) - ((s64)parent_rate * m)) * 8192), (s64)parent_rate);
+}
+
+static unsigned int __pll_params_with_frac_unsigned(unsigned long rate,
 					   unsigned long parent_rate,
 					   unsigned int m,
 					   unsigned int n,
@@ -227,7 +272,10 @@ static int meson_clk_get_pll_settings(unsigned long rate,
 		if (ret == -EINVAL)
 			break;
 
-		now = __pll_params_to_rate(parent_rate, m, n, 0, pll);
+		if (pll->flags & CLK_MESON_PLL_SIGNED_FRACTION)
+			now = __pll_params_to_rate_signed(parent_rate, m, n, 0);
+		else
+			now = __pll_params_to_rate_unsigned(parent_rate, m, n, 0, pll);
 		if (meson_clk_pll_is_better(rate, best, now, pll)) {
 			best = now;
 			*best_m = m;
@@ -241,7 +289,47 @@ static int meson_clk_get_pll_settings(unsigned long rate,
 	return best ? 0 : -EINVAL;
 }
 
-static int meson_clk_pll_determine_rate(struct clk_hw *hw,
+static int meson_clk_pll_determine_rate_signed(struct clk_hw *hw,
+					struct clk_rate_request *req)
+{
+	struct clk_regmap *clk = to_clk_regmap(hw);
+	struct meson_clk_pll_data *pll = meson_clk_pll_data(clk);
+	unsigned int m, n;
+	s16 frac;
+	unsigned long round;
+	int ret;
+
+	pr_debug("meson_clk_pll_determine_rate req->rate %lu\n", req->rate);
+
+	ret = meson_clk_get_pll_settings(req->rate, req->best_parent_rate,
+					 &m, &n, pll);
+	if (ret)
+		return ret;
+
+	round = __pll_params_to_rate_signed(req->best_parent_rate, m, n, 0);
+
+	pr_debug("meson_clk_pll_determine_rate best_parent_rate: %lu, round: %lu, m: %d, n: %d\n",
+		req->best_parent_rate, round, m, n);
+
+	if (!MESON_PARM_APPLICABLE(&pll->frac) || req->rate == round) {
+		req->rate = round;
+		return 0;
+	}
+
+	/*
+	 * The rate provided by the setting is not an exact match, let's
+	 * try to improve the result using the fractional parameter
+	 */
+	frac = __pll_params_with_frac_signed(req->rate, req->best_parent_rate, m, n);
+	pr_debug("fractional part: %d\n", frac);
+	req->rate = __pll_params_to_rate_signed(req->best_parent_rate, m, n, frac);
+	pr_debug("calculated rate: %ld\n", req->rate);
+
+	return 0;
+}
+
+
+static int meson_clk_pll_determine_rate_unsigned(struct clk_hw *hw,
 					struct clk_rate_request *req)
 {
 	struct clk_regmap *clk = to_clk_regmap(hw);
@@ -255,7 +343,7 @@ static int meson_clk_pll_determine_rate(struct clk_hw *hw,
 	if (ret)
 		return ret;
 
-	round = __pll_params_to_rate(req->best_parent_rate, m, n, 0, pll);
+	round = __pll_params_to_rate_unsigned(req->best_parent_rate, m, n, 0, pll);
 
 	if (!MESON_PARM_APPLICABLE(&pll->frac) || req->rate == round) {
 		req->rate = round;
@@ -266,10 +354,21 @@ static int meson_clk_pll_determine_rate(struct clk_hw *hw,
 	 * The rate provided by the setting is not an exact match, let's
 	 * try to improve the result using the fractional parameter
 	 */
-	frac = __pll_params_with_frac(req->rate, req->best_parent_rate, m, n, pll);
-	req->rate = __pll_params_to_rate(req->best_parent_rate, m, n, frac, pll);
+	frac = __pll_params_with_frac_unsigned(req->rate, req->best_parent_rate, m, n, pll);
+	req->rate = __pll_params_to_rate_unsigned(req->best_parent_rate, m, n, frac, pll);
 
 	return 0;
+}
+
+static int meson_clk_pll_determine_rate(struct clk_hw *hw,
+					struct clk_rate_request *req)
+{
+	struct clk_regmap *clk = to_clk_regmap(hw);
+	struct meson_clk_pll_data *pll = meson_clk_pll_data(clk);
+	if (pll->flags & CLK_MESON_PLL_SIGNED_FRACTION)
+		return meson_clk_pll_determine_rate_signed(hw, req);
+	else
+		return meson_clk_pll_determine_rate_unsigned(hw, req);
 }
 
 static int meson_clk_pll_wait_lock(struct clk_hw *hw)
@@ -426,7 +525,10 @@ static int meson_clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	meson_parm_write(clk->map, &pll->m, m);
 
 	if (MESON_PARM_APPLICABLE(&pll->frac)) {
-		frac = __pll_params_with_frac(rate, parent_rate, m, n, pll);
+		if (pll->flags & CLK_MESON_PLL_SIGNED_FRACTION)
+			frac = __pll_params_with_frac_signed(rate, parent_rate, m, n);
+		else
+			frac = __pll_params_with_frac_unsigned(rate, parent_rate, m, n, pll);
 		meson_parm_write(clk->map, &pll->frac, frac);
 	}
 
