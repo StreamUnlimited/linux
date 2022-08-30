@@ -166,6 +166,15 @@ config POWER_RESET_LTC2952
 	  This driver supports an external powerdown trigger and board power
 	  down via the LTC2952. Bindings are made in the device tree.
 
+config POWER_RESET_AMLOGIC
+	bool "Amlogic power-off driver"
+	depends on ARCH_MESON
+	help
+	  This driver adds reboot support for Amlogic SoCs. It sets a special PSCI flag.
+	  This flag will be interpreted by the BL31 to determine the reboot reason
+
+	  Say Y if you use the vendor BL31 and want to send the reboot reason to the bootloader.
+
 config POWER_RESET_MT6323
 	bool "MediaTek MT6323 power-off driver"
 	depends on MFD_MT6397
