@@ -220,6 +220,11 @@
 		reg = <0x0 0x000a8 0x0 0x4>;
 	};
 
+	amlogic_reboot: amlogic_reboot{
+		compatible = "amlogic,reboot";
+		sys_reset = <0x84000009>;
+	};
+
 	wifi32k: wifi32k {
 		compatible = "pwm-clock";
 		#clock-cells = <0>;
