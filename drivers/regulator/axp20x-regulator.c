@@ -1802,7 +1802,8 @@ static int axp20x_resume(struct device *dev)
 		struct regulator_dev *rdev = pdata->regs[i];
 
 		regulator_lock(rdev);
-		if (rdev->use_count > 0 || rdev->constraints->always_on) {
+		if ((rdev->use_count > 0 || rdev->constraints->always_on)
+			&& rdev->desc->ops->set_suspend_enable) {
 			if (!rdev->desc->ops->is_enabled(rdev)) {
 				dev_info(dev, "enabling %s\n", rdev->desc->name);
 				ret = rdev->desc->ops->set_suspend_enable(rdev);
