@@ -28,7 +28,7 @@
 #include <linux/phy/phy.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/role.h>
-#include <linux/regulator/consumer.h>
+#include <linux/gpio/consumer.h>
 
 static int forceid = -1;
 module_param(forceid, int, 0);
@@ -261,10 +261,13 @@ struct dwc3_meson_g12a {
 	enum phy_mode		otg_phy_mode;
 	unsigned int		usb2_ports;
 	unsigned int		usb3_ports;
-	struct regulator	*vbus;
+	struct gpio_desc	*vbus;
 	struct usb_role_switch_desc switch_desc;
 	struct usb_role_switch	*role_switch;
 	const struct dwc3_meson_g12a_drvdata *drvdata;
+	int			oc_irq;
+	bool			oc_detect;
+	struct delayed_work	oc_work;
 };
 
 static int dwc3_meson_gxl_set_phy_mode(struct dwc3_meson_g12a *priv,
@@ -486,6 +489,45 @@ static enum phy_mode dwc3_meson_g12a_get_id(struct dwc3_meson_g12a *priv)
 	return PHY_MODE_USB_HOST;
 }
 
+static void dwc3_meson_set_usb_vbus_power(struct dwc3_meson_g12a *priv, bool is_power_on)
+{
+	if (is_power_on) {
+		if (priv->oc_detect) {
+				/*
+				 * When over-current detection (using DRVVBUS) is enabled, we configure
+				 * the pin as an input with a pull-up, when the DRVVBUS gets low an IRQ
+				 * will be triggered.
+				 */
+				gpiod_direction_input(priv->vbus);
+				gpiod_set_pull(priv->vbus, GPIOD_PULL_UP);
+			} else {
+				/* without over-current detection we just drive the pin */
+				gpiod_direction_output(priv->vbus, is_power_on);
+			}
+	} else {
+		gpiod_direction_output(priv->vbus, is_power_on);
+	}
+}
+
+static irqreturn_t dwc3_meson_g12a_oc_irq(int irq, void *dev_id)
+{
+	struct dwc3_meson_g12a *priv = dev_id;
+
+	/* disable port power and shedule re-enabling in one second from now */
+	dwc3_meson_set_usb_vbus_power(priv, 0);
+	schedule_delayed_work(&priv->oc_work, msecs_to_jiffies(1000));
+
+	return IRQ_HANDLED;
+}
+
+static void dwc3_meson_g12a_oc_irq_thread(struct work_struct *work)
+{
+	struct dwc3_meson_g12a *priv = container_of(work, struct dwc3_meson_g12a, oc_work.work);
+
+	dev_info(priv->dev, "trying to re-enable port power\n");
+	dwc3_meson_set_usb_vbus_power(priv, 1);
+}
+
 static int dwc3_meson_g12a_otg_mode_set(struct dwc3_meson_g12a *priv,
 					enum phy_mode mode)
 {
@@ -500,12 +542,7 @@ static int dwc3_meson_g12a_otg_mode_set(struct dwc3_meson_g12a *priv,
 		dev_info(priv->dev, "switching to Device Mode\n");
 
 	if (priv->vbus) {
-		if (mode == PHY_MODE_USB_DEVICE)
-			ret = regulator_disable(priv->vbus);
-		else
-			ret = regulator_enable(priv->vbus);
-		if (ret)
-			return ret;
+		dwc3_meson_set_usb_vbus_power(priv, mode == PHY_MODE_USB_DEVICE);
 	}
 
 	priv->otg_phy_mode = mode;
@@ -720,11 +757,10 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 	priv->drvdata = of_device_get_match_data(&pdev->dev);
 	priv->dev = dev;
 
-	priv->vbus = devm_regulator_get_optional(dev, "vbus");
-	if (IS_ERR(priv->vbus)) {
-		if (PTR_ERR(priv->vbus) == -EPROBE_DEFER)
-			return PTR_ERR(priv->vbus);
-		priv->vbus = NULL;
+	priv->vbus = devm_gpiod_get_optional(dev, "vbus", GPIOD_OUT_HIGH);
+	if (IS_ERR_OR_NULL(priv->vbus)){
+		dev_warn(dev, "could not get vbus GPIO\n");
+		return PTR_ERR(priv->vbus);
 	}
 
 	ret = devm_clk_bulk_get(dev,
@@ -759,10 +795,28 @@ static int dwc3_meson_g12a_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_rearm;
 
+	if(of_property_read_bool(dev->of_node, "sue,oc-detect")) {
+		dev_info(&pdev->dev, "over-current detection usind DRVVBUS is enabled\n");
+		priv->oc_detect = true;
+	}
+
 	if (priv->vbus) {
-		ret = regulator_enable(priv->vbus);
+		dwc3_meson_set_usb_vbus_power(priv, 1);
+	}
+
+	if (priv->oc_detect) {
+		int ret;
+		priv->oc_irq = gpiod_to_irq(priv->vbus);
+
+		ret = devm_request_irq(dev, priv->oc_irq,
+					dwc3_meson_g12a_oc_irq,
+					IRQF_TRIGGER_FALLING,
+					"dwc3_meson_g12a_oc_irq", priv);
+
 		if (ret)
-			goto err_rearm;
+			dev_err(dev, "error requesting oc irq: %d\n", ret);
+
+		INIT_DELAYED_WORK(&priv->oc_work, dwc3_meson_g12a_oc_irq_thread);
 	}
 
 	/* Get dr_mode */
@@ -824,7 +878,7 @@ err_phys_exit:
 
 err_disable_regulator:
 	if (priv->vbus)
-		regulator_disable(priv->vbus);
+		dwc3_meson_set_usb_vbus_power(priv, 0);
 
 err_rearm:
 	reset_control_rearm(priv->reset);
@@ -882,12 +936,10 @@ static int __maybe_unused dwc3_meson_g12a_runtime_resume(struct device *dev)
 static int __maybe_unused dwc3_meson_g12a_suspend(struct device *dev)
 {
 	struct dwc3_meson_g12a *priv = dev_get_drvdata(dev);
-	int i, ret;
+	int i;
 
 	if (priv->vbus && priv->otg_phy_mode == PHY_MODE_USB_HOST) {
-		ret = regulator_disable(priv->vbus);
-		if (ret)
-			return ret;
+		dwc3_meson_set_usb_vbus_power(priv, 0);
 	}
 
 	for (i = 0 ; i < PHY_COUNT ; ++i) {
@@ -928,9 +980,7 @@ static int __maybe_unused dwc3_meson_g12a_resume(struct device *dev)
 	}
 
 	if (priv->vbus && priv->otg_phy_mode == PHY_MODE_USB_HOST) {
-		ret = regulator_enable(priv->vbus);
-		if (ret)
-			return ret;
+		dwc3_meson_set_usb_vbus_power(priv, 1);
 	}
 
 	if (priv->drvdata->usb_post_init) {
