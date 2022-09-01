@@ -14,7 +14,7 @@
 #include <linux/types.h>
 #include <linux/watchdog.h>
 
-#define DEFAULT_TIMEOUT	30	/* seconds */
+#define DEFAULT_TIMEOUT	120	/* seconds */
 #define TICKS_PER_SEC	500	/* 2ms */
 
 #define GXBB_WDT_CTRL_REG			0x0
