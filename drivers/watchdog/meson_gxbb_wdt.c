@@ -212,6 +212,7 @@ static int meson_gxbb_wdt_probe(struct platform_device *pdev)
 
 	writel(ctrl_reg, data->reg_base + GXBB_WDT_CTRL_REG);
 	meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
+	meson_gxbb_wdt_start(&data->wdt_dev);
 
 	dev_info(dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
 		 data->wdt_dev.timeout, nowayout);
