@@ -22,6 +22,7 @@ struct axg_dai_link_tdm_data {
 	unsigned int slot_width;
 	u32 *tx_mask;
 	u32 *rx_mask;
+	unsigned int system_clock_frequency;
 	struct axg_dai_link_tdm_mask *codec_masks;
 };
 
@@ -86,7 +87,7 @@ static int axg_card_tdm_dai_init(struct snd_soc_pcm_runtime *rtd)
 	if (idle_clk) {
 		for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
 			struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
-			int rate = MCLK_48k;
+			int rate = be->system_clock_frequency;
 			ret = cpu_dai->driver->ops->set_sysclk(cpu_dai, 0, rate, SND_SOC_CLOCK_OUT);
 			/*
 			* Always set the BCLK to MCLK/8 and the WCLK to BCLK/64 for the
@@ -309,6 +310,9 @@ static int axg_card_parse_tdm(struct snd_soc_card *card,
 	link->dai_fmt = meson_card_parse_daifmt(node, link->cpus->of_node);
 
 	of_property_read_u32(node, "mclk-fs", &be->mclk_fs);
+
+	if(of_property_read_u32(node, "system-clock-frequency", &be->system_clock_frequency))
+		be->system_clock_frequency = MCLK_48k;
 
 	ret = axg_card_parse_cpu_tdm_slots(card, link, node, be);
 	if (ret) {
