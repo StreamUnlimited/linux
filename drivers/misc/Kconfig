@@ -58,6 +58,24 @@ config AMLOGIC_WIFI
 	help
 		This module adds gpio reset controls on amlogic platforms.
 
+config AMLOGIC_SECMON
+	bool "Amlogic secure monitor driver support"
+	default n
+	select CMA
+	select DMA_CMA
+	help
+		This is the Amlogic secure monitor driver
+		this config only ctrl in makefile
+		prepare share memory
+		etc
+
+config	AMLOGIC_CPU_INFO
+	bool "Amlogic chipid"
+	default n
+	select AMLOGIC_SECMON
+	help
+	  say y to enable Amlogic chipid driver.
+
 config DUMMY_IRQ
 	tristate "Dummy IRQ handler"
 	help

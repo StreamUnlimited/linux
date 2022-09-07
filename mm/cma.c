@@ -40,6 +40,59 @@ struct cma cma_areas[MAX_CMA_AREAS];
 unsigned cma_area_count;
 static DEFINE_MUTEX(cma_mutex);
 
+int cma_mmu_op(struct page *page, int count, bool set)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	p4d_t *p4d;
+	pmd_t *pmd;
+	pte_t *pte;
+	unsigned long addr, end;
+	struct mm_struct *mm;
+
+	if (!page || PageHighMem(page))
+		return -EINVAL;
+
+	addr = (unsigned long)page_address(page);
+	end  = addr + count * PAGE_SIZE;
+	mm = &init_mm;
+	for (; addr < end; addr += PAGE_SIZE) {
+		pgd = pgd_offset(mm, addr);
+		if (pgd_none(*pgd) || pgd_bad(*pgd))
+			break;
+
+		p4d = p4d_offset(pgd, addr);
+		if (p4d_none(*p4d) || p4d_bad(*p4d))
+			break;
+
+		pud = pud_offset(p4d, addr);
+		if (pud_none(*pud) || pud_bad(*pud))
+			break;
+
+		pmd = pmd_offset(pud, addr);
+		if (pmd_none(*pmd))
+			break;
+
+		pte = pte_offset_map(pmd, addr);
+		if (set)
+			set_pte_at(mm, addr, pte, mk_pte(page, PAGE_KERNEL));
+		else
+			pte_clear(mm, addr, pte);
+		pte_unmap(pte);
+	#ifdef CONFIG_ARM
+		pr_debug("%s, add:%lx, pgd:%p %x, pmd:%p %x, pte:%p %x\n",
+			 __func__, addr, pgd, (int)pgd_val(*pgd),
+			 pmd, (int)pmd_val(*pmd), pte, (int)pte_val(*pte));
+	#elif defined(CONFIG_ARM64)
+		pr_debug("%s, add:%lx, pgd:%p %llx, pmd:%p %llx, pte:%p %llx\n",
+			 __func__, addr, pgd, pgd_val(*pgd),
+			 pmd, pmd_val(*pmd), pte, pte_val(*pte));
+	#endif
+		page++;
+	}
+	return 0;
+}
+
 phys_addr_t cma_get_base(const struct cma *cma)
 {
 	return PFN_PHYS(cma->base_pfn);

@@ -174,10 +174,16 @@ static const char *const compat_hwcap2_str[] = {
 };
 #endif /* CONFIG_COMPAT */
 
+extern void cpuinfo_get_chipid(unsigned char *cid, unsigned int size);
+
 static int c_show(struct seq_file *m, void *v)
 {
 	int i, j;
 	bool compat = personality(current->personality) == PER_LINUX32;
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+	#define CHIPID_LEN 16
+	unsigned char chipid[CHIPID_LEN];
+#endif
 
 	for_each_online_cpu(i) {
 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
@@ -237,6 +243,15 @@ static int c_show(struct seq_file *m, void *v)
 		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
 		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 	}
+
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+	cpuinfo_get_chipid(chipid, CHIPID_LEN);
+	seq_puts(m, "Serial\t\t: ");
+	for (i = 0; i < CHIPID_LEN; i++)
+		seq_printf(m, "%02x", chipid[i]);
+	seq_puts(m, "\n");
+#endif
+	seq_printf(m, "Hardware\t: %s\n\n", "Amlogic");
 
 	return 0;
 }
