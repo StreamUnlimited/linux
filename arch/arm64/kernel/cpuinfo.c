@@ -210,6 +210,8 @@ static const char *const compat_hwcap2_str[] = {
 };
 #endif /* CONFIG_COMPAT */
 
+extern void cpuinfo_get_chipid(unsigned char *cid, unsigned int size);
+
 static int c_show(struct seq_file *m, void *v)
 {
 	int j;
@@ -217,6 +219,10 @@ static int c_show(struct seq_file *m, void *v)
 	bool compat = personality(current->personality) == PER_LINUX32;
 	struct cpuinfo_arm64 *cpuinfo = v;
 	u32 midr = cpuinfo->reg_midr;
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+	#define CHIPID_LEN 16
+	unsigned char chipid[CHIPID_LEN];
+#endif
 
 	/*
 	 * glibc reads /proc/cpuinfo to determine the number of
@@ -271,6 +277,15 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
 	seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
 	seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
+
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+	cpuinfo_get_chipid(chipid, CHIPID_LEN);
+	seq_puts(m, "Serial\t\t: ");
+	for (j = 0; j < CHIPID_LEN; j++)
+		seq_printf(m, "%02x", chipid[j]);
+	seq_puts(m, "\n");
+#endif
+	seq_printf(m, "Hardware\t: %s\n\n", "Amlogic");
 
 	return 0;
 }
