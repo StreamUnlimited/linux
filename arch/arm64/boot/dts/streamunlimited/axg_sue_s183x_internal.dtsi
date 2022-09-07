@@ -190,10 +190,15 @@
 		memory-region = <&secmon_reserved>;
 		in_base_func = <0x82000020>;
 		out_base_func = <0x82000021>;
+		inout_size_func = <0x8200002a>;
 		reserve_mem_size = <0x00300000>;
+		clear_range = <0x05100000 0x200000>;
 	};
 
 	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
 		secos_reserved:linux,secos {
 			status = "disable";
 			compatible = "amlogic, aml_secos_memory";
@@ -223,6 +228,11 @@
 	amlogic_reboot: amlogic_reboot{
 		compatible = "amlogic,reboot";
 		sys_reset = <0x84000009>;
+	};
+
+	amlogic_cpuinfo: amlogic_cpuinfo {
+		compatible = "amlogic,cpuinfo";
+		cpuinfo_cmd = <0x82000044>;
 	};
 
 	wifi32k: wifi32k {
