@@ -376,6 +376,7 @@ static int ak4458_hw_params(struct snd_pcm_substream *substream,
 	int pcm_width = max(params_physical_width(params), ak4458->slot_width);
 	u8 format, dsdsel0, dsdsel1, dchn;
 	int nfs1, dsd_bclk, ret, channels, channels_max;
+	int needs_reset = 0;
 
 	nfs1 = params_rate(params);
 	ak4458->fs = nfs1;
@@ -418,15 +419,15 @@ static int ak4458_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 
-		snd_soc_component_update_bits(component, AK4458_06_DSD1,
-					      AK4458_DSDSEL_MASK, dsdsel0);
-		snd_soc_component_update_bits(component, AK4458_09_DSD2,
-					      AK4458_DSDSEL_MASK, dsdsel1);
+		needs_reset |= snd_soc_component_update_bits(component, AK4458_06_DSD1,
+							      AK4458_DSDSEL_MASK, dsdsel0);
+		needs_reset |= snd_soc_component_update_bits(component, AK4458_09_DSD2,
+							      AK4458_DSDSEL_MASK, dsdsel1);
 		break;
 	}
 
 	/* Master Clock Frequency Auto Setting Mode Enable */
-	snd_soc_component_update_bits(component, AK4458_00_CONTROL1, 0x80, 0x80);
+	needs_reset |= snd_soc_component_update_bits(component, AK4458_00_CONTROL1, 0x80, 0x80);
 
 	switch (pcm_width) {
 	case 16:
@@ -460,8 +461,8 @@ static int ak4458_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	snd_soc_component_update_bits(component, AK4458_00_CONTROL1,
-			    AK4458_DIF_MASK, format);
+	needs_reset |= snd_soc_component_update_bits(component, AK4458_00_CONTROL1,
+						    AK4458_DIF_MASK, format);
 
 	/*
 	 * Enable/disable Daisy Chain if in TDM mode and the number of played
@@ -471,7 +472,7 @@ static int ak4458_hw_params(struct snd_pcm_substream *substream,
 		(ak4458->fmt == SND_SOC_DAIFMT_DSP_B) &&
 		(channels > channels_max) ? AK4458_DCHAIN_MASK : 0;
 
-	snd_soc_component_update_bits(component, AK4458_0B_CONTROL7,
+	needs_reset |= snd_soc_component_update_bits(component, AK4458_0B_CONTROL7,
 				      AK4458_DCHAIN_MASK, dchn);
 
 	if (ak4458->drvdata->type == AK4497) {
@@ -479,15 +480,19 @@ static int ak4458_hw_params(struct snd_pcm_substream *substream,
 						    0x4, (ak4458->dsd_path << 2));
 		if (ret < 0)
 			return ret;
+		else
+			needs_reset |= ret;
 	}
 
-	ret = ak4458_rstn_control(component, 0);
-	if (ret)
-		return ret;
+	if (needs_reset) {
+		ret = ak4458_rstn_control(component, 0);
+		if (ret)
+			return ret;
 
-	ret = ak4458_rstn_control(component, 1);
-	if (ret)
-		return ret;
+		ret = ak4458_rstn_control(component, 1);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }
