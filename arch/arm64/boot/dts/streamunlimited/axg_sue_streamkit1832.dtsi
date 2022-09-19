@@ -145,6 +145,10 @@
 	status = "okay";
 };
 
+&toddr_c {
+	compatible = "amlogic,axg-toddr-spdif";
+};
+
 &spdifout {
 	pinctrl-0 = <&spdif_out_a20_pins>;
 	pinctrl-names = "default";
