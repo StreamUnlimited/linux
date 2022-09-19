@@ -185,9 +185,12 @@ static const struct clk_parent_data mst_mux_parent_data[] = {
 	{ .fw_name = "mst_in7", },
 };
 
-#define AUD_MST_MUX(_name, _reg, _flag)					\
+#define AUD_MST_MUX_SET_PARENT(_name, _reg, _flag)					\
 	AUD_MUX(_name##_sel, _reg, 0x7, 24, _flag,			\
 		mst_mux_parent_data, CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT)
+#define AUD_MST_MUX(_name, _reg, _flag)					\
+	AUD_MUX(_name##_sel, _reg, 0x7, 24, _flag,			\
+		mst_mux_parent_data, CLK_SET_RATE_NO_REPARENT)
 #define AUD_MST_DIV(_name, _reg, _flag)					\
 	AUD_DIV(_name##_div, _reg, 0, 16, _flag,			\
 		aud_##_name##_sel, CLK_SET_RATE_PARENT)
@@ -195,6 +198,8 @@ static const struct clk_parent_data mst_mux_parent_data[] = {
 	AUD_GATE(_name, _reg, 31, aud_##_name##_div,			\
 		 CLK_SET_RATE_PARENT)
 
+#define AUD_MST_MCLK_MUX_SET_PARENT(_name, _reg)					\
+	AUD_MST_MUX_SET_PARENT(_name, _reg, CLK_MUX_ROUND_CLOSEST)
 #define AUD_MST_MCLK_MUX(_name, _reg)					\
 	AUD_MST_MUX(_name, _reg, CLK_MUX_ROUND_CLOSEST)
 #define AUD_MST_MCLK_DIV(_name, _reg)					\
@@ -202,6 +207,8 @@ static const struct clk_parent_data mst_mux_parent_data[] = {
 
 #define AUD_MST_SYS_MUX(_name, _reg)					\
 	AUD_MST_MUX(_name, _reg, 0)
+#define AUD_MST_SYS_MUX_SET_PARENT(_name, _reg)					\
+	AUD_MST_MUX_SET_PARENT(_name, _reg, 0)
 #define AUD_MST_SYS_DIV(_name, _reg)					\
 	AUD_MST_DIV(_name, _reg, 0)
 
@@ -370,7 +377,7 @@ static struct clk_regmap spdifout_clk_sel =
 static struct clk_regmap pdm_dclk_sel =
 	AUD_MST_MCLK_MUX(pdm_dclk, AUDIO_CLK_PDMIN_CTRL0);
 static struct clk_regmap spdifin_clk_sel =
-	AUD_MST_SYS_MUX(spdifin_clk, AUDIO_CLK_SPDIFIN_CTRL);
+	AUD_MST_SYS_MUX_SET_PARENT(spdifin_clk, AUDIO_CLK_SPDIFIN_CTRL);
 static struct clk_regmap pdm_sysclk_sel =
 	AUD_MST_SYS_MUX(pdm_sysclk, AUDIO_CLK_PDMIN_CTRL1);
 static struct clk_regmap spdifout_b_clk_sel =
@@ -567,17 +574,17 @@ static struct clk_hw axg_aud_top = {
 };
 
 static struct clk_regmap mst_a_mclk_sel =
-	AUD_MST_MCLK_MUX(mst_a_mclk, AUDIO_MCLK_A_CTRL);
+	AUD_MST_MCLK_MUX_SET_PARENT(mst_a_mclk, AUDIO_MCLK_A_CTRL);
 static struct clk_regmap mst_b_mclk_sel =
-	AUD_MST_MCLK_MUX(mst_b_mclk, AUDIO_MCLK_B_CTRL);
+	AUD_MST_MCLK_MUX_SET_PARENT(mst_b_mclk, AUDIO_MCLK_B_CTRL);
 static struct clk_regmap mst_c_mclk_sel =
-	AUD_MST_MCLK_MUX(mst_c_mclk, AUDIO_MCLK_C_CTRL);
+	AUD_MST_MCLK_MUX_SET_PARENT(mst_c_mclk, AUDIO_MCLK_C_CTRL);
 static struct clk_regmap mst_d_mclk_sel =
-	AUD_MST_MCLK_MUX(mst_d_mclk, AUDIO_MCLK_D_CTRL);
+	AUD_MST_MCLK_MUX_SET_PARENT(mst_d_mclk, AUDIO_MCLK_D_CTRL);
 static struct clk_regmap mst_e_mclk_sel =
-	AUD_MST_MCLK_MUX(mst_e_mclk, AUDIO_MCLK_E_CTRL);
+	AUD_MST_MCLK_MUX_SET_PARENT(mst_e_mclk, AUDIO_MCLK_E_CTRL);
 static struct clk_regmap mst_f_mclk_sel =
-	AUD_MST_MCLK_MUX(mst_f_mclk, AUDIO_MCLK_F_CTRL);
+	AUD_MST_MCLK_MUX_SET_PARENT(mst_f_mclk, AUDIO_MCLK_F_CTRL);
 
 static struct clk_regmap mst_a_mclk_div =
 	AUD_MST_MCLK_DIV(mst_a_mclk, AUDIO_MCLK_A_CTRL);
