@@ -244,4 +244,7 @@
 	pinctrl-0 = <&spdif_out_a20_pins>;
 	pinctrl-names = "default";
 	status = "okay";
+
+	assigned-clocks = <&clkc_audio AUD_CLKID_SPDIFOUT_CLK_SEL>;
+	assigned-clock-parents = <&clkc CLKID_HIFI_PLL>;
 };
