@@ -43,11 +43,12 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_onoff>;
 
-		wakeup {
-			label = "WAKEUP";
-			gpios = <&gpio5 27 GPIO_ACTIVE_LOW>;
+		button_sense {
+			label = "button_sense";
+			/* The BUTTON_SENSE is the inverted NPB_IN_N so it becomes active high. */
+			gpios = <&gpio5 27 GPIO_ACTIVE_HIGH>;
+			linux,code = <KEY_POWER>;
 			wakeup-source;
-			linux,code = <KEY_WAKEUP>;
 		};
 	};
 };
