@@ -17,6 +17,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
+#include <linux/mmc/sd.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/slot-gpio.h>
 #include <linux/io.h>
@@ -177,6 +178,8 @@ struct meson_host {
 	bool needs_pre_post_req;
 
 	spinlock_t lock;
+
+	int sd_sdio_switch_voltage_done;
 };
 
 static struct mmc_host *sdio_host;
@@ -335,6 +338,7 @@ static void meson_mmc_clk_gate(struct meson_host *host)
 		 */
 		cfg = readl(host->regs + SD_EMMC_CFG);
 		cfg |= CFG_STOP_CLOCK;
+		cfg &= ~CFG_AUTO_CLK;
 		writel(cfg, host->regs + SD_EMMC_CFG);
 	}
 }
@@ -806,6 +810,12 @@ static void meson_mmc_start_cmd(struct mmc_host *mmc, struct mmc_command *cmd)
 
 	meson_mmc_set_response_bits(cmd, &cmd_cfg);
 
+	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+		u32 val = readl(host->regs + SD_EMMC_CFG);
+		val &= ~CFG_AUTO_CLK;
+		writel(val, host->regs + SD_EMMC_CFG);
+	}
+
 	/* data? */
 	if (data) {
 		data->bytes_xfered = 0;
@@ -1080,6 +1090,12 @@ static int meson_mmc_card_busy(struct mmc_host *mmc)
 	u32 regval;
 
 	regval = readl(host->regs + SD_EMMC_STATUS);
+	if (mmc->card && mmc_card_sdio(mmc->card) && host->sd_sdio_switch_voltage_done) {
+		u32 val = readl(host->regs + SD_EMMC_CFG);
+		val |= CFG_AUTO_CLK;
+		writel(val, host->regs + SD_EMMC_CFG);
+		host->sd_sdio_switch_voltage_done = 0;
+	}
 
 	/* We are only interrested in lines 0 to 3, so mask the other ones */
 	return !(FIELD_GET(STATUS_DATI, regval) & 0xf);
@@ -1087,7 +1103,14 @@ static int meson_mmc_card_busy(struct mmc_host *mmc)
 
 static int meson_mmc_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
 {
+	struct meson_host *host = mmc_priv(mmc);
 	int ret;
+
+	{
+		u32 val = readl(host->regs + SD_EMMC_CFG);
+		val &= ~CFG_AUTO_CLK;
+		writel(val, host->regs + SD_EMMC_CFG);
+	}
 
 	/* vqmmc regulator is available */
 	if (!IS_ERR(mmc->supply.vqmmc)) {
@@ -1099,6 +1122,10 @@ static int meson_mmc_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
 		 * of your own regulator constraints
 		 */
 		ret = mmc_regulator_set_vqmmc(mmc, ios);
+
+		if (ret >= 0 && ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+			host->sd_sdio_switch_voltage_done += 1;
+
 		return ret < 0 ? ret : 0;
 	}
 
