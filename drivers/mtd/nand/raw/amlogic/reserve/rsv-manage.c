@@ -167,6 +167,7 @@ int meson_rsv_write(struct meson_rsv_info_t *rsv_info, u_char *buf)
 		oob_ops.ooboffs = 0;
 		oob_ops.datbuf = buf + length;
 		oob_ops.oobbuf = (u8 *)&oobinfo;
+		oob_ops.stats = NULL;
 
 		ret = mtd->_write_oob(mtd, offset, &oob_ops);
 		if (ret) {
@@ -335,6 +336,7 @@ RE_RSV_INFO:
 	oob_ops.ooboffs = 0;
 	oob_ops.datbuf = NULL;
 	oob_ops.oobbuf = (u8 *)&oobinfo;
+	oob_ops.stats = NULL;
 
 	memset((u8 *)&oobinfo, 0, sizeof(struct oobinfo_t));
 
@@ -444,6 +446,7 @@ RE_RSV_INFO:
 		oob_ops.ooboffs = 0;
 		oob_ops.datbuf = NULL;
 		oob_ops.oobbuf = (u8 *)&oobinfo;
+		oob_ops.stats = NULL;
 
 	for (i = 0; i < pages_per_blk; i++) {
 		memset((u8 *)&oobinfo, 0, oob_ops.ooblen);
@@ -538,6 +541,7 @@ READ_RSV_AGAIN:
 		oob_ops.ooboffs = 0;
 		oob_ops.datbuf = buf + length;
 		oob_ops.oobbuf = (u8 *)&oobinfo;
+		oob_ops.stats = NULL;
 
 		memset((u8 *)&oobinfo, 0, oob_ops.ooblen);
 
