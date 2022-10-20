@@ -1197,6 +1197,11 @@ static const struct mtd_ooblayout_ops meson_ooblayout_ops = {
 
 #define CLK_DIV_SHIFT 0
 #define CLK_DIV_WIDTH 6
+#define EMMC_CLK_CFG_MAGIC BIT(31) /* Not documented in the datasheet under SD_EMMC_CLOCK, but must be set */
+#define EMMC_CLK_CFG_ALWAYS_ON BIT(28)
+#define EMMC_CLK_CFG_CO_PHASE_DEFAULT BIT(9)
+#define EMMC_CLK_CFG_SRC_DEFAULT BIT(6)
+#define EMMC_CLK_CFG_DIV_DEFAULT (BIT(2) | BIT(0))
 static int meson_nfc_clk_init(struct meson_nfc *nfc)
 {
 	int ret;
@@ -1247,6 +1252,23 @@ static int meson_nfc_clk_init(struct meson_nfc *nfc)
 		dev_err(nfc->dev, "pre enable NFC divider fail\n");
 		return ret;
 	}
+
+	/*
+	 * When device is booted over USB recovery, u-boot does not set up
+	 * the EMMC clk, which results in a boot timeout, because the NFC
+	 * registers can only be read if this clk is running.
+	 * The following code turns on the clk with
+	 * default parameters if u-boot did not do so.
+	 * SD_EMMC_CLOCK is only partially documented in the datasheet,
+	 * so using the number coming from u-boot here.
+	*/
+	if (readl(nfc->nand_divider.reg) == 0)
+		writel(EMMC_CLK_CFG_MAGIC |
+		EMMC_CLK_CFG_ALWAYS_ON |
+		EMMC_CLK_CFG_CO_PHASE_DEFAULT |
+		EMMC_CLK_CFG_SRC_DEFAULT |
+		EMMC_CLK_CFG_DIV_DEFAULT,
+		nfc->nand_divider.reg);
 
 	return 0;
 }
