@@ -1043,19 +1043,24 @@ static void ci_power_lost_work(struct work_struct *work)
 	enable_irq(ci->irq);
 }
 
+/* check if vbus is valid, this blocks if device is in suspend */
+static bool ci_overcurrent_detected(struct ci_hdrc *ci)
+{
+	return !(hw_read_id_reg(ci, 0x23c, 0xff) & BIT(3));
+}
+
 static void imx8_check_vbus_overcurrent(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct ci_hdrc *ci =
 		container_of(dwork, struct ci_hdrc, check_vbus_work);
-	u32 reg;
 	int check_interval = 1000; /* Normal check interval in ms. */
 	const int overcurrent_disabled_time = 5000;
 	const int overcurrent_reenabled_time = 200;
 
-	/* If in low power mode, OC cannot be detected anyway, so just return and wait for resume */
+	/* If in low power mode, OC cannot be detected anyway, so just reschedule */
 	if (ci->in_lpm)
-		return;
+		goto overcurrent_reschedule;
 
 	/*
 	 * According to the reference manual for the SOC, setting or
@@ -1066,7 +1071,6 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 	 */
 	if (ci->vbus_overcurrent) {
 		int ret;
-		dev_info(ci->dev, "reenabling port power after an overcurrent condition\n");
 		/* Reenabling the port like this doesn't work, any
 		 * device plugged in will not been seen by the driver,
 		 * some other reinitialisation is required, so leave
@@ -1077,17 +1081,26 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 		if (ret) {
 			/* Retry if enabling the regulator failed. */
 			dev_err(ci->dev, "reenabling vbus regulator failed!\n");
-		} else {
-			ci->vbus_overcurrent = false;
+			goto overcurrent_reschedule;
 		}
-		/* Overcurrent fixed, let device sleep if it wants to again. */
-		pm_runtime_mark_last_busy(ci->dev);
-		pm_request_autosuspend(ci->dev);
-		check_interval = overcurrent_reenabled_time;
+		/* Wait here synchronously a little instead of rescheduling
+		 * This way we can be sure device did not enter low power mode */
+		msleep(overcurrent_reenabled_time);
+		if (ci_overcurrent_detected(ci)) {
+			/* Still having an overcurrent issue */
+			regulator_disable(ci->platdata->reg_vbus);
+			check_interval = overcurrent_disabled_time;
+			goto overcurrent_reschedule;
+		} else {
+			dev_info(ci->dev, "reenabling port power after an overcurrent condition\n");
+			ci->vbus_overcurrent = false;
+			/* Overcurrent fixed, let device sleep if it wants to again. */
+			pm_runtime_mark_last_busy(ci->dev);
+			pm_request_autosuspend(ci->dev);
+			check_interval = overcurrent_reenabled_time;
+		}
 	} else {
-		/* check if vbus is valid, this blocks if device is in suspend */
-		reg = hw_read_id_reg(ci, 0x23c, 0xff);
-		if (!(reg & BIT(3))) {
+		if (ci_overcurrent_detected(ci)) {
 			dev_err(ci->dev, "vbus overcurrent detected, disabling port power!\n");
 			/* See comment in reenable code. */
 			/* hw_write(ci, OP_PORTSC, PORTSC_PP, 0); */
@@ -1097,6 +1110,7 @@ static void imx8_check_vbus_overcurrent(struct work_struct *work)
 		}
 	}
 
+overcurrent_reschedule:
 	queue_delayed_work(
 		ci->vbus_oc_wq,
 		&ci->check_vbus_work,
@@ -1363,6 +1377,7 @@ static int ci_hdrc_remove(struct platform_device *pdev)
 	flush_workqueue(ci->power_lost_wq);
 	destroy_workqueue(ci->power_lost_wq);
 	if (!ci->platdata->vbus_oc_protection_disabled) {
+		cancel_delayed_work_sync(&ci->check_vbus_work);
 		flush_workqueue(ci->vbus_oc_wq);
 		destroy_workqueue(ci->vbus_oc_wq);
 	}
@@ -1486,8 +1501,6 @@ static int ci_suspend(struct device *dev)
 	struct ci_hdrc *ci = dev_get_drvdata(dev);
 
 	flush_workqueue(ci->power_lost_wq);
-	if (!ci->platdata->vbus_oc_protection_disabled)
-		flush_workqueue(ci->vbus_oc_wq);
 	if (ci->wq)
 		flush_workqueue(ci->wq);
 	/*
@@ -1575,9 +1588,6 @@ static int ci_runtime_suspend(struct device *dev)
 	/* Can't go to sleep while the overcurrent is happening, need to reset first */
 	if(ci->vbus_overcurrent)
 		return -EBUSY;
-
-	if (!ci->platdata->vbus_oc_protection_disabled)
-		cancel_delayed_work_sync(&ci->check_vbus_work); 
 
 	if (ci->in_lpm)
 		return 0;
