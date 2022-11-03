@@ -47,7 +47,7 @@ static int ehci_ci_portpower(struct usb_hcd *hcd, int portnum, bool enable)
 		}
 		if (enable)
 			ret = regulator_enable(priv->reg_vbus);
-		else
+		else if (!ci->vbus_overcurrent)
 			ret = regulator_disable(priv->reg_vbus);
 		if (ret) {
 			dev_err(dev,
