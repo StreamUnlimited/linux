@@ -518,7 +518,7 @@ static int meson_clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 		return ret;
 
 	enabled = meson_parm_read(clk->map, &pll->en);
-	if (enabled)
+	if (enabled && !(clk_hw_get_flags(hw) & CLK_SET_RATE_UNGATE))
 		meson_clk_pll_disable(hw);
 
 	meson_parm_write(clk->map, &pll->n, n);
