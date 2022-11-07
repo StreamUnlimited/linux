@@ -392,6 +392,7 @@ static struct clk_regmap axg_hifi_pll_dco = {
 			.fw_name = "xtal",
 		},
 		.num_parents = 1,
+		.flags = CLK_SET_RATE_UNGATE,
 	},
 };
 
