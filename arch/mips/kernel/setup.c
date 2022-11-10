@@ -811,3 +811,13 @@ static int __init setnocoherentio(char *str)
 }
 early_param("nocoherentio", setnocoherentio);
 #endif
+
+int plat_qemu;
+
+static int __init setup_qemu(char *p)
+{
+	plat_qemu = 1;
+
+	return 1;
+}
+__setup("qemu", setup_qemu);

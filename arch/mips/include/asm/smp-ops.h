@@ -67,6 +67,8 @@ static inline void register_smp_ops(const struct plat_smp_ops *ops)
 
 #endif /* !CONFIG_SMP */
 
+extern void plat_smp_init_secondary(void);
+
 static inline int register_up_smp_ops(void)
 {
 #ifdef CONFIG_SMP_UP
@@ -82,10 +84,10 @@ static inline int register_up_smp_ops(void)
 
 static inline int register_cmp_smp_ops(void)
 {
-#ifdef CONFIG_MIPS_CMP
+#if defined(CONFIG_MIPS_CMP) || defined(CONFIG_TAROKO_CMP)
 	extern const struct plat_smp_ops cmp_smp_ops;
 
-	if (!mips_cm_present())
+	if (IS_ENABLED(CONFIG_MIPS_CMP) && !mips_cm_present())
 		return -ENODEV;
 
 	register_smp_ops(&cmp_smp_ops);

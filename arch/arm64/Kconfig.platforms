@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-only
 menu "Platform selection"
 
+config ARCH_SHEIPA
+	bool "Realtek Sheipa ARMv8 Platform"
+	help
+	  This enables support for the Realtek Sheipa ARMv8 platform.
+
 config ARCH_ACTIONS
 	bool "Actions Semi Platforms"
 	select OWL_TIMER

@@ -1,0 +1,1074 @@
+/*
+ * Copyright (c) 2021 Realtek, LLC.
+ * All rights reserved.
+ *
+ * Licensed under the Realtek License, Version 1.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License from Realtek
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#include <linux/delay.h>
+#include <linux/slab.h>
+#include <linux/clk.h>
+#include <linux/clk-provider.h>
+#include <linux/io.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/of_gpio.h>
+#include <linux/of_address.h>
+#include <linux/dmaengine.h>
+#include <linux/delay.h>
+#include <sound/soc.h>
+#include <sound/pcm_params.h>
+
+#include "dma.h"
+#include "ameba_sport.h"
+#include "ameba_gdma.h"
+#include "ameba_audio_clock.h"
+
+#define NO_MICRO_ADJUST 1
+
+struct sport_dai {
+	/* Platform device for this DAI */
+	struct platform_device *pdev;
+
+	/* IOREMAP'd SFRs */
+	void __iomem *addr;
+	/* Physical base address of SFRs */
+	u32 base;
+	u32 reg_size;
+	/* Frame clock */
+	unsigned frmclk;
+	unsigned cap_frmclk;
+
+	int id;
+	u32 clock_in_from_dts;
+
+	/* DMA parameters */
+	struct ameba_pcm_dma_params dma_playback;
+	struct ameba_pcm_dma_params dma_capture;
+
+	int sport_debug;
+
+	struct clk* clock;
+	struct clock_params * audio_clock_params;
+	unsigned int sport_mclk_multiplier;
+	unsigned int sport_multi_io;
+	unsigned int sport_mode;
+	int	irq;
+
+	/* total frames delivered through LRCLK */
+	u32 total_rx_counter;
+	u32 total_tx_counter;
+	/* total frames delivered through LRCLK */
+	u32 total_rx_counter_boundary;
+	u32 total_tx_counter_boundary;
+	/* total irq counts, if LRCLK delivers dma buffer_size(tx_sport_compare_val)
+	*  (rx_sport_compare_val) then triggers one sport irq */
+	u32 irq_tx_count;
+	u32 irq_rx_count;
+	/* size that LRCLK delivers, that triggers one sport irq */
+	u32 tx_sport_compare_val;
+	u32 rx_sport_compare_val;
+
+	spinlock_t lock;
+};
+
+#define sport_info(mask,dev, ...)						\
+do{									\
+	if (((struct sport_dai *)(dev_get_drvdata(dev))) != NULL)					\
+		if (((((struct sport_dai *)(dev_get_drvdata(dev)))->sport_debug) & mask) >= 1)		\
+			dev_info(dev, ##__VA_ARGS__); \
+}while(0)
+
+#define sport_verbose(mask,dev, ...)						\
+do{									\
+	if (((struct sport_dai *)(dev_get_drvdata(dev))) != NULL)					\
+		if (((((struct sport_dai *)(dev_get_drvdata(dev)))->sport_debug) & mask) == 2)		\
+			dev_info(dev, ##__VA_ARGS__); \
+}while(0)
+
+
+static ssize_t sport_debug_show(struct device *dev, struct device_attribute*attr, char *buf)
+{
+		struct sport_dai *data = dev_get_drvdata(dev);
+        return sprintf(buf, "sport_debug=%d\n", data->sport_debug);
+}
+
+static ssize_t sport_debug_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct sport_dai *data = dev_get_drvdata(dev);
+	data->sport_debug = buf[0] - '0';
+    return count;
+}
+
+static DEVICE_ATTR(sport_debug, S_IWUSR |S_IRUGO, sport_debug_show, sport_debug_store);
+
+static struct attribute *sport_debug_attrs[] = {
+        &dev_attr_sport_debug.attr,
+        NULL
+};
+
+static const struct attribute_group sport_debug_attr_grp = {
+        .attrs = sport_debug_attrs,
+};
+
+void dumpSportRegs(struct device *dev,void __iomem * sportx){
+	u32 tmp;
+	struct sport_dai *sport = dev_get_drvdata(dev);
+	if ( sport -> sport_debug >= 1 ) {
+		tmp = readl(sportx + REG_SP_REG_MUX);
+		sport_info(1, dev, "REG_SP_REG_MUX:%x",tmp);
+		tmp = readl(sportx + REG_SP_CTRL0);
+		sport_info(1, dev, "REG_SP_CTRL0:%x",tmp);
+		tmp = readl(sportx + REG_SP_CTRL1);
+		sport_info(1, dev, "REG_SP_CTRL1:%x",tmp);
+		tmp = readl(sportx + REG_SP_INT_CTRL);
+		sport_info(1, dev, "REG_SP_INT_CTRL:%x",tmp);
+		tmp = readl(sportx + REG_RSVD0);
+		sport_info(1, dev, "REG_RSVD0:%x",tmp);
+		tmp = readl(sportx + REG_SP_TRX_COUNTER_STATUS);
+		sport_info(1, dev, "REG_SP_TRX_COUNTER_STATUS:%x",tmp);
+		tmp = readl(sportx + REG_SP_ERR);
+		sport_info(1, dev, "REG_SP_ERR:%x",tmp);
+		tmp = readl(sportx + REG_SP_SR_TX_BCLK);
+		sport_info(1, dev, "REG_SP_SR_TX_BCLK:%x",tmp);
+		tmp = readl(sportx + REG_SP_TX_LRCLK);
+		sport_info(1, dev, "REG_SP_TX_LRCLK:%x",tmp);
+		tmp = readl(sportx + REG_SP_FIFO_CTRL);
+		sport_info(1, dev, "REG_SP_FIFO_CTRL:%x",tmp);
+		tmp = readl(sportx + REG_SP_FORMAT);
+		sport_info(1, dev, "REG_SP_FORMAT:%x",tmp);
+		tmp = readl(sportx + REG_SP_RX_BCLK);
+		sport_info(1, dev, "REG_SP_RX_BCLK:%x",tmp);
+		tmp = readl(sportx + REG_SP_RX_LRCLK);
+		sport_info(1, dev, "REG_SP_RX_LRCLK:%x",tmp);
+		tmp = readl(sportx + REG_SP_DSP_COUNTER);
+		sport_info(1, dev, "REG_SP_DSP_COUNTER:%x",tmp);
+		tmp = readl(sportx + REG_RSVD1);
+		sport_info(1, dev, "REG_RSVD1:%x",tmp);
+		tmp = readl(sportx + REG_SP_DIRECT_CTRL0);
+		sport_info(1, dev, "REG_SP_DIRECT_CTRL0:%x",tmp);
+		tmp = readl(sportx + REG_RSVD2);
+		sport_info(1, dev, "REG_RSVD2:%x",tmp);
+		tmp = readl(sportx + REG_SP_FIFO_IRQ);
+		sport_info(1, dev, "REG_SP_FIFO_IRQ:%x",tmp);
+		tmp = readl(sportx + REG_SP_DIRECT_CTRL1);
+		sport_info(1, dev, "REG_SP_DIRECT_CTRL1:%x",tmp);
+		tmp = readl(sportx + REG_SP_DIRECT_CTRL2);
+		sport_info(1, dev, "REG_SP_DIRECT_CTRL2:%x",tmp);
+		tmp = readl(sportx + REG_RSVD3);
+		sport_info(1, dev, "REG_RSVD3:%x",tmp);
+		tmp = readl(sportx + REG_SP_DIRECT_CTRL3);
+		sport_info(1, dev, "REG_SP_DIRECT_CTRL3:%x",tmp);
+		tmp = readl(sportx + REG_SP_DIRECT_CTRL4);
+		sport_info(1, dev, "REG_SP_DIRECT_CTRL4:%x",tmp);
+		tmp = readl(sportx + REG_SP_RX_COUNTER1);
+		sport_info(1, dev, "REG_SP_RX_COUNTER1:%x",tmp);
+		tmp = readl(sportx + REG_SP_RX_COUNTER2);
+		sport_info(1, dev, "REG_SP_RX_COUNTER2:%x",tmp);
+		tmp = readl(sportx + REG_SP_TX_FIFO_0_WR_ADDR);
+		sport_info(1, dev, "REG_SP_TX_FIFO_0_WR_ADDR:%x",tmp);
+		tmp = readl(sportx + REG_SP_RX_FIFO_0_RD_ADDR);
+		sport_info(1, dev, "REG_SP_RX_FIFO_0_RD_ADDR:%x",tmp);
+		tmp = readl(sportx + REG_SP_TX_FIFO_1_WR_ADDR);
+		sport_info(1, dev, "REG_SP_TX_FIFO_1_WR_ADDR:%x",tmp);
+		tmp = readl(sportx + REG_SP_RX_FIFO_1_RD_ADDR);
+		sport_info(1, dev, "REG_SP_RX_FIFO_1_RD_ADDR:%x",tmp);
+	}
+}
+
+static const struct of_device_id amebad2_sport_match[] = {
+	{ .compatible = "realtek,amebad2-sport", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, amebad2_sport_match);
+
+static int sport_trigger(struct snd_pcm_substream *substream,
+	int cmd, struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
+	int i;
+	int fifo_bytes = 128;
+	sport_info(1,&sport->pdev->dev,"%s",__func__);
+
+	switch ( cmd ) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		audio_sp_dma_cmd(sport->addr, true);
+
+		if ( is_playback ) {
+			sport->total_tx_counter_boundary = substream->runtime->boundary;
+			dev_info(&sport->pdev->dev,"tx X:%d, counter boundary:%d", sport->tx_sport_compare_val, sport->total_tx_counter_boundary);
+			audio_sp_tx_start(sport->addr, true);
+			audio_sp_set_tx_count(sport->addr, sport->tx_sport_compare_val);
+		} else {
+			sport->total_rx_counter_boundary = substream->runtime->boundary;
+			sport_info(1, &sport->pdev->dev,"rx X:%d, counter boundary:%d", sport->rx_sport_compare_val, sport->total_rx_counter_boundary);
+			audio_sp_rx_start(sport->addr, true);
+			audio_sp_set_rx_count(sport->addr, sport->rx_sport_compare_val);
+		}
+
+		if ( sport->sport_debug == 2 ){
+			msleep(8); //sleep 8ms to wait for rx data to debug
+			if ( !is_playback ){
+				for (i = 0;i < fifo_bytes; i++)
+					sport_verbose(2,&sport->pdev->dev,"trigger sport1 fifo0: %x",readb(sport->addr + REG_SP_RX_FIFO_0_RD_ADDR + i));
+			}
+			sport_info(1, &sport->pdev->dev,"%s start done\n",__func__);
+		}
+
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		audio_sp_dma_cmd(sport->addr, false);
+
+		if ( is_playback )
+			audio_sp_tx_start(sport->addr, false);
+		else
+			audio_sp_rx_start(sport->addr, false);
+
+		sport_info(1,&sport->pdev->dev,"%s stop done \n",__func__);
+		break;
+	}
+
+	return 0;
+}
+
+static int enable_audio_source_clock(struct clock_params * params, int id, bool enabled)
+{
+	int ret = 0;
+	if ( params->clock == PLL_CLOCK_98P304M ) {
+#if ( !I2S_PLL_ALWAYS_ON )
+		update_98MP304M_input_clock_status(enabled);
+#endif
+		if ( enabled )
+			choose_input_clock_for_sport_index(id, CKSL_I2S_PLL98M);
+	} else if ( params->clock == PLL_CLOCK_45P1584M ) {
+#if ( !I2S_PLL_ALWAYS_ON )
+		update_45MP158_input_clock_status(enabled);
+#endif
+		if ( enabled )
+			choose_input_clock_for_sport_index(id, CKSL_I2S_PLL45M);
+	} else if ( params->clock == PLL_CLOCK_24P576M ) {
+#if ( !I2S_PLL_ALWAYS_ON )
+		update_24MP576_input_clock_status(enabled);
+#endif
+		if ( enabled )
+			choose_input_clock_for_sport_index(id, CKSL_I2S_PLL24M);
+	}
+	return ret;
+}
+
+/*
+ * calculate the runtime delay
+ * to notice that: for alsa fwk, the boundary is calculated as follows:
+ * LONG_MAX:0x7fffffffUL
+ * runtime->boundary = runtime->buffer_size;
+ * while (runtime->boundary * 2 <= LONG_MAX - runtime->buffer_size)
+ *		runtime->boundary *= 2;
+ * this means the runtime->boundary is always the interger multiple of buffer_size.
+ * sport->tx_sport_compare_val is set as buffer_size, so the runtime->boundary is multiple
+ * of tx_sport_compare_val or rx_sport_compare_val.
+ */
+static snd_pcm_sframes_t sport_delay(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
+{
+	u32 counter = 0;
+	/* frames totally delivered through LRCLK */
+	u32 total_counter = 0;
+	/* delay(frames) is the value of substream->runtime->delay */
+	u32 delay = 0;
+	/* delay(frames) of dma buffer */
+	u32 dma_buf_delay = 0;
+	bool is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
+	struct sport_dai *sport;
+	sport = snd_soc_dai_get_drvdata(dai);
+
+	spin_lock(&sport->lock);
+	if ( is_playback ) {
+		counter = audio_sp_get_tx_count(sport->addr);
+		total_counter = counter + sport->irq_tx_count * sport->tx_sport_compare_val;
+		dma_buf_delay = snd_pcm_playback_hw_avail(substream->runtime);
+	} else {
+		counter = audio_sp_get_rx_count(sport->addr);
+		total_counter += counter + sport->irq_rx_count * sport->rx_sport_compare_val;
+		dma_buf_delay = snd_pcm_capture_avail(substream->runtime);
+	}
+
+	if ( is_playback ) {
+		/* application out of boundary, yet LRCLK frames not out of boundary */
+		if ( substream->runtime->control->appl_ptr < total_counter ) {
+			delay = substream->runtime->boundary - total_counter + substream->runtime->control->appl_ptr - dma_buf_delay;
+		} else {
+			delay = substream->runtime->control->appl_ptr - total_counter - dma_buf_delay;
+		}
+	} else {
+		if ( substream->runtime->control->appl_ptr > total_counter ) {
+			delay = substream->runtime->boundary - substream->runtime->control->appl_ptr + total_counter - dma_buf_delay;
+		} else {
+			delay = total_counter - substream->runtime->control->appl_ptr - dma_buf_delay;
+		}
+	}
+
+	spin_unlock(&sport->lock);
+	//pr_info("%s counter:%d, appl_ptr:%d total_counter:%d sport->irq_tx_count:%d dma_buf_delay:%d delay:%d\n", __func__, counter, substream->runtime->control->appl_ptr, total_counter, sport->irq_tx_count, dma_buf_delay, delay);
+
+	return delay;
+}
+
+
+static int sport_hw_params(struct snd_pcm_substream *substream,
+	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
+{
+	sport_init_params sp_tx_init;
+	sport_init_params sp_rx_init;
+	unsigned int channel_count;
+	unsigned int channel_length = 32;
+	struct sport_dai *sport;
+	channel_count = params_channels(params);
+	sport = snd_soc_dai_get_drvdata(dai);
+
+	sport_info(1,&sport->pdev->dev,"%s: sport addr:%p,channel:%d,rate:%dhz,width:%d",__func__,sport->addr,channel_count,params_rate(params),params_width(params));
+
+	if ( substream->stream == SNDRV_PCM_STREAM_PLAYBACK ){
+		sport->tx_sport_compare_val = params_buffer_size(params);
+		sp_tx_init.sp_sel_data_format = SP_DF_LEFT;
+		sp_tx_init.sp_sel_ch = SP_TX_CH_LR;
+		sp_tx_init.sp_sr = SP_16K;
+		sp_tx_init.sp_in_clock = sport->clock_in_from_dts;
+		sp_tx_init.sp_sel_tdm = SP_TX_NOTDM;
+		sp_tx_init.sp_sel_fifo = SP_TX_FIFO2;
+		sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+		sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+
+		if ( sport->sport_multi_io == 1 )
+			sp_tx_init.sp_set_multi_io = SP_TX_MULTIIO_EN;
+		else
+			sp_tx_init.sp_set_multi_io = SP_TX_MULTIIO_DIS;
+
+		/* this means the external codec MCLK needs to be imported by sport_mclk_multiplier*sport_MCLK */
+		if ( sport->sport_mclk_multiplier != 0 ) {
+			if ( sport->sport_multi_io == 1 ) {
+				if ( choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params)!= 0 )
+					return -EINVAL;
+			} else {
+				if ( choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
+					return -EINVAL;
+			}
+			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
+			update_fen_cke_sport_status(sport->id, true);
+#if NO_MICRO_ADJUST
+			set_rate_divider(sport->id, sport->audio_clock_params->pll_div);
+#endif
+			sp_tx_init.sp_in_clock = sport->audio_clock_params->clock / sport->audio_clock_params->pll_div;
+#if NO_MICRO_ADJUST
+			audio_sp_set_mclk_clk_div(sport->addr, sport->audio_clock_params->sport_mclk_div);
+#else
+			audio_sp_set_mclk_clk_div(sport->addr, 1);
+#endif
+		}
+
+		switch ( channel_count ) {     //params_channels - Get the number of channels from the hw params
+			case 8:
+				sport->dma_playback.datawidth = 4;     //4 byte:32bit
+				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_tdm = SP_TX_TDM8;
+				sp_tx_init.sp_sel_fifo = SP_TX_FIFO8;
+				break;
+			case 6:
+				sport->dma_playback.datawidth = 4;     //4 byte:32bit
+				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_tdm = SP_TX_TDM6;
+				sp_tx_init.sp_sel_fifo = SP_TX_FIFO6;
+				break;
+			case 4:
+				sport->dma_playback.datawidth = 4;     //4 byte:32bit
+				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_tdm = SP_TX_TDM4;
+				sp_tx_init.sp_sel_fifo = SP_TX_FIFO4;
+				break;
+			case 2:
+				sport->dma_playback.datawidth = 4;     //4 byte:32bit
+				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				break;
+			case 1:
+				sport->dma_playback.datawidth = 2;
+				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_MONO;
+				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_MONO;
+				break;
+			default:
+				dev_err(&sport->pdev->dev, "%d channels not supported\n",
+						params_channels(params));
+			return -EINVAL;
+		}
+
+		switch ( params_width(params) ) {     //params_width - get the number of bits of the sample format,like 16LS
+			//case 8 is supported in spec, yet fwlib not support it now.
+			case 16:
+				sp_tx_init.sp_sel_word_len = SP_TXWL_16;
+				sp_tx_init.sp_sel_ch_len = SP_TXCL_32;
+				break;
+			case 20:
+				sp_tx_init.sp_sel_word_len = SP_TXWL_20;
+				sp_tx_init.sp_sel_ch_len = SP_TXCL_32;
+				break;
+			case 24:
+				sp_tx_init.sp_sel_word_len = SP_TXWL_24;
+				sp_tx_init.sp_sel_ch_len = SP_TXCL_32;
+				break;
+			case 32:
+				sp_tx_init.sp_sel_word_len = SP_TXWL_32;
+				sp_tx_init.sp_sel_ch_len = SP_TXCL_32;
+				break;
+			default:
+				dev_err(&sport->pdev->dev, "Format(%d) not supported\n",
+						params_format(params));
+				return -EINVAL;
+		}
+
+		if ( IS_RATE_SUPPORTED(params_rate(params)) ) {
+			sport->frmclk = params_rate(params);
+			sp_tx_init.sp_sr = params_rate(params);
+		} else {
+			dev_err(&sport->pdev->dev,"unsupported samplerate:%d",sport->frmclk);
+			return -EINVAL;
+		}
+	}
+
+	if ( substream->stream == SNDRV_PCM_STREAM_CAPTURE ){
+		sport->rx_sport_compare_val = params_buffer_size(params);
+		sp_rx_init.sp_sel_data_format = SP_DF_LEFT;
+		sp_rx_init.sp_sel_ch = SP_RX_CH_LR;
+		sp_rx_init.sp_sr = SP_16K;
+		sp_rx_init.sp_in_clock = sport->clock_in_from_dts;
+		sp_rx_init.sp_sel_tdm = SP_RX_NOTDM;
+		sp_rx_init.sp_sel_fifo = SP_RX_FIFO2;
+		sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+		sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+
+		if ( sport->sport_multi_io == 1 )
+			sp_rx_init.sp_set_multi_io = SP_RX_MULTIIO_EN;
+		else
+			sp_rx_init.sp_set_multi_io = SP_RX_MULTIIO_DIS;
+
+		if ( sport->sport_mclk_multiplier != 0 ) {
+			if ( sport->sport_multi_io == 1 ) {
+				if ( choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0 )
+					return -EINVAL;
+			} else {
+				if ( choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0 )
+					return -EINVAL;
+			}
+			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
+			update_fen_cke_sport_status(sport->id, true);
+#if NO_MICRO_ADJUST
+			set_rate_divider(sport->id, sport->audio_clock_params->pll_div);
+#endif
+			sp_rx_init.sp_in_clock = sport->audio_clock_params->clock / sport->audio_clock_params->pll_div;
+#if NO_MICRO_ADJUST
+			audio_sp_set_mclk_clk_div(sport->addr, sport->audio_clock_params->sport_mclk_div);
+#else
+			audio_sp_set_mclk_clk_div(sport->addr, 1);
+#endif
+		}
+
+		switch ( channel_count ) {     //params_channels - Get the number of channels from the hw params
+			case 8:
+				sport->dma_capture.datawidth = 4;
+				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_tdm = SP_RX_TDM8;
+				sp_rx_init.sp_sel_fifo = SP_RX_FIFO8;
+				break;
+			case 6:
+				sport->dma_capture.datawidth = 4;
+				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_tdm = SP_RX_TDM6;
+				sp_rx_init.sp_sel_fifo = SP_RX_FIFO6;
+				break;
+			case 4:
+				sport->dma_capture.datawidth = 4;
+				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_tdm = SP_RX_TDM4;
+				sp_rx_init.sp_sel_fifo = SP_RX_FIFO4;
+				break;
+			case 2:
+				sport->dma_capture.datawidth = 4;
+				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+				break;
+			case 1:
+				sport->dma_capture.datawidth = 2;
+				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_MONO;
+				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_MONO;
+				break;
+			default:
+				dev_err(&sport->pdev->dev, "%d channels not supported\n",
+						params_channels(params));
+			return -EINVAL;
+		}
+
+		switch ( params_width(params) ) {     //params_width - get the number of bits of the sample format,like 16LS
+			//case 8 is supported in spec, yet fwlib not support it now.
+			case 16:
+				sp_rx_init.sp_sel_word_len = SP_RXWL_16;
+				sp_rx_init.sp_sel_ch_len = SP_RXCL_32;
+				break;
+			case 20:
+				sp_rx_init.sp_sel_word_len = SP_RXWL_20;
+				sp_rx_init.sp_sel_ch_len = SP_RXCL_32;
+				break;
+			case 24:
+				sp_rx_init.sp_sel_word_len = SP_RXWL_24;
+				sp_rx_init.sp_sel_ch_len = SP_RXCL_32;
+				break;
+			case 32:
+				sp_rx_init.sp_sel_word_len = SP_RXWL_32;
+				sp_rx_init.sp_sel_ch_len = SP_RXCL_32;
+				break;
+			default:
+				dev_err(&sport->pdev->dev, "Format(%d) not supported\n",
+					params_format(params));
+			return -EINVAL;
+		}
+
+		if ( IS_RATE_SUPPORTED(params_rate(params)) ) {
+			sport->cap_frmclk = params_rate(params);
+			sp_rx_init.sp_sr = params_rate(params);
+		} else {
+			dev_err(&sport->pdev->dev,"unsupported samplerate:%d",sport->cap_frmclk);
+			return -EINVAL;
+		}
+	}
+
+	snd_soc_dai_init_dma_data(dai, &sport->dma_playback, &sport->dma_capture);
+
+	if ( substream->stream == SNDRV_PCM_STREAM_PLAYBACK )
+		audio_sp_tx_init(sport->addr, &sp_tx_init);
+	else if ( substream->stream == SNDRV_PCM_STREAM_CAPTURE )
+		audio_sp_rx_init(sport->addr, &sp_rx_init);
+
+	pr_info("set sport->id:%d, mode:%d\n", sport->id, sport->sport_mode);
+	audio_sp_set_i2s_mode(sport->addr, sport->sport_mode);
+
+	dumpSportRegs(&sport->pdev->dev, sport->addr);
+
+	return 0;
+}
+
+static int sport_hw_free(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+
+	sport_info(1,&sport->pdev->dev,"%s",__func__);
+	sport->total_tx_counter = 0;
+	sport->total_rx_counter = 0;
+	sport->total_tx_counter_boundary = 0;
+	sport->total_rx_counter_boundary = 0;
+	sport->irq_tx_count = 0;
+	sport->irq_rx_count = 0;
+	sport->tx_sport_compare_val = 6144;
+	sport->rx_sport_compare_val = 6144;
+
+	return 0;
+}
+
+static int sport_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+{
+	return 0;
+}
+
+static int sport_startup(struct snd_pcm_substream *substream,
+	  struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+	int ret;
+	sport_info(1,&sport->pdev->dev,"%s",__func__);
+
+	/* enable sport clock */
+	ret = clk_prepare_enable(sport->clock);
+	if ( ret < 0 ) {
+		dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
+	}
+
+	if ( (sport -> sport_debug) >= 1 && (sport->sport_mclk_multiplier != 0) )
+		audio_clock_dump();
+
+	return 0;
+}
+
+static void sport_shutdown(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+
+	sport_info(1,&sport->pdev->dev,"%s",__func__);
+
+	clk_disable_unprepare(sport->clock);
+	//below to be done
+	if ( sport->sport_mclk_multiplier != 0 ) {
+		/* disable sport clock */
+		update_fen_cke_sport_status(sport->id, false);
+		if ( sport -> sport_debug >= 1 )
+			audio_clock_dump();
+		//enable_audio_source_clock(sport->audio_clock_params, sport->id, false);
+	}
+
+	dev_info(&sport->pdev->dev,"close");
+}
+
+static const struct snd_soc_dai_ops amebad2_sport_dai_ops = {
+	.trigger   = sport_trigger,
+	.delay     = sport_delay,
+	.hw_params = sport_hw_params,
+	.hw_free   = sport_hw_free,
+	.set_fmt   = sport_set_fmt,
+	.startup   = sport_startup,
+	.shutdown  = sport_shutdown,
+};
+
+
+static const struct snd_kcontrol_new sport_controls[] = {
+
+};
+
+static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+
+	int i = 0;
+	int fifo_byte = 128;
+
+	sport_info(1,&sport->pdev->dev,"%s",__func__);
+
+	sport->addr = ioremap(sport->base, sport->reg_size);
+	if ( sport->addr == NULL ) {
+		dev_err(&sport->pdev->dev, "cannot ioremap registers\n");
+		return -ENXIO;
+	}
+
+	if ( sport->sport_debug == 2 ){
+		for (i = 0;i < fifo_byte; i++)
+			sport_verbose(2,&sport->pdev->dev,"sp1 ff0: %x",readb(sport->addr + REG_SP_RX_FIFO_0_RD_ADDR + i));
+	}
+
+	/* disable rx, tx counter irq */
+	audio_sp_disable_rx_tx_sport_irq(sport->addr);
+
+	sport->dma_playback.dev_phys_0 = sport->base + REG_SP_TX_FIFO_0_WR_ADDR;
+	sport->dma_playback.dev_phys_1 = sport->base + REG_SP_TX_FIFO_1_WR_ADDR;
+	sport->dma_playback.datawidth = DMA_SLAVE_BUSWIDTH_4_BYTES;    //32bit
+	sport->dma_playback.src_maxburst = SP_TX_FIFO_DEPTH/2;    //deliver 8 samples to fifo one time, because fifo is 16 sample depth
+	sport->dma_playback.chan_name = "tx";
+
+	sport->dma_capture.dev_phys_0 = sport->base + REG_SP_RX_FIFO_0_RD_ADDR;
+	sport->dma_capture.dev_phys_1 = sport->base + REG_SP_RX_FIFO_1_RD_ADDR;
+	sport->dma_capture.datawidth = DMA_SLAVE_BUSWIDTH_4_BYTES;    //32bit
+	sport->dma_capture.src_maxburst = SP_RX_FIFO_DEPTH/2;    //deliver 8 samples to fifo one time, because fifo is 16 sample depth
+	sport->dma_capture.chan_name = "rx";
+
+	switch ( sport->id )
+	{
+	case 0:
+		sport->dma_playback.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT0F0_TX;
+		sport->dma_capture.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT0F0_RX;
+		sport->dma_capture.handshaking_1 = GDMA_HANDSHAKE_INTERFACE_SPORT0F1_RX;
+		break;
+	case 1:
+		sport->dma_playback.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT1F0_TX;
+		sport->dma_capture.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT1F0_RX;
+		sport->dma_capture.handshaking_1 = GDMA_HANDSHAKE_INTERFACE_SPORT1F1_RX;
+		break;
+	case 2:
+		sport->dma_playback.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT2F0_TX;
+		sport->dma_capture.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT2F0_RX;
+		sport->dma_playback.handshaking_1 = GDMA_HANDSHAKE_INTERFACE_SPORT2F1_TX;
+		sport->dma_capture.handshaking_1 = GDMA_HANDSHAKE_INTERFACE_SPORT2F1_RX;
+		break;
+	case 3:
+		sport->dma_playback.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT3F0_TX;
+		sport->dma_capture.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT3F0_RX;
+		sport->dma_playback.handshaking_1 = GDMA_HANDSHAKE_INTERFACE_SPORT3F1_TX;
+		sport->dma_capture.handshaking_1 = GDMA_HANDSHAKE_INTERFACE_SPORT3F1_RX;
+		break;
+	default:
+		dev_err(&sport->pdev->dev, " sport id:%d not supported \n", sport->id);
+		break;
+	}
+
+	sport_info(1,&sport->pdev->dev,"%s, play phyaddr:%x,cap phyaddr:%x\n",__func__,sport->dma_playback.dev_phys_0,sport->dma_capture.dev_phys_0);
+
+	snd_soc_add_component_controls(dai->component, sport_controls,
+				       ARRAY_SIZE(sport_controls));
+	return 0;
+}
+
+static int amebad2_sport_dai_remove(struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+	iounmap(sport->addr);
+	return 0;
+}
+
+static struct snd_soc_dai_driver amebad2_sport_dai_drv[] = {
+	{
+		.name = "4100d000.sport",
+		.id = 0,
+        .playback = {
+                .channels_min = 1,
+                .channels_max = 8,
+                .rates = SNDRV_PCM_RATE_8000_192000,
+                .rate_min = 8000,
+                .rate_max = 192000,
+                .formats = SNDRV_PCM_FMTBIT_S16_LE |
+							SNDRV_PCM_FORMAT_U16_LE |
+							SNDRV_PCM_FORMAT_S20_LE |
+							SNDRV_PCM_FORMAT_U20_LE |
+							SNDRV_PCM_FMTBIT_S24_LE |
+							SNDRV_PCM_FORMAT_U24_LE |
+							SNDRV_PCM_FMTBIT_S32_LE |
+							SNDRV_PCM_FMTBIT_U32_LE,
+        },
+		.probe = amebad2_sport_dai_probe,
+		.remove = amebad2_sport_dai_remove,
+		.ops = &amebad2_sport_dai_ops,
+	},
+	{
+		.name = "4100e000.sport",
+		.id = 1,
+		.capture = {
+                .channels_min = 1,
+                .channels_max = 8,
+                .rates = SNDRV_PCM_RATE_8000_192000,
+                .rate_min = 8000,
+                .rate_max = 192000,
+                .formats = SNDRV_PCM_FMTBIT_S16_LE |
+							SNDRV_PCM_FORMAT_U16_LE |
+							SNDRV_PCM_FORMAT_S20_LE |
+							SNDRV_PCM_FORMAT_U20_LE |
+							SNDRV_PCM_FMTBIT_S24_LE |
+							SNDRV_PCM_FORMAT_U24_LE |
+							SNDRV_PCM_FMTBIT_S32_LE |
+							SNDRV_PCM_FMTBIT_U32_LE,
+        },
+		.probe = amebad2_sport_dai_probe,
+		.remove = amebad2_sport_dai_remove,
+		.ops = &amebad2_sport_dai_ops,
+	},
+	{
+		.name = "4100f000.sport",
+		.id = 2,
+        .playback = {
+                .channels_min = 1,
+                .channels_max = 8,
+                .rates = SNDRV_PCM_RATE_8000_192000,
+                .rate_min = 8000,
+                .rate_max = 192000,
+                .formats = SNDRV_PCM_FMTBIT_S16_LE |
+							SNDRV_PCM_FORMAT_U16_LE |
+							SNDRV_PCM_FORMAT_S20_LE |
+							SNDRV_PCM_FORMAT_U20_LE |
+							SNDRV_PCM_FMTBIT_S24_LE |
+							SNDRV_PCM_FORMAT_U24_LE |
+							SNDRV_PCM_FMTBIT_S32_LE |
+							SNDRV_PCM_FMTBIT_U32_LE,
+        },
+		.capture = {
+                .channels_min = 1,
+                .channels_max = 8,
+                .rates = SNDRV_PCM_RATE_8000_192000,
+                .rate_min = 8000,
+                .rate_max = 192000,
+                .formats = SNDRV_PCM_FMTBIT_S16_LE |
+							SNDRV_PCM_FORMAT_U16_LE |
+							SNDRV_PCM_FORMAT_S20_LE |
+							SNDRV_PCM_FORMAT_U20_LE |
+							SNDRV_PCM_FMTBIT_S24_LE |
+							SNDRV_PCM_FORMAT_U24_LE |
+							SNDRV_PCM_FMTBIT_S32_LE |
+							SNDRV_PCM_FMTBIT_U32_LE,
+        },
+		.probe = amebad2_sport_dai_probe,
+		.remove = amebad2_sport_dai_remove,
+		.ops = &amebad2_sport_dai_ops,
+	},
+	{
+		.name = "41010000.sport",
+		.id = 3,
+        .playback = {
+                .channels_min = 1,
+                .channels_max = 8,
+                .rates = SNDRV_PCM_RATE_8000_192000,
+                .rate_min = 8000,
+                .rate_max = 192000,
+                .formats = SNDRV_PCM_FMTBIT_S16_LE |
+							SNDRV_PCM_FORMAT_U16_LE |
+							SNDRV_PCM_FORMAT_S20_LE |
+							SNDRV_PCM_FORMAT_U20_LE |
+							SNDRV_PCM_FMTBIT_S24_LE |
+							SNDRV_PCM_FORMAT_U24_LE |
+							SNDRV_PCM_FMTBIT_S32_LE |
+							SNDRV_PCM_FMTBIT_U32_LE,
+        },
+		.capture = {
+                .channels_min = 1,
+                .channels_max = 8,
+                .rates = SNDRV_PCM_RATE_8000_192000,
+                .rate_min = 8000,
+                .rate_max = 192000,
+                .formats = SNDRV_PCM_FMTBIT_S16_LE |
+							SNDRV_PCM_FORMAT_U16_LE |
+							SNDRV_PCM_FORMAT_S20_LE |
+							SNDRV_PCM_FORMAT_U20_LE |
+							SNDRV_PCM_FMTBIT_S24_LE |
+							SNDRV_PCM_FORMAT_U24_LE |
+							SNDRV_PCM_FMTBIT_S32_LE |
+							SNDRV_PCM_FMTBIT_U32_LE,
+        },
+		.probe = amebad2_sport_dai_probe,
+		.remove = amebad2_sport_dai_remove,
+		.ops = &amebad2_sport_dai_ops,
+	},
+};
+
+static const struct snd_soc_component_driver amebad2_sport_component = {
+	.name = "amebad2,sport",
+};
+
+
+struct sport_dai *sport_alloc_dai(struct platform_device *pdev)
+{
+	struct sport_dai *sport;
+
+	sport = devm_kzalloc(&pdev->dev, sizeof(struct sport_dai), GFP_KERNEL);
+	if ( sport == NULL )
+		return NULL;
+
+	sport->pdev = pdev;
+
+	return sport;
+}
+
+/*
+ * when sport LRCLK delivered tx_sport_compare_val or rx_sport_compare_val frames,
+ * the interrupt callback is triggered.
+ * make sure the max size of total counter matches the substream->runtime->boundary.
+ */
+static irqreturn_t rtk_sport_interrupt(int irq, void * dai)
+{
+	struct sport_dai *sport = dai;
+	spin_lock(&sport->lock);
+
+	if ( audio_sp_is_rx_sport_irq(sport->addr) ) {
+		sport->irq_rx_count++;
+		sport->total_rx_counter = sport->irq_rx_count * sport->rx_sport_compare_val;
+		if ( sport->total_rx_counter >= sport->total_rx_counter_boundary ) {
+			sport->total_rx_counter -= sport->total_rx_counter_boundary;
+			sport->irq_rx_count = 0;
+		}
+
+		audio_sp_clear_rx_sport_irq(sport->addr);
+	} else if ( audio_sp_is_tx_sport_irq(sport->addr) ) {
+		sport->irq_tx_count++;
+		//pr_info("irq_tx_count:%d", sport->irq_tx_count);
+		sport->total_tx_counter = sport->irq_tx_count * sport->tx_sport_compare_val;
+		if ( sport->total_tx_counter >= sport->total_tx_counter_boundary ) {
+			sport->total_tx_counter -= sport->total_tx_counter_boundary;
+			sport->irq_tx_count = 0;
+		}
+
+		audio_sp_clear_tx_sport_irq(sport->addr);
+	}
+
+	spin_unlock(&sport->lock);
+	return IRQ_HANDLED;
+}
+
+
+/*
+* for clk set, get clk first, then set parent relationship ,then enable from
+* parent to child. To notice: cke_ac is enabled in codec. sport using clk from cke_ac
+*/
+int set_sport_clk(struct platform_device *pdev, struct sport_dai *sport){
+	int ret = 0;
+
+	sport_info(1, &pdev->dev,"%s",__func__);
+
+	/* get sport clock */
+	sport->clock = devm_clk_get(&pdev->dev, NULL);
+	if ( IS_ERR(sport->clock) ) {
+		dev_err(&pdev->dev, "Fail to get clock %d\n",__LINE__);
+		ret = -1;
+		goto err;
+	}
+
+	sport->clock_in_from_dts = clk_get_rate(sport->clock);
+	sport_info(1, &pdev->dev,"(%d)current clk rate is :%d", sport->id, sport->clock_in_from_dts);
+
+err:
+	return ret;
+}
+
+
+static int amebad2_sport_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+
+	int ret;
+	u32 sportx_regs_base;
+	struct sport_dai *sport = NULL;
+
+	int sportx_reg_size;
+	struct resource *resource_reg;
+
+	resource_reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+	sportx_regs_base = resource_reg->start;
+	sportx_reg_size = resource_reg->end - resource_reg->start + 1;
+
+	sport = sport_alloc_dai(pdev);
+	if ( !sport ) {
+		dev_err(&pdev->dev, "Unable to alloc sport_pri\n");
+		ret = -ENOMEM;
+		return ret;
+	}
+
+	sport->base = sportx_regs_base;
+	sport->reg_size = sportx_reg_size;
+
+	sport->sport_debug = 0;
+	if ( sysfs_create_group(&pdev->dev.kobj,&sport_debug_attr_grp) )
+		dev_warn(&pdev->dev, "Error creating sysfs entry\n");
+
+	sport_info(1,&pdev->dev,"%s,sportx_reg_base:%x,sportx_reg_size:%x \n",__func__,sportx_regs_base,sportx_reg_size);
+
+	if ( !request_mem_region(sport->base, sportx_reg_size,
+							"amebad2-sport") ) {
+		dev_err(&pdev->dev, "Unable to request SFR region\n");
+		ret = -EBUSY;
+		goto err;
+	}
+
+	/* Reads the channel id from the device tree and stores in data->id */
+	ret = of_property_read_u32_index(dev->of_node, "id", 0, &sport->id);
+	if ( ret < 0 ) {
+		dev_err(&pdev->dev, "id property reading fail\n");
+		goto err;
+	}
+
+	/* default multiplier 0 */
+	sport->sport_mclk_multiplier = 0;
+	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
+	of_property_read_u32_index(dev->of_node, "rtk,sport-mclk-multiplier", 0, &sport->sport_mclk_multiplier);
+	dev_info(&pdev->dev, "multiplier:%d", sport->sport_mclk_multiplier);
+
+	/* default sport_multi_io 0 */
+	sport->sport_multi_io = 0;
+	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
+	of_property_read_u32_index(dev->of_node, "rtk,sport-multi-io", 0, &sport->sport_multi_io);
+	dev_info(&pdev->dev, "multi-io:%d", sport->sport_multi_io);
+
+	/* default sport_multi_io 0(master) */
+	sport->sport_mode = 0;
+	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
+	of_property_read_u32_index(dev->of_node, "rtk,sport-mode", 0, &sport->sport_mode);
+	dev_info(&pdev->dev, "sport-mode:%d", sport->sport_mode);
+
+	/* Read irq of sport */
+	sport->irq = platform_get_irq(pdev, 0);
+	dev_info(&pdev->dev, "irq:%d", sport->irq);
+	/* request irq with irq func. */
+	ret = devm_request_irq(&pdev->dev, sport->irq, rtk_sport_interrupt, 0, dev_name(&pdev->dev), sport);
+	sport->total_tx_counter = 0;
+	sport->total_rx_counter = 0;
+	sport->total_tx_counter_boundary = 0;
+	sport->total_rx_counter_boundary = 0;
+	sport->irq_tx_count = 0;
+	sport->irq_rx_count = 0;
+	sport->tx_sport_compare_val = 6144;
+	sport->rx_sport_compare_val = 6144;
+
+	spin_lock_init(&sport->lock);
+
+	/*for internal sport0, and sport1, using 40M to support all kinds of samplerates below 192k*/
+	ret = set_sport_clk(pdev, sport);
+	if ( ret < 0 ){
+		dev_err(&pdev->dev, "set sport clock err");
+		goto err;
+	}
+
+	/*for external sport2, and sport3, using rcc node to control clocks*/
+	if ( sport->sport_mclk_multiplier != 0 ) {
+		sport->audio_clock_params = devm_kzalloc(dev, sizeof(struct clock_params), GFP_KERNEL);
+		if ( sport->audio_clock_params == NULL ){
+			dev_err(&pdev->dev, "alloc audio_clock_params fail");
+			ret = -ENOMEM;
+			goto err;
+    	}
+
+	}
+
+	/* Pre-assign snd_soc_dai_set_drvdata */
+	dev_set_drvdata(&sport->pdev->dev, sport);       // set drv data, for sport_startup to get
+
+	ret = devm_snd_soc_register_component(&pdev->dev,
+					&amebad2_sport_component,
+					&amebad2_sport_dai_drv[sport->id], 1);
+	return 0;
+
+err:
+	release_mem_region(sport->base, sportx_reg_size);
+	return ret;
+}
+
+static int amebad2_sport_remove(struct platform_device *pdev)
+{
+    //do we need to release sport here?? need check
+	struct sport_dai *sport;
+
+	sport_info(1,&pdev->dev,"%s\n",__func__);
+
+	sport = dev_get_drvdata(&pdev->dev);
+
+	clk_disable_unprepare(sport->clock);
+
+	iounmap(sport->addr);
+	release_mem_region(sport->base, sport->reg_size);
+
+	sysfs_remove_group(&pdev->dev.kobj,&sport_debug_attr_grp);
+
+	return 0;
+}
+
+
+static struct platform_driver amebad2_sport_driver = {
+	.probe  = amebad2_sport_probe,
+	.remove = amebad2_sport_remove,
+	.driver = {
+		.name = "amebad2-sport",
+		.of_match_table = of_match_ptr(amebad2_sport_match),
+	},
+};
+
+module_platform_driver(amebad2_sport_driver);
+
+/* Module information */
+MODULE_DESCRIPTION("ALSA SoC Amebad2 audio");
+MODULE_AUTHOR("Anne Yu <anne.yu@realsil.com.cn>");
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:Amebad2 audio");

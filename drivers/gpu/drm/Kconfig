@@ -265,8 +265,11 @@ config DRM_VKMS
 
 	  If M is selected the module will be called vkms.
 
+
 config DRM_ATI_PCIGART
         bool
+
+
 
 source "drivers/gpu/drm/exynos/Kconfig"
 

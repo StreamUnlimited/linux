@@ -30,8 +30,10 @@ static void dump_tlb(int first, int last)
 {
 	int	i;
 	unsigned int asid;
+	unsigned int index;
 	unsigned long entryhi, entrylo0, asid_mask;
 
+	index = read_c0_index();
 	asid_mask = cpu_asid_mask(&current_cpu_data);
 	asid = read_c0_entryhi() & asid_mask;
 
@@ -67,7 +69,7 @@ static void dump_tlb(int first, int last)
 	}
 	printk("\n");
 
-	write_c0_entryhi(asid);
+	write_c0_index(index);
 }
 
 void dump_tlb_all(void)

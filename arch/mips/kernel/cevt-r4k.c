@@ -15,6 +15,8 @@
 #include <asm/time.h>
 #include <asm/cevt-r4k.h>
 
+extern int plat_qemu;
+
 static int mips_next_event(unsigned long delta,
 			   struct clock_event_device *evt)
 {
@@ -138,8 +140,10 @@ irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 	 * performance counter interrupt was pending, so we have to run
 	 * the performance counter interrupt handler anyway.
 	 */
+#ifndef CONFIG_CPU_RLX
 	if (handle_perf_irq(r2))
 		return IRQ_HANDLED;
+#endif
 
 	/*
 	 * The same applies to performance counter interrupts.	But with the
@@ -197,6 +201,9 @@ int c0_compare_int_usable(void)
 #ifdef CONFIG_KVM_GUEST
     return 1;
 #endif
+
+	if (plat_qemu)
+		return 1;
 
 	/*
 	 * IP7 already pending?	 Try to clear it by acking the timer.

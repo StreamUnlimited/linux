@@ -9,6 +9,7 @@
 #include <asm/sections.h>
 #include <asm/fpu.h>
 #include <asm/dsp.h>
+#include <asm/radiax.h>
 
 static u32 saved_status;
 struct pt_regs saved_regs;
@@ -21,6 +22,9 @@ void save_processor_state(void)
 		save_fp(current);
 	if (cpu_has_dsp)
 		save_dsp(current);
+#ifdef CONFIG_CPU_HAS_RADIAX
+	save_radiax(current);
+#endif
 }
 
 void restore_processor_state(void)
@@ -31,6 +35,9 @@ void restore_processor_state(void)
 		restore_fp(current);
 	if (cpu_has_dsp)
 		restore_dsp(current);
+#ifdef CONFIG_CPU_HAS_RADIAX
+	restore_radiax(current);
+#endif
 }
 
 int pfn_is_nosave(unsigned long pfn)

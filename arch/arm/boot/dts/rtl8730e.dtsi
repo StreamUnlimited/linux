@@ -1,0 +1,20 @@
+/*
+ * Realtek Semiconductor Corp.
+ *
+ * Device Tree Structure
+ */
+
+/dts-v1/;
+
+#include "rtl8730e-a32.dtsi"
+#include "rtl8730e-ocp.dtsi"
+
+/ {
+	model = "Ameba Platform";
+	compatible = "realtek,ameba";
+};
+
+&rcc {
+	assigned-clocks = <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_SPORT0>, <&rcc RTK_CKSL_SPORT1>, <&rcc RTK_CKSL_SPORT2>, <&rcc RTK_CKSL_SPORT3>;
+	assigned-clock-parents = <&rcc RTK_CKE_XTAL_GRP1>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>;
+};

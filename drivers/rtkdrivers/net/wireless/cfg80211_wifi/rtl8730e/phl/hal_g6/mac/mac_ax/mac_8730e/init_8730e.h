@@ -1,0 +1,200 @@
+/** @file */
+/******************************************************************************
+ *
+ * Copyright(c) 2019 Realtek Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ ******************************************************************************/
+
+#ifndef _MAC_AX_INIT_8730E_H_
+#define _MAC_AX_INIT_8730E_H_
+
+#include "mac/type.h"
+#if MAC_AX_8730E_SUPPORT
+
+#define TX_FIFO_SIZE_8730E	32768
+#define RX_FIFO_SIZE_8730E	16384
+#define TRX_SHARE_SIZE0_8730E	8192
+#define TRX_SHARE_SIZE1_8730E	8192
+#define TRX_SHARE_SIZE2_8730E	8192
+
+#define TX_FIFO_SIZE_LA_8730E	(TX_FIFO_SIZE_8730E >>  1)
+#define TX_FIFO_SIZE_RX_EXPAND_1BLK_8730E	\
+	(TX_FIFO_SIZE_8730E - TRX_SHARE_SIZE0_8730E)
+#define RX_FIFO_SIZE_RX_EXPAND_1BLK_8730E	\
+	(RX_FIFO_SIZE_8730E + TRX_SHARE_SIZE0_8730E)
+#define TX_FIFO_SIZE_RX_EXPAND_2BLK_8730E	\
+	(TX_FIFO_SIZE_8730E - TRX_SHARE_SIZE2_8730E)
+#define RX_FIFO_SIZE_RX_EXPAND_2BLK_8730E	\
+	(RX_FIFO_SIZE_8730E + TRX_SHARE_SIZE2_8730E)
+#define TX_FIFO_SIZE_RX_EXPAND_3BLK_8730E	\
+	(TX_FIFO_SIZE_8730E - TRX_SHARE_SIZE2_8730E - TRX_SHARE_SIZE0_8730E)
+#define RX_FIFO_SIZE_RX_EXPAND_3BLK_8730E	\
+	(RX_FIFO_SIZE_8730E + TRX_SHARE_SIZE2_8730E + TRX_SHARE_SIZE0_8730E)
+#define TX_FIFO_SIZE_RX_EXPAND_4BLK_8730E	\
+	(TX_FIFO_SIZE_8730E - (2 * TRX_SHARE_SIZE2_8730E))
+#define RX_FIFO_SIZE_RX_EXPAND_4BLK_8730E	\
+	(RX_FIFO_SIZE_8730E + (2 * TRX_SHARE_SIZE2_8730E))
+
+#define TX_PAGE_SIZE_8730e		128
+#define TX_PAGE_SIZE_SHIFT_8730e		7 /* 128 = 2^7 */
+
+#define WLAN_TXQ_RPT_EN		0xF
+
+#define RSVD_PG_DRV_NUM			16
+#ifdef CONFIG_FW_OFFLOAD_PARAM_INIT  //whether config 24 pages dynamically 
+#define RSVD_PG_H2C_EXTRAINFO_NUM	24
+#else
+#define RSVD_PG_H2C_EXTRAINFO_NUM	0
+#endif
+#define RSVD_PG_H2C_STATICINFO_NUM	8
+#define RSVD_PG_H2CQ_NUM		0
+#define RSVD_PG_CPU_INSTRUCTION_NUM	0
+#define RSVD_PG_FW_TXBUF_NUM		0
+#define RSVD_PG_CSIBUF_NUM		4
+#define RSVD_PG_DLLB_NUM		(TX_FIFO_SIZE_8730E / 3 >> \
+					TX_PAGE_SIZE_SHIFT_8730e)
+
+#define C2H_PKT_BUF_8730e		256
+
+#define WLAN_SIFS_CCK_DUR_TUNE	0x0A
+#define WLAN_SIFS_OFDM_DUR_TUNE	0x10
+#define WLAN_SIFS_CCK_CONT_TX	0x0A
+#define WLAN_SIFS_OFDM_CONT_TX	0x10
+#define WLAN_SIFS_CCK_TRX	0x0A
+#define WLAN_SIFS_OFDM_TRX	0x10
+#define WLAN_SIFS_CCK_T2T	0x46
+#define WLAN_SIFS_CCK_R2T	0x46
+#define WLAN_SIFS_OFDM_T2T	0x46
+#define WLAN_SIFS_OFDM_R2T	0x46
+#define WLAN_DATA_RATE_FB_CNT_1_4	0x01000000
+#define WLAN_DATA_RATE_FB_CNT_5_8	0x08070504
+#define WLAN_RTS_RATE_FB_CNT_5_8	0x08070504
+#define WLAN_AMPDU_MAX_TIME		0x5E
+#define WLAN_PRE_TXCNT_TIME_TH		0x8C
+#define WLAN_MAX_AGG_PKT_LIMIT		0x3F
+#define WLAN_RTS_MAX_AGG_PKT_LIMIT	0x20
+#define WLAN_RTS_LEN_TH			0xFF
+#define WLAN_RTS_TX_TIME_TH		0x08
+#define WLAN_BAR_RETRY_LIMIT		0x01
+#define WLAN_RA_TRY_RATE_AGG_LIMIT	0x08
+#define WALN_FAST_EDCA_VO_TH		0x06
+#define WLAN_FAST_EDCA_VI_TH		0x06
+#define WLAN_FAST_EDCA_BE_TH		0x06
+#define WLAN_FAST_EDCA_BK_TH		0x06
+#define WLAN_EDCA_VO_PARAM	0x002F3217
+#define WLAN_EDCA_VI_PARAM	0x005E4317
+#define WLAN_EDCA_BE_PARAM	0x005EA42B
+#define WLAN_EDCA_BK_PARAM	0x0000A444
+#define WLAN_PIFS_TIME		0x1C
+#define WLAN_SLOT_TIME		0x09
+#define WLAN_RDG_NAV		0x05
+#define WLAN_TXOP_NAV		0x1B
+#define WLAN_CCK_RX_TSF		0x40
+#define WLAN_OFDM_RX_TSF	0x25
+#define WLAN_TBTT_PROHIBIT	0x04 /* unit : 32us */
+#define WLAN_TBTT_HOLD_TIME	0x064 /* unit : 32us */
+#define WLAN_DRV_EARLY_INT	0x04
+#define WLAN_BCN_CTRL_CLT0	0x10
+#define WLAN_BCN_DMA_TIME	0x02
+#define WLAN_BCN_MAX_ERR	0xFF
+#define MAC_CLK_SPEED	0x28 /* 40M */
+#define WLAN_RESP_TXRATE		0x84
+#define WLAN_ACK_TO_OFDM			0x26
+#define WLAN_ACK_TO_CCK			0x41
+#define WLAN_EIFS_DUR_TUNE	0x13A
+#define WLAN_NAV_MAX		0x42
+#define WLAN_RX_FILTER0		0xFFFFFFFF
+#define WLAN_RX_FILTER2		0xFFFF
+#define WLAN_RCR_CFG		0x741c40ce
+#define WLAN_RXPKT_MAX_SZ	2048
+#define WLAN_TX_FUNC_CFG1		0x30
+#define WLAN_TX_FUNC_CFG2		0x30
+#define WLAN_MAC_OPT_FUNC2		0xB1810041
+#define WLAN_MAC_OPT_NORM_FUNC1		0x98
+#define WLAN_MAC_OPT_LB_FUNC1		0x80
+#define COEX_GNT_WLAN  0x14
+
+#define WLAN_SIFS_CFG	(WLAN_SIFS_CCK_CONT_TX | \
+			(WLAN_SIFS_OFDM_CONT_TX << BIT_SHIFT_SIFS_OFDM_CTX) | \
+			(WLAN_SIFS_CCK_TRX << BIT_SHIFT_SIFS_CCK_TRX) | \
+			(WLAN_SIFS_OFDM_TRX << BIT_SHIFT_SIFS_OFDM_TRX))
+#define WLAN_SIFS_DUR_TUNE	(WLAN_SIFS_CCK_DUR_TUNE | \
+				(WLAN_SIFS_OFDM_DUR_TUNE << 8))
+#define WLAN_NAV_CFG		(WLAN_RDG_NAV | (WLAN_TXOP_NAV << 16))
+#define WLAN_RX_TSF_CFG		(WLAN_CCK_RX_TSF | (WLAN_OFDM_RX_TSF) << 8)
+#define WLAN_TBTT_TIME	(WLAN_TBTT_PROHIBIT |\
+			(WLAN_TBTT_HOLD_TIME << BIT_SHIFT_TBTT_HOLD_TIME))
+#define WLAN_ACKTO   (WLAN_ACK_TO_OFDM | (WLAN_ACK_TO_CCK << 12))
+#define WLAN_RXPKT_MAX_SZ_512	(WLAN_RXPKT_MAX_SZ >> 9)
+
+
+#ifdef CONFIG_NEW_HALMAC_INTERFACE
+struct mac_ax_adapter *get_mac_8730e_adapter(enum mac_ax_intf intf,
+		u8 cv, void *phl_adapter,
+		void *drv_adapter,
+		struct mac_ax_pltfm_cb *pltfm_cb)
+#else
+struct mac_ax_adapter *get_mac_8730e_adapter(enum mac_ax_intf intf,
+		u8 cv, void *drv_adapter,
+		struct mac_ax_pltfm_cb *pltfm_cb);
+#endif
+
+u32 init_trx_cfg_8730e(struct mac_ax_adapter *adapter,
+		       enum halmac_trx_mode mode);
+
+u32 init_protocol_cfg_8730e(struct mac_ax_adapter *adapter);
+
+u32 init_edca_cfg_8730e(struct mac_ax_adapter *adapter);
+
+u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter);
+
+u32 txdma_queue_mapping_8730e(struct mac_ax_adapter *adapter,
+			      enum halmac_trx_mode mode);
+
+u32 rqpn_parser_8730e(struct mac_ax_adapter *adapter,
+		      enum halmac_trx_mode mode, struct halmac_rqpn *tbl);
+
+u32 priority_queue_cfg_8730e(struct mac_ax_adapter *adapter,
+			     enum halmac_trx_mode mode);
+
+u32 set_trx_fifo_info_8730e(struct mac_ax_adapter *adapter,
+			    enum halmac_trx_mode mode);
+
+u32 pg_num_parser_8730e(struct mac_ax_adapter *adapter,
+			enum halmac_trx_mode mode, struct halmac_pg_num *tbl);
+
+u32 init_txq_ctrl_8730e(struct mac_ax_adapter *adapter);
+
+u32 init_rate_fallback_ctrl_8730e(struct mac_ax_adapter *adapter);
+
+void cfg_mac_clk_8730e(struct mac_ax_adapter *adapter);
+
+u32 init_sifs_ctrl_8730e(struct mac_ax_adapter *adapter);
+
+u32 init_low_pwr_8730e(struct mac_ax_adapter *adapter);
+
+u32 enable_port_8730e(struct mac_ax_adapter *adapter, u8 port, bool en);
+
+u32 cfg_mac_addr_8730e(struct mac_ax_adapter *adapter, u8 port,
+		       union halmac_wlan_addr *addr);
+
+u32 cfg_bssid_8730e(struct mac_ax_adapter *adapter, u8 port,
+		    union halmac_wlan_addr *addr);
+
+u32 cfg_transmitter_addr_8730e(struct mac_ax_adapter *adapter,
+			       u8 port, union halmac_wlan_addr *addr);
+
+u32 cfg_net_type_8730e(struct mac_ax_adapter *adapter, u8 port,
+		       enum mac_ax_net_type net_type);
+
+#endif /* #if MAC_AX_8730E_SUPPORT */
+#endif

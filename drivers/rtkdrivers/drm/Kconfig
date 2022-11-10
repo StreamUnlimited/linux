@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Drm device configuration
+#
+# This driver provides support for the
+# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+#
+
+config DRM_RTK_AMEBA
+	tristate "DRM driver"
+	select DRM
+	select DRM_KMS_HELPER
+	select DRM_GEM_CMA_HELPER
+	select DRM_KMS_CMA_HELPER
+	select DRM_MIPI_DSI
+	default n
+	help
+	  Ameba DRM Kernel Mode-Setting , used for LCDC MIPI DRM support 
+	  If M is selected the module will be called drm.
+

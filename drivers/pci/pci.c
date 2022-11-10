@@ -4194,7 +4194,7 @@ int pci_set_cacheline_size(struct pci_dev *dev)
 	u8 cacheline_size;
 
 	if (!pci_cache_line_size)
-		return -EINVAL;
+		pci_cache_line_size = pci_dfl_cache_line_size;
 
 	/* Validate current setting: the PCI_CACHE_LINE_SIZE must be
 	   equal to or multiple of the right value. */

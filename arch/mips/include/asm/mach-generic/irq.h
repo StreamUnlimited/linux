@@ -34,12 +34,24 @@
 #endif
 #endif
 
+#ifdef CONFIG_TAROKO_VEC
+#ifndef MIPS_VEC_IRQ_BASE
+#define MIPS_VEC_IRQ_BASE (MIPS_CPU_IRQ_BASE+8)
+#endif
+#endif
+
 #endif /* CONFIG_IRQ_MIPS_CPU */
 
-#ifdef CONFIG_MIPS_GIC
+#if defined(CONFIG_MIPS_GIC) || defined(CONFIG_TAROKO_GIC)
 #ifndef MIPS_GIC_IRQ_BASE
-#define MIPS_GIC_IRQ_BASE (MIPS_CPU_IRQ_BASE + 8)
+#define MIPS_GIC_IRQ_BASE (MIPS_CPU_IRQ_BASE + 16)
 #endif
-#endif /* CONFIG_MIPS_GIC */
+#endif /* CONFIG_MIPS_GIC || CONFIG_TAROKO_GIC */
+
+#ifdef CONFIG_TAROKO_GIC
+#ifndef MIPS_GIC_IRQ_BASE
+#define MIPS_GIC_IRQ_BASE (MIPS_CPU_IRQ_BASE + 16)
+#endif
+#endif /* CONFIG_TAROKO_GIC */
 
 #endif /* __ASM_MACH_GENERIC_IRQ_H */

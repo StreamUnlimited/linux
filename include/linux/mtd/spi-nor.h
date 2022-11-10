@@ -112,6 +112,9 @@
 #define SPINOR_OP_EN4B		0xb7	/* Enter 4-byte mode */
 #define SPINOR_OP_EX4B		0xe9	/* Exit 4-byte mode */
 
+#define SPINOR_OP_RSTEN		0x66    /* Reset-Enable */
+#define SPINOR_OP_RST		0x99    /* Reset, must follow Reset-Enable */
+
 /* Used for Spansion flashes only. */
 #define SPINOR_OP_BRWR		0x17	/* Bank register write */
 #define SPINOR_OP_CLSR		0x30	/* Clear status register 1 */
@@ -598,6 +601,7 @@ struct spi_nor {
 	ssize_t (*write)(struct spi_nor *nor, loff_t to,
 			size_t len, const u_char *write_buf);
 	int (*erase)(struct spi_nor *nor, loff_t offs);
+	int (*wait_till_ready)(struct spi_nor *nor);
 
 	int (*clear_sr_bp)(struct spi_nor *nor);
 	struct spi_nor_flash_parameter params;

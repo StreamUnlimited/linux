@@ -94,7 +94,9 @@ MODULE_PARM_DESC (ignore_oc, "ignore bogus hardware overcurrent indications");
 /*-------------------------------------------------------------------------*/
 
 #include "ehci.h"
+#ifdef CONFIG_USB_EHCI_PCI
 #include "pci-quirks.h"
+#endif
 
 static void compute_tt_budget(u8 budget_table[EHCI_BANDWIDTH_SIZE],
 		struct ehci_tt *tt);
@@ -441,8 +443,10 @@ static void ehci_stop (struct usb_hcd *hcd)
 	spin_unlock_irq (&ehci->lock);
 	ehci_mem_cleanup (ehci);
 
+#ifdef CONFIG_USB_EHCI_PCI
 	if (ehci->amd_pll_fix == 1)
 		usb_amd_dev_put();
+#endif
 
 	dbg_status (ehci, "ehci_stop completed",
 		    ehci_readl(ehci, &ehci->regs->status));

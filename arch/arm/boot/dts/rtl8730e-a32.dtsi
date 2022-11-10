@@ -1,0 +1,98 @@
+/*
+ * Realtek Semiconductor Corp.
+ *
+ * Device Tree Structure
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
+
+/ {
+
+	#address-cells = <1>;
+	#size-cells = <1>;
+	interrupt-parent = <&gic>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a32";
+			reg = <0x0>;
+			enable-method = "psci";
+			clock-frequency = <800000000>;
+			clock-latency = <1000000>;
+			clocks = <&rcc RTK_CKE_AP>,
+					<&rcc RTK_CKD_AP>,
+					<&rcc RTK_CKSL_AP>,
+					<&rcc RTK_CLK_AP_PLL>,
+					<&clk_np_syspll 0>;
+			clock-names = "cpu","cpu-div","cpu-mux","ap-pll","np-pll";
+			freq_tab = < 800000 840000 
+						880000 920000 
+						960000 1000000 
+						1040000 1080000 
+						1120000 1160000 
+						1200000 1240000 
+						1280000 1320000 
+						1360000 1400000 >;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a32";
+			reg = <0x1>;
+			enable-method = "psci";
+			clock-frequency = <800000000>;
+			clock-latency = <1000000>;
+			clocks = <&rcc RTK_CKE_AP>,
+					<&rcc RTK_CKD_AP>,
+					<&rcc RTK_CKSL_AP>,
+					<&rcc RTK_CLK_AP_PLL>,
+					<&clk_np_syspll 0>;
+			clock-names = "cpu","cpu-div","cpu-mux","ap-pll","np-pll";
+			freq_tab = < 800000 840000 
+						880000 920000 
+						960000 1000000 
+						1040000 1080000 
+						1120000 1160000 
+						1200000 1240000 
+						1280000 1320000 
+						1360000 1400000 >;
+		};
+
+	};
+
+	gic: gic@A0101000 {
+		compatible = "arm,cortex-a15-gic";
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		reg = <0xA0101000 0x1000>,
+			  <0xA0102000 0x0100>,
+			  <0x41000010 4>,
+			  <0x4200827C 4>;
+	};
+
+	psci {
+		migrate = <0x84000005>;
+		cpu_on = <0x84000003>;
+		cpu_off = <0x84000002>;
+		cpu_suspend = <0x84000001>;
+		method = "smc";
+		compatible = "arm,psci-0.2", "arm,psci";
+	};
+
+	timer {
+		// compatible = "arm,armv8-timer","arm,armv7-timer";
+		compatible = "arm,armv7-timer";
+		clock-frequency = <50000000>;
+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+				 <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+				 <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+				 <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+	};
+};

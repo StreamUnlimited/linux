@@ -682,6 +682,7 @@ cache_on:	mov	r3, #8			@ cache_on function
  * to cover all 32bit address and cacheable and bufferable.
  */
 __armv4_mpu_cache_on:
+AR_CLASS(	.arch	armv4	)
 		mov	r0, #0x3f		@ 4G, the whole
 		mcr	p15, 0, r0, c6, c7, 0	@ PR7 Area Setting
 		mcr 	p15, 0, r0, c6, c7, 1
@@ -789,6 +790,7 @@ ENDPROC(__setup_mmu)
 @ Enable unaligned access on v6, to allow better code generation
 @ for the decompressor C code:
 __armv6_mmu_cache_on:
+AR_CLASS(	.arch	armv6	)
 		mrc	p15, 0, r0, c1, c0, 0	@ read SCTLR
 		bic	r0, r0, #2		@ A (no unaligned access fault)
 		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
@@ -797,11 +799,13 @@ __armv6_mmu_cache_on:
 
 __arm926ejs_mmu_cache_on:
 #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+AR_CLASS(	.arch	armv5	)
 		mov	r0, #4			@ put dcache in WT mode
 		mcr	p15, 7, r0, c15, c0, 0
 #endif
 
 __armv4_mmu_cache_on:
+AR_CLASS(	.arch	armv4	)
 		mov	r12, lr
 #ifdef CONFIG_MMU
 		mov	r6, #CB_BITS | 0x12	@ U
@@ -820,6 +824,7 @@ __armv4_mmu_cache_on:
 		mov	pc, r12
 
 __armv7_mmu_cache_on:
+AR_CLASS(	.arch	armv7-a	)
 		mov	r12, lr
 #ifdef CONFIG_MMU
 		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
@@ -850,6 +855,7 @@ __armv7_mmu_cache_on:
 		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
 #endif
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+		mcr	p15, 0, r0, c7, c10, 4	@ DSB
 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
 		mov	r0, #0
@@ -1171,6 +1177,7 @@ cache_clean_flush:
 		mov	r3, #16
 		b	call_cache_fn
 
+AR_CLASS(	.arch	armv4	)
 __armv4_mpu_cache_flush:
 		tst	r4, #1
 		movne	pc, lr
@@ -1200,6 +1207,7 @@ __fa526_cache_flush:
 		mov	pc, lr
 
 __armv6_mmu_cache_flush:
+AR_CLASS(	.arch	armv6	)
 		mov	r1, #0
 		tst	r4, #1
 		mcreq	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
@@ -1208,6 +1216,7 @@ __armv6_mmu_cache_flush:
 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
 		mov	pc, lr
 
+AR_CLASS(	.arch	armv7-a	)
 __armv7_mmu_cache_flush:
 		tst	r4, #1
 		bne	iflush
@@ -1270,6 +1279,7 @@ iflush:
 		mcr	p15, 0, r10, c7, c5, 4	@ ISB
 		mov	pc, lr
 
+AR_CLASS(	.arch	armv5	)
 __armv5tej_mmu_cache_flush:
 		tst	r4, #1
 		movne	pc, lr
@@ -1279,6 +1289,7 @@ __armv5tej_mmu_cache_flush:
 		mcr	p15, 0, r0, c7, c10, 4	@ drain WB
 		mov	pc, lr
 
+AR_CLASS(	.arch	armv4	)
 __armv4_mmu_cache_flush:
 		tst	r4, #1
 		movne	pc, lr
@@ -1320,6 +1331,8 @@ __armv3_mpu_cache_flush:
 		mov	r1, #0
 		mcr	p15, 0, r1, c7, c0, 0	@ invalidate whole cache v3
 		mov	pc, lr
+
+AR_CLASS(	.arch	armv4	)
 
 /*
  * Various debugging routines for printing hex characters and

@@ -1,0 +1,50 @@
+/*
+ * Copyright (c) 2021 Realtek, LLC.
+ * All rights reserved.
+ *
+ * Licensed under the Realtek License, Version 1.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License from Realtek
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the Lice
+ */
+#include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
+
+ / {
+	ocp {
+		drm:drm@0x400D8000 {
+			compatible = "realtek,amebad2-drm";
+			reg = <0x400D8000 0xE0>;
+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_LCDCMIPI>;
+			memory-region = <&mem_drm_reserved>;
+
+			port {
+				lcdc_out: endpoint {
+					remote-endpoint = <&dsi_in>;
+				};
+			};
+		};
+
+		dsi: dsi@0x400EA000 {
+			compatible = "realtek,amebad2-dsi";
+			reg = <0x400EA000 0xC10>;
+			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+
+			pinctrl-names="default";
+			pinctrl-0 = <&drm_disable_swd_pins>;
+			mipi-gpios = <&gpioa 14 0>;
+
+		        // 0 for input port
+			port {
+					dsi_in: endpoint {
+						remote-endpoint = <&lcdc_out>;
+				};
+			};
+		};
+	};
+};

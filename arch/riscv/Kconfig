@@ -145,6 +145,7 @@ config PGTABLE_LEVELS
 	default 2
 
 source "arch/riscv/Kconfig.socs"
+source "arch/riscv/Kconfig.formosa"
 
 menu "Platform type"
 
@@ -210,6 +211,7 @@ endchoice
 
 config SMP
 	bool "Symmetric Multi-Processing"
+	depends on SYS_SUPPORTS_SMP
 	help
 	  This enables support for systems with more than one CPU.  If
 	  you say N here, the kernel will run on single and
@@ -220,6 +222,9 @@ config SMP
 	  here.
 
 	  If you don't know what to do here, say N.
+
+config SYS_SUPPORTS_SMP
+	bool
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"

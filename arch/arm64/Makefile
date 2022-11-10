@@ -102,6 +102,11 @@ endif
 # Default value
 head-y		:= arch/arm64/kernel/head.o
 
+# Board Makefile
+ifeq ($(CONFIG_ARCH_SHEIPA),y)
+include $(srctree)/arch/$(VAR_ARCH)/bsp/Makefile
+endif
+
 # The byte offset of the kernel image in RAM from the start of RAM.
 ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
 TEXT_OFFSET := $(shell awk "BEGIN {srand(); printf \"0x%06x\n\", \

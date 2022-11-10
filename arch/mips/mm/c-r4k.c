@@ -1760,6 +1760,11 @@ early_param("cca", cca_setup);
 
 static void coherency_setup(void)
 {
+#if defined(CONFIG_MIPS_CMP) || defined(CONFIG_MIPS_CPS)
+	cca = CONF_CM_CACHABLE_COW;
+#elif defined CONFIG_CPU_HAS_WBC
+	cca = CONF_CM_CACHABLE_NONCOHERENT;
+#endif
 	if (cca < 0 || cca > 7)
 		cca = read_c0_config() & CONF_CM_CMASK;
 	_page_cachable_default = cca << _CACHE_SHIFT;

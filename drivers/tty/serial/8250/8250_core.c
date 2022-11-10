@@ -518,6 +518,8 @@ static void __init serial8250_isa_init_ports(void)
 		timer_setup(&up->timer, serial8250_timeout, 0);
 
 		up->ops = &univ8250_driver_ops;
+		if (!(up->port.flags & UPF_SKIP_TEST))
+			up->cur_iotype = 0xFF;
 
 		/*
 		 * ALPHA_KLUDGE_MCR needs to be killed.

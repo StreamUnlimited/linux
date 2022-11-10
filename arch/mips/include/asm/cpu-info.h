@@ -16,6 +16,7 @@
 #include <linux/types.h>
 
 #include <asm/mipsregs.h>
+#include "bspcpu.h"
 
 /*
  * Descriptor for a cache
@@ -86,8 +87,12 @@ struct cpuinfo_mips {
 	void			*data;	/* Additional data */
 	unsigned int		watch_reg_count;   /* Number that exist */
 	unsigned int		watch_reg_use_cnt; /* Usable by ptrace */
-#define NUM_WATCH_REGS 4
+#define NUM_WATCH_REGS BSP_WATCH_NUM
 	u16			watch_reg_masks[NUM_WATCH_REGS];
+#ifdef CONFIG_CPU_RLX
+	unsigned int		watch_mode;   /* WMPCTL:mode_switch */
+	unsigned int            watch_kernel; /* WMPCTL:kernel_enable */
+#endif
 	unsigned int		kscratch_mask; /* Usable KScratch mask. */
 	/*
 	 * Cache Coherency attribute for write-combine memory writes.

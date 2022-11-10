@@ -1540,7 +1540,14 @@ void drm_atomic_helper_commit_tail(struct drm_atomic_state *old_state)
 
 	drm_atomic_helper_commit_hw_done(old_state);
 
-	drm_atomic_helper_wait_for_vblanks(dev, old_state);
+	//modify by chunlin.yi@realsil.com.cn at 20211230
+	//drm_atomic_helper_wait_for_vblanks wait for next vblank, before clean up the planes
+	//for amebaSmart , lcdc allows to set all params to HW register anytime
+	//but it will not valid until lcdc reloaded the configuration at next vertical blanking period
+	//	The shadow registers are reloaded during the vertical blanking period 
+	//	(at the beginning of the first line after the active display area)
+	//so wait for vblanks is useless for amebaSmart
+	//drm_atomic_helper_wait_for_vblanks(dev, old_state);
 
 	drm_atomic_helper_cleanup_planes(dev, old_state);
 }

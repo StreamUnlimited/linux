@@ -1,0 +1,8 @@
+config SPI_RTK_AMEBA
+	tristate "SPI general controller driver"
+	select HAS_IOMEM
+	select SPI
+	select SPI_SPIDEV
+	select SPI_SLAVE
+	help
+	  This is the driver for the Realtek SPI Controller.

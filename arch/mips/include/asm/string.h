@@ -6,6 +6,9 @@
  * Copyright (c) 1994, 95, 96, 97, 98, 2000, 01 Ralf Baechle
  * Copyright (c) 2000 by Silicon Graphics, Inc.
  * Copyright (c) 2001 MIPS Technologies, Inc.
+ *
+ * Modified for RLX processors
+ * Copyright (C) 2008-2011 Tony Wu (tonywu@realtek.com)
  */
 #ifndef _ASM_STRING_H
 #define _ASM_STRING_H
@@ -84,7 +87,7 @@ static __inline__ int strcmp(__const__ char *__cs, __const__ char *__ct)
 	"addiu\t%1,1\n\t"
 	"bnez\t%2,1b\n\t"
 	"lbu\t%2,(%0)\n\t"
-#if defined(CONFIG_CPU_R3000)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_RLX4181) || defined(CONFIG_CPU_RLX5181)
 	"nop\n\t"
 #endif
 	"move\t%2,$1\n"
@@ -117,7 +120,7 @@ strncmp(__const__ char *__cs, __const__ char *__ct, size_t __count)
 	"bnez\t%3,1b\n\t"
 	"addiu\t%1,1\n"
 	"2:\n\t"
-#if defined(CONFIG_CPU_R3000)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_RLX4181) || defined(CONFIG_CPU_RLX5181)
 	"nop\n\t"
 #endif
 	"move\t%3,$1\n"

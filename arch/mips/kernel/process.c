@@ -42,6 +42,7 @@
 #include <asm/irq.h>
 #include <asm/mips-cps.h>
 #include <asm/msa.h>
+#include <asm/radiax.h>
 #include <asm/pgtable.h>
 #include <asm/mipsregs.h>
 #include <asm/processor.h>
@@ -100,6 +101,8 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 	 * gets a chance to save the parent's live hardware registers to the
 	 * child context.
 	 */
+#if defined(CONFIG_CPU_HAS_MSA) || defined(CONFIG_MIPS_FP_SUPPORT) || \
+    defined(CONFIG_CPU_HAS_DSP) || defined(CONFIG_CPU_HAS_RADIAX)
 	preempt_disable();
 
 	if (is_msa_enabled())
@@ -107,9 +110,14 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 	else if (is_fpu_owner())
 		_save_fp(current);
 
-	save_dsp(current);
+	if (cpu_has_dsp)
+		save_dsp(current);
+
+	if (cpu_has_radiax)
+		save_radiax(current);
 
 	preempt_enable();
+#endif
 
 	*dst = *src;
 	return 0;
@@ -141,7 +149,7 @@ int copy_thread_tls(unsigned long clone_flags, unsigned long usp,
 		p->thread.reg17 = kthread_arg;
 		p->thread.reg29 = childksp;
 		p->thread.reg31 = (unsigned long) ret_from_kernel_thread;
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_RLX)
 		status = (status & ~(ST0_KUP | ST0_IEP | ST0_IEC)) |
 			 ((status & (ST0_KUC | ST0_IEC)) << 2);
 #else

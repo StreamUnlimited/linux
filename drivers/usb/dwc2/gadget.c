@@ -32,6 +32,10 @@
 
 #include "core.h"
 #include "hw.h"
+#ifdef CONFIG_ARCH_AMEBAD2
+#include "phy-rtk-usb.h"
+#endif
+
 
 /* conversion functions */
 static inline struct dwc2_hsotg_req *our_req(struct usb_request *req)
@@ -1158,6 +1162,18 @@ static void dwc2_hsotg_start_req(struct dwc2_hsotg *hsotg,
 		}
 	}
 
+#ifdef DWC2_PREDICT_NEXTSEQ
+	if (!hsotg->hw_params.en_multiple_tx_fifo && using_dma(hsotg)) {
+		u32 ep_type;
+		/* Update nextep_seq array */
+		ep_type = ctrl & DXEPCTL_EPTYPE_MASK;
+		if ((ep_type == DXEPCTL_EPTYPE_CONTROL || ep_type == DXEPCTL_EPTYPE_BULK) && dir_in) {
+			ctrl &= ~DXEPCTL_NEXTEP_MASK;
+			ctrl |= DXEPCTL_NEXTEP(hsotg->nextep_seq[index]);
+		}
+	}
+#endif
+
 	if (hs_ep->isochronous && hs_ep->interval == 1) {
 		hs_ep->target_frame = dwc2_hsotg_read_frameno(hsotg);
 		dwc2_gadget_incr_frame_num(hs_ep);
@@ -2063,6 +2079,19 @@ static void dwc2_hsotg_program_zlp(struct dwc2_hsotg *hsotg,
 	ctrl |= DXEPCTL_CNAK;  /* clear NAK set by core */
 	ctrl |= DXEPCTL_EPENA; /* ensure ep enabled */
 	ctrl |= DXEPCTL_USBACTEP;
+
+#ifdef DWC2_PREDICT_NEXTSEQ
+	if (!hsotg->hw_params.en_multiple_tx_fifo && using_dma(hsotg)) {
+		u32 ep_type;
+		/* Update nextep_seq array */
+		ep_type = ctrl & DXEPCTL_EPTYPE_MASK;
+		if ((ep_type == DXEPCTL_EPTYPE_CONTROL || ep_type == DXEPCTL_EPTYPE_BULK) && hs_ep->dir_in) {
+			ctrl &= ~DXEPCTL_NEXTEP_MASK;
+			ctrl |= DXEPCTL_NEXTEP(hsotg->nextep_seq[index]);
+		}
+	}
+#endif
+
 	dwc2_writel(hsotg, ctrl, epctl_reg);
 }
 
@@ -3370,7 +3399,30 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 	if (!is_usb_reset)
 		dwc2_set_bit(hsotg, DCTL, DCTL_SFTDISCON);
 
-	dcfg |= DCFG_EPMISCNT(1);
+#ifdef DWC2_PREDICT_NEXTSEQ
+	if (!hsotg->hw_params.en_multiple_tx_fifo && using_dma(hsotg)) {
+		u32 rstctl;
+		u32 diepctl;
+
+		/* Flush the Learning Queue. */
+		rstctl = dwc2_readl(hsotg, GRSTCTL);
+		rstctl |= GRSTCTL_IN_TKNQ_FLSH;
+		dwc2_writel(hsotg, rstctl, GRSTCTL);
+
+		hsotg->start_predict = 0;
+		for (ep = 0; ep <= hsotg->hw_params.num_dev_in_eps; ++ep) {
+			hsotg->nextep_seq[ep] = 0xff;  // 0xff - EP not active
+		}
+
+		hsotg->nextep_seq[0] = 0;
+		hsotg->first_in_nextep_seq = 0;
+		diepctl = dwc2_readl(hsotg, DIEPCTL0);
+		diepctl &= ~DXEPCTL_NEXTEP_MASK;
+		dwc2_writel(hsotg, diepctl, DIEPCTL0);
+	}
+#endif
+
+	dcfg |= DCFG_EPMISCNT(8);
 
 	switch (hsotg->params.speed) {
 	case DWC2_SPEED_PARAM_LOW:
@@ -4118,6 +4170,31 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 			epctrl |= DXEPCTL_CNAK;
 	}
 
+#ifdef DWC2_PREDICT_NEXTSEQ
+	/* Update nextep_seq array and EPMSCNT in DCFG */
+	if (!(ep_type & 1) && dir_in && using_dma(hsotg)) {   // NP IN EP
+		u32 dcfg;
+		u32 epmscnt;
+		/* control & bulk EP*/
+		for (i = 0; i <= hsotg->hw_params.num_dev_in_eps; i++) {
+			if (hsotg->nextep_seq[i] == hsotg->first_in_nextep_seq) {
+				break;
+			}
+		}
+
+		hsotg->nextep_seq[i] = index;
+		hsotg->nextep_seq[index] = hsotg->first_in_nextep_seq;
+		epctrl &= ~DXEPCTL_NEXTEP_MASK;
+		epctrl |= DXEPCTL_NEXTEP(hsotg->nextep_seq[index]);
+
+		dcfg = dwc2_readl(hsotg, DCFG);
+		epmscnt = ((dcfg & DCFG_EPMISCNT_MASK) >> DCFG_EPMISCNT_SHIFT) + 1;
+		dcfg &= ~DCFG_EPMISCNT_MASK;
+		dcfg |= DCFG_EPMISCNT(epmscnt);
+		dwc2_writel(hsotg, dcfg, DCFG);
+	}
+#endif
+
 	dev_dbg(hsotg->dev, "%s: write DxEPCTL=0x%08x\n",
 		__func__, epctrl);
 
@@ -4177,6 +4254,42 @@ static int dwc2_hsotg_ep_disable(struct usb_ep *ep)
 	ctrl &= ~DXEPCTL_EPENA;
 	ctrl &= ~DXEPCTL_USBACTEP;
 	ctrl |= DXEPCTL_SNAK;
+
+#ifdef DWC2_PREDICT_NEXTSEQ
+	if (using_dma(hsotg)) {
+		u8 i;
+		u32 ep_type;
+		u32 dcfg;
+		u32 epmscnt;
+		/* Update nextep_seq array and EPMSCNT in DCFG */
+		ep_type = ctrl & DXEPCTL_EPTYPE_MASK;
+		if ((ep_type == DXEPCTL_EPTYPE_CONTROL || ep_type == DXEPCTL_EPTYPE_BULK) && dir_in) {   // NP IN EP
+			/* control & bulk EP*/
+			for (i = 0; i <= hsotg->hw_params.num_dev_in_eps; i++) {
+				if (hsotg->nextep_seq[i] == index) {
+					break;
+				}
+			}
+
+			hsotg->nextep_seq[i] = hsotg->nextep_seq[index];
+
+			if (hsotg->first_in_nextep_seq == index) {
+				hsotg->first_in_nextep_seq = i;
+			}
+			hsotg->nextep_seq[index] = 0xFF;
+			ctrl &= ~DXEPCTL_NEXTEP_MASK;
+
+			dcfg = dwc2_readl(hsotg, DCFG);
+			epmscnt = ((dcfg & DCFG_EPMISCNT_MASK) >> DCFG_EPMISCNT_SHIFT);
+			if (epmscnt >= 1) {
+				epmscnt--;
+			}
+			dcfg &= ~DCFG_EPMISCNT_MASK;
+			dcfg |= DCFG_EPMISCNT(epmscnt);
+			dwc2_writel(hsotg, dcfg, DCFG);
+		}
+	}
+#endif
 
 	dev_dbg(hsotg->dev, "%s: DxEPCTL=0x%08x\n", __func__, ctrl);
 	dwc2_writel(hsotg, ctrl, epctrl_reg);
@@ -4540,6 +4653,14 @@ static int dwc2_hsotg_pullup(struct usb_gadget *gadget, int is_on)
 	if (is_on) {
 		hsotg->enabled = 1;
 		dwc2_hsotg_core_init_disconnected(hsotg, false);
+	#ifdef CONFIG_ARCH_AMEBAD2
+		int ret = 0;
+		ret = rtk_phy_calibrate(hsotg);
+		if (ret != 0) {
+			dev_err(hsotg->dev,"PHY calibration fail\n");
+			return ret;
+                }
+	#endif
 		/* Enable ACG feature in device mode,if supported */
 		dwc2_enable_acg(hsotg);
 		dwc2_hsotg_core_connect(hsotg);
@@ -4679,7 +4800,7 @@ static void dwc2_hsotg_initep(struct dwc2_hsotg *hsotg,
 	 * if we're using dma, we need to set the next-endpoint pointer
 	 * to be something valid.
 	 */
-
+#ifndef DWC2_PREDICT_NEXTSEQ
 	if (using_dma(hsotg)) {
 		u32 next = DXEPCTL_NEXTEP((epnum + 1) % 15);
 
@@ -4688,6 +4809,7 @@ static void dwc2_hsotg_initep(struct dwc2_hsotg *hsotg,
 		else
 			dwc2_writel(hsotg, next, DOEPCTL(epnum));
 	}
+#endif
 }
 
 /**

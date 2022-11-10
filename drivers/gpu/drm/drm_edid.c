@@ -250,6 +250,14 @@ static const struct drm_display_mode drm_dmt_modes[] = {
 	{ DRM_MODE("640x480", DRM_MODE_TYPE_DRIVER, 36000, 640, 696,
 		   752, 832, 0, 480, 481, 484, 509, 0,
 		   DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
+
+
+	{ DRM_MODE("480x800", DRM_MODE_TYPE_DRIVER, 30720, ///yiyuan 
+		480, 481, 484, 500, 0,
+		800, 824, 896, 1024, 0,
+		DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */  //choose this one
+
+		   
 	/* 0x08 - 800x600@56Hz */
 	{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 36000, 800, 824,
 		   896, 1024, 0, 600, 601, 603, 625, 0,
@@ -589,7 +597,15 @@ static const struct drm_display_mode drm_dmt_modes[] = {
 static const struct drm_display_mode edid_est_modes[] = {
 	{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 40000, 800, 840,
 		   968, 1056, 0, 600, 601, 605, 628, 0,
-		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */
+		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */  //choose this one
+
+
+	{ DRM_MODE("480x800", DRM_MODE_TYPE_DRIVER, 30720, 
+		480, 481, 484, 500, 0,
+		800, 824, 896, 1024, 0,
+		DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */  //choose this one
+
+
 	{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 36000, 800, 824,
 		   896, 1024, 0, 600, 601, 603,  625, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@56Hz */
@@ -4931,7 +4947,7 @@ EXPORT_SYMBOL(drm_add_edid_modes);
 int drm_add_modes_noedid(struct drm_connector *connector,
 			int hdisplay, int vdisplay)
 {
-	int i, count, num_modes = 0;
+	int i, count, num_modes = 0,refresh;
 	struct drm_display_mode *mode;
 	struct drm_device *dev = connector->dev;
 
@@ -4953,7 +4969,9 @@ int drm_add_modes_noedid(struct drm_connector *connector,
 					ptr->vdisplay > vdisplay)
 				continue;
 		}
-		if (drm_mode_vrefresh(ptr) > 61)
+		refresh = drm_mode_vrefresh(ptr) ;
+		//printk("[%s-%d] refresh=%d,i=%d[%dx%d] \n",__func__,__LINE__,refresh,i,ptr->hdisplay,ptr->vdisplay);
+		if (refresh > 61)
 			continue;
 		mode = drm_mode_duplicate(dev, ptr);
 		if (mode) {

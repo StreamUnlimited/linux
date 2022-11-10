@@ -13,6 +13,10 @@ menuconfig INPUT_KEYBOARD
 
 if INPUT_KEYBOARD
 
+config KEYBOARD_RLXVM
+	tristate "RLXVM virtual keypad"
+	default n
+
 config KEYBOARD_ADC
 	tristate "ADC Ladder Buttons"
 	depends on IIO

@@ -79,6 +79,11 @@ core-y += arch/riscv/
 
 libs-y += arch/riscv/lib/
 
+# Board Makefile
+ifeq ($(CONFIG_SHEIPA),y)
+include $(srctree)/arch/$(VAR_ARCH)/bsp/Makefile
+endif
+
 PHONY += vdso_install
 vdso_install:
 	$(Q)$(MAKE) $(build)=arch/riscv/kernel/vdso $@

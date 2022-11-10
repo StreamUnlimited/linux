@@ -651,7 +651,6 @@ config ZX_DMA
 	help
 	  Support the DMA engine for ZTE ZX family platform devices.
 
-
 # driver files
 source "drivers/dma/bestcomm/Kconfig"
 

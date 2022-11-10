@@ -1,4 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0
+# Realtek Semiconductor Corp.
+#
+# RLX Linux Kernel Configuration
+#
+# Tony Wu (tonywu@realtek.com)
+# Dec. 07, 2008
+#
+
 config ARM
 	bool
 	default y
@@ -265,6 +273,7 @@ config NEED_MACH_MEMORY_H
 config PHYS_OFFSET
 	hex "Physical address of main memory" if MMU
 	depends on !ARM_PATCH_PHYS_VIRT
+	default 0x0 if MMU
 	default DRAM_BASE if !MMU
 	default 0x00000000 if ARCH_EBSA110 || \
 			ARCH_FOOTBRIDGE || \
@@ -309,8 +318,41 @@ config ARCH_MMAP_RND_BITS_MAX
 #
 choice
 	prompt "ARM system type"
-	default ARM_SINGLE_ARMV7M if !MMU
-	default ARCH_MULTIPLATFORM if MMU
+	default ARCH_AMEBA_M if !MMU
+	default ARCH_AMEBA if MMU
+
+config ARCH_AMEBA_M
+	bool "Realtek ARM platform"
+	depends on !MMU
+	select ARCH_WANT_OPTIONAL_GPIOLIB
+	select ARM_NVIC
+	select AUTO_ZRELADDR
+	select CLKSRC_OF
+	select COMMON_CLK
+	select GENERIC_CLOCKEVENTS
+	select NO_IOPORT_MAP
+	select SPARSE_IRQ
+	select USE_OF
+	select ARMV7M_SYSTICK
+	select DW_APB_TIMER_OF
+
+config ARCH_AMEBA
+	bool "Realtek ARM platform"
+	depends on MMU
+	select COMMON_CLK
+	select CLKDEV_LOOKUP
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select USE_OF
+
+config ARCH_AMEBAD2
+	bool "Realtek AmebaD2 platform"
+	depends on MMU
+	select COMMON_CLK
+	select CLKDEV_LOOKUP
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select USE_OF
 
 config ARCH_MULTIPLATFORM
 	bool "Allow multiple platforms to be selected"
@@ -745,6 +787,8 @@ source "arch/arm/mach-vt8500/Kconfig"
 source "arch/arm/mach-zx/Kconfig"
 
 source "arch/arm/mach-zynq/Kconfig"
+
+source "arch/arm/mach-amebad2/Kconfig"
 
 # ARMv7-M architecture
 config ARCH_EFM32
@@ -1252,8 +1296,17 @@ config HAVE_ARM_ARCH_TIMER
 	help
 	  This option enables support for the ARM architected timer
 
+config HAVE_ARM_GLOBAL_TIMER
+	bool "Global timer support"
+	depends on CPU_V7
+	select ARM_GLOBAL_TIMER
+	select GENERIC_CLOCKEVENTS
+	help
+	  This option enables support for the ARM global timer
+
 config HAVE_ARM_TWD
 	bool
+	depends on SMP
 	help
 	  This options enables support for the ARM timer and watchdog unit
 
@@ -1478,9 +1531,8 @@ config ARM_PATCH_IDIV
 	  code to do integer division.
 
 config AEABI
-	bool "Use the ARM EABI to compile the kernel" if !CPU_V7 && \
-		!CPU_V7M && !CPU_V6 && !CPU_V6K && !CC_IS_CLANG
-	default CPU_V7 || CPU_V7M || CPU_V6 || CPU_V6K || CC_IS_CLANG
+	bool "Use the ARM EABI to compile the kernel"
+	default y
 	help
 	  This option allows for the kernel to be compiled using the latest
 	  ARM ABI (aka EABI).  This is only useful if you are using a user
@@ -1497,6 +1549,7 @@ config AEABI
 config OABI_COMPAT
 	bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
 	depends on AEABI && !THUMB2_KERNEL
+	default n
 	help
 	  This option preserves the old syscall interface along with the
 	  new (ARM EABI) one. It also provides a compatibility layer to

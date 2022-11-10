@@ -376,9 +376,8 @@ static void cps_init_secondary(void)
 	if (cpu_has_veic)
 		clear_c0_status(ST0_IM);
 	else
-		change_c0_status(ST0_IM, STATUSF_IP2 | STATUSF_IP3 |
-					 STATUSF_IP4 | STATUSF_IP5 |
-					 STATUSF_IP6 | STATUSF_IP7);
+		/* Call platform init_secondary hook */
+		plat_smp_init_secondary();
 }
 
 static void cps_smp_finish(void)

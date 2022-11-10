@@ -273,7 +273,7 @@ config ARCH_NO_SWAP
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
 	depends on MMU && BLOCK && !ARCH_NO_SWAP
-	default y
+	default n
 	help
 	  This option allows you to choose whether you want to have support
 	  for so called swap devices or swap files in your kernel that are
@@ -346,6 +346,7 @@ config USELIB
 config AUDIT
 	bool "Auditing support"
 	depends on NET
+	default n
 	help
 	  Enable auditing infrastructure that can be used with another
 	  kernel subsystem, such as SELinux (which requires this for
@@ -438,6 +439,7 @@ config HAVE_SCHED_AVG_IRQ
 config BSD_PROCESS_ACCT
 	bool "BSD Process Accounting"
 	depends on MULTIUSER
+	default n
 	help
 	  If you say Y here, a user level program will be able to instruct the
 	  kernel (via a special system call) to write process accounting
@@ -1410,7 +1412,7 @@ config BUG
 
 config ELF_CORE
 	depends on COREDUMP
-	default y
+	default n
 	bool "Enable ELF core dumps" if EXPERT
 	help
 	  Enable support for generating core dumps. Disabling saves about 4k.
@@ -1420,13 +1422,13 @@ config PCSPKR_PLATFORM
 	bool "Enable PC-Speaker support" if EXPERT
 	depends on HAVE_PCSPKR_PLATFORM
 	select I8253_LOCK
-	default y
+	default n
 	help
           This option allows to disable the internal PC-Speaker
           support, saving some memory.
 
 config BASE_FULL
-	default y
+	default n
 	bool "Enable full-sized data structures for core" if EXPERT
 	help
 	  Disabling this option reduces the size of miscellaneous core
@@ -1491,7 +1493,7 @@ config EVENTFD
 
 config SHMEM
 	bool "Use full shmem filesystem" if EXPERT
-	default y
+	default n
 	depends on MMU
 	help
 	  The shmem is an internal filesystem used to manage shared memory.
@@ -1724,7 +1726,7 @@ config VM_EVENT_COUNTERS
 	  if VM event counters are disabled.
 
 config SLUB_DEBUG
-	default y
+	default n
 	bool "Enable SLUB debugging support" if EXPERT
 	depends on SLUB && SYSFS
 	help
