@@ -818,7 +818,6 @@ void dump_TX_FIFO(struct mac_ax_adapter padapter, u8 page_num, u16 page_size);
 u8 rtw_hal_set_fw_media_status_cmd(struct mac_ax_adapter *adapter, u8 mstatus, u8 macid);
 u32 mac_process_c2h(struct mac_ax_adapter *adapter, u8 *buf, u32 len, u8 *c2h_ret);
 u32 mac_send_h2c_hmebox(struct mac_ax_adapter *adapter, u8 *h2c);
-u32 mac_send_bcn_h2c(struct mac_ax_adapter *adapter, struct mac_ax_bcn_info *info);
 u32 mac_outsrc_h2c_common(struct mac_ax_adapter *adapter, struct rtw_g6_h2c_hdr *hdr, u32 *pvalue);
 u32 mac_ie_cam_upd(struct mac_ax_adapter *adapter, struct mac_ax_ie_cam_cmd_info *info);
 u32 mac_fw_log_cfg(struct mac_ax_adapter *adapter, struct mac_ax_fw_log *log_cfg);

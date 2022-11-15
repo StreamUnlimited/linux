@@ -116,6 +116,11 @@ static void __init plat_map_io(void)
 static void plat_arch_restart(enum reboot_mode mode, const char *cmd)
 {
 	if (plat_lsys_base) {
+		writel(0U, plat_lsys_base + REG_AON_SYSRST_MSK);
+		writel(0U, plat_lsys_base + REG_LSYS_SYSRST_MSK0);
+		writel(0U, plat_lsys_base + REG_LSYS_SYSRST_MSK1);
+		writel(0U, plat_lsys_base + REG_LSYS_SYSRST_MSK2);
+
 		writel(SYS_RESET_KEY, plat_lsys_base + REG_LSYS_SW_RST_TRIG);
 		writel(LSYS_BIT_LPSYS_RST << AP_CPU_ID, plat_lsys_base + REG_LSYS_SW_RST_CTRL);
 		writel(SYS_RESET_TRIG, plat_lsys_base + REG_LSYS_SW_RST_TRIG);

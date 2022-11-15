@@ -169,8 +169,8 @@ u32 mac_trx_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info)
 		return ret;
 	}
 
-	rrsr_cfg.rrsr_rate_en = 1;
-	rrsr_cfg.cck_cfg = 0xF;
+	rrsr_cfg.rrsr_rate_en = 0xF;
+	rrsr_cfg.cck_cfg = 0x3;
 	rrsr_cfg.ref_rate_sel = 1;
 	rrsr_cfg.ref_rate = 0x387;
 	rrsr_cfg.ofdm_cfg = 0xFF;

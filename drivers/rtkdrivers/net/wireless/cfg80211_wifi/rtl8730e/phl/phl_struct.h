@@ -244,6 +244,9 @@ struct phl_info_t {
 
 	struct rtw_phl_com_t *phl_com;
 	struct rtw_phl_handler phl_tx_handler;
+#ifdef RTW_PHL_BCN_IOT
+	struct rtw_phl_handler phl_bcn_handler;
+#endif
 	struct rtw_phl_handler phl_rx_handler;
 	struct rtw_phl_handler phl_event_handler;
 	struct rtw_phl_rx_ring phl_rx_ring;

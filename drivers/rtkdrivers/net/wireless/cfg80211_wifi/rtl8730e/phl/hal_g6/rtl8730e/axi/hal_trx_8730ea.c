@@ -16,6 +16,9 @@
 #include "../../hal_headers.h"
 #include "../rtl8730e_hal.h"
 #include "hal_trx_8730ea.h"
+#ifdef RTW_PHL_BCN_IOT
+#include "mac/mac_ax/bcn.h"
+#endif
 
 /**
  * this function will query total hw tx dma channels number
@@ -648,7 +651,7 @@ hal_update_txbd_8730ea(struct hal_info_t *hal,
 			SET_TXBUFFER_DESC_PSB(target_txbd, 0);
 			SET_TXBUFFER_DESC_ADD_LOW(target_txbd, 0);
 
-			for (i = 1 ; i <= seg_num ; i++) {
+			for (i = 1 ; i < seg_num ; i++) {
 				SET_TXBUFFER_DESC_LEN_WITH_OFFSET(target_txbd, i, 0);
 				SET_TXBUFFER_DESC_MODE_WITH_OFFSET(target_txbd, i, 0);
 				SET_TXBUFFER_DESC_ADD_LOW_WITH_OFFSET(target_txbd, i, 0);
@@ -690,6 +693,63 @@ hal_update_txbd_8730ea(struct hal_info_t *hal,
 	return hstatus;
 }
 
+#ifdef RTW_PHL_BCN_IOT
+static enum rtw_hal_status
+hal_update_bcn_txbd_8730ea(struct hal_info_t *hal,
+			   struct tx_base_desc *txbd_ring,
+			   void *info) {
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
+	struct rtw_hal_com_t *hal_com = hal->hal_com;
+	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)info;
+	struct bus_hw_cap_t *bus_hw_cap = &hal_com->bus_hw_cap;
+	u16 seg_num = ((TX_BUFFER_SEG_NUM == 0) ? 2 : ((TX_BUFFER_SEG_NUM == 1) ? 4 : 8));
+	u8 ch_idx = BCN_QUEUE_IDX_8730EA;
+	u8 *ring_head = 0;
+	int i = 0;
+	u8 *target_txbd = 0;
+	u16 total_len = 0;
+
+	total_len = bcn_info->desc_len + bcn_info->bcn_len;
+	ring_head = txbd_ring[ch_idx].vir_addr;
+	target_txbd = ring_head;
+
+	SET_TXBUFFER_DESC_LEN(target_txbd, 0);
+	SET_TXBUFFER_DESC_PSB(target_txbd, 0);
+	SET_TXBUFFER_DESC_ADD_LOW(target_txbd, 0);
+
+	for (i = 1 ; i < seg_num ; i++) {
+		SET_TXBUFFER_DESC_LEN_WITH_OFFSET(target_txbd, i, 0);
+		SET_TXBUFFER_DESC_MODE_WITH_OFFSET(target_txbd, i, 0);
+		SET_TXBUFFER_DESC_ADD_LOW_WITH_OFFSET(target_txbd, i, 0);
+	}
+
+	SET_TXBUFFER_DESC_LEN(target_txbd, TX_WIFI_INFO_SIZE);
+	SET_TXBUFFER_DESC_PSB(target_txbd, RTW_DIV_ROUND_UP(total_len, TXBD_PAGE_SIZE));
+	SET_TXBUFFER_DESC_ADD_LOW(target_txbd, bcn_info->desc_phy_addr);
+	SET_TXBUFFER_DESC_OWN(target_txbd, 1);
+
+	SET_TXBUFFER_DESC_MODE_WITH_OFFSET(target_txbd, 1, 0);
+	SET_TXBUFFER_DESC_ADD_LOW_WITH_OFFSET(target_txbd, 1, bcn_info->bcn_phy_addr);
+	SET_TXBUFFER_DESC_LEN_WITH_OFFSET(target_txbd, 1, bcn_info->bcn_len);
+
+	return hstatus;
+}
+
+static enum rtw_hal_status
+hal_trigger_bcn_8730ea(struct hal_info_t *hal) {
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
+	u8 tx_dma_ch = BCN_QUEUE_IDX_8730EA;
+	u32 txbd_reg;
+	u16 val16 = 0;
+
+	val16 = hal_read16(hal->hal_com, REG_RX_RXBD_NUM);
+	hal_write16(hal->hal_com, REG_RX_RXBD_NUM, val16 | BIT_POLL_BCNQ);
+	hstatus = RTW_HAL_STATUS_SUCCESS;
+
+	return hstatus;
+}
+#endif
+
 /**
  * the function trigger tx start
  * @hal: see struct hal_info_t
@@ -721,7 +781,6 @@ hal_trigger_txdma_8730ea(struct hal_info_t *hal,
 
 	return hstatus;
 }
-
 
 static enum rtw_hal_status hal_pltfm_tx_8730ea(void *hal, struct rtw_h2c_pkt *h2c_pkt)
 {
@@ -984,6 +1043,7 @@ static void _hal_trx_init_bd_num_8730ea(struct hal_info_t *hal)
 			continue;
 		}
 
+
 		value = ((RTL8730AE_SEG_NUM & 0x3) << 12)
 			| (txbd_num & 0x3F);
 
@@ -1031,7 +1091,8 @@ static void _hal_trx_init_bd_8730ea(struct hal_info_t *hal, u8 *txbd_buf, u8 *rx
 
 		/* data queue + mgnt queue + high queue */
 		for (i = 0; i < TX_DMA_CHANNEL_ENTRY_8730EA; i++) {
-			if (TXCMD_QUEUE_IDX_8730EA == i) {
+			if ((TXCMD_QUEUE_IDX_8730EA == i) \
+			    || (BCN_QUEUE_IDX_8730EA == i)) {
 				continue;
 			}
 
@@ -1054,9 +1115,6 @@ static void _hal_trx_init_bd_8730ea(struct hal_info_t *hal, u8 *txbd_buf, u8 *rx
 			case HIGH_QUEUE_IDX_8730EA:
 				value32 = BIT_MQ0DESA(txbd[i].phy_addr_l);
 				break;
-			case BCN_QUEUE_IDX_8730EA:
-				value32 = BIT_BPQDESA(txbd[i].phy_addr_l);
-				break;
 			default:
 				PHL_ERR("not support channel (ch_idx = %d)\n", i);
 				break;
@@ -1068,6 +1126,15 @@ static void _hal_trx_init_bd_8730ea(struct hal_info_t *hal, u8 *txbd_buf, u8 *rx
 			} else {
 				PHL_ERR("query txbd desc reg_addr_l fail (ch_idx = %d)\n", i);
 			}
+		}
+
+		/* beacon queue */
+		value32 = BIT_BPQDESA(txbd[BCN_QUEUE_IDX_8730EA].phy_addr_l);
+		_hal_get_bd_desc_reg_8730ea(BCN_QUEUE_IDX_8730EA, &reg_addr_l, &reg_addr_h);
+		if (0 != reg_addr_l) {
+			hal_write32(hal->hal_com, reg_addr_l, value32);
+		} else {
+			PHL_ERR("query txbd desc reg_addr_l fail (bcn queue)\n", i);
 		}
 
 		/* RX queue */
@@ -1096,54 +1163,85 @@ static u8 hal_poll_txdma_idle_8730ea(struct hal_info_t *hal)
 	return true;
 }
 
+static u32 hal_check_bcn_status_8730ea(struct hal_info_t *hal)
+{
+	u32 status = 0;
+
+	if ((hal->txdone_ch_map[0] & BIT_TXBCN1_OK_INT)
+#ifdef CONFIG_CONCURRENT_MODE
+	    | (hal->txdone_ch_map[2] & BIT_TXBCNOK9_INT)
+#endif
+	    ) {
+		status |= PHL_TX_BCN_OK;
+	}
+
+	if ((hal->txdone_ch_map[0] & BIT_TXBCN1_ERR_INT)
+#ifdef CONFIG_CONCURRENT_MODE
+	    | (hal->txdone_ch_map[2] & BIT_TXBCNERR9_INT)
+#endif
+	    ) {
+		status |= PHL_TX_BCN_ERR;
+	}
+
+	if ((hal->txdone_ch_map[2] & BIT_BCNERLY0_INT)
+#ifdef CONFIG_CONCURRENT_MODE
+	    | (hal->txdone_ch_map[2] & BIT_BCNERLY8_INT)
+#endif
+	    ) {
+		status |= PHL_TX_BCN_EARLY;
+	}
+
+	return status;
+}
+
 static bool hal_check_tx_done_8730ea(struct hal_info_t *hal, u8 dma_ch)
 {
 	bool ret = false;
 
 	switch (dma_ch) {
 	case MGT_QUEUE_IDX_8730EA:
-		if (hal->txdone_ch_map & IMR_MGNTDOK_8730E) {
-			hal->txdone_ch_map &= ~IMR_MGNTDOK_8730E;
+		if (hal->txdone_ch_map[1] & IMR_MGNTDOK_8730E) {
+			hal->txdone_ch_map[1] &= ~IMR_MGNTDOK_8730E;
 			ret = true;
 		} else {
 			ret = false;
 		}
 		break;
 	case VO_QUEUE_IDX_8730EA:
-		if (hal->txdone_ch_map & IMR_VODOK_8730E) {
-			hal->txdone_ch_map &= ~IMR_VODOK_8730E;
+		if (hal->txdone_ch_map[1] & IMR_VODOK_8730E) {
+			hal->txdone_ch_map[1] &= ~IMR_VODOK_8730E;
 			ret = true;
 		} else {
 			ret = false;
 		}
 		break;
 	case VI_QUEUE_IDX_8730EA:
-		if (hal->txdone_ch_map & IMR_VIDOK_8730E) {
-			hal->txdone_ch_map &= ~IMR_VIDOK_8730E;
+		if (hal->txdone_ch_map[1] & IMR_VIDOK_8730E) {
+			hal->txdone_ch_map[1] &= ~IMR_VIDOK_8730E;
 			ret = true;
 		} else {
 			ret = false;
 		}
 		break;
 	case BE_QUEUE_IDX_8730EA:
-		if (hal->txdone_ch_map & IMR_BEDOK_8730E) {
-			hal->txdone_ch_map &= ~IMR_BEDOK_8730E;
+		if (hal->txdone_ch_map[1] & IMR_BEDOK_8730E) {
+			hal->txdone_ch_map[1] &= ~IMR_BEDOK_8730E;
 			ret = true;
 		} else {
 			ret = false;
 		}
 		break;
 	case BK_QUEUE_IDX_8730EA:
-		if (hal->txdone_ch_map & IMR_BKDOK_8730E) {
-			hal->txdone_ch_map &= ~IMR_BKDOK_8730E;
+		if (hal->txdone_ch_map[1] & IMR_BKDOK_8730E) {
+			hal->txdone_ch_map[1] &= ~IMR_BKDOK_8730E;
 			ret = true;
 		} else {
 			ret = false;
 		}
 		break;
 	case HIGH_QUEUE_IDX_8730EA:
-		if (hal->txdone_ch_map & IMR_H0DOK_8730E) {
-			hal->txdone_ch_map &= ~IMR_H0DOK_8730E;
+		if (hal->txdone_ch_map[1] & IMR_H0DOK_8730E) {
+			hal->txdone_ch_map[1] &= ~IMR_H0DOK_8730E;
 			ret = true;
 		} else {
 			ret = false;
@@ -1177,7 +1275,7 @@ static enum rtw_hal_status hal_trx_init_8730ea(struct hal_info_t *hal, u8 *txbd_
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 	/* Set AMPDU max agg number to 128 */
 	/* CR setting*/
-	rtw_hal_mac_set_hw_ampdu_cfg(hal, 0, 0x7F, 0xAB);
+	rtw_hal_mac_set_hw_ampdu_cfg(hal, 0, 0x14, 0xAB);
 
 	_hal_trx_init_bd_8730ea(hal, txbd_buf, rxbd_buf);
 
@@ -1202,8 +1300,13 @@ void hal_trx_ops_init_8730ea(void)
 	ops.query_rxch_num = hal_query_rxch_num_8730ea;
 	ops.update_wd = hal_update_wd_8730ea;
 	ops.update_txbd = hal_update_txbd_8730ea;
+#ifdef RTW_PHL_BCN_IOT
+	ops.update_bcn_txbd = hal_update_bcn_txbd_8730ea;
+	ops.tx_bcn_start = hal_trigger_bcn_8730ea;
+#endif
 	ops.tx_start = hal_trigger_txdma_8730ea;
 	ops.check_rxrdy = hal_check_rxrdy_8730ea;
+	ops.check_bcn_status = hal_check_bcn_status_8730ea;
 	ops.check_tx_done = hal_check_tx_done_8730ea;
 	ops.handle_rxbd_info = hal_handle_rxbd_info_8730ea;
 	ops.handle_rx_buffer = hal_handle_rx_buffer_8730e;

@@ -142,8 +142,17 @@ enum rtw_hal_status hal_init_8730ea(struct rtw_phl_com_t *phl_com,
 		goto error_trx_stats_wp_rpt;
 	}
 
-	hal_info->txdone_ch_map = 0;
-	hal_info->tx_dma_ch_map = IMR_TX_MASK;
+	_os_mem_set(hal_to_drvpriv(hal_info), hal_info->txdone_ch_map, 0,
+		    4 * sizeof(u32));
+	hal_info->tx_dma_ch_map[0] = (BIT_TXBCN1_ERR_INT | BIT_TXBCN1_OK_INT);
+	hal_info->tx_dma_ch_map[1] = IMR_TX_MASK;
+	hal_info->tx_dma_ch_map[2] = (BIT_BCNERLY0_INT
+#ifdef CONFIG_CONCURRENT_MODE
+				      | BIT_TXBCNERR9_INT
+				      | BIT_TXBCNOK9_INT
+				      | BIT_BCNERLY8_INT
+#endif
+				      );
 
 	hal_info->rpr_cfg = _os_mem_alloc(drv,
 					  sizeof(struct mac_ax_host_rpr_cfg));
@@ -172,8 +181,10 @@ void hal_deinit_8730ea(struct rtw_phl_com_t *phl_com,
 
 	txch_num = rtw_hal_query_txch_num(hal_info);
 
-	hal_info->txdone_ch_map = 0;
-	hal_info->tx_dma_ch_map = 0;
+	_os_mem_set(hal_to_drvpriv(hal_info), hal_info->txdone_ch_map, 0,
+		    4 * sizeof(u32));
+	_os_mem_set(hal_to_drvpriv(hal_info), hal_info->tx_dma_ch_map, 0,
+		    4 * sizeof(u32));
 	_os_mem_free(phlcom_to_drvpriv(phl_com),
 		     hal_info->hal_com->trx_stat.wp_rpt_stats,
 		     sizeof(struct rtw_wp_rpt_stats) * txch_num);
@@ -316,7 +327,7 @@ void hal_init_default_value_8730ea(struct hal_info_t *hal, struct hal_intr_mask_
 
 	hal_com->int_mask_default[1] = (u32)(
 					       IMR_ROK_8730E |
-					       IMR_RDU_8730E |
+					       /* IMR_RDU_8730E | */
 					       IMR_VODOK_8730E |
 					       IMR_VIDOK_8730E |
 					       IMR_BEDOK_8730E |
@@ -359,7 +370,6 @@ void hal_enable_int_8730ea(struct hal_info_t *hal)
 		  REG_HEMR, hal_read32(hal_com, REG_HEMR),
 		  REG_HIMR2, hal_read32(hal_com, REG_HIMR2)
 		 );
-
 }
 
 void hal_disable_int_8730ea(struct hal_info_t *hal)
@@ -370,6 +380,52 @@ void hal_disable_int_8730ea(struct hal_info_t *hal)
 	hal_write32(hal_com, REG_AXI_INTERRUPT_MASK, 0);
 	hal_write32(hal_com, REG_HEMR, 0);
 	hal_write32(hal_com, REG_HIMR2, 0);
+}
+
+void hal_config_int_8730ea(struct hal_info_t *hal, enum rtw_phl_config_int int_mode)
+{
+	struct rtw_hal_com_t *hal_com = hal->hal_com;
+	u8 index = 0;
+
+	hal_disable_int_8730ea(hal);
+
+	switch (int_mode) {
+#ifdef RTW_PHL_BCN_IOT
+	case RTW_PHL_EN_AP_MODE_INT:
+		hal_com->int_mask[2] |= BIT_BCNERLY0_INT;
+#ifdef CONFIG_CONCURRENT_MODE
+		hal_com->int_mask[2] |= BIT_BCNERLY8_INT_EN;
+#endif
+		break;
+	case RTW_PHL_DIS_AP_MODE_INT:
+		hal_com->int_mask[2] &= ~BIT_BCNERLY0_INT;
+#ifdef CONFIG_CONCURRENT_MODE
+		hal_com->int_mask[2] &= ~BIT_BCNERLY8_INT_EN;
+#endif
+		break;
+	case RTW_PHL_EN_TX_BCN_INT:
+		hal_com->int_mask[0] |= (BIT_TXBCN1_ERR_INT_EN
+					| BIT_TXBCN1_OK_INT_EN);
+#ifdef CONFIG_CONCURRENT_MODE
+		hal_com->int_mask[2] |= (BIT_TXBCNERR9_INT
+					| BIT_TXBCNOK9_INT);
+#endif
+		break;
+	case RTW_PHL_DIS_TX_BCN_INT:
+		hal_com->int_mask[0] &= ~(BIT_TXBCN1_ERR_INT_EN
+					| BIT_TXBCN1_OK_INT_EN);
+#ifdef CONFIG_CONCURRENT_MODE
+		hal_com->int_mask[2] &= ~(BIT_TXBCNERR9_INT
+					 | BIT_TXBCNOK9_INT);
+#endif
+		break;
+#endif
+	default:
+		PHL_WARN("Not support interrupt mode %d.\n", int_mode);
+		break;
+	}
+
+	hal_enable_int_8730ea(hal);
 }
 
 bool hal_recognize_int_8730ea(struct hal_info_t *hal)

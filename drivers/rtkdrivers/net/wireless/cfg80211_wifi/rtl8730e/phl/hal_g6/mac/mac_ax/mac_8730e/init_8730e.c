@@ -24,6 +24,7 @@
 #include "../trx_desc.h"
 #include "../../feature_cfg.h"
 #include "../fwcmd.h"
+#include "../bcn.h"
 #include "../fwdl.h"
 #include "../fwofld.h"
 #include "../role.h"
@@ -224,8 +225,8 @@ static struct mac_ax_ops mac8730e_ops = {
 	NULL,/* rx_forwarding */
 	mac_get_rx_fltr_opt, /* get_rx_fltr_opt */
 	mac_set_rx_fltr_opt, /* set_rx_fltr_opt */
-	mac_set_typ_fltr_opt, /* set machdr type fltr opt */
-	mac_set_typsbtyp_fltr_opt, /* set machdr typ subtyp fltr opt */
+	mac_set_typ_fltr_opt, /* set_rx_fltr_typ_opt */
+	mac_set_typsbtyp_fltr_opt, /* set_rx_fltr_typstyp_opt */
 	mac_set_typsbtyp_fltr_detail, /* set detail type subtype filter config*/
 	NULL, /* get addrcam setting */
 	NULL, /* get addrcam disable default setting */
@@ -234,7 +235,11 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_sr_update, /* set sr parameter */
 	mac_two_nav_cfg,  /* config 2NAV hw setting */
 	NULL, /* pkt_drop */
-	mac_send_bcn_h2c, /* send beacon h2c */
+#ifdef RTW_PHL_BCN_IOT
+	mac_send_bcn, /* send beacon h2c */
+#else
+	NULL,
+#endif
 	NULL, /*tx_mode_sel*/
 	NULL, /* tcpip_chksum_ofd */
 	NULL, /* chk_rx_tcpip_chksum_ofd */
@@ -685,7 +690,41 @@ static struct halmac_pg_num HALMAC_PG_NUM_AXI_8730E[] = {
 	{HALMAC_TRX_MODE_DELAY_LOOPBACK, 8, 8, 8, 8, 1},
 };
 
+static void mac_dis_clock_gate_8730e(struct mac_ax_adapter *adapter)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 value32 = 0;
 
+	/*RXDMA CG*/
+	value32 = MAC_REG_R32(REG_RXDMA_MODE);
+	value32 &= ~BIT_RXDMA_GCLK_EN;
+	MAC_REG_W32(REG_RXDMA_MODE, value32);
+
+	/*TXDMA CG*/
+	value32 = MAC_REG_R32(REG_TDE_GCK_CTRL);
+	value32 &= ~BIT_TDE_GCLK_EN;
+	MAC_REG_W32(REG_TDE_GCK_CTRL, value32);
+
+	/*PTCL CG*/
+	value32 = MAC_REG_R32(REG_GCLK_CFG);
+	value32 &= ~BIT_EN_PTCL_GCLK;
+	MAC_REG_W32(REG_GCLK_CFG, value32);
+
+	/*WSEC CG*/
+	value32 = MAC_REG_R32(REG_SECCFG);
+	value32 |= (BIT_DIS_GCLK_TKIP | BIT_DIS_GCLK_AES | BIT_DIS_GCLK_WAPI);
+	MAC_REG_W32(REG_SECCFG, value32);
+
+	/*TX CG*/
+	value32 = MAC_REG_R32(REG_TCR);
+	value32 |= BIT_WMAC_TCR_DISGCLK;
+	MAC_REG_W32(REG_TCR, value32);
+
+	/*RX CG*/
+	value32 = MAC_REG_R32(REG_RCR);
+	value32 |= BIT_DISGCLK;
+	MAC_REG_W32(REG_RCR, value32);
+}
 
 u32 init_trx_cfg_8730e(struct mac_ax_adapter *adapter,
 		       enum halmac_trx_mode mode)
@@ -738,7 +777,7 @@ u32 init_protocol_cfg_8730e(struct mac_ax_adapter *adapter)
 	MAC_REG_W32(REG_PROT_MODE_CTRL, val32);
 
 	MAC_REG_W16(REG_BAR_MODE_CTRL + 2,
-		    WLAN_BAR_RETRY_LIMIT | WLAN_RA_TRY_RATE_AGG_LIMIT << 8);
+		    WLAN_BAR_RETRY_LIMIT | WLAN_RETRY_PKT_LIMIT << 8);
 
 	/*close A/B/C/D-cut BA parser*/
 	val8 = MAC_REG_R8(REG_BNDY_LIFETIME_TAIL + 2);
@@ -759,6 +798,7 @@ u32 init_protocol_cfg_8730e(struct mac_ax_adapter *adapter)
 
 	/*Fix incorrect HW default value of RSC*/
 	val32 = BIT_CLEAR_RRSR_RSC(MAC_REG_R32(REG_RRSR));
+	val32 = BIT_SET_R_RATE_CTRL_TABLE(val32, WLAN_RATE_RRSR_CCK_ONLY_1M);
 	MAC_REG_W32(REG_RRSR, val32);
 
 	val8 = MAC_REG_R8(REG_CFEND_RATE_SC_CTRL);
@@ -795,8 +835,10 @@ u32 init_edca_cfg_8730e(struct mac_ax_adapter *adapter)
 	MAC_REG_W32(REG_EDCA_BE_PARAM, WLAN_EDCA_BE_PARAM);
 	MAC_REG_W32(REG_EDCA_BK_PARAM, WLAN_EDCA_BK_PARAM);
 
+	MAC_REG_W16(REG_BCN_CFG_PIFS, 0x660F);
 	val32 = MAC_REG_R32(REG_BCN_CFG_PIFS);
-	MAC_REG_W32(REG_BCN_CFG_PIFS, BIT_SET_PIFS(val32, WLAN_PIFS_TIME));
+	val32 = BIT_SET_PIFS(val32, WLAN_PIFS_TIME);
+	MAC_REG_W32(REG_BCN_CFG_PIFS, val32);
 
 	/*sifs break enable, can finish the process of gen_cmd
 		when enable pretx, set to 0*/
@@ -810,7 +852,7 @@ u32 init_edca_cfg_8730e(struct mac_ax_adapter *adapter)
 
 	/*enable freerun counter*/
 	val8 = MAC_REG_R8(REG_FREERUN_CNT_P2POFF_DIS_TXTIME + 1);
-	val8 = (val8 | BIT(4));
+	val8 = (val8 | BIT(5));
 	MAC_REG_W8(REG_FREERUN_CNT_P2POFF_DIS_TXTIME + 1, val8);
 
 	/*not according secondary_cca20/cca40 when tx,  modify later*/
@@ -852,7 +894,7 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	u16 val16;
 	u8 DA[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x02};
 	u8 sec_cfg;
-	u32 start_page;   //crc5_addr,addr,wdata_L,wdata_H,
+	u32 start_page, val32;   //crc5_addr,addr,wdata_L,wdata_H,
 	u8 i = 0, j = 0;
 	start_page = 0;
 
@@ -872,12 +914,15 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 
 	/*0x66C[8]=0  0x66C[1:0]=2'b00  in itself txop can send CTS*/
 	val16 = MAC_REG_R16(REG_WMAC_TRXPTCL_CTL_H);
-	val16 = (u16)((val16 & (~BIT_EN_TXCTS_INTXOP_V1)) | (~BIT_EN_TXCTS_INRXNAV_V1) |
-		      (~BIT_EN_TXCTS_TO_TXOPOWNER_INRXNAV_V1));
+	val16 = (u16)((val16 & (~(BIT_EN_TXCTS_INTXOP_V1 | BIT_EN_TXCTS_INRXNAV_V1 |
+		      BIT_EN_TXCTS_TO_TXOPOWNER_INRXNAV_V1))));
 	MAC_REG_W16(REG_WMAC_TRXPTCL_CTL_H, val16);
 
 	MAC_REG_W32(REG_RXFLTMAP0, WLAN_RX_FILTER0);
 	MAC_REG_W16(REG_RXFLTMAP, WLAN_RX_FILTER2);
+
+	/* enable bssid check for trigger/ndpa/ba */
+	MAC_REG_W32(REG_RX_CFG, (MAC_REG_R32(REG_RX_CFG) | BIT_R_CHK_CTL_BSSID));
 
 	MAC_REG_W32(REG_RCR, WLAN_RCR_CFG);
 	val8 = MAC_REG_R8(REG_RXPSF_CTRL + 2);
@@ -895,6 +940,9 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	val16 = (val16 & 0xF000) | 0xFC;
 	MAC_REG_W16(REG_WMAC_CSIDMA_CFG, val16);
 
+	/* append MACID in the rx descriptor of rx response packet */
+	MAC_REG_W32(REG_ANTTRN_CTR_1_V1, BIT_APPEND_MACID_IN_RESP_EN);
+
 	//HALMAC_REG_W16_SET(REG_GENERAL_OPTION, BIT_DUMMY_FCS_READY_MASK_EN); yx_qi
 
 	//jerry_zhou 20201202
@@ -911,15 +959,11 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	MAC_REG_W32(REG_RX_FILTER_FUNCTION, WLAN_MAC_OPT_FUNC2);
 
 	/*0x16f6=0x4  new rx coming, fix rx hang*/
-	MAC_REG_W32(REG_CHINFO_TRIG_TYPE1 + 2, 0x4);
+	MAC_REG_W8(REG_CHINFO_TRIG_TYPE1 + 2, 0x4);
 
-	if (adapter->hw_cfg_info.trx_mode == HALMAC_TRNSFER_NORMAL) {
-		val8 = WLAN_MAC_OPT_NORM_FUNC1;
-	} else {
-		val8 = WLAN_MAC_OPT_LB_FUNC1;
-	}
-	val8 = val8 & 0x7F; //MAC don't receive early drop pkt
-	MAC_REG_W8(REG_WMAC_OPTION_FUNCTION_1, val8);
+	val32 = MAC_REG_R32(REG_WMAC_OPTION_FUNCTION_1);
+	val32 |= (BIT_R_WMAC_FIL_FCPROVER_1 | BIT_R_WMAC_FIL_FCTYPE_1);
+	MAC_REG_W32(REG_WMAC_OPTION_FUNCTION_1, val32);
 
 	ret = init_low_pwr_8730e(adapter);
 	if (ret != MACSUCCESS) {
@@ -929,7 +973,7 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	/*gnt wlan*/
 	MAC_REG_W8(REG_BT_COEX_ENH + 1, COEX_GNT_WLAN);
 
-
+	mac_dis_clock_gate_8730e(adapter);
 
 	return MACSUCCESS;
 }
@@ -1033,9 +1077,19 @@ u32 priority_queue_cfg_8730e(struct mac_ax_adapter *adapter,
 	adapter->sdio_fs.exq_pg_num = txff_info->extra_queue_pg_num;
 	*/
 
+	MAC_REG_W8(REG_BNDY_LIFETIME_TAIL + 1, (u8)(txff_info->rsvd_cpu_instr_addr));
+
 	/*bcn head0*/
-	MAC_REG_W8(REG_DWBCN0_CTRL + 1, (u8)(txff_info->rsvd_boundary));
-	MAC_REG_W8(REG_BNDY_LIFETIME_TAIL, (u8)txff_info->rsvd_boundary);
+	MAC_REG_W8(REG_DWBCN0_CTRL + 1, (u8)(txff_info->rsvd_bcnq_addr));
+	MAC_REG_W8(REG_BNDY_LIFETIME_TAIL, (u8)(txff_info->rsvd_bcnq_addr));
+	/*bcn head1*/
+	MAC_REG_W8(REG_BCN_AMPDU_CTCL + 3, (u8)(txff_info->rsvd_bcnq1_addr));
+	MAC_REG_W8(REG_DWBCN1_CTRL + 1, (u8)(txff_info->rsvd_bcnq1_addr));
+	/*bcn head2*/
+	MAC_REG_W8(REG_BCN_AMPDU_CTCL + 1, (u8)(txff_info->rsvd_bcnq2_addr));
+	MAC_REG_W8(REG_DWBCN1_CTRL + 3, (u8)(txff_info->rsvd_bcnq2_addr));
+
+	MAC_REG_W32(REG_FWHW_TXQ_HWSSN_CTRL, MAC_REG_R32(REG_FWHW_TXQ_HWSSN_CTRL) & ~BIT_EN_WR_FREE_TAIL);
 
 	MAC_REG_W16(0x116, (u16)(adapter->hw_cfg_info.rx_fifo_size - C2H_PKT_BUF_8730e - 1));
 
@@ -1062,6 +1116,7 @@ u32 priority_queue_cfg_8730e(struct mac_ax_adapter *adapter,
 	adapter->hw_cfg_info.trx_mode = transfer_mode;
 	MAC_REG_W8(REG_CR + 3, (u8)transfer_mode);
 
+	MAC_REG_W16((REG_TRXFF_BNDY + 2), RX_DMA_BOUNDARY_8730E);
 
 	return MACSUCCESS;
 }
@@ -1083,13 +1138,16 @@ u32 set_trx_fifo_info_8730e(struct mac_ax_adapter *adapter,
 	adapter->hw_cfg_info.rx_fifo_size = rxff_size;
 	info->tx_fifo_pg_num = (u16)(txff_size >> TX_PAGE_SIZE_SHIFT_8730e);
 
+	info->rsvd_drv_pg_num = RSVD_PG_DRV_NUM;
+
 	info->rsvd_pg_num = info->rsvd_drv_pg_num +
-			    RSVD_PG_H2C_EXTRAINFO_NUM +
-			    RSVD_PG_H2C_STATICINFO_NUM +
-			    RSVD_PG_H2CQ_NUM +
 			    RSVD_PG_CPU_INSTRUCTION_NUM +
 			    RSVD_PG_FW_TXBUF_NUM +
-			    RSVD_PG_CSIBUF_NUM;
+			    RSVD_PG_CSIBUF_NUM +
+			    RSVD_PG_BCNQ_NUM +
+			    RSVD_PG_BCNQ1_NUM +
+			    RSVD_PG_BCNQ2_NUM +
+			    RSVD_PG_WOWLAN_NUM;
 
 	if (mode == HALMAC_TRX_MODE_DELAY_LOOPBACK) {
 		info->rsvd_pg_num += RSVD_PG_DLLB_NUM;
@@ -1103,18 +1161,20 @@ u32 set_trx_fifo_info_8730e(struct mac_ax_adapter *adapter,
 	info->rsvd_boundary = info->tx_fifo_pg_num - info->rsvd_pg_num;
 
 	cur_pg_addr = info->tx_fifo_pg_num;
+	cur_pg_addr -= RSVD_PG_WOWLAN_NUM;
+	info->rsvd_wowlan_addr = cur_pg_addr;
+	cur_pg_addr -= RSVD_PG_BCNQ2_NUM;
+	info->rsvd_bcnq2_addr = cur_pg_addr;
+	cur_pg_addr -= RSVD_PG_BCNQ1_NUM;
+	info->rsvd_bcnq1_addr = cur_pg_addr;
+	cur_pg_addr -= RSVD_PG_BCNQ_NUM;
+	info->rsvd_bcnq_addr = cur_pg_addr;
 	cur_pg_addr -= RSVD_PG_CSIBUF_NUM;
 	info->rsvd_csibuf_addr = cur_pg_addr;
 	cur_pg_addr -= RSVD_PG_FW_TXBUF_NUM;
 	info->rsvd_fw_txbuf_addr = cur_pg_addr;
 	cur_pg_addr -= RSVD_PG_CPU_INSTRUCTION_NUM;
 	info->rsvd_cpu_instr_addr = cur_pg_addr;
-	cur_pg_addr -= RSVD_PG_H2CQ_NUM;
-	info->rsvd_h2cq_addr = cur_pg_addr;
-	cur_pg_addr -= RSVD_PG_H2C_STATICINFO_NUM;
-	info->rsvd_h2c_sta_info_addr = cur_pg_addr;
-	cur_pg_addr -= RSVD_PG_H2C_EXTRAINFO_NUM;
-	info->rsvd_h2c_info_addr = cur_pg_addr;
 	cur_pg_addr -= info->rsvd_drv_pg_num;
 	info->rsvd_drv_addr = cur_pg_addr;
 
@@ -1208,7 +1268,9 @@ u32 init_sifs_ctrl_8730e(struct mac_ax_adapter *adapter)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u32 ret = MACSUCCESS;
 
-	MAC_REG_W16(REG_RETRY_LIMIT_SIFS, WLAN_SIFS_DUR_TUNE);
+	MAC_REG_W32(REG_RETRY_LIMIT_SIFS, WLAN_SIFS_DUR_TUNE \
+		    | BIT_SRL(WLAN_RETRY_LIMIT) \
+		    | BIT_LRL(WLAN_RETRY_LIMIT));
 	MAC_REG_W32(REG_SIFS, WLAN_SIFS_CFG);
 	MAC_REG_W16(REG_RESP_SIFS_CCK,
 		    (u16)(WLAN_SIFS_CCK_T2T | WLAN_SIFS_CCK_R2T << 11));
@@ -1267,7 +1329,7 @@ u32 init_low_pwr_8730e(struct mac_ax_adapter *adapter)
 		   | BIT_RXPSF_OFDMRST;
 
 	MAC_REG_W16(REG_RXPSF_CTRL, value16);
-	MAC_REG_W32(REG_RXPSF_TYPE_CTRL, 0xFFFFFFFF);
+	MAC_REG_W32(REG_RXPSF_TYPE_CTRL, 0);
 
 	return MACSUCCESS;
 }
@@ -1340,6 +1402,7 @@ u32 cfg_bssid_8730e(struct mac_ax_adapter *adapter, u8 port,
 {
 	u32 offset;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u8 *mac = (u8 *)addr;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
 	if (port >= MAC_AX_PORT_NUM - 1) {
@@ -1396,9 +1459,18 @@ u32 cfg_net_type_8730e(struct mac_ax_adapter *adapter, u8 port,
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u8 value8 = 0;
+	u32 value32 = 0;
 	u8 net_type_tmp = 0;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
+
+	value32 = MAC_REG_R32(REG_MACID_H);
+	if (net_type == MAC_AX_NET_TYPE_AP) {
+		value32 |= BIT_AP_BSSID_FIT_UC;
+	} else {
+		value32 &= ~BIT_AP_BSSID_FIT_UC;
+	}
+	MAC_REG_W32(REG_MACID_H, value32);
 
 	switch (port) {
 	case MAC_AX_PORT_0:
@@ -1414,6 +1486,7 @@ u32 cfg_net_type_8730e(struct mac_ax_adapter *adapter, u8 port,
 	default:
 		break;
 	}
+
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 
 	return MACSUCCESS;

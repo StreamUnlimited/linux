@@ -14,9 +14,9 @@
  */
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <video/mipi_display.h>
 
 #include "ameba_drm_util.h"
-
 
 #define MIPI_DSI_RTNI		2//4
 #define MIPI_DSI_HSA		4
@@ -27,11 +27,7 @@
 #define MIPI_DSI_VBP		20
 #define MIPI_DSI_VFP		15
 
-#define MIPI_DSI_DCS_SHORT_WRITE			0x05
-#define MIPI_DSI_DCS_SHORT_WRITE_PARAM		0x15
-#define MIPI_DSI_DCS_LONG_WRITE				0x39
-
-#define Mhz									1000000UL
+#define Mhz			1000000UL
 #define T_LPX		5
 #define T_HS_PREP	6
 #define T_HS_TRAIL	8
@@ -40,6 +36,8 @@
 
 #define REGFLAG_DELAY						0xFC
 #define REGFLAG_END_OF_TABLE				0xFD	// END OF REGISTERS MARKER
+
+#define DUMP_REG(a,b)   b,readl(a + b)
 
 /*
 	struct define
@@ -56,70 +54,6 @@ typedef struct LCM_setting_table {
 	u8 para_list[128];
 } LCM_setting_table_t;
 
-#if 0
-//update initial param for IC boe_nt35521 0.01
-static LCM_setting_table_t lcm_initialization_setting[] = {
-	//Initial CODE
-	{0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x13}},	/* Command2_BK3	*/
-	{0xEF, 1, {0x08}},
-
-	//Display Control setting
-	{0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x10}},	/* Command2_BK0	*/
-	{0xC0, 2, {0x63, 0x00}},					/*Display Line Setting=>NL=(Line[6:0]+1)*8=800*/
-	{0xC1, 2, {0x10, 0x0C}},//{0xC1, 2, {MIPI_DSI_VBP + MIPI_DSI_VSA, MIPI_DSI_VFP}},	/*Porch Control=>VBP,VFP*/
-	/*minimum number of pclk in each line; PCLK=512+(RTNI[4:0]x16=512+8*16)=640*/
-	{0xC2, 2, {0x01, 0x08}},//{0xC2, 2, {0x31, MIPI_DSI_RTNI}},					/*Inversion selection(2Dot) & Frame Rate Control*/
-	//Gamma Cluster Setting
-	{0xB0, 16, {0x40, 0xC9, 0x8F, 0x0D, 0x11, 0x07, 0x02, 0x09, 0x09, 0x1F, 0x04, 0x50, 0x0F, 0xE4, 0x29, 0xDF}},
-	{0xB1, 16, {0x40, 0xCB, 0xD3, 0x11, 0x8F, 0x04, 0x00, 0x08, 0x07, 0x1C, 0x06, 0x53, 0x12, 0x63, 0xEB, 0xDF}},
-
-	//Power Control Registers Initial
-	{0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x11}},	/* Command2_BK1	*/
-	{0xB0, 1, {0x65}},
-	//Vcom Setting
-	{0xB1, 1, {0x43}},
-	//End Vcom Setting
-	{0xB2, 1, {0x87}},
-	{0xB3, 1, {0x80}},
-	{0xB5, 1, {0x47}},
-	{0xB7, 1, {0x87}},
-	{0xB8, 1, {0x21}},
-	//{0xB9, 1,{0x10}},  //add
-	{0xC1, 1, {0x78}},
-	{0xC2, 1, {0x78}},
-	{0xD0, 1, {0x88}},							/*MIPI Setting 1*/
-	{REGFLAG_DELAY, 10, {}},
-
-	//GIP Setting
-	{0xE0, 3, {0x00, 0x19, 0x02}},
-	{0xE1, 11, {0x05, 0xA0, 0x07, 0xA0, 0x04, 0xA0, 0x06, 0xA0, 0x00, 0x44, 0x44}},
-	{0xE2, 13, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
-	{0xE3, 4, {0x00, 0x00, 0x33, 0x33}},
-	{0xE4, 2, {0x44, 0x44}},
-	{0xE5, 16, {0x0D, 0x31, 0xC8, 0xAF, 0x0F, 0x33, 0xC8, 0xAF, 0x09, 0x2D, 0xC8, 0xAF, 0x0B, 0x2F, 0xC8, 0xAF}},
-	{0xE6, 4, {0x00, 0x00, 0x33, 0x33}},
-	{0xE7, 2, {0x44, 0x44}},
-	{0xE8, 16, {0x0C, 0x30, 0xC8, 0xAF, 0x0E, 0x32, 0xC8, 0xAF, 0x08, 0x2C, 0xC8, 0xAF, 0x0A, 0x2E, 0xC8, 0xAF}},
-	//{0xEB,5,{0x02,0x01,0xE4,0xE4,0x44}}, //correct
-	{0xEB, 7, {0x02, 0x00, 0xE4, 0xE4, 0x44, 0x00, 0x00}},
-	{0xEC, 2, {0x3C, 0x00}},
-	{0xED, 16, {0xAB, 0x89, 0x76, 0x54, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x10, 0x45, 0x67, 0x98, 0xBA}},
-	{0xEF, 6, {0x08, 0x08, 0x08, 0x45, 0x3F, 0x54}},
-	//Bank1 Setting
-	{0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x13}},	/* Command2_BK3	*/
-	{0xe8, 2, {0x00, 0x0e}},
-	{0x11, 0, {0x00}},
-	{REGFLAG_DELAY, 120, {}},
-	{0xe8, 2, {0x00, 0x0c}},
-	{REGFLAG_DELAY, 20, {}},
-	{0xe8, 2, {0x00, 0x00}},
-	{0xFF, 5, {0x77, 0x01, 0x00, 0x00, 0x00}},
-	//{0x3A, 1, {0x70}}, 			/*0x50=16-bit/pixel, 0x60=18-bit/pixel,0x70=16-bit/pixel*/
-	{0x29, 0, {0x00}},
-	{REGFLAG_DELAY, 20, {}},
-	{REGFLAG_END_OF_TABLE, 0x00, {}},
-};
-#else
 static LCM_setting_table_t lcm_initialization_setting[] = {/* DCS Write Long */
 	/* ST7701S Reset Sequence */
 	/* LCD_Nreset (1); Delayms (1); */
@@ -184,12 +118,11 @@ static LCM_setting_table_t lcm_initialization_setting[] = {/* DCS Write Long */
 	{0x29, 0, {0x00}},
 	{REGFLAG_END_OF_TABLE, 0x00, {}},
 } ;
-#endif
 
 /*
 *	lcdc apis
 */
-static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u32 bgcolor)
+static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u32 bgcolor, u16 widht, u16 height)
 {
 	u8 idx ;
 	rgb888_t bg_color;
@@ -197,8 +130,8 @@ static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u3
 		return ;
 	}
 	LCDC_StructInit(plcdc_initstruct);
-	plcdc_initstruct->LCDC_ImageWidth = MIPI_DISPLAY_X;
-	plcdc_initstruct->LCDC_ImageHeight = MIPI_DISPLAY_Y;
+	plcdc_initstruct->LCDC_ImageWidth = widht;
+	plcdc_initstruct->LCDC_ImageHeight = height;
 
 	*(u32 *)&bg_color = bgcolor;
 	plcdc_initstruct->LCDC_BgColorRed = bg_color.red;
@@ -207,45 +140,42 @@ static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u3
 
 	for (idx = 0; idx < LCDC_LAYER_MAX_NUM; idx++) {
 		plcdc_initstruct->layerx[idx].LCDC_LayerEn = DISABLE;
-		plcdc_initstruct->layerx[idx].LCDC_LayerImgFormat = LCDC_LAYER_IMG_FORMAT_ARGB8888;
+		plcdc_initstruct->layerx[idx].LCDC_LayerImgFormat = LCDC_LAYER_IMG_FORMAT_ARGB8888;//default value
 		plcdc_initstruct->layerx[idx].LCDC_LayerImgBaseAddr = (u32)imgbuffer;
 		plcdc_initstruct->layerx[idx].LCDC_LayerHorizontalStart = 1;/*1-based*/
-		plcdc_initstruct->layerx[idx].LCDC_LayerHorizontalStop = MIPI_DISPLAY_X;
+		plcdc_initstruct->layerx[idx].LCDC_LayerHorizontalStop = widht;
 		plcdc_initstruct->layerx[idx].LCDC_LayerVerticalStart = 1;/*1-based*/
-		plcdc_initstruct->layerx[idx].LCDC_LayerVerticalStop = MIPI_DISPLAY_Y;
+		plcdc_initstruct->layerx[idx].LCDC_LayerVerticalStop = height;
 	}
 }
 
 //lcdc global register APIs
 void LcdcDumpRegValue(void __iomem *address, const char *filename)
 {
-	(void)address ;
-	(void)filename ;
-#ifdef AMEBA_LCDC_DEBUG
-	u32 idx ;
 	void __iomem  *pLCDCx =  address;
 	void __iomem  *LCDC_Layerx;
+	u32 idx ;
 
 	/*global register*/
-	printk(KERN_DEBUG"[%s]Dump lcdc register value baseaddr : 0x%08x\n", filename, (u32)pLCDCx);
-
-	printk(KERN_DEBUG"pLCDCx->LCDC_CTRL = 0x%08x\n", readl(pLCDCx + LCDC_CTRL_OFFSET));
-//	printk(KERN_DEBUG"pLCDCx->LCDC_PLANE_SIZE = 0x%08x\n", readl(pLCDCx+LCDC_PLANE_SIZE);
-	printk(KERN_DEBUG"pLCDCx->LCDC_UNDFLW_CFG = 0x%08x\n", readl(pLCDCx + LCDC_UNDFLW_CFG_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_DMA_MODE_CFG = 0x%08x\n", readl(pLCDCx + LCDC_DMA_MODE_CFG_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_SHW_RLD_CFG = 0x%08x\n", readl(pLCDCx + LCDC_SHW_RLD_CFG_OFFSET));
-//	printk(KERN_DEBUG"pLCDCx->LCDC_BKG_COLOR = 0x%08x\n", readl(pLCDCx+LCDC_BKG_COLOR_OFFSET));
-//	printk(KERN_DEBUG"pLCDCx->LCDC_SEC_DEST_ADDR = 0x%08x\n", readl(pLCDCx+LCDC_SEC_DEST_ADDR_OFFSET));
-//	printk(KERN_DEBUG"\n");
+	printk(KERN_NOTICE"[%s]Dump lcdc register value baseaddr : 0x%08x\n", filename, (u32)pLCDCx);
+	
+	printk(KERN_NOTICE"pLCDCx CTRL[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CTRL_OFFSET));
+	printk(KERN_NOTICE"pLCDCx PLANE_SIZE[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_PLANE_SIZE_OFFSET));
+	printk(KERN_NOTICE"pLCDCx UNDFLW_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_UNDFLW_CFG_OFFSET));
+	printk(KERN_NOTICE"pLCDCx DMA_MODE_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_DMA_MODE_CFG_OFFSET));
+	printk(KERN_NOTICE"pLCDCx SHW_RLD_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_SHW_RLD_CFG_OFFSET));
+	printk(KERN_NOTICE"pLCDCx BKG_COLOR[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_BKG_COLOR_OFFSET));
+//	printk(KERN_NOTICE"pLCDCx->LCDC_SEC_DEST_ADDR = 0x%08x\n", readl(pLCDCx+LCDC_SEC_DEST_ADDR_OFFSET));
+	printk(KERN_NOTICE"pLCDCx DEBUG_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_DEBUG_STATUS_OFFSET));
 
 	//interrupt related register
-	printk(KERN_DEBUG"pLCDCx->LCDC_IRQ_EN = 0x%08x\n", readl(pLCDCx + LCDC_IRQ_EN_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_IRQ_STATUS = 0x%08x\n", readl(pLCDCx + LCDC_IRQ_STATUS_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_IRQ_RAW = 0x%08x\n", readl(pLCDCx + LCDC_IRQ_RAW_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_LINE_INT_POS = 0x%08x\n", readl(pLCDCx + LCDC_LINE_INT_POS_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_CUR_POS_STATUS = 0x%08x\n", readl(pLCDCx + LCDC_CUR_POS_STATUS_OFFSET));
-	printk(KERN_DEBUG"pLCDCx->LCDC_STATUS = 0x%08x\n", readl(pLCDCx + LCDC_STATUS_OFFSET));
-	printk(KERN_DEBUG"\n");
+	printk(KERN_NOTICE"pLCDCx IRQ_EN[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_EN_OFFSET));
+	printk(KERN_NOTICE"pLCDCx IRQ_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_STATUS_OFFSET));
+	printk(KERN_NOTICE"pLCDCx IRQ_RAW[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_RAW_OFFSET));
+	printk(KERN_NOTICE"pLCDCx LINE_INT_POS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_LINE_INT_POS_OFFSET));
+	printk(KERN_NOTICE"pLCDCx CUR_POS_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CUR_POS_STATUS_OFFSET));
+	printk(KERN_NOTICE"pLCDCx STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_STATUS_OFFSET));
+	printk(KERN_NOTICE"\n");
 
 	for (idx = 0; idx < LCDC_LAYER_MAX_NUM; idx++) {
 		switch (idx) {
@@ -261,16 +191,24 @@ void LcdcDumpRegValue(void __iomem *address, const char *filename)
 			break;
 		}
 		/*Layerx related register*/
-		printk(KERN_DEBUG"pLCDCx->LCDC_LAYER%x_CTRL = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_CTRL_OFFSET));
-		printk(KERN_DEBUG"pLCDCx->LCDC_LAYER%x_BASE_ADDR = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_BASE_ADDR_OFFSET));
-		printk(KERN_DEBUG"pLCDCx->LCDC_LAYER%x_WIN_XPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_XPOS_OFFSET));
-		printk(KERN_DEBUG"pLCDCx->LCDC_LAYER%x_WIN_YPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_YPOS_OFFSET));
-		//printk(KERN_DEBUG"pLCDCx->LCDC_LAYER%x_COLOR_KEY = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_COLOR_KEY_OFFSET));
-		//printk(KERN_DEBUG"pLCDCx->LCDC_LAYER%x_ALPHA = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_ALPHA_OFFSET));
-		printk(KERN_DEBUG"\n");
+		printk(KERN_NOTICE"pLCDCx->LCDC_LAYER%x_CTRL = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_CTRL_OFFSET));
+		printk(KERN_NOTICE"pLCDCx->LCDC_LAYER%x_BASE_ADDR = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_BASE_ADDR_OFFSET));
+		printk(KERN_NOTICE"pLCDCx->LCDC_LAYER%x_WIN_XPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_XPOS_OFFSET));
+		printk(KERN_NOTICE"pLCDCx->LCDC_LAYER%x_WIN_YPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_YPOS_OFFSET));
+		printk(KERN_NOTICE"pLCDCx->LCDC_LAYER%x_COLOR_KEY = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_COLOR_KEY_OFFSET));
+		printk(KERN_NOTICE"pLCDCx->LCDC_LAYER%x_ALPHA = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_ALPHA_OFFSET));
+		printk(KERN_NOTICE"\n");
 	}
-#endif
 }
+u32 ameba_lcdc_reg_read(void __iomem *address)
+{
+	return readl(address);
+}
+void ameba_lcdc_reg_write(void __iomem *address,u32 Value32)
+{
+	writel(Value32,address);
+}
+
 void ameba_lcdc_enable(void __iomem *address, u32 NewState)
 {
 	if (DISABLE == NewState) {
@@ -291,13 +229,13 @@ void ameba_lcdc_clean_irqstatus(void __iomem *address, u32 irq)
 }
 
 //reset lcdc struct
-void ameba_lcdc_reset_config(LCDC_InitTypeDef *LCDC_InitStruct)
+void ameba_lcdc_reset_config(LCDC_InitTypeDef *LCDC_InitStruct,u16 widht, u16 height,u32 bgcolor)
 {
 	if (NULL == LCDC_InitStruct) {
 		return ;
 	}
 	//LCDC_StructInit(LCDC_InitStruct);
-	LcdcInitConfig(LCDC_InitStruct, NULL, LCDC_BACKGROUND);
+	LcdcInitConfig(LCDC_InitStruct, NULL, bgcolor,widht, height);
 }
 void ameba_lcdc_set_planesize(LCDC_InitTypeDef *LCDC_InitStruct, u16 widht, u16 height)
 {
@@ -439,11 +377,12 @@ void DelayUs(u32 time)
 {
 	ndelay(1000 * time) ;
 }
-void MIPI_InitStruct_Config(MIPI_InitTypeDef *MIPI_InitStruct)
+void MIPI_InitStruct_Config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd)
 {
 	u32 vtotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits, total_bits;
-	u32 MIPI_HACT_g = MIPI_DISPLAY_X;
-	u32 MIPI_VACT_g = MIPI_DISPLAY_Y;
+	u32 MIPI_HACT_g = width;
+	u32 MIPI_VACT_g = height;
+	u32 vo_freq, vo_totalx, vo_totaly, mipi_div;
 
 	switch (MIPI_InitStruct->MIPI_VideoDataFormat) {
 	case MIPI_VIDEO_DATA_FORMAT_RGB565:
@@ -460,7 +399,7 @@ void MIPI_InitStruct_Config(MIPI_InitTypeDef *MIPI_InitStruct)
 	}
 
 	MIPI_InitStruct->MIPI_LaneNum = 2;
-	MIPI_InitStruct->MIPI_FrameRate = 60;
+	MIPI_InitStruct->MIPI_FrameRate = framerate;
 
 	MIPI_InitStruct->MIPI_HSA = MIPI_DSI_HSA * bit_per_pixel / 8 ;//- 10; /* here the unit is pixel but not us */
 	if (MIPI_InitStruct->MIPI_VideoModeInterface == MIPI_VIDEO_NON_BURST_MODE_WITH_SYNC_PULSES) {
@@ -487,26 +426,37 @@ void MIPI_InitStruct_Config(MIPI_InitTypeDef *MIPI_InitStruct)
 	MIPI_InitStruct->MIPI_VideDataLaneFreq = MIPI_InitStruct->MIPI_FrameRate * total_bits * vtotal / MIPI_InitStruct->MIPI_LaneNum / Mhz + 20;
 
 	MIPI_InitStruct->MIPI_LineTime = (MIPI_InitStruct->MIPI_VideDataLaneFreq * Mhz) / 8 / MIPI_InitStruct->MIPI_FrameRate / vtotal;
-	MIPI_InitStruct->MIPI_BllpLen = MIPI_InitStruct->MIPI_LineTime / 2;
+	MIPI_InitStruct->MIPI_BllpLen = MIPI_InitStruct->MIPI_LineTime / MIPI_InitStruct->MIPI_LaneNum ;
 
 	if (MIPI_DSI_HSA + MIPI_DSI_HBP + MIPI_HACT_g + MIPI_DSI_HFP < (512 + MIPI_DSI_RTNI * 16)) {
-		printk(KERN_DEBUG"!!ERROR!!, LCM NOT SUPPORT\n");
+		printk(KERN_WARNING"!!ERROR!!, LCM NOT SUPPORT\n");
 	}
 
 	if (MIPI_InitStruct->MIPI_LineTime * MIPI_InitStruct->MIPI_LaneNum < total_bits / 8) {
-		printk(KERN_DEBUG"!!ERROR!!, LINE TIME TOO SHORT!\n");
+		printk(KERN_WARNING"!!ERROR!!, LINE TIME TOO SHORT!\n");
+	}
+	
+	//vo frequency , //output format is RGB888
+	vo_totalx = MIPI_DSI_HSA + MIPI_DSI_HBP + MIPI_DSI_HFP + width;
+	vo_totaly = MIPI_DSI_VSA + MIPI_DSI_VBP + MIPI_DSI_VFP + height;
+	vo_freq = vo_totalx * vo_totaly * MIPI_InitStruct->MIPI_FrameRate * 24 / 24 / Mhz + 4;
+	//assert_param(vo_freq < 67);
+
+	mipi_div = 1000 / vo_freq - 1;//shall get NPPLL frequency 
+	if(mipi_ckd)
+	{
+		*mipi_ckd = mipi_div;
 	}
 
-	printk(KERN_DEBUG"DataLaneFreq: %d, LineTime: %d\n", MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LineTime);
+	printk(KERN_INFO"DataLaneFreq: %d, LineTime: %d, vo_freq: %d[Mhz], mipi_ckd: %d\n", 
+		MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LineTime, vo_freq, mipi_div);
 }
 
-static void MipiDsi_ST7701S_Send_DCS(void __iomem *MIPIx, u8 cmd, u8 payload_len, u8 *para_list)
+static void MipiDsi_Send_DCS_Cmd(void __iomem *MIPIx, u8 cmd, u8 payload_len, u8 *para_list)
 {
-#if 1
 	u32 word0, word1, addr, idx;
 	u8 cmd_addr[128];
 
-//	DRM_MIPI_IN();
 	if (payload_len == 0) {
 		MIPI_DSI_CMD_Send(MIPIx, MIPI_DSI_DCS_SHORT_WRITE, cmd, 0);
 		return;
@@ -514,7 +464,7 @@ static void MipiDsi_ST7701S_Send_DCS(void __iomem *MIPIx, u8 cmd, u8 payload_len
 		MIPI_DSI_CMD_Send(MIPIx, MIPI_DSI_DCS_SHORT_WRITE_PARAM, cmd, para_list[0]);
 		return;
 	}
-//	DRM_MIPI_TEST();
+
 	cmd_addr[0] = cmd;
 	for (idx = 0; idx < payload_len; idx++) {
 		cmd_addr[idx + 1 ] = para_list[idx];
@@ -530,13 +480,10 @@ static void MipiDsi_ST7701S_Send_DCS(void __iomem *MIPIx, u8 cmd, u8 payload_len
 
 		MIPI_DSI_CMD_LongPkt_MemQWordRW(MIPIx, addr, &word0, &word1, false);
 	}
-//	DRM_MIPI_TEST();
 	MIPI_DSI_CMD_Send(MIPIx, MIPI_DSI_DCS_LONG_WRITE, payload_len, 0);
-//	DRM_MIPI_OUT();
-#endif
 }
 
-static void MipiDsi_ST7701S_Send_Cmd(void __iomem *MIPIx, LCM_setting_table_t *table, u32 *initdone)
+static void MipiDsi_Send_Cmd(void __iomem *MIPIx, LCM_setting_table_t *table, u32 *initdone)
 {
 	static u8 send_cmd_idx_s = 0;
 	u32 payload_len;
@@ -561,7 +508,7 @@ static void MipiDsi_ST7701S_Send_Cmd(void __iomem *MIPIx, LCM_setting_table_t *t
 			cmd_addr = table[send_cmd_idx_s].para_list;
 			payload_len = table[send_cmd_idx_s].count;
 
-			MipiDsi_ST7701S_Send_DCS(MIPIx, cmd, payload_len, cmd_addr);
+			MipiDsi_Send_DCS_Cmd(MIPIx, cmd, payload_len, cmd_addr);
 
 			send_flag = true;
 		}
@@ -569,8 +516,11 @@ static void MipiDsi_ST7701S_Send_Cmd(void __iomem *MIPIx, LCM_setting_table_t *t
 	}
 }
 
-void MipiDsi_ST7701S_push_table(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u32 *initdone, u32 *sendcmd)
+void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct,  u32 *sendcmd)
 {
+	u32 initdone = 0 ;
+	*sendcmd = true;
+
 	MIPI_DSI_TO1_Set(MIPIx, DISABLE, 0);
 	MIPI_DSI_TO2_Set(MIPIx, ENABLE, 0x7FFFFFFF);
 	MIPI_DSI_TO3_Set(MIPIx, DISABLE, 0);
@@ -579,15 +529,12 @@ void MipiDsi_ST7701S_push_table(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_Init
 	MIPI_DSI_INT_Config(MIPIx, DISABLE, ENABLE, false);
 	MIPI_DSI_init(MIPIx, MIPI_InitStruct);
 
-	*initdone = false;
-	*sendcmd = true;
-
 	while (1) {
 		if (*sendcmd) {
 			*sendcmd = 0;
 
-			if (!(*initdone)) {
-				MipiDsi_ST7701S_Send_Cmd(MIPIx, lcm_initialization_setting, initdone);
+			if (!(initdone)) {
+				MipiDsi_Send_Cmd(MIPIx, lcm_initialization_setting, &initdone);
 				mdelay(1);
 			} else {
 				break;
@@ -602,44 +549,38 @@ void MipiDsi_ST7701S_push_table(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_Init
 
 void MipiDumpRegValue(void __iomem *address)
 {
-#ifndef AMEBA_LCDC_DEBUG
-	(void)address ;
-#else
 	void __iomem *MIPIx = address;
-	return ;
 
 	/*global register*/
-	printk(KERN_DEBUG"Dump mipi register value baseaddr : 0x%08x\n", (u32)MIPIx);
-	printk(KERN_DEBUG"MIPIx->MIPI_MAIN_CTRL = 0x%08x\n", readl(MIPIx + MIPI_MAIN_CTRL_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_INTE = 0x%08x\n", readl(MIPIx + MIPI_INTE_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_INTS = 0x%08x\n", readl(MIPIx + MIPI_INTS_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_INTS_ACPU = 0x%08x\n", readl(MIPIx + MIPI_INTS_ACPU_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_PAT_GEN = 0x%08x\n", readl(MIPIx + MIPI_PAT_GEN_OFFSET));
-	printk(KERN_DEBUG"\n");
+	printk(KERN_NOTICE"Dump mipi register value baseaddr : 0x%08x\n", (u32)MIPIx);	
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_MAIN_CTRL_OFFSET,readl(MIPIx + MIPI_MAIN_CTRL_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_INTE_OFFSET,readl(MIPIx + MIPI_INTE_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_INTS_ACPU_OFFSET,readl(MIPIx + MIPI_INTS_ACPU_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_PAT_GEN_OFFSET,readl(MIPIx + MIPI_PAT_GEN_OFFSET));
+	printk(KERN_NOTICE"\n");
 
 	/*Dphy register*/
-	printk(KERN_DEBUG"MIPIx->MIPI_CLOCK_GEN = 0x%08x\n", readl(MIPIx + MIPI_CLOCK_GEN_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_WATCHDOG = 0x%08x\n", readl(MIPIx + MIPI_WATCHDOG_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_DF = 0x%08x\n", readl(MIPIx + MIPI_DF_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_SSC2 = 0x%08x\n", readl(MIPIx + MIPI_SSC2_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_SSC3 = 0x%08x\n", readl(MIPIx + MIPI_SSC3_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_MPLL = 0x%08x\n", readl(MIPIx + MIPI_MPLL_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_ESCAPE_TX_DATA_1 = 0x%08x\n", readl(MIPIx + MIPI_ESCAPE_TX_DATA_1_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_ESCAPE_TX_DATA_2 = 0x%08x\n", readl(MIPIx + MIPI_ESCAPE_TX_DATA_2_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_ESCAPE_TX_DATA_3 = 0x%08x\n", readl(MIPIx + MIPI_ESCAPE_TX_DATA_3_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_ESCAPE_TX_CLK_0 = 0x%08x\n", readl(MIPIx + MIPI_ESCAPE_TX_CLK_0_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_ESCAPE_TX_DATA_6 = 0x%08x\n", readl(MIPIx + MIPI_ESCAPE_TX_DATA_6_OFFSET));
-	printk(KERN_DEBUG"\n");
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_CLOCK_GEN_OFFSET,readl(MIPIx + MIPI_CLOCK_GEN_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_WATCHDOG_OFFSET,readl(MIPIx + MIPI_WATCHDOG_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_DF_OFFSET,readl(MIPIx + MIPI_DF_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_SSC2_OFFSET,readl(MIPIx + MIPI_SSC2_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_SSC3_OFFSET,readl(MIPIx + MIPI_SSC3_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_MPLL_OFFSET,readl(MIPIx + MIPI_MPLL_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_1_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_1_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_2_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_2_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_3_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_3_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_CLK_0_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_CLK_0_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_6_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_6_OFFSET));
+	printk(KERN_NOTICE"\n");
 
 	/*DSI register*/
-	printk(KERN_DEBUG"MIPIx->MIPI_TC0 = 0x%08x\n", readl(MIPIx + MIPI_TC0_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_TC1 = 0x%08x\n", readl(MIPIx + MIPI_TC1_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_TC2 = 0x%08x\n", readl(MIPIx + MIPI_TC2_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_TC3 = 0x%08x\n", readl(MIPIx + MIPI_TC3_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_TC4 = 0x%08x\n", readl(MIPIx + MIPI_TC4_OFFSET));
-	printk(KERN_DEBUG"MIPIx->MIPI_TC5 = 0x%08x\n", readl(MIPIx + MIPI_TC5_OFFSET));
-	printk(KERN_DEBUG"\n");
-#endif
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_TC0_OFFSET,readl(MIPIx + MIPI_TC0_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_TC1_OFFSET,readl(MIPIx + MIPI_TC1_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_TC2_OFFSET,readl(MIPIx + MIPI_TC2_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_TC3_OFFSET,readl(MIPIx + MIPI_TC3_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_TC4_OFFSET,readl(MIPIx + MIPI_TC4_OFFSET));
+	printk(KERN_NOTICE"MIPIx[0x%x] = 0x%08x\n", MIPI_TC5_OFFSET,readl(MIPIx + MIPI_TC5_OFFSET));
+	printk(KERN_NOTICE"\n");
 }
 
 //afdsads

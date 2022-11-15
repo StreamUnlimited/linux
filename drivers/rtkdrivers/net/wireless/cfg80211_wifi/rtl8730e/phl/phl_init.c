@@ -14,6 +14,9 @@
  *****************************************************************************/
 #define _PHL_INIT_C_
 #include "phl_headers.h"
+#ifdef RTW_PHL_BCN_IOT
+#include "hal_g6/mac/mac_ax/bcn.h"
+#endif
 
 void _phl_com_init_rssi_stat(struct rtw_phl_com_t *phl_com)
 {
@@ -244,6 +247,111 @@ static void phl_fw_deinit(struct phl_info_t *phl_info)
 		_os_mem_free(phl_to_drvpriv(phl_info), fw_info->sym_buf,
 			     RTW_MAX_FW_SIZE);
 }
+
+#ifdef RTW_PHL_BCN_IOT
+static enum rtw_phl_status phl_bcn_init(struct phl_info_t *phl_info)
+{
+	enum rtw_phl_status phl_status = RTW_PHL_STATUS_RESOURCE;
+	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
+	struct mac_ax_bcn_priv *bcn_info = NULL;
+
+	FUNCIN_WSTS(phl_status);
+
+	bcn_info = _os_mem_alloc(phl_to_drvpriv(phl_info), sizeof(struct mac_ax_bcn_priv));
+	if (!bcn_info) {
+		PHL_ERR("%s : bcn_info allocate fail!!\n", __func__);
+		goto mem_alloc_fail;
+	}
+	_os_spinlock_init(phl_to_drvpriv(phl_info), &bcn_info->lock);
+	_os_spinlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
+	bcn_info->port = 0;
+	bcn_info->mbssid =0;
+	bcn_info->band = 0;
+	bcn_info->grp_ie_ofst = 0;
+	bcn_info->macid = 0;
+	bcn_info->ssn_sel = 0;
+	bcn_info->ssn_mode = 0;
+	bcn_info->rate_sel = 0;
+	bcn_info->txpwr = 0;
+	bcn_info->txinfo_ctrl_en = 0;
+	bcn_info->ntx_path_en = 0;
+	bcn_info->path_map_a = 0;
+	bcn_info->path_map_b = 0;
+	bcn_info->path_map_c = 0;
+	bcn_info->path_map_d = 0;
+	bcn_info->antsel_a = 0;
+	bcn_info->antsel_b = 0;
+	bcn_info->antsel_c = 0;
+	bcn_info->antsel_d = 0;
+	bcn_info->sw_tsf = 0;
+	bcn_info->csa_ofst = 0;
+	bcn_info->tx_bcn = false;
+	bcn_info->desc_len = TX_DESC_LEN;
+	bcn_info->desc_vir_addr = _os_shmem_alloc(phl_to_drvpriv(phl_info),
+						  (_dma *)&bcn_info->desc_phy_addr,
+						  0,
+						  bcn_info->desc_len,
+						  0,
+						  DMA_TO_DEVICE,
+						  0);
+	bcn_info->bcn_len = MAX_BCN_SIZE;
+	bcn_info->bcn_vir_addr = _os_shmem_alloc(phl_to_drvpriv(phl_info),
+						  (_dma *)&bcn_info->bcn_phy_addr,
+						  0,
+						  bcn_info->bcn_len,
+						  0,
+						  DMA_TO_DEVICE,
+						  0);
+
+	phl_com->bcn_info = bcn_info;
+	_os_spinunlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
+
+	phl_status = RTW_PHL_STATUS_SUCCESS;
+
+	FUNCOUT_WSTS(phl_status);
+
+mem_alloc_fail:
+	return phl_status;
+}
+
+static enum rtw_phl_status phl_bcn_deinit(struct phl_info_t *phl_info)
+{
+	enum rtw_phl_status phl_status = RTW_PHL_STATUS_RESOURCE;
+	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
+	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)(phl_com->bcn_info);
+
+	FUNCIN_WSTS(phl_status);
+
+	_os_spinlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
+	_os_shmem_free(phl_to_drvpriv(phl_info),
+		       bcn_info->bcn_vir_addr,
+		       (_dma *)&bcn_info->bcn_phy_addr,
+		       0,
+		       MAX_BCN_SIZE,
+		       0,
+		       DMA_TO_DEVICE,
+		       0);
+	_os_shmem_free(phl_to_drvpriv(phl_info),
+		       bcn_info->desc_vir_addr,
+		       (_dma *)&bcn_info->desc_phy_addr,
+		       0,
+		       TX_DESC_LEN,
+		       0,
+		       DMA_TO_DEVICE,
+		       0);
+	bcn_info->tx_bcn = false;
+	_os_spinunlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
+	_os_spinlock_free(phl_to_drvpriv(phl_info), &bcn_info->lock);
+	_os_mem_free(phl_to_drvpriv(phl_info), bcn_info, sizeof(struct mac_ax_bcn_priv));
+	phl_com->bcn_info = NULL;
+
+	FUNCOUT_WSTS(phl_status);
+
+mem_alloc_fail:
+	return phl_status;
+}
+#endif
+
 static enum rtw_phl_status
 phl_register_background_module_entry(struct phl_info_t *phl_info) {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
@@ -343,6 +451,9 @@ static enum rtw_phl_status phl_com_init(void *drv_priv,
 	_os_spinlock_init(drv_priv, &phl_info->phl_com->evt_info.evt_lock);
 
 	phl_fw_init(phl_info);
+#ifdef RTW_PHL_BCN_IOT
+	phl_bcn_init(phl_info);
+#endif
 #ifdef CONFIG_PHL_CHANNEL_INFO
 	phl_status = phl_chaninfo_init(phl_info);
 	if (phl_status) {
@@ -391,6 +502,9 @@ static void phl_com_deinit(struct phl_info_t *phl_info,
 		_os_spinlock_free(drv_priv, &phl_com->evt_info.evt_lock);
 		_phl_com_deinit_rssi_stat(phl_info->phl_com);
 		_phl_com_deinit_ppdu_sts(phl_info->phl_com);
+#ifdef RTW_PHL_BCN_IOT
+		phl_bcn_deinit(phl_info);
+#endif
 		phl_fw_deinit(phl_info);
 #ifdef CONFIG_PHL_CHANNEL_INFO
 		phl_chaninfo_deinit(phl_info);
@@ -2322,8 +2436,11 @@ enum rtw_phl_status rtw_phl_interrupt_handler(void *phl)
 
 	PHL_DBG("%s : 0x%x\n", __func__, int_hdler_msk);
 	/* beacon interrupt */
-	if (int_hdler_msk & BIT0)
-		;/* todo */
+	if (int_hdler_msk & BIT0) {
+#ifdef CONFIG_AXI_HCI
+		phl_status = rtw_phl_bcn_int_hdl(phl);
+#endif
+	}
 
 	/* rx interrupt */
 	if (int_hdler_msk & BIT1) {

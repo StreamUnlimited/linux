@@ -16,6 +16,10 @@
 #include "../phl_headers.h"
 #include "phl_trx_axi.h"
 #include "hal_struct.h"
+#ifdef RTW_PHL_BCN_IOT
+#include "mac/mac_ax/bcn.h"
+#endif
+#include "rtw_xmit.h"
 
 #define target_in_area(target, start, end) \
 	((target < start || target > end) ? false : true)
@@ -707,6 +711,9 @@ static void phl_tx_reset_axi(struct phl_info_t *phl_info)
 		wd_ring[ch].cur_hw_res = 0;
 		_phl_reset_wp_tag(phl_info, &wd_ring[ch], ch);
 	}
+#ifdef RTW_PHL_BCN_IOT
+	_phl_reset_txbd(phl_info, &txbd[BCN_QUEUE_INX]);
+#endif
 }
 
 
@@ -1222,10 +1229,10 @@ _phl_alloc_wd_ring_axi(struct phl_info_t *phl_info, u8 ch_num) {
 			wd_page_ring[i].idle_wd_page_cnt = MAX_WD_PAGE_NUM;
 			wd_page_ring[i].busy_wd_page_cnt = 0;
 			wd_page_ring[i].pending_wd_page_cnt = 0;
-			wd_page_ring[i].wp_seq = 1;
-			wd_page_ring[i].wp_seq_idx = 1;
+			wd_page_ring[i].wp_seq = 0;
+			wd_page_ring[i].wp_seq_idx = 0;
 			wd_page_ring[i].hw_idx = 0;
-			wd_page_ring[i].wp_seq_start = 1;
+			wd_page_ring[i].wp_seq_start = 0;
 			pstatus = RTW_PHL_STATUS_SUCCESS;
 		}
 	}
@@ -1601,7 +1608,7 @@ static void _phl_release_tx_done_res(struct phl_info_t *phl_info)
 	u8 ch = 0;
 	u16 seq_idx = 0;
 
-	if (!hal->txdone_ch_map) {
+	if (!(hal->txdone_ch_map[1])) {
 		/* no channel to release */
 		return;
 	}
@@ -1617,9 +1624,6 @@ static void _phl_release_tx_done_res(struct phl_info_t *phl_info)
 				phl_recycle_payload(phl_info, ch, seq_idx,
 						    TX_STATUS_TX_DONE);
 				seq_idx = (seq_idx + 1) % WP_MAX_SEQ_NUMBER;
-				if (0 == seq_idx) {
-					seq_idx = 1;
-				}
 				wd_ring[ch].hw_idx++;
 				if (wd_ring[ch].hw_idx == bus_cap->txbd_num) {
 					wd_ring[ch].hw_idx = 0;
@@ -1633,6 +1637,52 @@ static void _phl_release_tx_done_res(struct phl_info_t *phl_info)
 
 	return;
 }
+
+#ifdef RTW_PHL_BCN_IOT
+static void _phl_bcn_callback_axi(void *context)
+{
+	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
+	struct rtw_phl_handler *phl_handler
+		= (struct rtw_phl_handler *)phl_container_of(context,
+				struct rtw_phl_handler,
+				os_handler);
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl_handler->context;
+	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
+	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)phl_com->bcn_info;
+	struct hci_info_t *hci_info = (struct hci_info_t *)phl_info->hci;
+	struct phl_hci_trx_ops *hci_trx_ops = phl_info->hci_trx_ops;
+	void *drvpriv = phl_to_drvpriv(phl_info);
+	struct rtw_t_meta_data mdata = {0};
+
+	FUNCIN_WSTS(pstatus);
+
+	_os_spinlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
+
+	mdata.type = RTW_PHL_PKT_TYPE_MGNT;
+	mdata.offset = TX_WIFI_INFO_SIZE;
+	mdata.macid = bcn_info->macid;
+	mdata.mbssid = bcn_info->mbssid;
+	mdata.band = bcn_info->band;
+	mdata.qsel = AX_TXDESC_QSEL_BCN;
+	mdata.bc = 1;
+	mdata.pktlen = bcn_info->bcn_len;
+	mdata.port_id = bcn_info->port;
+	mdata.userate_sel = 1;
+	mdata.f_rate = bcn_info->rate_sel;
+	mdata.hw_seq_mode = bcn_info->ssn_mode;
+	mdata.sw_seq = bcn_info->ssn_sel;
+	mdata.wdinfo_en = 1;
+	rtw_hal_fill_bcn_desc(phl_info->hal, &mdata);
+
+	rtw_hal_update_bcn_txbd(phl_info->hal, hci_info->txbd_buf, bcn_info);
+
+	rtw_hal_trigger_bcn(phl_info->hal);
+
+	_os_spinunlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
+
+	FUNCOUT_WSTS(pstatus);
+}
+#endif
 
 static void _phl_tx_callback_axi(void *context)
 {
@@ -1832,8 +1882,13 @@ void phl_trx_deinit_axi(struct phl_info_t *phl_info)
 			      hci_info->total_txch_num);
 	hci_info->wd_ring = NULL;
 
+#ifdef RTW_PHL_BCN_IOT
+	_phl_free_txbd_axi(phl_info, hci_info->txbd_buf,
+			   hci_info->total_txch_num + 1);
+#else
 	_phl_free_txbd_axi(phl_info, hci_info->txbd_buf,
 			   hci_info->total_txch_num);
+#endif
 	hci_info->txbd_buf = NULL;
 	FUNCOUT();
 }
@@ -1844,6 +1899,9 @@ enum rtw_phl_status phl_trx_init_axi(struct phl_info_t *phl_info)
 	struct hci_info_t *hci_info = phl_info->hci;
 	struct rtw_phl_handler *tx_handler = &phl_info->phl_tx_handler;
 	struct rtw_phl_handler *rx_handler = &phl_info->phl_rx_handler;
+#ifdef RTW_PHL_BCN_IOT
+	struct rtw_phl_handler *bcn_handler = &phl_info->phl_bcn_handler;
+#endif
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
 	u8 txch_num = 0, rxch_num = 0;
@@ -1869,11 +1927,28 @@ enum rtw_phl_status phl_trx_init_axi(struct phl_info_t *phl_info)
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 			break;
 		}
+
+#ifdef RTW_PHL_BCN_IOT
+		bcn_handler->type = RTW_PHL_HANDLER_PRIO_HIGH; /* tasklet */
+		bcn_handler->callback = _phl_bcn_callback_axi;
+		bcn_handler->context = phl_info;
+		bcn_handler->drv_priv = drv_priv;
+		pstatus = phl_register_handler(phl_info->phl_com, bcn_handler);
+		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
+			break;
+		}
+#endif
+
 		/* axi tx sw resource */
 		txch_num = rtw_hal_query_txch_num(phl_info->hal);
 		hci_info->total_txch_num = txch_num;
 		/* allocate tx bd */
+#ifdef RTW_PHL_BCN_IOT
+		/* add the tx bcn txbd */
+		pstatus = _phl_alloc_txbd_axi(phl_info, txch_num + 1);
+#else
 		pstatus = _phl_alloc_txbd_axi(phl_info, txch_num);
+#endif
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 			break;
 		}
@@ -2170,9 +2245,6 @@ phl_prepare_tx_axi(struct phl_info_t *phl_info, struct rtw_xmit_req *tx_req) {
 				       _bh, NULL);
 
 			wp_seq = (wp_seq + 1) % WP_MAX_SEQ_NUMBER;
-			if (0 == wp_seq) {
-				wp_seq = 1;
-			}
 
 			wd_ring[dma_ch].wp_seq = wp_seq;
 
@@ -2262,12 +2334,13 @@ phl_handle_pending_wd(struct phl_info_t *phl_info,
 	return pstatus;
 }
 
-
 static enum rtw_phl_status
 phl_handle_busy_wd(struct phl_info_t *phl_info,
-		   struct rtw_wd_page_ring *wd_ring, u16 hw_idx) {
+		   struct rtw_wd_page_ring *wd_ring, u16 hw_idx, u16 host_idx) {
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
 	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
+	struct hal_info_t *hal = (struct hal_info_t *)phl_info->hal;
+	struct hal_trx_ops *trx_ops = hal->trx_ops;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 	_os_list *list = &wd_ring->busy_wd_page_list;
 	struct rtw_wd_page *wd = NULL;
@@ -2285,32 +2358,39 @@ phl_handle_busy_wd(struct phl_info_t *phl_info,
 			break;
 		}
 
-		if (wd_ring->busy_wd_page_cnt > (bndy - 1)) {
-			release_num = wd_ring->busy_wd_page_cnt - (bndy - 1);
+		if (hw_idx == host_idx) {
+			release_num = wd_ring->busy_wd_page_cnt;
 			_os_spinunlock(drv_priv, &wd_ring->busy_lock, _bh, NULL);
-			pstatus = rtw_release_busy_wd_page(phl_info, wd_ring,
-							   release_num);
-
-			if (RTW_PHL_STATUS_SUCCESS != pstatus) {
-				break;
-			} else {
-				_os_spinlock(drv_priv, &wd_ring->busy_lock, _bh, NULL);
-			}
+			pstatus = rtw_release_busy_wd_page(phl_info, wd_ring, release_num);
+			break;
 		}
 
 		wd = list_first_entry(list, struct rtw_wd_page, list);
 		target = wd->host_idx;
 
-		if (hw_idx >= target) {
-			release_num = ((hw_idx - target) + 1) % bndy;
+		if (host_idx > hw_idx) {
+			if (target > hw_idx && target <= host_idx) {
+				release_num = 0;
+			} else {
+				if (target <= hw_idx) {
+					release_num = hw_idx -target;
+				} else {
+					release_num = hw_idx + (bndy - target);
+				}
+			}
 		} else {
-			release_num = ((bndy - target) + (hw_idx + 1)) % bndy;
+			if (target > host_idx && target <= hw_idx) {
+				release_num = hw_idx - target;
+			} else {
+				release_num = 0;
+			}
 		}
 
 		_os_spinunlock(drv_priv, &wd_ring->busy_lock, _bh, NULL);
 
-		pstatus = rtw_release_busy_wd_page(phl_info, wd_ring,
-						   release_num);
+		if (release_num) {
+			pstatus = rtw_release_busy_wd_page(phl_info, wd_ring, release_num);
+		}
 
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 			break;
@@ -2330,10 +2410,10 @@ enum rtw_phl_status phl_recycle_busy_wd(struct phl_info_t *phl_info)
 	FUNCIN_WSTS(pstatus);
 	wd_ring = (struct rtw_wd_page_ring *)hci_info->wd_ring;
 
-	for (ch = 0; ch < hci_info->total_txch_num - 1; ch++) {
+	for (ch = 0; ch < hci_info->total_txch_num; ch++) {
 		hw_res = rtw_hal_tx_res_query(phl_info->hal, ch, &host_idx,
 					      &hw_idx);
-		pstatus = phl_handle_busy_wd(phl_info, &wd_ring[ch], hw_idx);
+		pstatus = phl_handle_busy_wd(phl_info, &wd_ring[ch], hw_idx, host_idx);
 	}
 
 	FUNCOUT_WSTS(pstatus);
@@ -2351,18 +2431,14 @@ static enum rtw_phl_status phl_tx_axi(struct phl_info_t *phl_info)
 	FUNCIN_WSTS(pstatus);
 	wd_ring = (struct rtw_wd_page_ring *)hci_info->wd_ring;
 
-	for (ch = 0; ch < hci_info->total_txch_num - 1; ch++) {
+	for (ch = 0; ch < hci_info->total_txch_num; ch++) {
 		/* hana_todo skip fwcmd queue */
 		if (wd_ring[ch].cur_hw_res < hal_com->bus_cap.read_txbd_th ||
 		    wd_ring[ch].pending_wd_page_cnt > wd_ring[ch].cur_hw_res) {
 			hw_res = rtw_hal_tx_res_query(phl_info->hal, ch, &host_idx,
 						      &hw_idx);
 			wd_ring[ch].cur_hw_res = hw_res;
-			pstatus = phl_handle_busy_wd(phl_info, &wd_ring[ch], hw_idx);
-
-			if (RTW_PHL_STATUS_FAILURE == pstatus) {
-				continue;
-			}
+			phl_handle_busy_wd(phl_info, &wd_ring[ch], hw_idx, host_idx);
 		} else {
 			hw_res = wd_ring[ch].cur_hw_res;
 		}
@@ -2995,6 +3071,9 @@ enum rtw_phl_status phl_register_trx_hdlr_axi(struct phl_info_t *phl_info)
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
 	struct rtw_phl_handler *tx_handler = &phl_info->phl_tx_handler;
 	struct rtw_phl_handler *rx_handler = &phl_info->phl_rx_handler;
+#ifdef RTW_PHL_BCN_IOT
+	struct rtw_phl_handler *bcn_handler = &phl_info->phl_bcn_handler;
+#endif
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
 	tx_handler->type = RTW_PHL_HANDLER_PRIO_HIGH; /* tasklet */
@@ -3014,6 +3093,17 @@ enum rtw_phl_status phl_register_trx_hdlr_axi(struct phl_info_t *phl_info)
 	if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 		PHL_ERR("%s : register rx_handler fail.\n", __FUNCTION__);
 	}
+
+#ifdef RTW_PHL_BCN_IOT
+	bcn_handler->type = RTW_PHL_HANDLER_PRIO_HIGH;
+	bcn_handler->callback = _phl_bcn_callback_axi;
+	bcn_handler->context = phl_info;
+	bcn_handler->drv_priv = drv_priv;
+	pstatus = phl_register_handler(phl_info->phl_com, bcn_handler);
+	if (RTW_PHL_STATUS_SUCCESS != pstatus) {
+		PHL_ERR("%s : register bcn_handler fail.\n", __FUNCTION__);
+	}
+#endif
 
 	return pstatus;
 }
@@ -3125,27 +3215,5 @@ enum rtw_phl_status phl_hook_trx_ops_axi(struct phl_info_t *phl_info)
 		pstatus = RTW_PHL_STATUS_SUCCESS;
 	}
 
-	return pstatus;
-}
-
-enum rtw_phl_status phl_cmd_set_l2_leave(struct phl_info_t *phl_info)
-{
-	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
-
-#ifdef CONFIG_CMD_DISP
-	pstatus = phl_cmd_enqueue(phl_info, HW_BAND_0, MSG_EVT_HAL_SET_L2_LEAVE, NULL, 0, NULL, PHL_CMD_WAIT, 0);
-
-	if (is_cmd_failure(pstatus)) {
-		/* Send cmd success, but wait cmd fail*/
-		pstatus = RTW_PHL_STATUS_FAILURE;
-	} else if (pstatus != RTW_PHL_STATUS_SUCCESS) {
-		/* Send cmd fail */
-		pstatus = RTW_PHL_STATUS_FAILURE;
-	}
-#else
-	if (rtw_hal_set_l2_leave(phl_info->hal) == RTW_HAL_STATUS_SUCCESS) {
-		pstatus = RTW_PHL_STATUS_SUCCESS;
-	}
-#endif
 	return pstatus;
 }

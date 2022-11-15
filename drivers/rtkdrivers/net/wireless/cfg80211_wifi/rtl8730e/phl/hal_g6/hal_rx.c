@@ -138,7 +138,25 @@ enum rtw_hal_status rtw_hal_set_rxfltr_by_type(void *hal, u8 band, u8 type, u8 t
 	hstats = rtw_hal_mac_set_rxfltr_by_type(hal_info->hal_com, band, type, target);
 
 	if (RTW_HAL_STATUS_SUCCESS != hstats) {
-		PHL_ERR("%s : type %u status %u target %u.band %u \n", __func__, type, hstats, target, band);
+		PHL_ERR("%s : type %u status %u target %u.band %u \n",
+		__func__, type, hstats, target, band);
+	}
+
+
+	return hstats;
+}
+
+enum rtw_hal_status rtw_hal_set_rxfltr_by_subtype(void *hal, u8 band, u8 type, u8 subtype, u8 target)
+{
+
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	enum rtw_hal_status hstats = RTW_HAL_STATUS_FAILURE;
+
+	hstats = rtw_hal_mac_set_rxfltr_by_subtype(hal_info->hal_com, band, type, subtype, target);
+
+	if (RTW_HAL_STATUS_SUCCESS != hstats) {
+		PHL_ERR("%s : type %u subtype %u status %u target %u.band %u \n",
+			__func__, type, subtype, hstats, target, band);
 	}
 
 
@@ -409,6 +427,9 @@ hal_rx_ppdu_sts_normal_data(struct rtw_phl_com_t *phl_com,
 
 			PHL_GET_80211_HDR_ADDRESS2(phl_com->drv_priv, hdr,
 						   ppdu_info->sts_ent[band][meta->ppdu_cnt].src_mac_addr);
+			PHL_GET_80211_HDR_ADDRESS1(phl_com->drv_priv, hdr,
+						   ppdu_info->sts_ent[band][meta->ppdu_cnt].dst_mac_addr);
+
 
 #ifdef DBG_AP_CLIENT_ASSOC_RSSI
 			{
@@ -427,6 +448,9 @@ hal_rx_ppdu_sts_normal_data(struct rtw_phl_com_t *phl_com,
 			_os_mem_cpy(phl_com->drv_priv,
 				    ppdu_info->sts_ent[band][meta->ppdu_cnt].src_mac_addr,
 				    meta->ta, MAC_ADDRESS_LENGTH);
+			_os_mem_cpy(phl_com->drv_priv,
+				    ppdu_info->sts_ent[band][meta->ppdu_cnt].dst_mac_addr,
+				    meta->ra, MAC_ADDRESS_LENGTH);
 		}
 		ppdu_info->sts_ent[band][meta->ppdu_cnt].valid = false;
 		ppdu_info->cur_rx_ppdu_cnt[band] = meta->ppdu_cnt;

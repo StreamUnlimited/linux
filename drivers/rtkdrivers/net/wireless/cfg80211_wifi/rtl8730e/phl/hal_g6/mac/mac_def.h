@@ -107,6 +107,16 @@
 #define WLAFE_ANAPAR_DCK_2 (WLAFE_BASE + 0x34)
 #define WLAFE_ANAPAR_DCK_3 (WLAFE_BASE + 0x38)
 
+/** @defgroup WLAFE_WLRFC_CTRL
+ * @brief
+ * @{
+ **/
+#define WLAFE_BIT_WLRFC_PWC_EN               ((u32)0x00000001 << 0)          /*!<R/W 0  1: gen request of wlan rfc power cut 0: gen request of turn off wlan rfc power cut */
+#define WLAFE_BIT_ISO_WLRFC_EN               ((u32)0x00000001 << 1)          /*!<R/W 1  Isolation control for wlan rfc 1: isolation 0: attach */
+#define WLAFE_BIT_WLRFC_SAVE_EN              ((u32)0x00000001 << 2)          /*!<R/W 0  1: backup(save) 0: restore */
+#define WLAFE_BIT_WLRFC_PWC_SEL              ((u32)0x00000001 << 3)          /*!<R/W 1  Option to turn off wlrfc pwr cut 1: enable 0: disable */
+/** @} */
+
 #define PAD_BASE  0x42008A00
 #define GPIOB_04  0x034
 #define GPIOB_05  0x038
@@ -304,11 +314,7 @@
 #define MAC_MAX_ARGV		16
 #define MAC_AX_DP_SEL_NUM	2
 
-#ifdef PHL_FEATURE_AP
 #define MAC_STA_NUM	16
-#else /*for NIC mode setting*/
-#define MAC_STA_NUM	1
-#endif
 
 #define MAC_AX_FAST_CH_SW_MAX_STA_NUM 4
 #define SCANOFLD_MAX_ADDITION_PKT_NUM 8
@@ -730,26 +736,27 @@ enum mac_ax_port_cfg_type {
 	MAC_AX_PCFG_RX_SW,
 	MAC_AX_PCFG_RX_RPT,
 	MAC_AX_PCFG_RX_SYNC,
-	MAC_AX_PCFG_BCN_PRCT,
+	MAC_AX_PCFG_BCN_PRCT, //5
 	MAC_AX_PCFG_TBTT_AGG,
 	//MAC_AX_PCFG_TBTT_SHIFT,//not support
 	MAC_AX_PCFG_RST_TSF,
 	//MAC_AX_PCFG_RST_TPR,//not support
 	MAC_AX_PCFG_BCAID,
 	MAC_AX_PCFG_HIQ_WIN,
-	MAC_AX_PCFG_HIQ_DTIM,
+	MAC_AX_PCFG_HIQ_DTIM, //10
 	MAC_AX_PCFG_HIQ_NOLIMIT,
 	MAC_AX_PCFG_NET_TYPE,
 	MAC_AX_PCFG_BCN_INTV,
 	MAC_AX_PCFG_BCN_SETUP_TIME,
-	MAC_AX_PCFG_BCN_HOLD_TIME,
+	MAC_AX_PCFG_BCN_HOLD_TIME, //15
 	MAC_AX_PCFG_MBSSID_EN,
 	MAC_AX_PCFG_BCN_ERLY,
 	MAC_AX_PCFG_BCN_MASK_AREA,
 	MAC_AX_PCFG_TBTT_ERLY,
-	MAC_AX_PCFG_BSS_CLR,
+	MAC_AX_PCFG_BSS_CLR, //20
 	MAC_AX_PCFG_MBSSID_NUM,
 	MAC_AX_PCFG_BCN_DRP_ALL,
+	MAC_AX_PCFG_SW_BCN
 };
 
 /**
@@ -4965,12 +4972,13 @@ struct halmac_txff_allocation {
 	u16 pub_queue_pg_num;
 	u16 rsvd_boundary;
 	u16 rsvd_drv_addr;
-	u16 rsvd_h2c_info_addr;
-	u16 rsvd_h2c_sta_info_addr;
-	u16 rsvd_h2cq_addr;
 	u16 rsvd_cpu_instr_addr;
 	u16 rsvd_fw_txbuf_addr;
 	u16 rsvd_csibuf_addr;
+	u16 rsvd_bcnq_addr;
+	u16 rsvd_bcnq1_addr;
+	u16 rsvd_bcnq2_addr;
+	u16 rsvd_wowlan_addr;
 	enum halmac_rx_fifo_expanding_mode rx_fifo_exp_mode;
 };
 
@@ -13050,6 +13058,7 @@ struct mac_ax_ampdu_cfg {
 	enum mac_ax_wdbk_mode wdbk_mode;
 	enum mac_ax_rty_bk_mode rty_bk_mode;
 	u16 max_agg_num;
+	u16 rts_max_agg_num;
 	u8 max_agg_time_32us;
 };
 

@@ -190,17 +190,7 @@ enum rtw_hal_status hal_get_efuse_8730e(struct rtw_phl_com_t *phl_com,
 
 	FUNCIN();
 
-	hal_status = rtw_hal_mac_hal_fast_init(phl_com, hal, init_info);
-	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
-		goto hal_fast_init_fail;
-	}
-
 	rtw_hal_efuse_process(hal, init_info->ic_name);
-
-	hal_status = rtw_hal_mac_power_switch(phl_com, hal, 0);
-	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
-		goto hal_power_off_fail;
-	}
 
 	FUNCOUT();
 
@@ -236,13 +226,6 @@ enum rtw_hal_status hal_start_8730e(struct rtw_phl_com_t *phl_com,
 				  phy_cap[HW_BAND_0].hw_rts_len_th);
 	/*update phy cap of tx agg info */
 	rtw_hal_mac_init_txagg_num(hal);
-	if (hal->hal_com->dbcc_en == true) {
-		rtw_hal_set_rxfltr_by_mode(hal, HW_BAND_1, RX_FLTR_MODE_STA_NORMAL);
-		rtw_hal_mac_set_rxfltr_mpdu_size(hal->hal_com, HW_BAND_1, 0x2c00);
-		rtw_hal_mac_set_hw_rts_th(hal, HW_BAND_1,
-					  phy_cap[HW_BAND_1].hw_rts_time_th,
-					  phy_cap[HW_BAND_1].hw_rts_len_th);
-	}
 
 #ifdef CONFIG_BTCOEX
 	/* power on config for btc */
@@ -438,7 +421,6 @@ enum rtw_hal_status hal_config_beacon_8730e(struct rtw_phl_com_t *phl_com, struc
 
 	return RTW_HAL_STATUS_SUCCESS;
 }
-
 
 enum rtw_hal_status hal_update_beacon_8730e(struct rtw_phl_com_t *phl_com, struct hal_info_t *hal, struct rtw_bcn_entry *bcn_entry)
 {

@@ -1126,19 +1126,12 @@ u8 rtl8730e_set_wowlan_ctrl_cmd(struct mac_ax_adapter *adapter, enum mac_ax_wow_
 u32 mac_outsrc_h2c_common(struct mac_ax_adapter *adapter,
 			  struct rtw_g6_h2c_hdr *hdr, u32 *pvalue)
 {
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
+	/* Confirmed: bb will not use h2c to write rf regs. */
 	return 0;
 }
 
 u32 mac_fw_log_cfg(struct mac_ax_adapter *adapter,
 		   struct mac_ax_fw_log *log_cfg)
-{
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
-}
-
-u32 mac_send_bcn_h2c(struct mac_ax_adapter *adapter,
-		     struct mac_ax_bcn_info *info)
 {
 	printk("%s: H2C Packet not supported.", __FUNCTION__);
 	return 0;

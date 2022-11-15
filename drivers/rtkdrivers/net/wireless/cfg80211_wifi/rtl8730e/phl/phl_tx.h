@@ -88,6 +88,7 @@ void rtw_phl_tx_packet_event_notify(void *phl,
 				    enum phl_pkt_evt_type pkt_type);
 #ifdef CONFIG_AXI_HCI
 enum rtw_phl_status rtw_phl_tx_done(void *phl);
+enum rtw_phl_status rtw_phl_bcn_int_hdl(void *phl);
 #endif
 
 #endif	/* __PHL_TX_H_ */

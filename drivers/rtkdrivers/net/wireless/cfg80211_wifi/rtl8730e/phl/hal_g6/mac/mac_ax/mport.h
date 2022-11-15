@@ -20,9 +20,9 @@
 #include "../type.h"
 
 /*--------------------Define -------------------------------------------*/
-#define BCN_ERLY_DEF 160
+#define BCN_ERLY_DEF 4
 #define BCN_SETUP_DEF 4
-#define BCN_HOLD_DEF 400
+#define BCN_HOLD_DEF 100
 #define BCN_MASK_DEF 0
 #define TBTT_ERLY_DEF 5
 #define TBTT_AGG_DEF 1

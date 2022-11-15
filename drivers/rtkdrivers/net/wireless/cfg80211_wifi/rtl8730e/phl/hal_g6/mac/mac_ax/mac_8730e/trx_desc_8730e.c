@@ -22,14 +22,14 @@
 #define TXD_TID_IND_SH		2
 #define TID_MAX_NUM		8
 
-#define TID_0_QSEL 0
-#define TID_1_QSEL 1
-#define TID_2_QSEL 1
-#define TID_3_QSEL 0
-#define TID_4_QSEL 2
-#define TID_5_QSEL 2
-#define TID_6_QSEL 3
-#define TID_7_QSEL 3
+#define TID_0_QSEL RTW_TXDESC_QSEL_BE
+#define TID_1_QSEL RTW_TXDESC_QSEL_BK
+#define TID_2_QSEL RTW_TXDESC_QSEL_BK
+#define TID_3_QSEL RTW_TXDESC_QSEL_BE
+#define TID_4_QSEL RTW_TXDESC_QSEL_VI
+#define TID_5_QSEL RTW_TXDESC_QSEL_VI
+#define TID_6_QSEL RTW_TXDESC_QSEL_VO
+#define TID_7_QSEL RTW_TXDESC_QSEL_VO
 #define TID_0_IND 0
 #define TID_1_IND 0
 #define TID_2_IND 1
@@ -137,6 +137,7 @@ static u32 txdes_proc_data_8730e(struct mac_ax_adapter *adapter,
 	}
 
 	txdesc = (struct tx_desc_t *)buf;
+	qsel = qsel_l[info->tid];
 
 	txdesc->txdw0 = cpu_to_le32(SET_WORD(info->pktlen, AX_TXD_TXPKTSIZE) |
 				    SET_WORD(info->offset, AX_TXD_OFFSET) |
@@ -175,8 +176,6 @@ static u32 txdes_proc_data_8730e(struct mac_ax_adapter *adapter,
 		}
 	}
 
-	qsel = qsel_l[info->tid];
-	info->pkt_offset = 0;
 	txdesc->txdw1 = cpu_to_le32(SET_WORD(info->macid, AX_TXD_MACID) |
 				    (info->bip_keyid_sel ? AX_TXD_BIP_KEYID_SEL : 0) |
 				    SET_WORD(qsel, AX_TXD_QSEL) |
@@ -297,6 +296,7 @@ static u32 txdes_proc_mgnt_8730e(struct mac_ax_adapter *adapter,
 	}
 
 	txdesc = (struct tx_desc_t *)buf;
+	qsel = info->qsel;
 
 	txdesc->txdw0 = cpu_to_le32(SET_WORD(info->pktlen, AX_TXD_TXPKTSIZE) |
 				    SET_WORD(info->offset, AX_TXD_OFFSET) |

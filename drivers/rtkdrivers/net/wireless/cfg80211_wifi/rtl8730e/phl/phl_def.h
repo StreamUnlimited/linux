@@ -215,6 +215,10 @@ enum rtw_phl_config_int {
 	RTW_PHL_EN_HCI_INT,
 	RTW_PHL_DIS_HCI_INT,
 	RTW_PHL_CLR_HCI_INT,
+	RTW_PHL_EN_AP_MODE_INT,
+	RTW_PHL_DIS_AP_MODE_INT,
+	RTW_PHL_EN_TX_BCN_INT,
+	RTW_PHL_DIS_TX_BCN_INT,
 	RTW_PHL_CONFIG_INT_MAX
 };
 
@@ -2544,6 +2548,7 @@ struct rtw_phl_ppdu_sts_ent {
 	u8 ppdu_type;
 	u16 rx_rate;
 	u8 src_mac_addr[MAC_ADDRESS_LENGTH];
+	u8 dst_mac_addr[MAC_ADDRESS_LENGTH];
 
 	/* from ppdu status */
 	bool valid;
@@ -2654,6 +2659,9 @@ struct rtw_phl_com_t {
 #endif
 	void *test_mgnt;
 
+#ifdef RTW_PHL_BCN_IOT
+	void *bcn_info;
+#endif
 	void *phl_priv; /* pointer to phl_info */
 	void *drv_priv;
 #ifdef RTW_WKARD_BFEE_SET_AID

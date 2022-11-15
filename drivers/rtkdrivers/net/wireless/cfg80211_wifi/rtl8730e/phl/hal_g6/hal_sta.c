@@ -163,17 +163,20 @@ out:
 static enum rtw_hal_status
 _hal_update_cctrl_tbl(struct hal_info_t *hal_info,
 		      struct rtw_phl_stainfo_t *sta) {
-	struct rtw_wifi_role_t *wrole = sta->wrole;
+	struct rtw_wifi_role_t *wrole = NULL;
 	enum rtw_hal_status sts = RTW_HAL_STATUS_FAILURE;
 	struct rtw_hal_mac_ax_cctl_info cctrl, cctl_info_mask;
 
-	_os_mem_set(hal_to_drvpriv(hal_info), &cctrl, 0, sizeof(struct rtw_hal_mac_ax_cctl_info));
-	_os_mem_set(hal_to_drvpriv(hal_info), &cctl_info_mask, 0, sizeof(struct rtw_hal_mac_ax_cctl_info));
-
-	if (NULL == sta)
-	{
+	if (NULL == sta) {
 		goto out;
 	}
+	wrole = sta->wrole;
+	if (NULL == wrole) {
+		goto out;
+	}
+
+	_os_mem_set(hal_to_drvpriv(hal_info), &cctrl, 0, sizeof(struct rtw_hal_mac_ax_cctl_info));
+	_os_mem_set(hal_to_drvpriv(hal_info), &cctl_info_mask, 0, sizeof(struct rtw_hal_mac_ax_cctl_info));
 
 	/*TODO - update cctrl tab from stainfo*/
 	cctrl.disrtsfb = 1;
@@ -622,6 +625,10 @@ rtw_hal_update_sta_entry(void *hal, struct rtw_phl_stainfo_t *sta,
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
 	enum phl_upd_mode mode = PHL_UPD_STA_CON_DISCONN;
 
+	if (sta == NULL || hal_info == NULL || hal_info->hal_com == NULL) {
+		return hal_status;
+	}
+
 	/*update cmac table*/
 	if (RTW_HAL_STATUS_SUCCESS != _hal_update_cctrl_tbl(hal_info, sta))
 	{
@@ -648,7 +655,7 @@ rtw_hal_update_sta_entry(void *hal, struct rtw_phl_stainfo_t *sta,
 			PHL_ERR("_hal_bfee_init Fail!\n");
 		}
 
-		if (sta->hal_sta->rssi_stat.assoc_rssi == 0
+		if (sta && sta->hal_sta && (sta->hal_sta->rssi_stat.assoc_rssi == 0)
 #ifdef CONFIG_PHL_TDLS
 		    /* There is no association frame for TDLS connection */
 		    && sta->wrole->type != PHL_RTYPE_TDLS

@@ -237,6 +237,7 @@ _hal_parsing_rx_wd_8730e(struct hal_info_t *hal, u8 *desc,
 
 	mdata->rx_rate = GET_RX_AX_DESC_RX_RATE_8730E(desc);
 	mdata->rx_gi_ltf = GET_RX_AX_DESC_GI_LTF_8730E(desc);
+	mdata->rxmpdu_bssid_fit = GET_RX_AX_DESC_BSSID_FIT_8730E(desc);
 	mdata->inter_ppdu = GET_RX_AX_DESC_INTER_PPDU_8730E(desc);
 	mdata->bw = GET_RX_AX_DESC_BW_8730E(desc);
 
@@ -270,10 +271,8 @@ _hal_parsing_rx_wd_8730e(struct hal_info_t *hal, u8 *desc,
 	mdata->frag_num = GET_RX_AX_DESC_FRAG_8730E(desc);
 
 	mdata->macid_vld = GET_RX_AX_DESC_MACID_VLD_8730E(desc);
-	if (mdata->macid_vld == 1) {
-		mdata->macid = GET_RX_AX_DESC_MACID_8730E(desc);
-	}
 	mdata->sec_type = GET_RX_AX_DESC_SEC_TYPE_8730E(desc);
+	mdata->macid = GET_RX_AX_DESC_MACID_8730E(desc);
 
 	if (mdata->pktlen == 0)
 	{
@@ -366,6 +365,8 @@ _hal_rx_wlanhdr_check_8730e(void *drvpriv, void *hdr, struct rtw_r_meta_data *md
 	retry = PHL_GET_80211_HDR_RETRY(hdr);
 	seq_num = PHL_GET_80211_HDR_SEQUENCE(hdr);
 	PHL_GET_80211_HDR_ADDRESS2(drvpriv, hdr, mdata->ta);
+	PHL_GET_80211_HDR_ADDRESS1(drvpriv, hdr, mdata->ra);
+
 	if (retry) {
 		PHL_TRACE(COMP_PHL_RECV, _PHL_DEBUG_, "[TP Debug] RETRY PKT!!!! seq_num = %d \n", seq_num);
 	}

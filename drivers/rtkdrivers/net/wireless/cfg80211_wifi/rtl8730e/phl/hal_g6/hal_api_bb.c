@@ -278,6 +278,12 @@ void rtw_hal_bb_media_status_update(struct hal_info_t *hal_info,
 enum rtw_hal_status
 rtw_hal_bb_upt_ramask(struct hal_info_t *hal_info,
 		      struct rtw_phl_stainfo_t *sta) {
+
+	if (hal_info == NULL || hal_info->bb == NULL) {
+		PHL_ERR("rtw_halbb_set_dft_mask failed\n");
+		return RTW_HAL_STATUS_FAILURE;
+	}
+
 	if (!rtw_halbb_dft_mask(hal_info->bb, sta))
 	{
 		PHL_ERR("rtw_halbb_set_dft_mask failed\n");
@@ -298,6 +304,12 @@ rtw_hal_bb_upt_ramask(struct hal_info_t *hal_info,
 enum rtw_hal_status
 rtw_hal_bb_ra_register(struct hal_info_t *hal_info,
 		       struct rtw_phl_stainfo_t *sta) {
+
+	if (hal_info == NULL || hal_info->bb == NULL) {
+		PHL_ERR("rtw_hal_bb_ra_register failed\n");
+		return RTW_HAL_STATUS_FAILURE;
+	}
+
 	if (!rtw_halbb_raregistered(hal_info->bb, sta))
 	{
 		return RTW_HAL_STATUS_FAILURE;

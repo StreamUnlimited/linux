@@ -475,6 +475,13 @@ bool rtw_hal_ltr_is_hw_ctrl(struct rtw_phl_com_t *phl_com, void *hal);
 enum rtw_hal_status
 rtw_hal_update_txbd(void *hal, void *txbd, void *wd, u8 dma_ch, u16 wd_num);
 
+#ifdef RTW_PHL_BCN_IOT
+enum rtw_hal_status
+rtw_hal_update_bcn_txbd(void *hal, void *txbd, void *bcn_info);
+
+enum rtw_hal_status rtw_hal_trigger_bcn(void *hal);
+#endif
+
 /**
  * rtw_hal_update_rxbd - update rx bd for recv packet
  * @hal: see struct hal_info_t
@@ -736,6 +743,7 @@ enum rtw_hal_status rtw_hal_acpt_crc_err_pkt(void *hal, u8 band, u8 enable);
  */
 enum rtw_hal_status rtw_hal_set_rxfltr_mpdu_size(void *hal, u8 band, u16 size);
 enum rtw_hal_status rtw_hal_set_rxfltr_by_type(void *hal, u8 band, u8 type, u8 target);
+enum rtw_hal_status rtw_hal_set_rxfltr_by_subtype(void *hal, u8 band, u8 type, u8 subtype, u8 target);
 
 
 enum rtw_hal_status
@@ -863,6 +871,10 @@ enum rtw_hal_status
 rtw_hal_tsf_sync(void *hal, u8 wrole_sync_from, u8 wrole_sync_to,
 		 enum phl_band_idx band, s32 sync_offset_tu,
 		 enum hal_tsf_sync_act act);
+
+#ifdef RTW_PHL_BCN_IOT
+enum rtw_hal_status rtw_hal_fill_bcn_desc(void *hal, struct rtw_t_meta_data *mdata);
+#endif
 
 /**
  * rtw_hal_fill_txdesc() - Fill hardware tx header
@@ -1014,4 +1026,5 @@ enum rtw_hal_status rtw_hal_get_txinfo_power(
 
 u32 rtw_hal_get_phy_stat_info(void *hal, enum phl_band_idx hw_band,
 			      enum phl_stat_info_query phy_stat);
+u8 rtw_hal_get_qsel(_adapter *padapter, enum QSEL_ID qsel);
 #endif /*_HAL_API_H_*/

@@ -665,7 +665,7 @@ void MIPI_StructInit(MIPI_InitTypeDef *MIPI_InitStruct)
 	MIPI_InitStruct->MIPI_BTADis = DISABLE;
 
 	MIPI_InitStruct->MIPI_LaneNum = 2;
-	MIPI_InitStruct->MIPI_FrameRate = 60;
+	MIPI_InitStruct->MIPI_FrameRate = MIPI_DSI_FRAME_RATE;
 
 	/*DataLaneFreq * LaneNum = FrameRate * (VSA+VBP+VACT+VFP) * (HSA+HBP+HACT+HFP) * PixelFromat*/
 	MIPI_InitStruct->MIPI_VideDataLaneFreq = 775;

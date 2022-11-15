@@ -48,6 +48,13 @@ u32 set_hw_ampdu_cfg(struct mac_ax_adapter *adapter,
 	} else {
 		return MACSETVALERR;
 	}
+
+	if (cfg->rts_max_agg_num > 0 && cfg->rts_max_agg_num <= BIT_MASK_RTS_MAX_AGG_NUM) {
+		val32 = BIT_SET_RTS_MAX_AGG_NUM(val32, cfg->rts_max_agg_num);
+	} else {
+		return MACSETVALERR;
+	}
+
 	MAC_REG_W32(REG_PROT_MODE_CTRL, val32);
 
 	return MACSUCCESS;

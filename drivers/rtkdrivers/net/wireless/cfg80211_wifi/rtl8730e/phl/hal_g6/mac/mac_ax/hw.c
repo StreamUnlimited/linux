@@ -583,7 +583,8 @@ u32 cfg_mac_bw(struct mac_ax_adapter *adapter, struct mac_ax_cfg_bw *cfg)
 	MAC_REG_W16(REG_WMAC_TRXPTCL_CTL, value16);
 
 	chk_val8 = MAC_REG_R8(REG_BCN_AMPDU_CTCL);
-	chk_val8 = chk_val8 & (~(BIT(0)));
+	/* flow freertos */
+	/* chk_val8 = chk_val8 & (~(BIT(0))); /*
 
 	/*Setting for CCK rate in 5G/6G Channel protection*/
 	if (cfg->pri_ch >= CHANNEL_5G) { // remove after phl setting band_type

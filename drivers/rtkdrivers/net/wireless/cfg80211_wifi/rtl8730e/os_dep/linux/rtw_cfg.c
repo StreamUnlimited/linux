@@ -1242,23 +1242,14 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 	phl_com->phy_sw_cap[0].rxss = rtw_rx_nss;
 	phl_com->phy_sw_cap[0].txagg_num = rtw_tx_ampdu_num;
 
-	phl_com->phy_sw_cap[1].proto_sup = rtw_wireless_mode;
-	phl_com->phy_sw_cap[1].band_sup = rtw_band_type;
-
 #ifdef CONFIG_NARROWBAND_SUPPORTING
 	if (rtw_nb_config != RTW_NB_CONFIG_NONE) {
 		phl_com->phy_sw_cap[1].bw_sup = BW_CAP_20M;
 	} else
 #endif /*CONFIG_NARROWBAND_SUPPORTING*/
-		phl_com->phy_sw_cap[1].bw_sup = ch_width_to_bw_cap(max_bw_mode + 1) - 1; /* max supported bw */
-	phl_com->phy_sw_cap[1].txss = rtw_tx_nss;
-	phl_com->phy_sw_cap[1].rxss = rtw_rx_nss;
-	phl_com->phy_sw_cap[1].txagg_num = rtw_tx_ampdu_num;
 
-	phl_com->phy_sw_cap[0].hw_rts_time_th = 88;
-	phl_com->phy_sw_cap[0].hw_rts_len_th = 4080;
-	phl_com->phy_sw_cap[1].hw_rts_time_th = 88;
-	phl_com->phy_sw_cap[1].hw_rts_len_th = 4080;
+	phl_com->phy_sw_cap[0].hw_rts_time_th = 9;
+	phl_com->phy_sw_cap[0].hw_rts_len_th = 0xff;
 
 	/*phl_com->dev_sw_cap.pkg_type = rtw_pkg_type;*/
 	phl_com->dev_sw_cap.rfe_type = rtw_rfe_type;
@@ -1272,7 +1263,6 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 	phl_com->dev_sw_cap.hw_hdr_conv = rtw_hw_hdr_conv;
 
 	phl_com->proto_sw_cap[0].max_amsdu_len = rtw_max_amsdu_len;
-	phl_com->proto_sw_cap[1].max_amsdu_len = rtw_max_amsdu_len;
 
 #if defined(CONFIG_PCI_HCI)
 #if defined(CONFIG_PCI_ASPM)
@@ -1363,16 +1353,6 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 	phl_com->proto_sw_cap[0].stbc_he_rx = (rtw_stbc_cap & BIT8) ? 1 : 0;
 	phl_com->proto_sw_cap[0].stbc_rx_greater_80mhz = (rtw_stbc_cap & BIT9) ? 1 : 0;
 
-	/*Band1*/
-	phl_com->proto_sw_cap[1].stbc_ht_tx = (rtw_stbc_cap & BIT5) ? 1 : 0;
-	phl_com->proto_sw_cap[1].stbc_vht_tx = (rtw_stbc_cap & BIT1) ? 1 : 0;
-	phl_com->proto_sw_cap[1].stbc_he_tx = (rtw_stbc_cap & BIT10) ? 1 : 0;
-	phl_com->proto_sw_cap[1].stbc_tx_greater_80mhz = (rtw_stbc_cap & BIT11) ? 1 : 0;
-
-	phl_com->proto_sw_cap[1].stbc_ht_rx = (rtw_stbc_cap & BIT4) ? 1 : 0;
-	phl_com->proto_sw_cap[1].stbc_vht_rx = (rtw_stbc_cap & BIT0) ? 1 : 0;
-	phl_com->proto_sw_cap[1].stbc_he_rx = (rtw_stbc_cap & BIT8) ? 1 : 0;
-	phl_com->proto_sw_cap[1].stbc_rx_greater_80mhz = (rtw_stbc_cap & BIT9) ? 1 : 0;
 
 #ifdef CONFIG_BEAMFORMING
 	phl_com->role_sw_cap.bf_cap = 0;
@@ -1399,17 +1379,6 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 	phl_com->proto_sw_cap[0].he_mu_bfmr = (rtw_sw_proto_bf_cap_phy0 & BIT8) ? 1 : 0;
 	phl_com->proto_sw_cap[0].he_mu_bfme = (rtw_sw_proto_bf_cap_phy0 & BIT9) ? 1 : 0;
 
-	/*Band1*/
-	phl_com->proto_sw_cap[1].vht_su_bfmr = (rtw_sw_proto_bf_cap_phy1 & BIT0) ? 1 : 0;
-	phl_com->proto_sw_cap[1].vht_su_bfme = (rtw_sw_proto_bf_cap_phy1 & BIT1) ? 1 : 0;
-	phl_com->proto_sw_cap[1].vht_mu_bfmr = (rtw_sw_proto_bf_cap_phy1 & BIT2) ? 1 : 0;
-	phl_com->proto_sw_cap[1].vht_mu_bfme = (rtw_sw_proto_bf_cap_phy1 & BIT3) ? 1 : 0;
-	phl_com->proto_sw_cap[1].ht_su_bfmr = (rtw_sw_proto_bf_cap_phy1 & BIT4) ? 1 : 0;
-	phl_com->proto_sw_cap[1].ht_su_bfme = (rtw_sw_proto_bf_cap_phy1 & BIT5) ? 1 : 0;
-	phl_com->proto_sw_cap[1].he_su_bfmr = (rtw_sw_proto_bf_cap_phy1 & BIT6) ? 1 : 0;
-	phl_com->proto_sw_cap[1].he_su_bfme = (rtw_sw_proto_bf_cap_phy1 & BIT7) ? 1 : 0;
-	phl_com->proto_sw_cap[1].he_mu_bfmr = (rtw_sw_proto_bf_cap_phy1 & BIT8) ? 1 : 0;
-	phl_com->proto_sw_cap[1].he_mu_bfme = (rtw_sw_proto_bf_cap_phy1 & BIT9) ? 1 : 0;
 #endif
 
 #if CONFIG_TXPWR_LIMIT

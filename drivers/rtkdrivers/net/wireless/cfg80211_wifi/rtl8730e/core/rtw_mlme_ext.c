@@ -5688,7 +5688,7 @@ void issue_beacon(_adapter *padapter, int timeout_ms)
 #endif /* CONFIG_P2P */
 
 
-	/* RTW_INFO("%s\n", __FUNCTION__); */
+	RTW_INFO("%s\n", __FUNCTION__);
 
 #if 0 /*def CONFIG_BCN_ICF*/
 	pmgntframe = rtw_alloc_bcnxmitframe(pxmitpriv);

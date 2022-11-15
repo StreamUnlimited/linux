@@ -18,6 +18,9 @@
 #define MAC_AX_8730E_SUPPORT 1
 
 /* core / phl common structrue */
+#define PHL_TX_BCN_OK BIT(0)
+#define PHL_TX_BCN_ERR BIT(1)
+#define PHL_TX_BCN_EARLY BIT(2)
 
 #define MAX_PHL_RING_ENTRY_NUM 32
 #define MAX_PHL_RING_CAT_NUM 10 /* 8 tid + 1 mgnt + 1 hiq*/
@@ -157,6 +160,7 @@ struct rtw_t_meta_data {
 	u8 wmm; /*0 or 1*/
 	enum rtw_packet_type type;
 	u8 tid;
+	u8 qsel;
 	u8 bc;
 	u8 mc;
 	u16 pktlen; /* MAC header length + frame body length */
@@ -434,6 +438,7 @@ struct rtw_r_meta_data {
 	u8 dma_ch;
 	u8 hal_port;
 	u8 ta[6]; /* Transmitter Address */
+	u8 ra[6]; /* Transmitter Address */
 	u8 mac_addr[6];
 	u8 ppdu_cnt_chg;
 

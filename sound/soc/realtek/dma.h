@@ -29,6 +29,12 @@ struct ameba_pcm_dma_params {
 	u32 handshaking_0;
 	u32 handshaking_1;
 	const char *chan_name;
+	//means the total counter calculated by irq interrupt.
+	//however it's not the real current time, need to add the delta
+	//counter value from last interrupt->now.
+	u64 total_sport_counter;
+	//means the current substream's sport's base addr.
+	void __iomem * sport_base_addr;
 };
 
 struct dma_callback_params {

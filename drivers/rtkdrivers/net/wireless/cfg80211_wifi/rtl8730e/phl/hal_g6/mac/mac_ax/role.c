@@ -43,6 +43,10 @@ u32 set_role_bss_clr(struct mac_ax_adapter *adapter,
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u32 bss_clr = 0;
 
+	if (info->self_role == MAC_AX_SELF_ROLE_AP_CLIENT) {
+		return 0;
+	}
+
 	switch (info->port) {
 	case MAC_AX_PORT_0:
 		bss_clr = MAC_REG_R32(REG_TRAN_BSSID0_H);
@@ -399,6 +403,51 @@ u32 role_tbl_exit(struct mac_ax_adapter *adapter)
 	return ret;
 }
 #endif
+
+static u32 role_info_to_hw(struct mac_ax_adapter *adapter,
+			   struct mac_ax_role_info *info)
+{
+	struct mac_ax_ops *mac_ops = adapter_to_mac_ops(adapter);
+	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
+	struct rtw_phl_com_t *phl_com = (struct rtw_phl_com_t *)adapter->phl_adapter;
+	struct rtw_wifi_role_t *wifi_roles = phl_com->wifi_roles;
+	u32 ret = 0;
+
+
+	if (info->self_role == MAC_AX_SELF_ROLE_AP_CLIENT) {
+		return ret;
+	}
+
+	ret = p_ops->cfg_mac_addr(adapter, info->port,
+				  (union halmac_wlan_addr *)info->self_mac);
+	if (MACSUCCESS != ret) {
+		PLTFM_MSG_ERR("set macid faied.\n");
+		return MACBADDR;
+	}
+
+	ret = p_ops->cfg_net_type(adapter, info->port, info->net_type);
+	if (MACSUCCESS != ret) {
+		PLTFM_MSG_ERR("set net type faied.\n");
+		return MACBADDR;
+	}
+
+	ret = p_ops->cfg_transmitter_addr(adapter, info->port,
+					  (union halmac_wlan_addr *)info->target_mac);
+	if (MACSUCCESS != ret) {
+		PLTFM_MSG_ERR("set transmitter address faied.\n");
+		return MACBADDR;
+	}
+
+	ret = p_ops->cfg_bssid(adapter, info->port,
+			     (union halmac_wlan_addr *)info->bssid);
+	if (MACSUCCESS != ret) {
+		PLTFM_MSG_ERR("set BSSID faied.\n");
+		return MACBADDR;
+	}
+
+	return ret;
+}
+
 u32 role_info_init(struct mac_ax_adapter *adapter,
 		   struct mac_ax_role_info *info)
 {
@@ -442,34 +491,6 @@ u32 role_info_init(struct mac_ax_adapter *adapter,
 		info->a_info.tma[i] = info->target_mac[i];
 		info->b_info.bssid[i] = info->bssid[i];
 	}
-
-	ret = p_ops->cfg_mac_addr(adapter, info->port,
-				  (union halmac_wlan_addr *)info->self_mac);
-	if (MACSUCCESS != ret) {
-		PLTFM_MSG_ERR("set macid faied.\n");
-		return MACBADDR;
-	}
-
-	ret = p_ops->cfg_net_type(adapter, info->port, info->net_type);
-	if (MACSUCCESS != ret) {
-		PLTFM_MSG_ERR("set net type faied.\n");
-		return MACBADDR;
-	}
-
-	ret = p_ops->cfg_transmitter_addr(adapter, info->port,
-					  (union halmac_wlan_addr *)info->target_mac);
-	if (MACSUCCESS != ret) {
-		PLTFM_MSG_ERR("set transmitter address faied.\n");
-		return MACBADDR;
-	}
-
-	ret = p_ops->cfg_bssid(adapter, info->port,
-			     (union halmac_wlan_addr *)info->bssid);
-	if (MACSUCCESS != ret) {
-		PLTFM_MSG_ERR("set transmitter address faied.\n");
-		return MACBADDR;
-	}
-
 
 	return MACSUCCESS;
 }
@@ -559,10 +580,12 @@ u32 role_init(struct mac_ax_adapter *adapter,
 
 	role->info = *info;
 
-	ret = p_ops->enable_port(adapter, info->port, 1);
-	if (MACSUCCESS != ret) {
-		PLTFM_MSG_ERR("enable port %d faied.\n", info->port);
-		return MACPORTCFGPORT;
+	if (info->self_role != MAC_AX_SELF_ROLE_AP_CLIENT) {
+		ret = p_ops->enable_port(adapter, info->port, 1);
+		if (MACSUCCESS != ret) {
+			PLTFM_MSG_ERR("enable port %d faied.\n", info->port);
+			return MACPORTCFGPORT;
+		}
 	}
 
 	return MACSUCCESS;
@@ -609,21 +632,6 @@ u32 mac_add_role(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
 		goto role_add_fail;
 	}
 
-	//modify fw later
-	// Do not call mac_fw_role_maintain if is_mulitcast_entry = 1.
-	// mac_fw_role_maintain will trigger FW to create FW Role.
-	/*if (!info->is_mul_ent) {
-		ret = mac_fw_role_maintain(adapter, info);
-		if (ret != MACSUCCESS) {
-			if (ret == MACFWNONRDY) {
-				PLTFM_MSG_WARN("skip fw role maintain\n");
-			} else {
-				PLTFM_MSG_ERR("mac_fw_role_maintain failed:%d\n", ret);
-				goto role_add_fail;
-			}
-		}
-	}*/
-
 	if (info->self_role == MAC_AX_SELF_ROLE_AP) {
 		ret = mac_h2c_join_info(adapter, info);
 		if (ret != MACSUCCESS) {
@@ -634,6 +642,17 @@ u32 mac_add_role(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
 				return ret;
 			}
 		}
+	}
+
+	ret = role_info_to_hw(adapter, info);
+	if (ret == MACADDRCAMFL) {
+		PLTFM_MSG_ERR("ADDRESS CAM full\n");
+		ret = MACADDRCAMFL;
+		goto role_add_fail;
+	} else if (ret == MACBSSIDCAMFL) {
+		PLTFM_MSG_ERR("BSSID CAM full\n");
+		ret = MACBSSIDCAMFL;
+		goto role_add_fail;
 	}
 
 	role_enqueue(adapter, list_head, role);
@@ -713,19 +732,6 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 	if (info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE ||
 	    info->upd_mode == MAC_AX_ROLE_REMOVE ||
 	    info->upd_mode == MAC_AX_ROLE_FW_RESTORE) {
-		// Do not call mac_fw_role_maintain if is_mulitcast_entry = 1.
-		if (!info->is_mul_ent) {
-			ret = mac_fw_role_maintain(adapter, info);
-			if (ret != MACSUCCESS) {
-				if (ret == MACFWNONRDY) {
-					PLTFM_MSG_WARN("skip fw role maintain\n");
-				} else {
-					PLTFM_MSG_ERR("mac_fw_role_maintain :%d\n",
-						      ret);
-					return ret;
-				}
-			}
-		}
 		if ((info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE ||
 		     info->upd_mode == MAC_AX_ROLE_FW_RESTORE) &&
 		    info->self_role == MAC_AX_SELF_ROLE_AP) {
@@ -773,13 +779,11 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 		return ret;
 	}
 
-#if 0
-	ret = mac_upd_addr_cam(adapter, &role->info, CHG);
+	ret = role_info_to_hw(adapter, info);
 	if (ret == MACBSSIDCAMFL) {
 		PLTFM_MSG_ERR("BSSID CAM full\n");
 		return MACBSSIDCAMFL;
 	}
-#endif
 
 	if (mac_en) {
 		set_role_bss_clr(adapter, info);
@@ -800,10 +804,11 @@ u32 mac_remove_role(struct mac_ax_adapter *adapter, u8 macid)
 		return MACNOROLE;
 	}
 
-	ret = p_ops->enable_port(adapter, role->info.port, 0);
-	if (MACSUCCESS != ret) {
-		PLTFM_MSG_ERR("disable port %d faied.\n",  role->info.port);
-		return MACPORTCFGPORT;
+	if (role->info.self_role != MAC_AX_SELF_ROLE_AP_CLIENT) {
+		if (MACSUCCESS != ret) {
+			PLTFM_MSG_ERR("disable port %d faied.\n",  role->info.port);
+			return MACPORTCFGPORT;
+		}
 	}
 
 	role->info.a_info.valid = 0;
@@ -986,7 +991,7 @@ static u32 mac_h2c_join_info(struct mac_ax_adapter *adapter,
 {
 	struct fwcmd_joininfo fwcmd_tbl;
 	struct mac_ax_sta_init_info sta;
-	u32 ret;
+	u32 ret = MACSUCCESS;
 	struct rtw_hal_com_t *hal_com = adapter->drv_adapter;
 
 	/* Miracast scenario. Not support miracast scenario now. */
@@ -1029,14 +1034,8 @@ static u32 mac_h2c_join_info(struct mac_ax_adapter *adapter,
 	fwcmd_tbl.data2 = macid_end;
 
 	ret = rtw_hal_mac_send_h2c_ameba(hal_com, fwcmd_tbl.cmd_id, sizeof(struct fwcmd_joininfo) - 1, &fwcmd_tbl.data0);
-	return ret;
-}
 
-static u32 mac_fw_role_maintain(struct mac_ax_adapter *adapter,
-				struct mac_ax_role_info *info)
-{
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
+	return ret;
 }
 
 u32 mac_role_sync(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
@@ -1050,15 +1049,6 @@ u32 mac_role_sync(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
 		return MACNOITEM;
 	}
 
-	ret = mac_fw_role_maintain(adapter, info);
-	if (ret) {
-		if (ret == MACFWNONRDY) {
-			PLTFM_MSG_WARN("skip fw role sync since fw not ready\n");
-		} else {
-			PLTFM_MSG_ERR("mac_fw_role_maintain failed:%d\n", ret);
-		}
-		return ret;
-	}
 	if (info->self_role == MAC_AX_SELF_ROLE_AP) {
 		ret = mac_h2c_join_info(adapter, info);
 		if (ret) {

@@ -161,6 +161,7 @@ u32 hal_hci_cfg_8730ea(struct rtw_phl_com_t *phl_com,
 
 void init_hal_spec_8730ea(struct rtw_phl_com_t *phl_com,
 			  struct hal_info_t *hal);
+void hal_config_int_8730ea(struct hal_info_t *hal, enum rtw_phl_config_int int_mode);
 void hal_enable_int_8730ea(struct hal_info_t *hal);
 void hal_disable_int_8730ea(struct hal_info_t *hal);
 bool hal_recognize_int_8730ea(struct hal_info_t *hal);

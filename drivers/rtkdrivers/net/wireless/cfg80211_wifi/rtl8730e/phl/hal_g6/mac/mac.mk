@@ -34,6 +34,7 @@ endif
 
 halmac-y +=		$(path_hm)/mac_ax.o \
 			$(path_hm_d1)/fwcmd.o \
+			$(path_hm_d1)/bcn.o \
 			$(path_hm_d1)/fwofld.o
 
 ifeq ($(CONFIG_AXI_HCI), n)

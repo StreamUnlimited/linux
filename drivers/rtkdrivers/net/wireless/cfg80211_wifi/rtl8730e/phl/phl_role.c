@@ -680,7 +680,7 @@ phl_wifi_role_change(struct phl_info_t *phl_info,
 				if (wrole->type == PHL_RTYPE_AP) {
 					wrole->bcn_cmn.bcn_interval = 100;
 					wrole->mstate = MLME_LINKED;
-					wrole->hiq_win = 16; /* unit: ms */
+					wrole->hiq_win = 2; /* unit: ms */
 				}
 #endif
 #endif

@@ -2147,7 +2147,7 @@ pre_validate_status_chk:
 	if ((psta->flags & WLAN_STA_AMSDU_DISABLE) && pattrib->amsdu) {
 #ifdef DBG_RX_DROP_FRAME
 		RTW_INFO("DBG_RX_DROP_FRAME "FUNC_ADPT_FMT" amsdu not allowed"MAC_FMT"\n"
-			 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->cmn.mac_addr));
+			 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->phl_sta->mac_addr));
 #endif
 		ret = _FAIL;
 		goto exit;
@@ -2226,7 +2226,7 @@ pre_validate_status_chk:
 			if (!pattrib->privacy) {
 #ifdef DBG_RX_DROP_FRAME
 				RTW_INFO("DBG_RX_DROP_FRAME "FUNC_ADPT_FMT"recv plaintext bmc packet for sta="MAC_FMT"\n"
-					 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->cmn.mac_addr));
+					 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->phl_sta->mac_addr));
 #endif
 				ret = _FAIL;
 				goto exit;
@@ -2245,7 +2245,7 @@ pre_validate_status_chk:
 				if (!pattrib->privacy && ether_type != eapol_type) {
 #ifdef DBG_RX_DROP_FRAME
 					RTW_INFO("DBG_RX_DROP_FRAME "FUNC_ADPT_FMT"recv plaintext unicast packet for sta="MAC_FMT"\n"
-						 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->cmn.mac_addr));
+						 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->phl_sta->mac_addr));
 #endif
 					ret = _FAIL;
 					goto exit;
@@ -2255,7 +2255,7 @@ pre_validate_status_chk:
 				if (!pattrib->privacy && pattrib->amsdu) {
 #ifdef DBG_RX_DROP_FRAME
 					RTW_INFO("DBG_RX_DROP_FRAME "FUNC_ADPT_FMT"recv plaintext A-MSDU for sta="MAC_FMT"\n"
-						 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->cmn.mac_addr));
+						 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->phl_sta->mac_addr));
 #endif
 					ret = _FAIL;
 					goto exit;
@@ -2277,7 +2277,7 @@ pre_validate_status_chk:
 				if (!pattrib->privacy) {
 #ifdef DBG_RX_DROP_FRAME
 					RTW_INFO("DBG_RX_DROP_FRAME "FUNC_ADPT_FMT"recv plaintext packet for sta="MAC_FMT"\n"
-						 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->cmn.mac_addr));
+						 , FUNC_ADPT_ARG(adapter), MAC_ARG(psta->phl_sta->mac_addr));
 #endif
 					ret = _FAIL;
 					goto exit;

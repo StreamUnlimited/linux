@@ -99,6 +99,15 @@ enum rtw_hal_status rtw_hal_chk_allq_empty(void *hal, u8 *empty)
 	return rtw_hal_mac_chk_allq_empty(hal_info, empty);
 }
 
+#ifdef RTW_PHL_BCN_IOT
+enum rtw_hal_status rtw_hal_fill_bcn_desc(void *hal, struct rtw_t_meta_data *mdata)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+
+
+	return rtw_hal_mac_ax_fill_bcn_desc(hal_info->mac, mdata);
+}
+#endif
 
 enum rtw_hal_status rtw_hal_fill_txdesc(void *hal, struct rtw_xmit_req *treq,
 					u8 *wd_buf, u32 *wd_len)
@@ -260,6 +269,29 @@ enum rtw_hal_status rtw_hal_update_txbd(void *hal, void *txbd, void *wd, u8 dma_
 	return hstatus;
 }
 
+#ifdef RTW_PHL_BCN_IOT
+enum rtw_hal_status rtw_hal_update_bcn_txbd(void *hal, void *txbd, void *bcn_info)
+{
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct hal_trx_ops *trx_ops = hal_info->trx_ops;
+
+	hstatus = trx_ops->update_bcn_txbd(hal, txbd, bcn_info);
+
+	return hstatus;
+}
+
+enum rtw_hal_status rtw_hal_trigger_bcn(void *hal)
+{
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct hal_trx_ops *trx_ops = hal_info->trx_ops;
+
+	hstatus = trx_ops->tx_bcn_start(hal);
+
+	return hstatus;
+}
+#endif
 
 /**
  * rtw_hal_update_trigger_txstart - trigger hw to start tx

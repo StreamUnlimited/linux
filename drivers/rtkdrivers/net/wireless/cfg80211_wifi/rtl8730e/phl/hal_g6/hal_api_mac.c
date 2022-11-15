@@ -18,7 +18,11 @@
 #include "mac/mac_ax/dle.h"
 #ifdef RTW_PHL_BCN
 #include "mac/mac_ax/fwcmd.h"
+#ifdef RTW_PHL_BCN_IOT
+#include "mac/mac_ax/bcn.h"
 #endif
+#endif
+#include "hal_api.h"
 
 #define RTL8852A_FPGA_VERIFICATION 1
 
@@ -1393,6 +1397,7 @@ rtw_hal_mac_port_init(struct hal_info_t *hal_info,
 			ppara.bcn_interval = 100;
 		}
 		ppara.bss_color = phl_sta->asoc_cap.bsscolor;
+		rtw_hal_config_interrupt(hal_info, RTW_PHL_DIS_AP_MODE_INT);
 	} else if (ppara.net_type == MAC_AX_NET_TYPE_AP)
 	{
 #ifdef RTW_PHL_BCN
@@ -1401,13 +1406,16 @@ rtw_hal_mac_port_init(struct hal_info_t *hal_info,
 		ppara.bcn_interval = 100;
 #endif
 		ppara.bss_color = wifi_role->proto_role_cap.bsscolor;
+		rtw_hal_config_interrupt(hal_info, RTW_PHL_EN_AP_MODE_INT);
 	} else if (ppara.net_type == MAC_AX_NET_TYPE_ADHOC)
 	{
 		/* TODO */
 		ppara.bcn_interval = 100;
+		rtw_hal_config_interrupt(hal_info, RTW_PHL_DIS_AP_MODE_INT);
 	} else
 	{
 		/* other net_type, i.e. MAC_AX_NO_LINK */
+		rtw_hal_config_interrupt(hal_info, RTW_PHL_DIS_AP_MODE_INT);
 		ppara.bcn_interval = 100;
 	}
 
@@ -1679,6 +1687,10 @@ rtw_hal_mac_addr_cam_change_entry(struct hal_info_t *hal_info,
 				  bool is_connect) {
 	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
 	struct mac_ax_role_info mac_rinfo = {0};
+
+	if (mac == NULL) {
+		return RTW_HAL_STATUS_FAILURE;
+	}
 
 	_hal_stainfo_to_macrinfo(hal_info, sta, &mac_rinfo, mode, is_connect);
 
@@ -3351,6 +3363,22 @@ rtw_hal_mac_enable_fw(struct hal_info_t *hal_info, u8 enable) {
 }
 #endif
 
+#ifdef RTW_PHL_BCN_IOT
+enum rtw_hal_status
+rtw_hal_mac_ax_fill_bcn_desc(void *mac, struct rtw_t_meta_data *mdata) {
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+	struct mac_ax_adapter *mac_info = (struct mac_ax_adapter *)mac;
+	struct rtw_phl_com_t *phl_com = (struct rtw_phl_com_t *)(mac_info->phl_adapter);
+	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)phl_com->bcn_info;
+
+	hal_status = mac_info->ops->build_txdesc(mac_info, mdata,
+						bcn_info->desc_vir_addr,
+						bcn_info->desc_len);
+
+	return hal_status;
+}
+#endif
+
 /*   */
 /**
  * rtw_hal_mac_ax_fill_txdesc
@@ -3404,6 +3432,7 @@ rtw_hal_mac_set_hw_ampdu_cfg(struct hal_info_t *hal_info,
 	info.rty_bk_mode = MAC_AX_RTY_BK_MODE_AGG;
 	info.max_agg_num = max_agg_num;
 	info.max_agg_time_32us = max_agg_time;
+	info.rts_max_agg_num = 0x0c;
 
 	mac_err = mac->ops->set_hw_value(mac, MAC_AX_HW_SET_AMPDU_CFG, &info);
 
@@ -4110,14 +4139,36 @@ void
 _hal_mac_ax_ppdu_sts_to_hal_info(struct hal_info_t *hal_info,
 				 struct mac_ax_ppdu_rpt *mac_ppdu, void *rx_mdata)
 {
+	struct rtw_phl_com_t *phl_com = hal_info->phl_com;
+	struct rtw_wifi_role_t *wifi_role = NULL;
+	enum role_type type = PHL_RTYPE_NONE;
 	struct rtw_r_meta_data *mdata =
 		(struct rtw_r_meta_data *)rx_mdata;
+	struct rtw_phl_ppdu_sts_info *ppdu_info = NULL;
+	struct rtw_phl_ppdu_sts_ent *ppdu_sts_ent = NULL;
 	int i = 0;
 
+	ppdu_info = &(phl_com->ppdu_sts_info);
+	ppdu_sts_ent = &ppdu_info->sts_ent[0][mdata->ppdu_cnt];
+	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
+		if (_os_mem_cmp(phl_com->drv_priv,
+				phl_com->wifi_roles[i].mac_addr,
+				ppdu_sts_ent->dst_mac_addr, MAC_ALEN) == 0) {
+			wifi_role = &(phl_com->wifi_roles[i]);
+			break;
+		}
+	}
+	if (wifi_role) {
+		type = wifi_role->type;
+	}
 	mac_ppdu->usr_num = 1; /* AX_TODO: need further check */
 	for (i = 0; i < mac_ppdu->usr_num; i++) {
 		if (rtw_phl_macid_is_used(hal_info->phl_com->phl_priv, mdata->macid)) {
-			mac_ppdu->usr[i].vld = 1;
+			if (type != PHL_RTYPE_AP) {
+				mac_ppdu->usr[i].vld = 1;
+			} else {
+				mac_ppdu->usr[i].vld = 0;
+			}
 			mac_ppdu->usr[i].macid = mdata->macid;
 			mac_ppdu->usr[i].has_data = (mdata->frame_type == RTW_FRAME_TYPE_DATA);
 			mac_ppdu->usr[i].has_ctrl = (mdata->frame_type == RTW_FRAME_TYPE_CTRL);
@@ -4229,6 +4280,7 @@ hal_mac_ax_send_beacon(struct hal_info_t *hal, struct rtw_bcn_entry *bcn_entry) 
 	struct rtw_bcn_info_hw *bcn_hw = &bcn_entry->bcn_hw;
 	struct mac_ax_bcn_info info = {0};
 
+#ifdef RTW_PHL_BCN_IOT
 	if (!mac->ops->send_bcn_h2c)
 	{
 		return RTW_HAL_STATUS_FAILURE;
@@ -4261,6 +4313,9 @@ hal_mac_ax_send_beacon(struct hal_info_t *hal, struct rtw_bcn_entry *bcn_entry) 
 	info.rate_sel = (u16)bcn_cmn->bcn_rate;
 
 	mac->ops->send_bcn_h2c(mac, &info);
+
+	rtw_hal_config_interrupt(hal, RTW_PHL_EN_TX_BCN_INT);
+#endif
 
 	return RTW_HAL_STATUS_SUCCESS;
 
@@ -5876,6 +5931,12 @@ rtw_hal_mac_set_rxfltr_by_mode(struct rtw_hal_com_t *hal_com,
 
 		break;
 	case RX_FLTR_MODE_STA_LINKING:
+		ctrl.acpt_add3 = 1;
+		mask.acpt_add3 = 1;
+
+		ctrl.chk_ta_mgnt = 1;
+		mask.chk_ta_mgnt = 1;
+
 		/* check broadcast */
 		ctrl.acpt_ack_cbssid = 1;
 		mask.acpt_ack_cbssid = 1;
@@ -5883,6 +5944,9 @@ rtw_hal_mac_set_rxfltr_by_mode(struct rtw_hal_com_t *hal_com,
 		/* check beacon */
 		ctrl.chk_cbssid_mgnt = 0;
 		mask.chk_cbssid_mgnt = 1;
+
+		ctrl.chk_cbssid_data = 1;
+		mask.chk_cbssid_data = 1;
 
 		break;
 
@@ -8369,6 +8433,11 @@ rtw_hal_mac_set_tx_lifetime(struct hal_info_t *hal, enum phl_band_idx band,
 		cfg.en.mgq_en = 1;
 		tmp = mgq_val >> HAL_MAC_TX_LIFETIME_UNIT_US_SHT;
 	}
+
+#ifdef CONFIG_CONCURRENT_MODE
+	cfg.val.vovi_val = 0x3000;
+	cfg.val.bebk_val = 0x3000;
+#endif
 
 	mac_status = mac->ops->set_hw_value(mac, MAC_AX_HW_SET_LIFETIME_CFG, (void *)&cfg);
 

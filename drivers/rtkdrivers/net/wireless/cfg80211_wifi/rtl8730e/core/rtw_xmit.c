@@ -7080,7 +7080,6 @@ u8 fill_txreq_pkt_mgmt(_adapter *padapter, struct xmit_frame *pxframe)
 
 	xf_txreq = pxframe->phl_txreq;
 	pkt_list = (struct rtw_pkt_buf_list *)xf_txreq->pkt_list;
-
 	//get_txreq_resources(padapter, pxframe,
 	//	(u8 **)&xf_txreq, (u8 **)&pkt_list, NULL, NULL);
 	//printk("p:txreq=0x%p, pkt_list=0x%p \n", (void *)xf_txreq, (void *)pkt_list);
@@ -7475,6 +7474,7 @@ void fill_txreq_mdata(_adapter *padapter, struct xmit_frame *pxframe)
 	/* packet identify */
 	if (pxframe->xftype == RTW_TX_DRV_MGMT) {
 		mdata->type = RTW_PHL_PKT_TYPE_MGNT;
+		mdata->qsel = RTW_TX_QSEL_MGT;
 	} else {
 		mdata->type = RTW_PHL_PKT_TYPE_DATA;
 	}
@@ -7488,11 +7488,7 @@ void fill_txreq_mdata(_adapter *padapter, struct xmit_frame *pxframe)
 
 	/* packet content */
 	mdata->hdr_len = pxframe->attrib.hdrlen;
-	if (!pxframe->attrib.qos_en) {
-		mdata->hw_seq_mode = 1;
-	} else {
-		mdata->hw_seq_mode = 0;
-	}
+	mdata->hw_seq_mode = 0;
 	mdata->sw_seq = pxframe->attrib.seqnum;
 	mdata->hw_sec_iv = 0;
 	mdata->nav_use_hdr = 0;
@@ -8443,7 +8439,7 @@ rtw_core_tx_recycle(void *drv_priv, struct rtw_xmit_req *txreq) {
 	core_add_record(padapter, REC_TX_PHL_RCC, txreq);
 #endif
 
-#ifdef CONFIG_PCI_HCI
+#if defined(CONFIG_PCI_HCI) || defined(CONFIG_AXI_HCI)
 	core_recycle_txreq_phyaddr(padapter, txreq);
 #endif
 	core_tx_free_xmitframe(padapter, pxframe);

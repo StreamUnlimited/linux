@@ -40,6 +40,7 @@ void hal_set_ops_8730ea(struct rtw_phl_com_t *phl_com,
 	ops->init_default_value = hal_init_default_value_8730ea;
 	ops->enable_interrupt = hal_enable_int_8730ea;
 	ops->disable_interrupt = hal_disable_int_8730ea;
+	ops->config_interrupt = hal_config_int_8730ea;
 	ops->recognize_interrupt = hal_recognize_int_8730ea;
 	ops->clear_interrupt = hal_clear_int_8730ea;
 	ops->interrupt_handler = hal_int_hdler_8730ea;

@@ -598,6 +598,8 @@ enum rtw_gpio_mode {
 #define PHL_GET_80211_HDR_RETRY(_hdr)	LE_BITS_TO_2BYTE((u8 *)_hdr, 11, 1)
 #define PHL_GET_80211_HDR_FRAG_NUM(_hdr)	LE_BITS_TO_2BYTE((u8 *)_hdr + 22, 0, 4)
 #define PHL_GET_80211_HDR_SEQUENCE(_hdr)	LE_BITS_TO_2BYTE((u8 *)_hdr + 22, 4, 12)
+#define PHL_GET_80211_HDR_ADDRESS1(_d, _hdr, _val) \
+		_os_mem_cpy(_d, (u8 *)_val, (u8 *)_hdr + FRAME_OFFSET_ADDRESS1, 6)
 #define PHL_GET_80211_HDR_ADDRESS2(_d, _hdr, _val) \
 		_os_mem_cpy(_d, (u8 *)_val, (u8 *)_hdr + FRAME_OFFSET_ADDRESS2, 6)
 #define PHL_GET_80211_HDR_ADDRESS3(_d, _hdr, _val) \

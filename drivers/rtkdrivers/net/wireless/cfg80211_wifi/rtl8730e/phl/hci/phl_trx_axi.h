@@ -18,7 +18,7 @@
 #define WP_DELAY_THRES_MS 1000
 #define WD_PAGE_SIZE 128
 #define WD_SUB_TXBD_SIZE (((TX_BUFFER_SEG_NUM == 0) ? 2 : ((TX_BUFFER_SEG_NUM == 1) ? 4 : 8) - 1) * 4 * 8 + TX_WIFI_INFO_SIZE)
-#define RX_BUF_SIZE 4000
+#define RX_BUF_SIZE 11460
 
 enum dump_list_type {
 	TYPE_WD_PAGE = 0,

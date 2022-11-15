@@ -201,6 +201,10 @@ rtw_hal_mac_cfg_nlo(struct hal_info_t *hal, u16 macid, u8 en,
 		    struct rtw_nlo_info *cfg);
 
 #endif /* CONFIG_WOWLAN */
+#ifdef RTW_PHL_BCN_IOT
+enum rtw_hal_status
+rtw_hal_mac_ax_fill_bcn_desc(void *mac, struct rtw_t_meta_data *mdata);
+#endif
 
 enum rtw_hal_status
 rtw_hal_mac_ax_fill_txdesc(void *mac, struct rtw_xmit_req *treq,

@@ -64,18 +64,18 @@ struct sport_dai {
 	int	irq;
 
 	/* total frames delivered through LRCLK */
-	u32 total_rx_counter;
-	u32 total_tx_counter;
+	u64 total_rx_counter;
+	u64 total_tx_counter;
 	/* total frames delivered through LRCLK */
-	u32 total_rx_counter_boundary;
-	u32 total_tx_counter_boundary;
+	u64 total_rx_counter_boundary;
+	u64 total_tx_counter_boundary;
 	/* total irq counts, if LRCLK delivers dma buffer_size(tx_sport_compare_val)
 	*  (rx_sport_compare_val) then triggers one sport irq */
-	u32 irq_tx_count;
-	u32 irq_rx_count;
+	u64 irq_tx_count;
+	u64 irq_rx_count;
 	/* size that LRCLK delivers, that triggers one sport irq */
-	u32 tx_sport_compare_val;
-	u32 rx_sport_compare_val;
+	u64 tx_sport_compare_val;
+	u64 rx_sport_compare_val;
 
 	spinlock_t lock;
 };
@@ -207,11 +207,17 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 
 		if ( is_playback ) {
 			sport->total_tx_counter_boundary = substream->runtime->boundary;
+			sport->total_tx_counter = 0;
+			sport->irq_tx_count = 0;
+			sport->dma_playback.total_sport_counter = 0;
 			dev_info(&sport->pdev->dev,"tx X:%d, counter boundary:%d", sport->tx_sport_compare_val, sport->total_tx_counter_boundary);
 			audio_sp_tx_start(sport->addr, true);
 			audio_sp_set_tx_count(sport->addr, sport->tx_sport_compare_val);
 		} else {
 			sport->total_rx_counter_boundary = substream->runtime->boundary;
+			sport->total_rx_counter = 0;
+			sport->irq_rx_count = 0;
+			sport->dma_capture.total_sport_counter = 0;
 			sport_info(1, &sport->pdev->dev,"rx X:%d, counter boundary:%d", sport->rx_sport_compare_val, sport->total_rx_counter_boundary);
 			audio_sp_rx_start(sport->addr, true);
 			audio_sp_set_rx_count(sport->addr, sport->rx_sport_compare_val);
@@ -232,10 +238,13 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		audio_sp_dma_cmd(sport->addr, false);
 
-		if ( is_playback )
+		if ( is_playback ) {
 			audio_sp_tx_start(sport->addr, false);
-		else
+			audio_sp_disable_tx_count(sport->addr);
+		} else {
 			audio_sp_rx_start(sport->addr, false);
+			audio_sp_disable_rx_count(sport->addr);
+		}
 
 		sport_info(1,&sport->pdev->dev,"%s stop done \n",__func__);
 		break;
@@ -282,13 +291,13 @@ static int enable_audio_source_clock(struct clock_params * params, int id, bool 
  */
 static snd_pcm_sframes_t sport_delay(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
 {
-	u32 counter = 0;
+	u64 counter = 0;
 	/* frames totally delivered through LRCLK */
-	u32 total_counter = 0;
+	u64 total_counter = 0;
 	/* delay(frames) is the value of substream->runtime->delay */
-	u32 delay = 0;
+	u64 delay = 0;
 	/* delay(frames) of dma buffer */
-	u32 dma_buf_delay = 0;
+	u64 dma_buf_delay = 0;
 	bool is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct sport_dai *sport;
 	sport = snd_soc_dai_get_drvdata(dai);
@@ -300,7 +309,7 @@ static snd_pcm_sframes_t sport_delay(struct snd_pcm_substream *substream, struct
 		dma_buf_delay = snd_pcm_playback_hw_avail(substream->runtime);
 	} else {
 		counter = audio_sp_get_rx_count(sport->addr);
-		total_counter += counter + sport->irq_rx_count * sport->rx_sport_compare_val;
+		total_counter = counter + sport->irq_rx_count * sport->rx_sport_compare_val;
 		dma_buf_delay = snd_pcm_capture_avail(substream->runtime);
 	}
 
@@ -675,12 +684,16 @@ static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
 	sport->dma_playback.datawidth = DMA_SLAVE_BUSWIDTH_4_BYTES;    //32bit
 	sport->dma_playback.src_maxburst = SP_TX_FIFO_DEPTH/2;    //deliver 8 samples to fifo one time, because fifo is 16 sample depth
 	sport->dma_playback.chan_name = "tx";
+	sport->dma_playback.total_sport_counter = 0;
+	sport->dma_playback.sport_base_addr = sport->addr;
 
 	sport->dma_capture.dev_phys_0 = sport->base + REG_SP_RX_FIFO_0_RD_ADDR;
 	sport->dma_capture.dev_phys_1 = sport->base + REG_SP_RX_FIFO_1_RD_ADDR;
 	sport->dma_capture.datawidth = DMA_SLAVE_BUSWIDTH_4_BYTES;    //32bit
 	sport->dma_capture.src_maxburst = SP_RX_FIFO_DEPTH/2;    //deliver 8 samples to fifo one time, because fifo is 16 sample depth
 	sport->dma_capture.chan_name = "rx";
+	sport->dma_capture.total_sport_counter = 0;
+	sport->dma_capture.sport_base_addr = sport->addr;
 
 	switch ( sport->id )
 	{
@@ -876,22 +889,24 @@ static irqreturn_t rtk_sport_interrupt(int irq, void * dai)
 
 	if ( audio_sp_is_rx_sport_irq(sport->addr) ) {
 		sport->irq_rx_count++;
-		sport->total_rx_counter = sport->irq_rx_count * sport->rx_sport_compare_val;
+		sport->total_rx_counter += sport->rx_sport_compare_val;
 		if ( sport->total_rx_counter >= sport->total_rx_counter_boundary ) {
 			sport->total_rx_counter -= sport->total_rx_counter_boundary;
 			sport->irq_rx_count = 0;
 		}
-
+		sport->dma_capture.total_sport_counter = sport->total_rx_counter;
+		//pr_info("total_rx_counter:%lld", sport->total_rx_counter);
 		audio_sp_clear_rx_sport_irq(sport->addr);
 	} else if ( audio_sp_is_tx_sport_irq(sport->addr) ) {
 		sport->irq_tx_count++;
 		//pr_info("irq_tx_count:%d", sport->irq_tx_count);
-		sport->total_tx_counter = sport->irq_tx_count * sport->tx_sport_compare_val;
+		sport->total_tx_counter += sport->tx_sport_compare_val;
 		if ( sport->total_tx_counter >= sport->total_tx_counter_boundary ) {
 			sport->total_tx_counter -= sport->total_tx_counter_boundary;
 			sport->irq_tx_count = 0;
 		}
-
+		sport->dma_playback.total_sport_counter = sport->total_tx_counter;
+		//pr_info("total_tx_counter:%lld, total_sport_counter:%lld", sport->total_tx_counter, sport->dma_playback.total_sport_counter);
 		audio_sp_clear_tx_sport_irq(sport->addr);
 	}
 

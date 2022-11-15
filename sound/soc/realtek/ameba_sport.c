@@ -818,3 +818,45 @@ void audio_sp_disable_rx_tx_sport_irq(void __iomem * sportx)
 	writel(tmp, sportx + REG_SP_RX_COUNTER1);
 
 }
+
+#if 0
+struct sport_counter_info {
+	void __iomem * sport_base_addr;
+	u32 irq_total_tx_counter;
+	u32 irq_total_rx_counter;
+};
+
+struct sport_counter_info counter_info[4] = {{.sport_base_addr = NULL, .irq_total_tx_counter = 0, .irq_total_rx_counter = 0},
+											{.sport_base_addr = NULL, .irq_total_tx_counter = 0, .irq_total_rx_counter = 0},
+											{.sport_base_addr = NULL, .irq_total_tx_counter = 0, .irq_total_rx_counter = 0}}
+
+void audio_sp_set_sport_addr(u32 sport_index, void __iomem * sportx)
+{
+	counter_info[sport_index].sport_base_addr = sportx;
+}
+
+__iomem * audio_sp_get_sport_addr(u32 sport_index)
+{
+	return counter_info[sport_index].sport_base_addr;
+}
+
+void audio_sp_set_sport_irq_total_tx_counter(u32 sport_index, u32 irq_total_tx_counter)
+{
+	counter_info[sport_index].irq_total_tx_counter = irq_total_tx_counter;
+}
+
+u32 audio_sp_get_sport_irq_total_tx_counter(u32 sport_index)
+{
+	return counter_info[sport_index].irq_total_tx_counter;
+}
+
+void audio_sp_set_sport_irq_total_rx_counter(u32 sport_index, u32 irq_total_rx_counter);
+{
+	counter_info[sport_index].irq_total_rx_counter = irq_total_rx_counter;
+}
+
+u32 audio_sp_get_sport_irq_total_rx_counter(u32 sport_index)
+{
+	return counter_info[sport_index].irq_total_rx_counter;
+}
+#endif

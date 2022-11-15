@@ -653,10 +653,12 @@ static u8 _rtw_mi_disconnect(_adapter *adapter, void *data)
 			rtw_ap_inform_ch_switch(adapter, mlmeext->chandef.chan, mlmeext->chandef.offset);
 		} else
 #endif
+#ifdef RTW_PHL_BCN
 #ifdef CONFIG_STA_CMD_DISPR
 			rtw_phl_cmd_stop_beacon(adapter_to_dvobj(adapter)->phl, adapter->phl_role, _TRUE, PHL_CMD_NO_WAIT, 0);
 #else
 			rtw_phl_cmd_stop_beacon(adapter_to_dvobj(adapter)->phl, adapter->phl_role, _TRUE, PHL_CMD_DIRECTLY, 0);
+#endif
 #endif
 		rtw_sta_flush(adapter, _FALSE);
 

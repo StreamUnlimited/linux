@@ -66,7 +66,7 @@
 
 
 /* data * 4 + MGQ * 1 + HIQ * 1 */
-#define TX_DMA_CHANNEL_ENTRY_8730EA 7
+#define TX_DMA_CHANNEL_ENTRY_8730EA 6
 /* RXQ * 1 + RPQ * 1 */
 #define RX_DMA_CHANNEL_ENTRY_8730EA 1
 
@@ -188,14 +188,14 @@
 #define GET_RX_RP_PKT_MAC_ID(rppkt) LE_BITS_TO_4BYTE(rppkt + 0x00, 0, 8)
 
 /* CONFIG_PHL_TXSC */
-#define TID_0_QSEL 0
-#define TID_1_QSEL 1
-#define TID_2_QSEL 1
-#define TID_3_QSEL 0
-#define TID_4_QSEL 2
-#define TID_5_QSEL 2
-#define TID_6_QSEL 3
-#define TID_7_QSEL 3
+#define TID_0_QSEL RTW_TXDESC_QSEL_BE
+#define TID_1_QSEL RTW_TXDESC_QSEL_BK
+#define TID_2_QSEL RTW_TXDESC_QSEL_BK
+#define TID_3_QSEL RTW_TXDESC_QSEL_BE
+#define TID_4_QSEL RTW_TXDESC_QSEL_VI
+#define TID_5_QSEL RTW_TXDESC_QSEL_VI
+#define TID_6_QSEL RTW_TXDESC_QSEL_VO
+#define TID_7_QSEL RTW_TXDESC_QSEL_VO
 #define TID_0_IND 0
 #define TID_1_IND 0
 #define TID_2_IND 1

@@ -926,13 +926,12 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 	u32 mbssid_idx = para->mbssid_idx;
 	u32 set_val = para->val;
 	u16 w_val16 = MAC_AX_R16_DEAD;
-	u32 val32;
+	u32 val32 = 0;
 	u32 w_val32 = MAC_AX_R32_DEAD;
-	u8 mbid_max;
+	u8 mbid_max, val8 = 0;
 	u8 i = 0, j = 0;
 	u32 ret = MACSUCCESS;
 	u8 mbssid_num = 0;
-
 
 	if (port >= MAC_AX_PORT_NUM) {
 		PLTFM_MSG_ERR("[ERR] invalid port idx %d\n", port);
@@ -1001,8 +1000,8 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 
 	case MAC_AX_PCFG_RX_SYNC:
 		val32 = MAC_REG_R32(cfg_regl[port]);
-		w_val32 = set_val ? val32 | b_rxtsfupd_l[port] :
-			  val32 & ~b_rxtsfupd_l[port];
+		w_val32 = set_val ? val32 & ~b_rxtsfupd_l[port] :
+			  val32 | b_rxtsfupd_l[port];
 		if (w_val32 != val32) {
 			MAC_REG_W32(cfg_regl[port], w_val32);
 		}
@@ -1080,6 +1079,7 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 		if (w_val32 != val32) {
 			MAC_REG_W32(REG_NOA0_TBTT_PROHIBIT, w_val32);
 		}
+
 		break;
 
 	case MAC_AX_PCFG_BCN_HOLD_TIME:
@@ -1097,7 +1097,7 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 		}
 
 		if (w_val32 != val32) {
-			MAC_REG_W32(REG_NOA0_TBTT_PROHIBIT, w_val32);
+			MAC_REG_W32(phb_regl[port], w_val32);
 		}
 		break;
 
@@ -1201,6 +1201,51 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 			MAC_REG_W32(bcnspc_regl[port], w_val32);
 		}
 		break;
+	case MAC_AX_PCFG_SW_BCN:
+#ifdef RTW_PHL_BCN_IOT
+		if (set_val == 1) {
+			/* set REG_CR bit 8 */
+			val8 = MAC_REG_R8(REG_CR + 1);
+			val8 |= BIT(0); // ENSWBCN
+			MAC_REG_W8(REG_CR + 1, val8);
+
+			/* Software beacon should set this bit */
+			val32 = MAC_REG_R32(REG_AXI_CTRL);
+			val32 |= BIT_MBSSID_ENSWBCN_BACKDOOR;
+			MAC_REG_W32(REG_AXI_CTRL, val32);
+
+			val32 = MAC_REG_R32(REG_DWBCN1_CTRL);
+			switch (port) {
+			case MAC_AX_PORT_0:
+				val32 &= ~BIT_SW_BCN_SEL_EN;
+				break;
+			case MAC_AX_PORT_1:
+				val32 |= BIT_SW_BCN_SEL_EN;
+				val32 = BIT_SET_SW_BCN_SEL(val32, 1);
+				break;
+			case MAC_AX_PORT_2:
+				val32 |= BIT_SW_BCN_SEL_EN;
+				val32 = BIT_SET_SW_BCN_SEL(val32, 2);
+				break;
+			}
+			MAC_REG_W32(REG_DWBCN1_CTRL, val32);
+		} else {
+			/* set REG_CR bit 8 */
+			val8 = MAC_REG_R8(REG_CR + 1);
+			val8 &= ~BIT(0); // ENSWBCN
+			MAC_REG_W8(REG_CR + 1, val8);
+
+			/* Software beacon should set this bit */
+			val32 = MAC_REG_R32(REG_AXI_CTRL);
+			val32 &= ~BIT_MBSSID_ENSWBCN_BACKDOOR;
+			MAC_REG_W32(REG_AXI_CTRL, val32);
+
+			val32 = MAC_REG_R32(REG_DWBCN1_CTRL);
+			val32 &= ~(BIT_SW_BCN_SEL_EN | BITS_SW_BCN_SEL);
+			MAC_REG_W32(REG_DWBCN1_CTRL, val32);
+		}
+#endif
+		break;
 
 	default:
 		PLTFM_MSG_ERR("[ERR] invalid cfg type %d\n", type);
@@ -1275,8 +1320,7 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 		}
 	}*/
 
-	cfg_para.val = (net_type == MAC_AX_NET_TYPE_INFRA ||
-			net_type == MAC_AX_NET_TYPE_ADHOC) ? 0 : 1;
+	cfg_para.val = (net_type == MAC_AX_NET_TYPE_AP) ? 1 : 0;
 	ret = mac_port_cfg(adapter, MAC_AX_PCFG_TX_RPT, &cfg_para);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]P%d cfg tx rpt fail %d\n",
@@ -1284,8 +1328,7 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 		return ret;
 	}
 
-	cfg_para.val = (net_type == MAC_AX_NET_TYPE_INFRA ||
-			net_type == MAC_AX_NET_TYPE_ADHOC) ? 1 : 0;
+	cfg_para.val = (net_type == MAC_AX_NET_TYPE_AP) ? 0 : 1;
 	ret = mac_port_cfg(adapter, MAC_AX_PCFG_RX_RPT, &cfg_para);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]P%d cfg rx rpt fail %d\n",
@@ -1317,6 +1360,7 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 		return ret;
 	}
 
+	/* disable update TSF */
 	cfg_para.val = 0;
 	ret = mac_port_cfg(adapter, MAC_AX_PCFG_RX_SYNC, &cfg_para);
 	if (ret != MACSUCCESS) {
@@ -1394,15 +1438,36 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 	switch (net_type) {
 	case MAC_AX_NET_TYPE_NO_LINK:
 		pinfo->stat = PORT_ST_NOLINK;
+		cfg_para.val = 0;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_SW_BCN, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d disable sw beacon fail %d\n",
+			      port, ret);
+			return ret;
+		}
 		break;
 	case MAC_AX_NET_TYPE_ADHOC:
 		pinfo->stat = PORT_ST_ADHOC;
 		break;
 	case MAC_AX_NET_TYPE_INFRA:
 		pinfo->stat = PORT_ST_INFRA;
+		cfg_para.val = 0;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_SW_BCN, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d disable sw beacon fail %d\n",
+			      port, ret);
+			return ret;
+		}
 		break;
 	case MAC_AX_NET_TYPE_AP:
 		pinfo->stat = PORT_ST_AP;
+		cfg_para.val = 1;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_SW_BCN, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d enable sw beacon fail %d\n",
+			      port, ret);
+			return ret;
+		}
 		break;
 	}
 

@@ -1016,7 +1016,7 @@ static enum rtw_phl_status _init_postcfg_set_rxfltr(struct phl_info_t *phl_info)
 			break;
 		}
 
-		hstatus = rtw_hal_set_rxfltr_by_type(phl_info->hal, 0, RTW_PHL_PKT_TYPE_CTRL, 1);
+		hstatus = rtw_hal_set_rxfltr_by_subtype(phl_info->hal, 0, RTW_PHL_PKT_TYPE_CTRL, 10, 1);
 		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
 			PHL_ERR("[wow] set rx filter ctrl to host fail, status(%u)\n", hstatus);
 			break;

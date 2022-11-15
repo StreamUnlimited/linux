@@ -25,6 +25,8 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 
+//why need sport.h in dma? Because we need to check the I2S counter for get_time_info
+#include "ameba_sport.h"
 #include "dma.h"
 
 #define IS_6_8_CHANNEL(NUM) (((NUM) == 6) || \
@@ -76,6 +78,7 @@ static const struct snd_pcm_hardware gdma_hardware = {
 		    SNDRV_PCM_INFO_MMAP_VALID |
 		    SNDRV_PCM_INFO_PAUSE |
 		    SNDRV_PCM_INFO_RESUME |
+			SNDRV_PCM_INFO_HAS_LINK_ATIME |
 		    SNDRV_PCM_INFO_NO_PERIOD_WAKEUP,
 	.buffer_bytes_max = MAX_IDMA_BUFFER,
 	.period_bytes_min = 128,
@@ -116,6 +119,80 @@ struct ameba_pcm_dma_private {
 	unsigned int sync_dma_0_1;                   //sync dma0 & dma1 for 6/8channel.
 };
 
+static u64 ameba_adjust_codec_delay(struct snd_pcm_substream *substream,
+				u64 nsec)
+{
+	struct snd_soc_pcm_runtime *rtd = snd_pcm_substream_chip(substream);
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	u64 codec_frames, codec_nsecs;
+
+	if (!codec_dai->driver->ops->delay)
+		return nsec;
+
+	codec_frames = codec_dai->driver->ops->delay(substream, codec_dai);
+	codec_nsecs = div_u64(codec_frames * 1000000000LL,
+			      substream->runtime->rate);
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		return nsec + codec_nsecs;
+
+	return (nsec > codec_nsecs) ? nsec - codec_nsecs : 0;
+}
+
+static u64 ameba_get_dai_counter_ntime(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct ameba_pcm_dma_params *dma_params = dma_private->pcm_params;
+	u64 nsec = 0;
+	//current total i2s counter of audio frames;
+	u64 now_counter = 0;
+	//means the delta_counter between now counter and last irq total counter.
+	u64 delta_counter = 0;
+
+	if (dma_params == NULL) {
+		return -EFAULT;
+	}
+
+	delta_counter = audio_sp_get_tx_count(dma_params->sport_base_addr);
+	now_counter = dma_params->total_sport_counter + delta_counter;
+	//this will cause __aeabi_uldivmod compile issue, so need to use div_u64 func.
+	//nsec = now_counter * 1000000000 / runtime->rate;
+	//pr_info("dma_params->total_sport_counter:%lld, delta_counter:%lld, now_counter:%lld \n", dma_params->total_sport_counter, delta_counter, now_counter);
+	nsec = div_u64(now_counter * 1000000000LL, runtime->rate);
+	return nsec;
+}
+
+static int ameba_get_time_info(struct snd_pcm_substream *substream,
+			struct timespec *system_ts, struct timespec *audio_ts,
+			struct snd_pcm_audio_tstamp_config *audio_tstamp_config,
+			struct snd_pcm_audio_tstamp_report *audio_tstamp_report)
+{
+	u64 nsec;
+
+	if ((substream->runtime->hw.info & SNDRV_PCM_INFO_HAS_LINK_ATIME) &&
+		(audio_tstamp_config->type_requested == SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK)) {
+		snd_pcm_gettime(substream->runtime, system_ts);
+
+		nsec = ameba_get_dai_counter_ntime(substream);
+		if (audio_tstamp_config->report_delay)
+			nsec = ameba_adjust_codec_delay(substream, nsec);
+
+		*audio_ts = ns_to_timespec(nsec);
+		//pr_info("%s nsec:%lld", __func__, nsec);
+		audio_tstamp_report->actual_type = SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK;
+		audio_tstamp_report->accuracy_report = 1; /* rest of struct is valid */
+		audio_tstamp_report->accuracy = 42; /* 24MHzWallClk == 42ns resolution */
+
+	} else {
+		audio_tstamp_report->actual_type = SNDRV_PCM_AUDIO_TSTAMP_TYPE_DEFAULT;
+	}
+
+	return 0;
+}
+
 static int gdma_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -138,6 +215,11 @@ static int gdma_open(struct snd_pcm_substream *substream)
 	runtime->private_data = dma_private;
 	dma_private->substream = substream;
 	dma_private->sync_dma_0_1 = 0;
+	//Because in soc-pcm.c soc_new_pcm:rtd->ops.get_time_info is not set.
+	//substream->ops = rtd->ops, so it's get_time_info is not set,too.
+	//This means add get_time_info in gdma_ops does not work.
+	//Need to set it ourself.the substream->ops is const, need to force change to normal.
+	((struct snd_pcm_ops*)(substream->ops))->get_time_info = ameba_get_time_info;
 	return 0;
 }
 
@@ -476,7 +558,7 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 		data_1->buffer_size = params_buffer_bytes(params) * data_1_channels / params_channels(params);
 		data_1->channels = data_1_channels;
 		data_1->dma_id = 1;
-		dma_info(1,component->dev,"%s, dma 1 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d; \n",__func__,data_1->period_bytes,data_1->period_num,data_1->buffer_size,data_1->channels,params_width(params),params_format(params));
+		dev_info(component->dev,"%s, dma 1 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d; \n",__func__,data_1->period_bytes,data_1->period_num,data_1->buffer_size,data_1->channels,params_width(params),params_format(params));
 	}
 
 	dev_info(component->dev,"%s, dma 0 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d,rate:%d; \n",__func__,data_0->period_bytes,data_0->period_num,data_0->buffer_size,data_0->channels,params_width(params),params_format(params),params_rate(params));
@@ -828,8 +910,8 @@ static const struct snd_pcm_ops gdma_ops = {
 	.hw_free	= gdma_hw_free,
 	.prepare	= gdma_prepare,
 	.copy_user  = gdma_copy,
+	.get_time_info = ameba_get_time_info,
 };
-
 
 /*
  *mainly assign members'values for substream->dma_buffer,including

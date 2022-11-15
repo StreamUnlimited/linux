@@ -126,6 +126,14 @@ struct hal_trx_ops {
 		       struct tx_base_desc *txbd_ring,
 		       struct rtw_wd_page *wd_page,
 		       u8 ch_idx, u16 wd_num);
+#ifdef RTW_PHL_BCN_IOT
+	enum rtw_hal_status
+	(*update_bcn_txbd)(struct hal_info_t *hal,
+			   struct tx_base_desc *txbd_ring,
+			   void *bcn_info);
+	enum rtw_hal_status
+	(*tx_bcn_start)(struct hal_info_t *hal);
+#endif
 	enum rtw_hal_status
 	(*tx_start)(struct hal_info_t *hal,
 		    struct tx_base_desc *txbd, u8 dma_ch);
@@ -133,6 +141,7 @@ struct hal_trx_ops {
 	u8(*get_fwcmd_queue_idx)(void);
 
 	u8(*check_rxrdy)(struct rtw_phl_com_t *phl_com, u8 *rxbuf, u8 dma_ch);
+	u32(*check_bcn_status)(struct hal_info_t *hal);
 	bool(*check_tx_done)(struct hal_info_t *hal, u8 dma_ch);
 	enum rtw_hal_status
 	(*handle_rx_buffer)(struct rtw_phl_com_t *phl_com,
@@ -248,8 +257,8 @@ struct hal_info_t {
 #endif
 
 #ifdef CONFIG_AXI_HCI
-	u32 txdone_ch_map;
-	u32 tx_dma_ch_map;
+	u32 txdone_ch_map[4];
+	u32 tx_dma_ch_map[4];
 #endif
 	void *rpr_cfg;
 

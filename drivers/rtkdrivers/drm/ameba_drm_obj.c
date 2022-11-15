@@ -38,37 +38,58 @@
 #include "ameba_drm_drv.h"
 #include "ameba_drm_util.h"
 
-#define CHECK_PARAM_RETURN_VALUE(a,b)   {if(0 == (u32)a){printk(KERN_DEBUG" %s-%d return !\n",__func__,__LINE__); return b;}}
-#define CHECK_PARAM_RETURN(a)           {if(0 == (u32)a){printk(KERN_DEBUG" %s-%d return !\n",__func__,__LINE__); return ;}}
+#define CHECK_IS_NULL(a) ((NULL==a)?(1):(0))
 
-
+//just update some area in the plane
+//used for second layout
 struct ameba_buf_struct {
 	u32 layer_address;
 
 	//used to copy window from fb to show
 	bool  use_sec_buffer ;
-	void *sec_vaddr;
-	dma_addr_t sec_paddr;
 	size_t size ;
+	void *sec_vaddr;		//virtual address
+	dma_addr_t sec_paddr;	//phy address
 };
 static struct ameba_buf_struct sec_layer_info[LCDC_LAYER_MAX_NUM]={0,};
 
+/**
+  * @brief  lcdc hw control struction 
+  */
 struct lcdc_hw_ctx_type {
 
-	//lcdc ctl register and struct instance
-	LCDC_InitTypeDef lcdc_initstancd;
-	void __iomem *reg_base_addr;
+	LCDC_InitTypeDef lcdc_initstancd; 	//LCDC Init Structure Definition
+	void __iomem *reg_base_addr; 		//LCDC Register
 
 	u32 ldcd_writeback_buffer_length;
 	u32 ldcd_writeback_buffer ;
 	dma_addr_t dump_paddr;
 
-	int irq;
+	int irq;							//LCDC IRQ value
 
-	struct clk *clock;
+	struct clk *clock; 					//LCDC clock 
 
-	///point to drv->private->crtc info , defined in ameba_drm_drv.c
 	struct drm_crtc *crtc;
+
+	u32 lcdc_debug;
+
+	//display config params
+	u32 lcdc_width;
+	u32 lcdc_height;
+	u32 lcdc_framerate;
+
+	u32 lcdc_bkg_color;
+	u32 lcdc_undflw_mode;
+	u32 lcdc_undflw_color;
+
+	u32 lcdc_burstsize;
+
+	//layer params
+	u32 lcdc_laycolor_key_en;
+	u32 lcdc_laycolor_key; 
+
+	u32 lcdc_layblend_factor;
+	u32 lcdc_layblend_alpha; 
 };
 
 void lcdc_underflow_reset(void *data)
@@ -76,52 +97,86 @@ void lcdc_underflow_reset(void *data)
 	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)data ;
 	void __iomem* plcdc_reg = lcdc_ctx->reg_base_addr;
 
-	//todo
-	LCDC_Cmd(plcdc_reg, DISABLE);
-	printk(KERN_DEBUG"Reset lcdc...\n");
+	ameba_lcdc_enable(plcdc_reg, DISABLE);
+	ameba_lcdc_enable(plcdc_reg, ENABLE);
 
-	LCDC_Cmd(plcdc_reg, ENABLE);
-	while (!LCDC_CheckLCDCReady(plcdc_reg));
+	DRM_TEST_PRINTK("Reset lcdc finish...\n");
 }
+
+static ssize_t lcdc_debug_show(struct device *dev, struct device_attribute*attr, char *buf)
+{
+	struct drm_device			*drm_dev = dev_get_drvdata(dev);
+	struct ameba_drm_private	*ameba_priv = (struct ameba_drm_private*)(drm_dev->dev_private);
+	struct lcdc_hw_ctx_type		*lcdc_ctx = (struct lcdc_hw_ctx_type*)(ameba_priv->lcdc_hw_ctx);
+
+	return sprintf(buf, "lcdc_debug=%d\n", lcdc_ctx->lcdc_debug);
+}
+
+static ssize_t lcdc_debug_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct drm_device			*drm_dev = dev_get_drvdata(dev);
+	struct ameba_drm_private	*ameba_priv = (struct ameba_drm_private*)(drm_dev->dev_private);
+	struct lcdc_hw_ctx_type		*lcdc_ctx = (struct lcdc_hw_ctx_type*)(ameba_priv->lcdc_hw_ctx);
+	u32 tmp = 0 ;
+	char c;
+	size_t tmp_count = count;
+	char* pbuf = (char*)buf;
+
+	//printk("count=%d/buf=%s\n",tmp_count,pbuf);
+	while(*pbuf != 0 && tmp_count > 1)
+	{
+		c = *pbuf;
+		if((c<'0')||(c>'9'))
+			break;
+		tmp = tmp * 10 + (c - '0');
+		pbuf++;
+		tmp_count--;
+	}
+
+	lcdc_ctx->lcdc_debug = tmp;
+    return count;
+}
+
+static DEVICE_ATTR(lcdc_debug, S_IWUSR |S_IRUGO, lcdc_debug_show, lcdc_debug_store);
+
+static struct attribute *lcdc_debug_attrs[] = {
+        &dev_attr_lcdc_debug.attr,
+        NULL
+};
+
+static const struct attribute_group lcdc_debug_attr_grp = {
+        .attrs = lcdc_debug_attrs,
+};
 
 
 ///defined in drm_fourcc.c :: drm_mode_legacy_fb_format
 static const struct ameba_format ameba_formats[] = {
 	/* 16bpp RGB: */
-	{ DRM_FORMAT_RGB565, LCDC_LAYER_IMG_FORMAT_RGB565 },
+	{2, DRM_FORMAT_RGB565, LCDC_LAYER_IMG_FORMAT_RGB565 },
 	/* 32bpp [A]RGB: */
-	{ DRM_FORMAT_ARGB8888, LCDC_LAYER_IMG_FORMAT_ARGB8888 },
+	{4, DRM_FORMAT_ARGB8888, LCDC_LAYER_IMG_FORMAT_ARGB8888 },
 	/* 16bpp ARGB: */
-	{ DRM_FORMAT_XRGB1555, LCDC_LAYER_IMG_FORMAT_ARGB1555 },
+	{2, DRM_FORMAT_XRGB1555, LCDC_LAYER_IMG_FORMAT_ARGB1555 },
 	/* 24bpp RGB: */
-	{ DRM_FORMAT_RGB888, LCDC_LAYER_IMG_FORMAT_RGB888 },
+	{3, DRM_FORMAT_RGB888, LCDC_LAYER_IMG_FORMAT_RGB888 },
 };
 static const u32 ameba_channel_formats[] = {
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_ARGB8888,
-
 	DRM_FORMAT_XRGB1555,
 	DRM_FORMAT_RGB888
 };
-//get bytes from pixformat
-static u32 getBppFromFormat(u32 pixformat)
-{
-	u32 bpp = 4 ;
 
-	switch (pixformat) {
-	case LCDC_LAYER_IMG_FORMAT_ARGB1555:
-	case LCDC_LAYER_IMG_FORMAT_RGB565:
-		bpp = 2 ;
-		break;
-	case LCDC_LAYER_IMG_FORMAT_RGB888:
-		bpp = 3;
-		break;
-	case LCDC_LAYER_IMG_FORMAT_ARGB8888:
-	default:
-		bpp = 4;
-		break;
+static u32 getBppFromFormat(u32 pixel_format)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(ameba_formats); i++)
+	{
+		if (ameba_formats[i].pixel_format == pixel_format) {
+			return ameba_formats[i].pixel_bpp;
+		}
 	}
-	return bpp ;
+	return 4 ;
 }
 
 /* convert from fourcc format to lcdc format */
@@ -129,9 +184,11 @@ static u32 ameba_get_format(u32 pixel_format)
 {
 	int i;
 	for (i = 0; i < ARRAY_SIZE(ameba_formats); i++)
+	{
 		if (ameba_formats[i].pixel_format == pixel_format) {
 			return ameba_formats[i].hw_format;
 		}
+	}
 
 	/* not found */
 	DRM_ERROR("Not found pixel format!!fourcc_format= 0x%x\n", pixel_format);
@@ -144,57 +201,61 @@ static bool ameba_crtc_mode_fixup(struct drm_crtc *crtc,
 	return true;
 }
 
-//while video frame done, should emit this event
-//todo @20210917
 static int ameba_crtc_enable_vblank(struct drm_crtc *crtc)
 {
-	struct ameba_crtc *kcrtc  ;
-	struct lcdc_hw_ctx_type *lcdc_ctx ;
-	DRM_LCDC_IN();
+	struct lcdc_hw_ctx_type 	*lcdc_ctx ;
+	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc) ;
+
 #ifdef ENABLE_LCDC_CTL
-	CHECK_PARAM_RETURN_VALUE(crtc, 0);
-	kcrtc = to_ameba_crtc(crtc);
-	CHECK_PARAM_RETURN_VALUE(kcrtc, 0);
+	if( CHECK_IS_NULL(kcrtc) 
+		|| CHECK_IS_NULL(kcrtc->lcdc_hw_ctx))
+		return 0;
+
 	lcdc_ctx = kcrtc->lcdc_hw_ctx;
-	CHECK_PARAM_RETURN_VALUE(lcdc_ctx, 0);
+
 	ameba_lcdc_irq_enable(lcdc_ctx->reg_base_addr, LCDC_BIT_LCD_LIN_INTEN, ENABLE);
 	ameba_lcdc_enable_SHW(lcdc_ctx->reg_base_addr);
 #endif
 
-	DRM_LCDC_OUT();
 	return 0 ;
 }
 
 static void ameba_crtc_disable_vblank(struct drm_crtc *crtc)
 {
-	struct ameba_crtc *kcrtc  ;
-	struct lcdc_hw_ctx_type *lcdc_ctx ;
-	DRM_LCDC_IN();
+	struct lcdc_hw_ctx_type 	*lcdc_ctx ;
+	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
 
 #ifdef ENABLE_LCDC_CTL
-	CHECK_PARAM_RETURN(crtc);
-	kcrtc = to_ameba_crtc(crtc);
-	CHECK_PARAM_RETURN(kcrtc);
-	lcdc_ctx = kcrtc->lcdc_hw_ctx;
-	CHECK_PARAM_RETURN(lcdc_ctx);
+	if( CHECK_IS_NULL(kcrtc) 
+		|| CHECK_IS_NULL(kcrtc->lcdc_hw_ctx))
+		return ;	
+
+	lcdc_ctx = (struct lcdc_hw_ctx_type *)(kcrtc->lcdc_hw_ctx);
+
 	ameba_lcdc_irq_enable(lcdc_ctx->reg_base_addr, LCDC_BIT_LCD_LIN_INTEN, DISABLE);
+
 	ameba_lcdc_enable_SHW(lcdc_ctx->reg_base_addr);
 #endif
-
-	DRM_LCDC_OUT();
 }
 
 static irqreturn_t ameba_irq_handler(int irq, void *data)
 {
 	/* vblank irq */
-	struct drm_crtc *crtc = (struct drm_crtc *)data ;
-	struct ameba_crtc *kcrtc = to_ameba_crtc(crtc);
-	struct lcdc_hw_ctx_type *lcdc_ctx = kcrtc->lcdc_hw_ctx;
-	u32 irq_status = ameba_lcdc_get_irqstatus(lcdc_ctx->reg_base_addr) ;
-	//DRM_TEST_PRINTK("here %s-%d [irq_status=0x%x-0x%x]\n",__func__,__LINE__,irq_status,LCDC_BIT_LCD_LIN_INTS);
-	if (irq_status & LCDC_BIT_LCD_LIN_INTS) {
-		ameba_lcdc_clean_irqstatus(lcdc_ctx->reg_base_addr, LCDC_BIT_LCD_LIN_INTS);
+	u32 irq_status;
+	struct drm_crtc 			*crtc = (struct drm_crtc *)data ;
+	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
+	struct lcdc_hw_ctx_type 	*lcdc_ctx;
 
+	if( CHECK_IS_NULL(kcrtc) 
+		|| CHECK_IS_NULL(kcrtc->lcdc_hw_ctx))
+		return IRQ_HANDLED;
+
+	lcdc_ctx = kcrtc->lcdc_hw_ctx;
+	
+	irq_status = ameba_lcdc_get_irqstatus(lcdc_ctx->reg_base_addr) ;
+	LCDC_ClearINT(lcdc_ctx->reg_base_addr, irq_status);
+
+	if (irq_status & LCDC_BIT_LCD_LIN_INTS) {
 		///send out vblank msg
 		drm_crtc_handle_vblank(crtc);
 	}
@@ -202,7 +263,6 @@ static irqreturn_t ameba_irq_handler(int irq, void *data)
 	if (irq_status & LCDC_BIT_DMA_UN_INTS) {
 		drm_underflow_flag_add(1);
 		if (drm_get_underflow_flag() == 1) {
-			printk(KERN_DEBUG"DMA Under-----\n");
 			mipi_dsi_underflow_reset();
 		}
 	}
@@ -213,17 +273,18 @@ static irqreturn_t ameba_irq_handler(int irq, void *data)
 static void ameba_display_enable(struct lcdc_hw_ctx_type *ctx)
 {
 	void __iomem *base ;
-	DRM_LCDC_IN();
+
 #ifdef ENABLE_LCDC_CTL
-	CHECK_PARAM_RETURN(ctx);
+	if( CHECK_IS_NULL(ctx) 
+		|| CHECK_IS_NULL(ctx->reg_base_addr))
+		return ;
+
 	base = ctx->reg_base_addr;
-	CHECK_PARAM_RETURN(base);
+
 	ameba_lcdc_enable(base, ENABLE);
-	//ameba_lcdc_config_setvalid(base, &(ctx->lcdc_initstancd));
-	//DRM_TEST_PRINTK("[LCDC]here lcdc enable success  %s-%d \n", __func__, __LINE__);
+
 	ameba_lcdc_enable_SHW(base);
 #endif
-	DRM_LCDC_OUT();
 }
 static void ameba_display_disable(struct lcdc_hw_ctx_type *ctx)
 {
@@ -231,58 +292,55 @@ static void ameba_display_disable(struct lcdc_hw_ctx_type *ctx)
 		should disable mipi first , then disable lcdc
 	*/
 	void __iomem *base ;
-	DRM_LCDC_IN();
-	CHECK_PARAM_RETURN(ctx);
+	if( CHECK_IS_NULL(ctx) 
+		|| CHECK_IS_NULL(ctx->reg_base_addr))
+		return ;
+
 	base = ctx->reg_base_addr;
-	CHECK_PARAM_RETURN(base);
 	ameba_lcdc_enable(base, DISABLE);
 	ameba_lcdc_enable_SHW(base);
-	DRM_LCDC_OUT();
 }
 
-static inline void ameba_dump_regs(struct lcdc_hw_ctx_type *ctx)
+static inline void ameba_dump_regs(struct lcdc_hw_ctx_type *ctx, const char *filename)
 {
-#if  0
-	return ;
-#else
 #ifdef ENABLE_LCDC_CTL
-	LcdcDumpRegValue(ctx->reg_base_addr, "ameba_dump_regs");
-#endif
+	if(ctx->lcdc_debug){
+		LcdcDumpRegValue(ctx->reg_base_addr, filename);
+	}
 #endif
 }
 
 static void ameba_crtc_atomic_enable(struct drm_crtc *crtc,
 									 struct drm_crtc_state *old_state)
 {
-	struct ameba_crtc *kcrtc = to_ameba_crtc(crtc);
-	struct lcdc_hw_ctx_type *ctx = kcrtc->lcdc_hw_ctx;
-	DRM_LCDC_IN();
-	if (kcrtc->enable) {
-		return;
-	}
+	struct lcdc_hw_ctx_type 	*ctx;
+	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
 
+	if( CHECK_IS_NULL(kcrtc) 
+		|| kcrtc->enable )
+		return ;
+
+	ctx = kcrtc->lcdc_hw_ctx;
 	ameba_display_enable(ctx);
-	ameba_dump_regs(ctx);
+	ameba_dump_regs(ctx, __func__);
 	drm_crtc_vblank_on(crtc);
 	kcrtc->enable = true;
-	DRM_LCDC_OUT();
 }
 
 static void ameba_crtc_atomic_disable(struct drm_crtc *crtc,
 									  struct drm_crtc_state *old_state)
 {
-	struct ameba_crtc *kcrtc = to_ameba_crtc(crtc);
-	struct lcdc_hw_ctx_type *ctx = kcrtc->lcdc_hw_ctx;
-	DRM_LCDC_IN();
-	if (!kcrtc->enable) {
-		DRM_LCDC_OUT();
-		return;
-	}
+	struct lcdc_hw_ctx_type 	*ctx;
+	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
 
+	if( CHECK_IS_NULL(kcrtc) 
+		|| !kcrtc->enable )
+		return ;
+
+	ctx = kcrtc->lcdc_hw_ctx;
 	drm_crtc_vblank_off(crtc);
 	ameba_display_disable(ctx);
 	kcrtc->enable = false;
-	DRM_LCDC_OUT();
 }
 /*
 	This callback is used to update the display mode of a CRTC without
@@ -290,107 +348,87 @@ static void ameba_crtc_atomic_disable(struct drm_crtc *crtc,
 */
 static void ameba_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
-//	struct ameba_crtc *kcrtc = to_ameba_crtc(crtc);
-//	struct lcdc_hw_ctx_type *lcdc_ctx = kcrtc->lcdc_hw_ctx;
+}
 
-	DRM_LCDC_IN();
-	DRM_LCDC_OUT();
-}
-/*
-static void ameba_crtc_atomic_begin(struct drm_crtc *crtc,
-				  struct drm_crtc_state *old_state)
-{
-	struct ameba_crtc *kcrtc = to_ameba_crtc(crtc);
-	struct lcdc_hw_ctx_type *lcdc_ctx = kcrtc->lcdc_hw_ctx;
-	DRM_LCDC_IN();
-	DRM_LCDC_OUT();
-}
-*/
 static void ameba_crtc_atomic_flush(struct drm_crtc *crtc,
 									struct drm_crtc_state *old_state)
-
 {
-	struct ameba_crtc *kcrtc = to_ameba_crtc(crtc);
-	struct lcdc_hw_ctx_type *lcdc_ctx = kcrtc->lcdc_hw_ctx;
+	struct ameba_crtc 				*kcrtc = to_ameba_crtc(crtc);
+	struct drm_pending_vblank_event	*event;
+	struct lcdc_hw_ctx_type 		*lcdc_ctx ;
+	
+	if( CHECK_IS_NULL(kcrtc) 
+		|| CHECK_IS_NULL(kcrtc->lcdc_hw_ctx) 
+		|| CHECK_IS_NULL(crtc->state) )
+		return ;
 
-	struct drm_pending_vblank_event *event = crtc->state->event;
-	DRM_LCDC_IN();
+	lcdc_ctx = kcrtc->lcdc_hw_ctx;
+	event = crtc->state->event;
 
 	/* only crtc is enabled regs take effect */
 	if (kcrtc->enable) {
 		/* flush lcdc registers */
 		ameba_lcdc_enable(lcdc_ctx->reg_base_addr, ENABLE);
-		//ameba_display_enable(lcdc_ctx);
 
-		ameba_dump_regs(lcdc_ctx);
+		ameba_dump_regs(lcdc_ctx, __func__);
 	}
-	DRM_LCDC_TEST();
+
 	if (event) {
 		crtc->state->event = NULL;
 
-		DRM_TEST_PRINTK("here %s-%d [type=0x%x]\n", __func__, __LINE__, event->event.base.type);
 		spin_lock_irq(&crtc->dev->event_lock);
 		if (drm_crtc_vblank_get(crtc) == 0) {
-			DRM_TEST_PRINTK("here %s-%d [send vblank event]\n", __func__, __LINE__);
 			drm_crtc_arm_vblank_event(crtc, event);
 		} else {
-			DRM_TEST_PRINTK("here %s-%d [send vblank event]\n", __func__, __LINE__);
 			drm_crtc_send_vblank_event(crtc, event);
 		}
 		spin_unlock_irq(&crtc->dev->event_lock);
 	}
-
-	DRM_LCDC_OUT();
 }
 
 static int ameba_drm_atomic_helper_set_config(struct drm_mode_set *set,
-		struct drm_modeset_acquire_ctx *ctx)
+											  struct drm_modeset_acquire_ctx *ctx)
 {
-	int ret = 0;
-
-	DRM_LCDC_IN();
-	ret = drm_atomic_helper_set_config(set, ctx);
-	DRM_LCDC_OUT();
-
-	return ret ;
+	return drm_atomic_helper_set_config(set, ctx);
 }
 
 static const struct drm_crtc_helper_funcs ameba_crtc_helper_funcs = {
-	.mode_fixup	= ameba_crtc_mode_fixup,//done
-	.mode_set_nofb	= ameba_crtc_mode_set_nofb,//done
+	.mode_fixup	= ameba_crtc_mode_fixup,
+	.mode_set_nofb	= ameba_crtc_mode_set_nofb,
 	//.atomic_begin	= ameba_crtc_atomic_begin,
-	.atomic_flush	= ameba_crtc_atomic_flush,//done
-	.atomic_enable	= ameba_crtc_atomic_enable,//done
-	.atomic_disable	= ameba_crtc_atomic_disable,//done
+	.atomic_flush	= ameba_crtc_atomic_flush,
+	.atomic_enable	= ameba_crtc_atomic_enable,
+	.atomic_disable	= ameba_crtc_atomic_disable,
 };
 
 static const struct drm_crtc_funcs ameba_crtc_funcs = {
 	.destroy	= drm_crtc_cleanup,
 
-	//set config  drmModeSetCrtc will call this function,
-	//it make all the link connect success
 	.set_config	= ameba_drm_atomic_helper_set_config,
-	//drmModePageFlip will call this function
 	.page_flip	= drm_atomic_helper_page_flip,
 
 	.reset		= drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state	= drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state	= drm_atomic_helper_crtc_destroy_state,
 
-	//todo support vblank
-	.enable_vblank	= ameba_crtc_enable_vblank,//
-	.disable_vblank	= ameba_crtc_disable_vblank,//
+	.enable_vblank	= ameba_crtc_enable_vblank,
+	.disable_vblank	= ameba_crtc_disable_vblank,
 };
 
 static int ameba_plane_atomic_check(struct drm_plane *plane,
 									struct drm_plane_state *state)
 {
-	struct drm_framebuffer *fb = state->fb;
-	struct drm_crtc *crtc = state->crtc;
-	struct drm_crtc_state *crtc_state;
+	struct drm_framebuffer 	*fb;
+	struct drm_crtc 		*crtc;
+	struct drm_crtc_state 	*crtc_state;
 	u32 src_x, src_y, src_w, src_h, crtc_w, crtc_h, fmt;
 	int crtc_x, crtc_y ;
-	DRM_LCDC_IN();
+
+	if( CHECK_IS_NULL(state) )
+		return -EINVAL;;
+
+	fb = state->fb;
+	crtc = state->crtc;
 #ifdef ENABLE_LCDC_CTL
 	src_x = state->src_x >> 16;
 	src_y = state->src_y >> 16;
@@ -402,21 +440,19 @@ static int ameba_plane_atomic_check(struct drm_plane *plane,
 	crtc_h = state->crtc_h;
 
 	if (!crtc || !fb) {
-		DRM_LCDC_OUT();
 		return 0;
 	}
-	//printk("fb = 0x%x crtc = 0x%x \n", fb, crtc);
-	DRM_LCDC_TEST();
+
 	fmt = ameba_get_format(fb->format->format);
 	if (fmt >= LCDC_LAYER_IMG_FORMAT_NOT_SUPPORT) {
 		return -EINVAL;
 	}
-	DRM_LCDC_TEST();
+
 	crtc_state = drm_atomic_get_crtc_state(state->state, crtc);
 	if (IS_ERR(crtc_state)) {
 		return PTR_ERR(crtc_state);
 	}
-	DRM_LCDC_TEST();
+
 	if (src_w != crtc_w || src_h != crtc_h) {
 		return -EINVAL;
 	}
@@ -435,77 +471,65 @@ static int ameba_plane_atomic_check(struct drm_plane *plane,
 		return -EINVAL;
 	}
 #endif
-	DRM_LCDC_OUT();
+
 	return 0;
 }
 
-/*
-static struct drm_gem_cma_object *
-ameba_drm_gem_cma_create_handle(struct drm_device *drm,
-	u32 height,u32 width,u32 bpp)
-{
-	struct drm_gem_cma_object *cma_obj;
-
-	height=800;
-	width=480 ;
-	cma_obj = drm_gem_cma_create(drm, height*width*bpp);
-	if (IS_ERR(cma_obj))
-	  return cma_obj;
-
-	return cma_obj ;
-}
-*/
-
-/*
-* Typicaly, a channel looks like: DMA-->clip-->scale-->ctrans-->compositor
-*
-* This hook is called in-between the &drm_crtc_helper_funcs.atomic_begin and
-* drm_crtc_helper_funcs.atomic_flush callbacks.
-*/
 static void ameba_plane_atomic_update(struct drm_plane *plane,
 									  struct drm_plane_state *old_state)
 {
-	struct drm_plane_state *state = plane->state;
 	u32 fmt;
-	struct ameba_plane *kplane;
-	struct lcdc_hw_ctx_type  *lcdc_local ;
-	LCDC_InitTypeDef *lcdc_tmp ;
 	u8 idx;
 	int dest_x, dest_y, dest_w, dest_h;
-	struct drm_framebuffer *fb ;
-	struct drm_gem_cma_object *rk_obj ;
-	DRM_LCDC_IN();
+
+	struct lcdc_hw_ctx_type 	*lcdc_local ;
+	LCDC_InitTypeDef 			*lcdc_tmp ;
+	struct drm_framebuffer 		*fb ;
+	struct drm_gem_cma_object 	*gem_cma_obj ;
+	struct drm_plane_state 		*state;
+	struct ameba_plane 			*kplane = to_ameba_plane(plane);
+	int display_width  = ameba_drm_get_display_width();
+	int display_height = ameba_drm_get_display_height();
+	u32 src_x, src_y, src_w, src_h;
+
 #ifdef ENABLE_LCDC_CTL
-	CHECK_PARAM_RETURN(state);
-	kplane = to_ameba_plane(plane);
-	CHECK_PARAM_RETURN(kplane);
+	if( CHECK_IS_NULL(plane) 
+		|| CHECK_IS_NULL(plane->state) 
+		|| CHECK_IS_NULL(plane->state->fb))
+		return ;
+
+	state = plane->state;
 	lcdc_local = (struct lcdc_hw_ctx_type *)(kplane->lcdc_hw_ctx);
-	CHECK_PARAM_RETURN(lcdc_local);
 	lcdc_tmp = &(lcdc_local->lcdc_initstancd) ;
 	idx = kplane->ch ;
 	fb = state->fb ;
+	src_x = state->src_x >> 16;
+	src_y = state->src_y >> 16;
+	src_w = state->src_w >> 16;
+	src_h = state->src_h >> 16;
 
-	ameba_dump_regs(lcdc_local);
-	CHECK_PARAM_RETURN(fb);
-	//rk_obj = drm_fb_cma_get_gem_obj(fb, kplane->ch);
-	rk_obj = drm_fb_cma_get_gem_obj(fb, 0);
-	CHECK_PARAM_RETURN(rk_obj);
+	gem_cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
+	if( CHECK_IS_NULL(gem_cma_obj))
+		return ;
 
 	fmt = ameba_get_format(fb->format->format);
-	DRM_TEST_PRINTK("here %s-%d[id=%d,fmt=0x%x/%d,[%d*%d],vaddr=0x%x][%d-%d-%d-%d][%d-%d-%d-%d] \n", __func__, __LINE__,
-					idx, fb->format->format, fmt, fb->width, fb->height,
-					(u32)rk_obj->vaddr,
+	/*
+		crtc_* is the display position
+		src_*  is the source display position
+	*/
+	DRM_TEST_PRINTK("here %s-%d[id=%d,fmt=%d][%d*%d][%d-%d-%d-%d][%d-%d-%d-%d] \n", __func__, __LINE__,
+					idx, fmt, fb->width, fb->height,
 					state->crtc_x, state->crtc_y, state->crtc_w, state->crtc_h,
-					state->src_x >> 16, state->src_y >> 16, state->src_w >> 16, state->src_h >> 16);
+					src_x, src_y, src_w, src_h);
 
-	///check the params , x <  MIPI_DISPLAY_X ; y < MIPI_DISPLAY_Y
-	if (state->crtc_x >= MIPI_DISPLAY_X || state->crtc_y >= MIPI_DISPLAY_Y) {
+	///check the params , x <  display_width ; y < display_height
+	if (state->crtc_x >= display_width || state->crtc_y >= display_height) {
 		DRM_WARN("[error happen] %s-%d [start[%d-%d][%d-%d]\n", __func__, __LINE__,
-				 state->crtc_x, state->crtc_y, MIPI_DISPLAY_X, MIPI_DISPLAY_Y);
+				 state->crtc_x, state->crtc_y, display_width, display_height);
 		return ;
 	}
 
-	//display from 1~MIPI_DISPLAY_X
+	//display from 1~MIPI_DISPLAY_WIDTH
 	dest_x = state->crtc_x ; //((state->crtc_x==0)?(1):(state->crtc_x));
 	dest_y = state->crtc_y ; //((state->crtc_y==0)?(1):(state->crtc_y));
 
@@ -522,32 +546,30 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 		//2.2 src.h < crtc.h , surface.h = src.h
 
 		//the desc w&h is the common place
-		dest_w = ((state->crtc_w > state->src_w >> 16) ? (state->src_w >> 16) : (state->crtc_w));
-		if (dest_x + dest_w > MIPI_DISPLAY_X) {
-			dest_w = MIPI_DISPLAY_X - dest_x;
+		dest_w = ((state->crtc_w > src_w) ? (src_w) : (state->crtc_w));
+		if (dest_x + dest_w > display_width) {
+			dest_w = display_width - dest_x;
 		}
-		dest_h = ((state->crtc_h > state->src_h >> 16) ? (state->src_h >> 16) : (state->crtc_h));
-		if (dest_y + dest_h > MIPI_DISPLAY_Y) {
-			dest_h = MIPI_DISPLAY_Y - dest_y;
+		dest_h = ((state->crtc_h > src_h) ? (src_h) : (state->crtc_h));
+		if (dest_y + dest_h > display_height) {
+			dest_h = display_height - dest_y;
 		}
 
-		DRM_TEST_PRINTK("here %s-%d[%d-%d-%d-%d]fb->width=%d \n", __func__, __LINE__, dest_x, dest_y, dest_w, dest_h, fb->width);
+		//DRM_TEST_PRINTK("here %s-%d[%d-%d-%d-%d]fb->width=%d \n", __func__, __LINE__, dest_x, dest_y, dest_w, dest_h, fb->width);
 
 		//from src_x&src_y  to  crtc_x & crtc_y
 		//w not match , x not 0 ,
 		//if y !=0, maybe just set a offset from the pixmap
 		//dest_w != fb->width it is just a window
 		//state->src_x!=0 or state->src_y !=0 , it is not from the first pixel
-		if (dest_w != fb->width || state->src_x || state->src_y) {
-			//should create a buffer, and do copy
-			//1.use the global buffer that create in ameba_hw_ctx_alloc
+		if (dest_w != fb->width || src_x || src_y) {
 			int y ;
-			u32 bpp = getBppFromFormat(fmt);
+			u32 bpp = getBppFromFormat(fb->format->format);
 			//2.do copy
-			DRM_TEST_PRINTK("here %s-%d[%d-%d-%d-%d]fb->width=%d/bpp=%d \n", __func__, __LINE__, dest_x, dest_y, dest_w, dest_h, fb->width, bpp);
+			DRM_TEST_PRINTK("here %s-%d[id=%d][%d-%d-%d-%d]width=%d/bpp=%d \n", __func__, __LINE__,idx, dest_x, dest_y, dest_w, dest_h, fb->width, bpp);
 			for (y = 0; y < dest_h ; ++y) {
-				memcpy((uint8_t *)sec_layer_info[idx].sec_vaddr + (y * dest_w * (bpp)),
-					   (uint8_t *)rk_obj->vaddr + ((y + state->src_y) * (fb->width) * (bpp)) + ((bpp)*state->src_x),
+				memcpy((uint8_t *)sec_layer_info[idx].sec_vaddr + (y * dest_w * bpp),
+					   (uint8_t *)gem_cma_obj->vaddr + ((y + src_y) * (fb->width) * bpp) + (bpp * src_x),
 					   dest_w * bpp);
 			}
 			sec_layer_info[idx].use_sec_buffer = 1;
@@ -555,35 +577,17 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 			sec_layer_info[idx].use_sec_buffer = 0 ;
 		}
 	}
-	//else
-	//{
-	//	dest_w =state->crtc_w ;
-	//	dest_h =state->crtc_h ;
-	//	DRM_LCDC_TEST();
-	//}
 
-	//disable all layer TODO issue @20211022
-	if (0) {
-		u32 DmaUnIntCnt ;
-		ameba_lcdc_dma_get_unint_cnt(lcdc_local->reg_base_addr, &DmaUnIntCnt);
-		if (DmaUnIntCnt) {
-			DRM_TEST_PRINTK("here %s-%d[DmaUnIntCnt=%d] \n", __func__, __LINE__, DmaUnIntCnt);
-			//LCDC_DeInit(lcdc_local->reg_base_addr);
-			//ameba_dump_regs(lcdc_local);
-		}
-	}
-	DRM_LCDC_TEST();
 	ameba_lcdc_layer_enable(lcdc_tmp, idx, ENABLE);
 	ameba_lcdc_layer_imgfmt(lcdc_tmp, idx, fmt);
-	ameba_lcdc_layer_colorkey_enable(lcdc_tmp, idx, DISABLE);
 
 	if (sec_layer_info[idx].use_sec_buffer) {
 		ameba_lcdc_layer_imgaddress(lcdc_tmp, idx, (u32)(sec_layer_info[idx].sec_paddr));
 	} else {
-		ameba_lcdc_layer_imgaddress(lcdc_tmp, idx, (u32)(rk_obj->paddr));
+		ameba_lcdc_layer_imgaddress(lcdc_tmp, idx, (u32)(gem_cma_obj->paddr));
 	}
-	sec_layer_info[idx].layer_address = (u32)rk_obj->vaddr ;
-	DRM_TEST_PRINTK("here %s-%d[%d-%d-%d-%d] \n", __func__, __LINE__, dest_x, dest_y, dest_w, dest_h);
+	sec_layer_info[idx].layer_address = (u32)gem_cma_obj->vaddr ;
+	//DRM_TEST_PRINTK("here %s-%d[%d-%d-%d-%d] \n", __func__, __LINE__, dest_x, dest_y, dest_w, dest_h);
 
 	if (state->crtc_x <= 0) {
 		dest_x = 1 ;
@@ -594,47 +598,27 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 	dest_w -= 1;
 	dest_h -= 1;
 
-	if (dest_x + dest_w > MIPI_DISPLAY_X) {
-		dest_w = MIPI_DISPLAY_X - dest_x;
+	if (dest_x + dest_w > display_width) {
+		dest_w = display_width - dest_x;
 	}
-	if (dest_y + dest_h > MIPI_DISPLAY_Y) {
-		dest_h = MIPI_DISPLAY_Y - dest_y;
+	if (dest_y + dest_h > display_height) {
+		dest_h = display_height - dest_y;
 	}
-	DRM_TEST_PRINTK("here %s-%d[%d-%d-%d-%d] \n", __func__, __LINE__, dest_x, dest_y, dest_x + dest_w, dest_y + dest_h);
+	DRM_TEST_PRINTK("%s-%d[area:%d-%d-%d-%d] \n", __func__, __LINE__, dest_x, dest_y, dest_x + dest_w, dest_y + dest_h);
 	ameba_lcdc_layer_pos(lcdc_tmp, idx, dest_x, dest_x + dest_w, dest_y, dest_y + dest_h);
-	//ameba_lcdc_layer_pos(lcdc_tmp,idx,1,MIPI_DISPLAY_X,1,MIPI_DISPLAY_Y);
 
-	//ameba_lcdc_config_setvalid(lcdc_local->reg_base_addr, lcdc_tmp);
 	ameba_lcdc_update_layer_reg(lcdc_local->reg_base_addr, idx, &(lcdc_tmp->layerx[idx]));
 	ameba_lcdc_enable_SHW(lcdc_local->reg_base_addr);
-
-	ameba_dump_regs(lcdc_local);
+	if(lcdc_local->lcdc_debug == UPDATE_DUMP_LDCD_REG){
+		ameba_dump_regs(lcdc_local, __func__);
+		lcdc_local->lcdc_debug = 0;
+	}
 #endif
-	DRM_LCDC_OUT();
 }
-/*
-static void ameba_plane_atomic_disable(struct drm_plane *plane,
-				     struct drm_plane_state *old_state)
-{
-	DRM_LCDC_IN();
-#ifdef ENABLE_LCDC_CTL
-	struct ameba_plane *kplane = to_ameba_plane(plane);
-	struct lcdc_hw_ctx_type*  lcdc_local = (struct lcdc_hw_ctx_type*)(kplane->lcdc_hw_ctx);
-	LCDC_InitTypeDef* lcdc_tmp = &(lcdc_local->lcdc_initstancd) ;
 
-	ameba_lcdc_layer_enable(lcdc_tmp,kplane->ch,DISABLE);
-	ameba_lcdc_config_setvalid(lcdc_local->reg_base_addr, lcdc_tmp);
-#endif
-	DRM_LCDC_OUT();
-}
-*/
 static int ameba_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	int ret ;
-	DRM_LCDC_IN();
-	ret = drm_gem_cma_mmap(filp, vma);
-	DRM_LCDC_OUT();
-	return ret ;
+	return drm_gem_cma_mmap(filp, vma);
 }
 
 
@@ -645,7 +629,7 @@ static const struct vm_operations_struct ameba_drm_gem_vm_ops = {
 static const struct file_operations ameba_drm_file_fops = {
 	.owner		= THIS_MODULE,
 	.open		= drm_open,
-	.mmap		= ameba_drm_gem_mmap,//done
+	.mmap		= ameba_drm_gem_mmap,
 	.unlocked_ioctl = drm_ioctl,
 	.compat_ioctl	= drm_compat_ioctl,
 	.poll		= drm_poll,
@@ -653,92 +637,42 @@ static const struct file_operations ameba_drm_file_fops = {
 	.llseek 	= no_llseek,
 	.release	= drm_release,
 };
-/*
-static void  ameba_drm_release(struct drm_device *dev)
-{
-	struct vkms_device *vkms = container_of(dev, struct vkms_device, drm);
 
-	platform_device_unregister(vkms->platform);
-	drm_atomic_helper_shutdown(&vkms->drm);
-	drm_mode_config_cleanup(&vkms->drm);
-	drm_dev_fini(&vkms->drm);
-	destroy_workqueue(vkms->output.composer_workq);
-}
-int ameba_drm_dumb_create(struct drm_file *file, struct drm_device *dev,
-		     struct drm_mode_create_dumb *args)
-{
-	int ret ;
-	DRM_LCDC_IN();
-
-	ret = drm_gem_cma_dumb_create_internal(file, dev, args);
-
-	DRM_LCDC_OUT();
-
-	return PTR_ERR_OR_ZERO(ret);
-}
-*/
 void ameba_drm_gem_free_object(struct drm_gem_object *gem_obj)
 {
-	DRM_LCDC_IN();
-	if (1) { //for test
-		struct drm_gem_cma_object *cma_obj;
-		u8 i = 0 ;
-		cma_obj = to_drm_gem_cma_obj(gem_obj);
-		DRM_TEST_PRINTK("here %s-%d [v=0x%x / p=0x%x] \n", __func__, __LINE__, (u32)cma_obj->vaddr, (u32)cma_obj->paddr);
-#ifdef ENABLE_LCDC_CTL
-		for (i = 0 ; i < LCDC_LAYER_MAX_NUM ; i ++) {
-			if (cma_obj->vaddr && ((u32)cma_obj->vaddr) == sec_layer_info[i].layer_address) {
-				struct lcdc_hw_ctx_type  *lcdc_local = (struct lcdc_hw_ctx_type *)drm_get_mipidsi_param();
-				LCDC_InitTypeDef *lcdc_tmp = &(lcdc_local->lcdc_initstancd) ;
-				sec_layer_info[i].layer_address = 0 ;
-				ameba_lcdc_layer_enable(lcdc_tmp, i, DISABLE);
-				//ameba_lcdc_config_setvalid(lcdc_local->reg_base_addr, lcdc_tmp);
-				ameba_lcdc_update_layer_reg(lcdc_local->reg_base_addr, i, &(lcdc_tmp->layerx[i]));
-				ameba_lcdc_enable_SHW(lcdc_local->reg_base_addr);
-				DRM_TEST_PRINTK("here %s-%d [destory %d layer] \n", __func__, __LINE__, i);
-				/*
-					fps=60 , shadow will be enable in 16.7ms,
-					sleep 50ms ,lcdc will not use the buffer anymore
-					it is safe to release the mem
-				*/
-				msleep(50);
-				//if(lcdcInstance.sec_paddr){
-				//drm_gem_cma_free_object(&(lcdcInstance.sec_cma_obj->base));
-				//	lcdcInstance.sec_paddr = NULL ;
-				//}
-				LcdcDumpRegValue(lcdc_local->reg_base_addr, "ameba_drm_gem_free_object");
-			}
-		}
-#endif
-	}
-	drm_gem_cma_free_object(gem_obj);
+	u8 i = 0 ;
+	struct drm_gem_cma_object *cma_obj = to_drm_gem_cma_obj(gem_obj);
 
-	DRM_LCDC_OUT();
+#ifdef ENABLE_LCDC_CTL
+	for (i = 0 ; i < LCDC_LAYER_MAX_NUM ; i ++) {
+		struct lcdc_hw_ctx_type *lcdc_local = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
+		LCDC_InitTypeDef *lcdc_tmp = &(lcdc_local->lcdc_initstancd) ;
+		if (cma_obj->vaddr && ((u32)cma_obj->vaddr) == sec_layer_info[i].layer_address) {
+			ameba_lcdc_layer_enable(lcdc_tmp, i, DISABLE);
+			//ameba_lcdc_config_setvalid(lcdc_local->reg_base_addr, lcdc_tmp);
+			ameba_lcdc_update_layer_reg(lcdc_local->reg_base_addr, i, &(lcdc_tmp->layerx[i]));
+			ameba_lcdc_enable_SHW(lcdc_local->reg_base_addr);
+			DRM_TEST_PRINTK("%s-%d [destory %d layer] \n", __func__, __LINE__, i);
+			sec_layer_info[i].layer_address = 0 ;
+			sec_layer_info[i].use_sec_buffer = 0 ;
+
+			/*
+				fps=60 , shadow will be enable in 16.7ms,
+				sleep 50ms ,lcdc will not use the buffer anymore
+				it is safe to release the mem
+			*/
+			msleep(50);
+			ameba_dump_regs(lcdc_local, __func__);
+		}
+	}
+#endif
+
+	drm_gem_cma_free_object(gem_obj);
 }
 static bool  ameba_drm_get_vblank_timestamp(struct drm_device *dev, unsigned int pipe,
-									 int *max_error, ktime_t *vblank_time,
-									 bool in_vblank_irq)
+											 int *max_error, ktime_t *vblank_time,
+											 bool in_vblank_irq)
 {
-#if 0
-	struct vkms_device *vkmsdev = drm_device_to_vkms_device(dev);
-	struct vkms_output *output = &vkmsdev->output;
-	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
-
-	*vblank_time = output->vblank_hrtimer.node.expires;
-
-	if (WARN_ON(*vblank_time == vblank->time)) {
-		return true;
-	}
-
-	/*
-	 * To prevent races we roll the hrtimer forward before we do any
-	 * interrupt processing - this is how real hw works (the interrupt is
-	 * only generated after all the vblank registers are updated) and what
-	 * the vblank core expects. Therefore we need to always correct the
-	 * timestampe by one frame.
-	 */
-	*vblank_time -= output->period_ns;
-#endif
 	return false;
 }
 
@@ -758,28 +692,25 @@ static bool  ameba_drm_get_vblank_timestamp(struct drm_device *dev, unsigned int
 *
 */
 static int ameba_drm_update_plane(struct drm_plane *plane,
-								  struct drm_crtc *crtc,
-								  struct drm_framebuffer *fb,
-								  int crtc_x, int crtc_y,
-								  unsigned int crtc_w, unsigned int crtc_h,
-								  uint32_t src_x, uint32_t src_y,
-								  uint32_t src_w, uint32_t src_h,
-								  struct drm_modeset_acquire_ctx *ctx)
+								struct drm_crtc *crtc,
+								struct drm_framebuffer *fb,
+								int crtc_x, int crtc_y,
+								unsigned int crtc_w, unsigned int crtc_h,
+								uint32_t src_x, uint32_t src_y,
+								uint32_t src_w, uint32_t src_h,
+								struct drm_modeset_acquire_ctx *ctx)
 {
 	return drm_atomic_helper_update_plane(plane, crtc, fb, crtc_x, crtc_y, crtc_w, crtc_h, src_x, src_y, src_w, src_h, ctx);
 }
 
 //plane
 static const struct drm_plane_helper_funcs ameba_plane_helper_funcs = {
-	.atomic_check = ameba_plane_atomic_check,//done
-	.atomic_update = ameba_plane_atomic_update,//done
-//	.atomic_disable = ameba_plane_atomic_disable,//done
+	.atomic_check = ameba_plane_atomic_check,
+	.atomic_update = ameba_plane_atomic_update,
 };
 
 static struct drm_plane_funcs ameba_plane_funcs = {
-	//drmModeSetPlane will call this hook function
-	.update_plane	= ameba_drm_update_plane,//done
-
+	.update_plane	= ameba_drm_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy = drm_plane_cleanup,
 	.reset = drm_atomic_helper_plane_reset,
@@ -787,60 +718,102 @@ static struct drm_plane_funcs ameba_plane_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
 };
 
+int ameba_drm_get_display_width(void)
+{
+	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
+	return (NULL == lcdc_ctx || 0 == lcdc_ctx->lcdc_width)?(MIPI_DSI_DISPLAY_X):(lcdc_ctx->lcdc_width);
+}
+int ameba_drm_get_display_height(void)
+{
+	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
+	return (NULL == lcdc_ctx || 0 == lcdc_ctx->lcdc_height)?(MIPI_DSI_DISPLAY_Y):(lcdc_ctx->lcdc_height);
+}
+int ameba_drm_get_framerate(void)
+{
+	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
+	return (NULL == lcdc_ctx || 0 == lcdc_ctx->lcdc_framerate)?(MIPI_DSI_FRAME_RATE):(lcdc_ctx->lcdc_framerate);
+}
+
 static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 								struct drm_crtc *crtc)
 {
-	struct resource *res;
-	struct device *dev = &pdev->dev;
+	struct resource 		*res;
+	struct device 			*dev = &pdev->dev;
+//	struct device_node		*np = dev->of_node;
 	struct lcdc_hw_ctx_type *lcdc_ctx = NULL;
 	int ret;
-	DRM_LCDC_IN();
+	u8  idx;
+	
 	lcdc_ctx = devm_kzalloc(dev, sizeof(*lcdc_ctx), GFP_KERNEL);
 	if (!lcdc_ctx) {
-		DRM_ERROR("failed to alloc lcdc_hw_ctx\n");
+		DRM_DEV_ERROR(dev, "failed to alloc lcdc_hw_ctx\n");
 		return ERR_PTR(-ENOMEM);
 	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	lcdc_ctx->reg_base_addr = devm_ioremap_resource(&pdev->dev, res);
+	lcdc_ctx->reg_base_addr = devm_ioremap_resource(dev, res);
 	if (0 == (lcdc_ctx->reg_base_addr)) {
-		DRM_ERROR("failed to remap lcdc io base\n");
+		DRM_DEV_ERROR(dev, "failed to remap lcdc io base\n");
 		return ERR_PTR(-ENODEV);
 	}
 
 	/* get RTK_CKE_LCDCMIPI  e:enable */
-	lcdc_ctx->clock = devm_clk_get(&pdev->dev, NULL);
+	lcdc_ctx->clock = devm_clk_get(dev, NULL);
 	if (IS_ERR(lcdc_ctx->clock)) {
-		dev_err(&pdev->dev, "Fail to get clock CKE_LCDCMIPI %d\n", __LINE__);
+		DRM_DEV_ERROR(dev, "Fail to get clock CKE_LCDCMIPI %d\n", __LINE__);
 		return ERR_PTR(-ENODEV);
 	}
 
 	/* enable RTK_CKE_LCDCMIPI clock */
 	ret = clk_prepare_enable(lcdc_ctx->clock);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable clock CKE_LCDCMIPI %d\n", ret);
+		DRM_DEV_ERROR(dev, "Fail to enable clock CKE_LCDCMIPI %d\n", ret);
 		return ERR_PTR(-ENODEV);
 	}
 
 	lcdc_ctx->irq = platform_get_irq(pdev, 0);
 	if (lcdc_ctx->irq < 0) {
-		DRM_ERROR("failed to get irq\n");
+		DRM_DEV_ERROR(dev, "failed to get irq\n");
 		return ERR_PTR(-ENODEV);
 	}
 	/*
 		irq init
 	*/
-	ret = devm_request_irq(dev, lcdc_ctx->irq, ameba_irq_handler, 0, dev_name(&pdev->dev), crtc);
+	ret = devm_request_irq(dev, lcdc_ctx->irq, ameba_irq_handler, 0, dev_name(dev), crtc);
 	if (ret) {
 		return ERR_PTR(-EIO);
 	}
 
 	/* Initialize reserved memory resources */
-	ret = of_reserved_mem_device_init(&pdev->dev);
+	ret = of_reserved_mem_device_init(dev);
 	if (ret) {
-		dev_err(&pdev->dev, "Could not get reserved memory\n");
+		DRM_DEV_ERROR(dev, "Could not get reserved memory\n");
 		return ERR_PTR(-ENODEV);
 	}
+
+	lcdc_ctx->crtc = crtc;
+
+	//debug attribute
+	lcdc_ctx->lcdc_debug = 0;
+	if ( sysfs_create_group(&pdev->dev.kobj,&lcdc_debug_attr_grp) )
+		DRM_DEV_INFO(&pdev->dev, "Error creating lcdc sysfs entry\n");
+
+	lcdc_ctx->lcdc_width = MIPI_DSI_DISPLAY_X;
+	lcdc_ctx->lcdc_height = MIPI_DSI_DISPLAY_Y;
+	lcdc_ctx->lcdc_framerate = MIPI_DSI_FRAME_RATE;
+	lcdc_ctx->lcdc_burstsize = LCDC_LAYER_BURSTSIZE_4X64BYTES;
+
+	lcdc_ctx->lcdc_bkg_color = LCDC_KG_COLOR;
+	lcdc_ctx->lcdc_undflw_mode = 1;
+	lcdc_ctx->lcdc_undflw_color = LCDC_UNDFLOW_COLOR;
+
+	lcdc_ctx->lcdc_laycolor_key_en = 0;
+	lcdc_ctx->lcdc_laycolor_key = LCDC_LAY_COLOR_KEY;
+
+	lcdc_ctx->lcdc_layblend_factor = 1;
+	lcdc_ctx->lcdc_layblend_alpha = LCDC_LAY_BLEND_ALPHA;
+
+	drm_set_lcdc_param(lcdc_ctx);
 /*
 	lcdc_ctx->ldcd_writeback_buffer_length = (MIPI_DISPLAY_X * MIPI_DISPLAY_Y * LDCD_PIXFORMAT_MAX_LEN) ;
 	//lcdc_ctx->ldcd_writeback_buffer = dma_alloc_coherent(&pdev->dev, lcdc_ctx->ldcd_writeback_buffer_length, &(lcdc_ctx->dump_paddr), GFP_KERNEL);
@@ -853,27 +826,24 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 		lcdc_ctx->ldcd_writeback_buffer_length = 0 ;
 	}
 */
+
 	lcdc_ctx->ldcd_writeback_buffer = 0 ;
 	lcdc_ctx->ldcd_writeback_buffer_length = 0 ;
-	lcdc_ctx->crtc = crtc;
 
 	//init the lcdc info
-	//right now not set the buffer address
-	ameba_lcdc_reset_config(&(lcdc_ctx->lcdc_initstancd));
-	ameba_lcdc_set_planesize(&(lcdc_ctx->lcdc_initstancd), MIPI_DISPLAY_X, MIPI_DISPLAY_Y);
-	ameba_lcdc_set_background_color(&(lcdc_ctx->lcdc_initstancd), LCDC_BACKGROUND);
+	ameba_lcdc_reset_config(&(lcdc_ctx->lcdc_initstancd),  lcdc_ctx->lcdc_width, lcdc_ctx->lcdc_height, lcdc_ctx->lcdc_bkg_color);
+	ameba_lcdc_set_planesize(&(lcdc_ctx->lcdc_initstancd), lcdc_ctx->lcdc_width, lcdc_ctx->lcdc_height);
+	ameba_lcdc_set_background_color(&(lcdc_ctx->lcdc_initstancd), lcdc_ctx->lcdc_bkg_color);
 
-	//dma read
-	ameba_lcdc_dma_config_bustsize(lcdc_ctx->reg_base_addr, LCDC_LAYER_BURSTSIZE_4X64BYTES);
-	//ToDo show last data, should set to 0 , 1 means errorData
-	ameba_lcdc_dma_config_keeplastFrm(lcdc_ctx->reg_base_addr, 1, DMA_ERROR_BACKGROUND);
+	//dma issue
+	ameba_lcdc_dma_config_bustsize(lcdc_ctx->reg_base_addr, lcdc_ctx->lcdc_burstsize);
+	ameba_lcdc_dma_config_keeplastFrm(lcdc_ctx->reg_base_addr, lcdc_ctx->lcdc_undflw_mode, lcdc_ctx->lcdc_undflw_color);
 
-	/*line number*/
-	ameba_lcdc_irq_linepos(lcdc_ctx->reg_base_addr, MIPI_DISPLAY_Y * 4 / 5);
-	/*enbale LCDC LCDC_BIT_LCD_LIN_INTEN interrupt*/
-	ameba_lcdc_irq_config(lcdc_ctx->reg_base_addr, LCDC_BIT_LCD_LIN_INTEN, ENABLE);
+	/*line number interrupt*/
+	ameba_lcdc_irq_linepos(lcdc_ctx->reg_base_addr, lcdc_ctx->lcdc_height * 4 / 5);
+	//enable dma underflow interrupt
+	ameba_lcdc_irq_config(lcdc_ctx->reg_base_addr, LCDC_BIT_DMA_UN_INTEN, ENABLE);
 
-	//LCDC_Init(ctx->reg_base_addr, &(ctx->lcdc_initstancd));
 	if (lcdc_ctx->ldcd_writeback_buffer) {
 		ameba_lcdc_dma_debug_config(lcdc_ctx->reg_base_addr, LCDC_DMA_OUT_ENABLE, (u32)lcdc_ctx->ldcd_writeback_buffer);
 	} else {
@@ -883,55 +853,72 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 	//set valid , disable all display , it should not display anything right now
 	ameba_lcdc_config_setvalid(lcdc_ctx->reg_base_addr, &(lcdc_ctx->lcdc_initstancd));
 
+	//layer info
+	for (idx = 0; idx < LCDC_LAYER_MAX_NUM; idx++) {
+		ameba_lcdc_layer_enable(&(lcdc_ctx->lcdc_initstancd), idx, 0);
+		ameba_lcdc_layer_colorkey_enable(&(lcdc_ctx->lcdc_initstancd), idx, lcdc_ctx->lcdc_laycolor_key_en);
+		ameba_lcdc_layer_colorkey_value(&(lcdc_ctx->lcdc_initstancd), idx, lcdc_ctx->lcdc_laycolor_key);
+		ameba_lcdc_layer_blend_value(&(lcdc_ctx->lcdc_initstancd), idx, lcdc_ctx->lcdc_layblend_factor);
+		ameba_lcdc_layer_alpha_value(&(lcdc_ctx->lcdc_initstancd), idx, lcdc_ctx->lcdc_layblend_alpha);
+	}
+	ameba_lcdc_enable_SHW(lcdc_ctx->reg_base_addr);
+
+	//second surface init
 	for (ret = 0 ; ret < LCDC_LAYER_MAX_NUM; ret ++) {
 		struct ameba_buf_struct * layinfo = &(sec_layer_info[ret]);
 		layinfo->layer_address = 0;
 		layinfo->use_sec_buffer = 0 ;
-		layinfo->size = round_up(MIPI_DISPLAY_X * MIPI_DISPLAY_Y * 4, PAGE_SIZE);
-		layinfo->sec_vaddr = dma_alloc_coherent(&pdev->dev, layinfo->size, &(layinfo->sec_paddr), GFP_KERNEL);
+		layinfo->size = round_up(lcdc_ctx->lcdc_width * lcdc_ctx->lcdc_height * 4, PAGE_SIZE);
+		layinfo->sec_vaddr = dma_alloc_coherent(dev, layinfo->size, &(layinfo->sec_paddr), GFP_KERNEL);
 	}
-	drm_set_lcdc_param(lcdc_ctx);
 
-	DRM_LCDC_OUT();
 	return lcdc_ctx;
 }
 
-static void ameba_hw_ctx_cleanup(void *hw_ctx)
+static void ameba_hw_ctx_cleanup(struct platform_device *pdev, void *hw_ctx)
 {
-	DRM_LCDC_IN();
-	DRM_LCDC_OUT();
+	int ret; 
+	struct device 			*dev = &pdev->dev;
+	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)hw_ctx ;
+
+	//release all resource
+	devm_free_irq(dev, lcdc_ctx->irq, lcdc_ctx->crtc);
+
+	clk_disable_unprepare(lcdc_ctx->clock);
+
+	for (ret = 0 ; ret < LCDC_LAYER_MAX_NUM; ret ++) {
+		struct ameba_buf_struct * layinfo = &(sec_layer_info[ret]);
+		dma_free_coherent(dev, layinfo->size, layinfo->sec_vaddr, layinfo->sec_paddr);
+	}
+	of_reserved_mem_device_release(dev);
+
+	sysfs_remove_group(&dev->kobj,&lcdc_debug_attr_grp);
 }
-static struct drm_framebuffer *
-ameba_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
-					 const struct drm_mode_fb_cmd2 *mode_cmd)
+
+static struct drm_framebuffer * ameba_user_fb_create(struct drm_device *dev, 
+													struct drm_file *file_priv,
+													const struct drm_mode_fb_cmd2 *mode_cmd)
 {
-	//DRM_TEST_PRINTK("mode_cmd->pixel_format=%d\n",mode_cmd->pixel_format);
-	DRM_LCDC_IN();
+	if( CHECK_IS_NULL(mode_cmd))
+			return ERR_PTR(-EINVAL);
+
 	if (ameba_get_format(mode_cmd->pixel_format) >= LCDC_LAYER_IMG_FORMAT_NOT_SUPPORT) {
-		dev_err(dev->dev, "mode_cmd->pixel_formaterror happen , not support =%x\n", mode_cmd->pixel_format);
+		DRM_DEV_ERROR(dev->dev, "mode_cmd->pixel_formaterror happen , not support =%x\n", mode_cmd->pixel_format);
 		return ERR_PTR(-EINVAL) ;
 	}
 	return drm_gem_fb_create(dev, file_priv, mode_cmd);
 }
 
 static int ameba_drm_atomic_helper_check(struct drm_device *dev,
-		struct drm_atomic_state *state)
+										struct drm_atomic_state *state)
 {
-	int ret = 0;
-	DRM_LCDC_IN();
-	ret = drm_atomic_helper_check(dev, state);
-	DRM_LCDC_OUT();
-	return ret ;
+	return drm_atomic_helper_check(dev, state);
 }
 static int ameba_drm_atomic_helper_commit(struct drm_device *dev,
-		struct drm_atomic_state *state,
-		bool nonblock)
+										struct drm_atomic_state *state,
+										bool nonblock)
 {
-	int ret = 0;
-	DRM_LCDC_IN();
-	ret = drm_atomic_helper_commit(dev, state, nonblock);
-	DRM_LCDC_OUT();
-	return ret ;
+	return drm_atomic_helper_commit(dev, state, nonblock);
 }
 
 static const struct drm_mode_config_funcs ameba_mode_config_funcs = {
@@ -946,21 +933,10 @@ static struct drm_driver ameba_lcdc_driver = {
 //	.release		=  ameba_drm_release,
 	.fops			= &ameba_drm_file_fops,
 
-	//create gem & buffer
 	.dumb_create	= drm_gem_cma_dumb_create_internal,
 	.gem_vm_ops		= &ameba_drm_gem_vm_ops,
 	.gem_free_object_unlocked = ameba_drm_gem_free_object,
 	.get_vblank_timestamp	=  ameba_drm_get_vblank_timestamp,
-
-#if 0  //need prime support : 
-	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
-	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
-	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
-	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
-	.gem_prime_vmap = drm_gem_cma_prime_vmap,
-	.gem_prime_vunmap = drm_gem_cma_prime_vunmap,
-	.gem_prime_mmap = drm_gem_cma_prime_mmap,
-#endif
 
 	.name = "amebad2",
 	.desc = "Realtek AmebaD2 SoC DRM Driver",
@@ -975,8 +951,6 @@ struct ameba_drm_data lcdc_driver_data = {
 	.prim_plane = LCDC_LAYER_LAYER1,
 	.channel_formats = ameba_channel_formats,
 	.channel_formats_cnt = ARRAY_SIZE(ameba_channel_formats),
-	.config_max_width = LDCD_XRES_MAX,
-	.config_max_height = LDCD_YRES_MAX,
 	.driver = &ameba_lcdc_driver,
 	.crtc_helper_funcs = &ameba_crtc_helper_funcs,
 	.crtc_funcs = &ameba_crtc_funcs,

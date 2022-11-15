@@ -337,8 +337,6 @@
 
 #define RTW_WKARD_BTC_RFETYPE
 
-#define RTW_WKARD_TXBD_UPD_LMT 	/* 8852AE/8852BE txbd index update limitation */
-
 #ifdef CONFIG_WPA3_SUITEB_SUPPORT
 #define RTW_WKARD_HW_MGNT_GCMP_256_DISABLE
 #endif

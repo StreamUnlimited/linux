@@ -39,13 +39,15 @@ void DelayUs(u32 time);
 	9. lcdc ir set posi
 */
 //lcdc global reg
+u32 ameba_lcdc_reg_read(void __iomem *address);
+void ameba_lcdc_reg_write(void __iomem *address,u32 Value32);
 void LcdcDumpRegValue(void __iomem * address,const char* filename);
 
 void ameba_lcdc_enable(void __iomem * address,u32 NewState);
 u32 ameba_lcdc_get_irqstatus(void __iomem * address);
 void ameba_lcdc_clean_irqstatus(void __iomem * address,u32 irq);
 
-void ameba_lcdc_reset_config(LCDC_InitTypeDef *LCDC_InitStruct);
+void ameba_lcdc_reset_config(LCDC_InitTypeDef *LCDC_InitStruct, u16 widht, u16 height,u32 bgcolor);
 void ameba_lcdc_set_planesize(LCDC_InitTypeDef *LCDC_InitStruct,u16 widht,u16 height);
 void ameba_lcdc_set_background_color(LCDC_InitTypeDef *LCDC_InitStruct,u32 bgcolor);
 void ameba_lcdc_config_setvalid(void __iomem * address,LCDC_InitTypeDef *LCDC_InitStruct);
@@ -81,8 +83,8 @@ void ameba_lcdc_layer_alpha_value(LCDC_InitTypeDef *LCDC_InitStruct,u8 layid,u8 
 	1. 
 */
 void MipiDumpRegValue(void __iomem * address);
-void MipiDsi_ST7701S_push_table(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct,u32* initdone,u32* sendcmd);
-void MIPI_InitStruct_Config(MIPI_InitTypeDef *MIPI_InitStruct);
+void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct,u32* sendcmd);
+void MIPI_InitStruct_Config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd);
 void MIPI_DPHY_Reset(void __iomem *MIPIx);
 
 #endif  /*_AMEBAD2_DRM_BASE_UTIL_H_*/

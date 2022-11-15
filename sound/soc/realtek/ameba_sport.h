@@ -872,6 +872,15 @@ void audio_sp_clear_rx_sport_irq(void __iomem * sportx);
 void audio_sp_disable_rx_tx_sport_irq(void __iomem * sportx);
 void audio_sp_set_i2s_mode(void __iomem * sportx, u32 mode);
 
+#if 0
+void audio_sp_set_sport_addr(u32 sport_index, void __iomem * sportx);
+__iomem * audio_sp_get_sport_addr(u32 sport_index);
+void audio_sp_set_sport_irq_total_tx_counter(u32 sport_index, u32 irq_total_tx_counter);
+u32 audio_sp_get_sport_irq_total_tx_counter(u32 sport_index);
+void audio_sp_set_sport_irq_total_rx_counter(u32 sport_index, u32 irq_total_rx_counter);
+u32 audio_sp_get_sport_irq_total_rx_counter(u32 sport_index);
+#endif
+
 #define AUDIO_BLOCK_SIZE 2048
 
 #endif

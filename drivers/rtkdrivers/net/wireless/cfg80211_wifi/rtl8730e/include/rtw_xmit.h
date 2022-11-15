@@ -38,14 +38,23 @@
 #define XMIT_BE_QUEUE (2)
 #define XMIT_BK_QUEUE (3)
 
-#define VO_QUEUE_INX		0
-#define VI_QUEUE_INX		1
-#define BE_QUEUE_INX		2
-#define BK_QUEUE_INX		3
-#define BCN_QUEUE_INX		4
-#define MGT_QUEUE_INX		5
-#define HIGH_QUEUE_INX		6
+#define BE_QUEUE_INX		0
+#define BK_QUEUE_INX		1
+#define VI_QUEUE_INX		2
+#define VO_QUEUE_INX		3
+#define MGT_QUEUE_INX		4
+#define HIGH_QUEUE_INX		5
+#define BCN_QUEUE_INX		6
 #define TXCMD_QUEUE_INX	7
+
+#define	RTW_TX_QSEL_BE 0x0
+#define	RTW_TX_QSEL_BK 0x2
+#define	RTW_TX_QSEL_VI 0x5
+#define	RTW_TX_QSEL_VO 0x7
+#define	RTW_TX_QSEL_BCN 0x10
+#define	RTW_TX_QSEL_HIGH 0x11
+#define	RTW_TX_QSEL_MGT 0x12
+#define	RTW_TX_QSEL_CMD 0x13
 
 #define HW_QUEUE_ENTRY	8
 
