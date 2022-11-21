@@ -872,7 +872,7 @@ pm_free:
 
 static u32 rtk_i2c_master_func(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR;
+	return I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR | I2C_FUNC_SMBUS_EMUL;
 }
 
 static const struct i2c_algorithm rtk_i2c_master_algo = {
