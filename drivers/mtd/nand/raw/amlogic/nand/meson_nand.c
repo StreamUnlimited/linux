@@ -1349,7 +1349,7 @@ int meson_nfc_setup_interface(struct nand_chip *nand, int csline,
 	if (bt_max < bt_min)
 		return -EINVAL;
 
-	meson_chip->level1_divider = div;
+	meson_chip->level1_divider = 5;
 	meson_chip->clk_rate = 1000000000 / meson_chip->level1_divider;
 	meson_chip->bus_timing = (bt_min + bt_max) / 2 + 1;
 	pr_info("%s %d level1_divider: %ld, clk_rate: %ld, bus_timing: %d\n",
