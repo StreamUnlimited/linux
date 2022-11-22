@@ -1136,6 +1136,10 @@ static int meson_nfc_exec_op(struct nand_chip *nand,
 			break;
 
 		case NAND_OP_DATA_IN_INSTR:
+			if (instr->ctx.data.len == 1) {
+				*(u8*)(instr->ctx.data.buf.in) = meson_nfc_read_byte(nfc);
+				break;
+			}
 			buf = meson_nand_op_get_dma_safe_input_buf(instr);
 			if (!buf)
 				return -ENOMEM;
