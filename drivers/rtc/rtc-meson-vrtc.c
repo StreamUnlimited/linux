@@ -10,22 +10,44 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/time64.h>
+#include <linux/scpi_protocol.h>
 
 struct meson_vrtc_data {
 	void __iomem *io_alarm;
 	struct rtc_device *rtc;
 	unsigned long alarm_time;
 	bool enabled;
+	struct scpi_ops* scpi_ops;
+	unsigned long long vrtc_init_date;
 };
 
 static int meson_vrtc_read_time(struct device *dev, struct rtc_time *tm)
 {
+	struct meson_vrtc_data *vrtc = dev_get_drvdata(dev);
 	struct timespec64 time;
+	u32 vrtc_val;
 
 	dev_dbg(dev, "%s\n", __func__);
-	ktime_get_real_ts64(&time);
+	ktime_get_boottime_ts64(&time);
+	vrtc_val = vrtc->scpi_ops->vrtc_get_val();
+	time.tv_sec += vrtc_val;
 	rtc_time64_to_tm(time.tv_sec, tm);
 
+	return 0;
+}
+
+static int meson_vrtc_set_time(struct device *dev, struct rtc_time *tm)
+{
+	struct meson_vrtc_data *vrtc = dev_get_drvdata(dev);
+	unsigned long time;
+	struct timespec64 boot_time;
+	u32 vrtc_val;
+
+	time = rtc_tm_to_time64(tm);
+	ktime_get_boottime_ts64(&boot_time);
+	vrtc_val = time - boot_time.tv_sec;
+
+	vrtc->scpi_ops->vrtc_set_val(vrtc_val);
 	return 0;
 }
 
@@ -59,12 +81,16 @@ static int meson_vrtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 static const struct rtc_class_ops meson_vrtc_ops = {
 	.read_time = meson_vrtc_read_time,
 	.set_alarm = meson_vrtc_set_alarm,
+	.set_time = meson_vrtc_set_time,
 	.alarm_irq_enable = meson_vrtc_alarm_irq_enable,
 };
 
 static int meson_vrtc_probe(struct platform_device *pdev)
 {
 	struct meson_vrtc_data *vrtc;
+
+	if(!get_scpi_ops())
+		return -EPROBE_DEFER;
 
 	vrtc = devm_kzalloc(&pdev->dev, sizeof(*vrtc), GFP_KERNEL);
 	if (!vrtc)
@@ -83,6 +109,10 @@ static int meson_vrtc_probe(struct platform_device *pdev)
 		return PTR_ERR(vrtc->rtc);
 
 	vrtc->rtc->ops = &meson_vrtc_ops;
+	vrtc->scpi_ops = get_scpi_ops();
+
+	vrtc->vrtc_init_date = vrtc->scpi_ops->vrtc_get_val();
+
 	return devm_rtc_register_device(vrtc->rtc);
 }
 
@@ -129,6 +159,15 @@ static int __maybe_unused meson_vrtc_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(meson_vrtc_pm_ops,
 			 meson_vrtc_suspend, meson_vrtc_resume);
 
+static void meson_vrtc_shutdown(struct platform_device *pdev)
+{
+	struct meson_vrtc_data *vrtc = dev_get_drvdata(&pdev->dev);
+	struct timespec64 now;
+
+	ktime_get_real_ts64(&now);
+	vrtc->scpi_ops->vrtc_set_val(now.tv_sec);
+}
+
 static const struct of_device_id meson_vrtc_dt_match[] = {
 	{ .compatible = "amlogic,meson-vrtc"},
 	{},
@@ -142,6 +181,7 @@ static struct platform_driver meson_vrtc_driver = {
 		.of_match_table = meson_vrtc_dt_match,
 		.pm = &meson_vrtc_pm_ops,
 	},
+	.shutdown = meson_vrtc_shutdown,
 };
 
 module_platform_driver(meson_vrtc_driver);
