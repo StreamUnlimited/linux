@@ -184,6 +184,8 @@ enum scpi_drv_cmds {
 	CMD_SENSOR_VALUE,
 	CMD_SET_DEVICE_PWR_STATE,
 	CMD_GET_DEVICE_PWR_STATE,
+	CMD_SET_RTC,
+	CMD_GET_RTC,
 	CMD_MAX_COUNT,
 };
 
@@ -200,6 +202,8 @@ static int scpi_std_commands[CMD_MAX_COUNT] = {
 	SCPI_CMD_SENSOR_VALUE,
 	SCPI_CMD_SET_DEVICE_PWR_STATE,
 	SCPI_CMD_GET_DEVICE_PWR_STATE,
+	-1, /* SET_RTC */
+	-1, /* GET_RTC */
 };
 
 static int scpi_legacy_commands[CMD_MAX_COUNT] = {
@@ -215,6 +219,8 @@ static int scpi_legacy_commands[CMD_MAX_COUNT] = {
 	LEGACY_SCPI_CMD_SENSOR_VALUE,
 	-1, /* SET_DEVICE_PWR_STATE */
 	-1, /* GET_DEVICE_PWR_STATE */
+	LEGACY_SCPI_CMD_SET_RTC,
+	LEGACY_SCPI_CMD_GET_RTC,
 };
 
 struct scpi_xfer {
@@ -558,6 +564,27 @@ static unsigned long scpi_clk_get_val(u16 clk_id)
 	return le32_to_cpu(rate);
 }
 
+unsigned long scpi_vrtc_get_val(void)
+{
+	int ret;
+	__le32 rtc;
+
+	ret = scpi_send_message(CMD_GET_RTC, NULL,
+					0, &rtc, sizeof(rtc));
+	if (ret)
+		return 0;
+
+	return le32_to_cpu(rtc);
+}
+
+int scpi_vrtc_set_val(u32 vrtc_val)
+{
+	int stat;
+	__le32 val = cpu_to_le32(vrtc_val);
+	return scpi_send_message(CMD_SET_RTC, &val,
+				sizeof(val), &stat, sizeof(stat));
+}
+
 static int scpi_clk_set_val(u16 clk_id, unsigned long rate)
 {
 	int stat;
@@ -787,6 +814,8 @@ static struct scpi_ops scpi_ops = {
 	.clk_get_range = scpi_clk_get_range,
 	.clk_get_val = scpi_clk_get_val,
 	.clk_set_val = scpi_clk_set_val,
+	.vrtc_get_val = scpi_vrtc_get_val,
+	.vrtc_set_val = scpi_vrtc_set_val,
 	.dvfs_get_idx = scpi_dvfs_get_idx,
 	.dvfs_set_idx = scpi_dvfs_set_idx,
 	.dvfs_get_info = scpi_dvfs_get_info,
