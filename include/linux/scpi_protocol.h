@@ -45,6 +45,8 @@ struct scpi_sensor_info {
  * @clk_get_val: gets clock value(in Hz)
  * @clk_set_val: sets the clock value, setting to 0 will disable the
  *	clock (if supported)
+ * @vrtc_get_val: get virtual RTC value (if supported)
+ * @vrtc_set_val: set virtual RTC value (if supported)
  * @dvfs_get_idx: gets the Operating Point of the given power domain.
  *	OPP is an index to the list return by @dvfs_get_info
  * @dvfs_set_idx: sets the Operating Point of the given power domain.
@@ -65,6 +67,8 @@ struct scpi_ops {
 	int (*clk_get_range)(u16, unsigned long *, unsigned long *);
 	unsigned long (*clk_get_val)(u16);
 	int (*clk_set_val)(u16, unsigned long);
+	unsigned long (*vrtc_get_val)(void);
+	int (*vrtc_set_val)(u32);
 	int (*dvfs_get_idx)(u8);
 	int (*dvfs_set_idx)(u8, u8);
 	struct scpi_dvfs_info *(*dvfs_get_info)(u8);
