@@ -698,9 +698,20 @@ static void fsl_spdif_shutdown(struct snd_pcm_substream *substream,
 		/* Disable TX clock */
 		regmap_update_bits(regmap, REG_SPDIF_STC, STC_TXCLK_ALL_EN_MASK, 0);
 	} else {
+		struct snd_kcontrol *ctrl_sample_rate =
+			snd_soc_card_get_kcontrol(spdif_priv->card,
+							SPDIFIN_SAMPLE_RATE_ENUM_NAME);
+
 		scr = SCR_RXFIFO_OFF | SCR_RXFIFO_CTL_ZERO;
 		mask = SCR_RXFIFO_FSEL_MASK | SCR_RXFIFO_AUTOSYNC_MASK|
 			SCR_RXFIFO_CTL_MASK | SCR_RXFIFO_OFF_MASK;
+
+		// Notify userspace that the actual sample rate will be N/A when closing.
+		// This makes sure that any processes watching only on ALSA mixer changes
+		// will be in the correct state when the device is closed/re-opend.
+		snd_ctl_notify(spdif_priv->card->snd_card,
+					   SNDRV_CTL_EVENT_MASK_VALUE,
+					   &ctrl_sample_rate->id);
 	}
 	regmap_update_bits(regmap, REG_SPDIF_SCR, mask, scr);
 
