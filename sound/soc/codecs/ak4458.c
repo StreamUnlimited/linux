@@ -734,7 +734,7 @@ static const struct snd_soc_component_driver soc_codec_dev_ak4458 = {
 	// .num_dapm_widgets	= ARRAY_SIZE(ak4458_dapm_widgets),
 	.dapm_routes		= ak4458_intercon,
 	// .num_dapm_routes	= ARRAY_SIZE(ak4458_intercon),
-	.idle_bias_on		= 1,
+	// .idle_bias_on		= 1,
 	.use_pmdown_time	= 1,
 	.endianness		= 1,
 };
