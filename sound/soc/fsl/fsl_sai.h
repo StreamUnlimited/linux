@@ -319,6 +319,7 @@ struct fsl_sai {
 	struct pm_qos_request pm_qos_req;
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pins_state;
+	struct pinctrl_state *pins_state_suspend;
 	struct sdma_peripheral_config audio_config[2];
 	struct snd_pcm_hw_constraint_list constraint_rates;
 	unsigned int constraint_rates_list[FAL_SAI_NUM_RATES];
@@ -326,7 +327,6 @@ struct fsl_sai {
 	unsigned int dai_fmt;
 
 	bool cont_mclks_prepared;
-	bool suspended;
 };
 
 const struct attribute_group *fsl_sai_get_dev_attribute_group(bool monitor_spdif);

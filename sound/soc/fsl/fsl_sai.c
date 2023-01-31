@@ -1524,7 +1524,6 @@ static int fsl_sai_probe(struct platform_device *pdev)
 		sai->cpu_dai_drv.symmetric_sample_bits = 0;
 	}
 
-	sai->suspended = true;
 	sai->mclk_direction_output = of_property_read_bool(np, "fsl,sai-mclk-direction-output");
 
 	if (sai->mclk_direction_output &&
@@ -1551,6 +1550,18 @@ static int fsl_sai_probe(struct platform_device *pdev)
 		sai->soc_data->max_burst[TX] ? sai->soc_data->max_burst[TX] : FSL_SAI_MAXBURST_TX;
 
 	sai->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (!IS_ERR_OR_NULL(sai->pinctrl)) {
+		sai->pins_state = pinctrl_lookup_state(sai->pinctrl, "default");
+		sai->pins_state_suspend = pinctrl_lookup_state(sai->pinctrl, "suspend");
+
+		if (IS_ERR_OR_NULL(sai->pins_state))
+			dev_warn(&pdev->dev, "could not get normal pins\n");
+
+		if (IS_ERR_OR_NULL(sai->pins_state_suspend))
+			dev_info(&pdev->dev, "could not get suspend pins\n");
+	} else {
+		dev_warn(&pdev->dev, "failed to get pinctrl\n");
+	}
 
 	platform_set_drvdata(pdev, sai);
 	pm_runtime_enable(dev);
@@ -1799,8 +1810,14 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 {
 	struct fsl_sai *sai = dev_get_drvdata(dev);
 
-	if (sai->dai_fmt & SND_SOC_DAIFMT_CONT)
-		return 0;
+	dev_info(dev, "suspending\n");
+
+	// Set pins to suspend state
+	if (!IS_ERR_OR_NULL(sai->pinctrl) && !IS_ERR_OR_NULL(sai->pins_state_suspend)) {
+		int ret = pinctrl_select_state(sai->pinctrl, sai->pins_state_suspend);
+		if (ret < 0)
+			dev_err(&sai->pdev->dev, "failed to set suspend pin state: %d\n", ret);
+	}
 
 	release_bus_freq(BUS_FREQ_AUDIO);
 
@@ -1811,8 +1828,6 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 		clk_disable_unprepare(sai->mclk_clk[sai->mclk_id[1]]);
 
 	clk_disable_unprepare(sai->bus_clk);
-
-	sai->suspended = true;
 
 	if (sai->soc_data->flags & PMQOS_CPU_LATENCY)
 		cpu_latency_qos_remove_request(&sai->pm_qos_req);
@@ -1828,8 +1843,7 @@ static int fsl_sai_runtime_resume(struct device *dev)
 	unsigned int ofs = sai->soc_data->reg_offset;
 	int ret;
 
-	if (!sai->suspended)
-		return 0;
+	dev_info(dev, "resuming\n");
 
 	ret = clk_prepare_enable(sai->bus_clk);
 	if (ret) {
@@ -1870,7 +1884,13 @@ static int fsl_sai_runtime_resume(struct device *dev)
 		regmap_update_bits(sai->regmap, FSL_SAI_TCSR(ofs),
 				   FSL_SAI_CSR_TERE, FSL_SAI_CSR_TERE);
 
-	sai->suspended = false;
+	// Set pins to normal state
+	if (!IS_ERR_OR_NULL(sai->pinctrl) && !IS_ERR_OR_NULL(sai->pins_state)) {
+		ret = pinctrl_select_state(sai->pinctrl, sai->pins_state);
+		if (ret < 0)
+			dev_err(&sai->pdev->dev, "failed to set normal pin state: %d\n", ret);
+	}
+
 	return 0;
 
 disable_rx_clk:
