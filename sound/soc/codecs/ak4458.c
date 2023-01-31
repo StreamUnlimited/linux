@@ -677,6 +677,8 @@ static int ak4458_runtime_suspend(struct device *dev)
 {
 	struct ak4458_priv *ak4458 = dev_get_drvdata(dev);
 
+	dev_info(dev, "suspending\n");
+
 	regcache_cache_only(ak4458->regmap, true);
 
 	ak4458_reset(ak4458, true);
@@ -693,6 +695,8 @@ static int ak4458_runtime_resume(struct device *dev)
 {
 	struct ak4458_priv *ak4458 = dev_get_drvdata(dev);
 	int ret;
+
+	dev_info(dev, "resuming\n");
 
 	ret = regulator_bulk_enable(ARRAY_SIZE(ak4458->supplies),
 				    ak4458->supplies);
