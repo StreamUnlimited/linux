@@ -52,6 +52,8 @@ struct stream195x_simple_priv {
 #define PLL_NOMINAL_RATE_48k	(786432000UL)
 #define PLL_NOMINAL_RATE_44k1	(722534400UL)
 
+#define KCONTROL_DRIFT_COMPENSATOR_NAME "Drift compensator"
+
 static int snd_soc_stream195x_ppm_info(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
@@ -112,7 +114,7 @@ static int snd_soc_stream195x_ppm_put(struct snd_kcontrol *kcontrol, struct snd_
 
 static const struct snd_kcontrol_new snd_soc_stream195x_controls[] = {
 	{
-		.name = "Drift compensator",
+		.name = KCONTROL_DRIFT_COMPENSATOR_NAME,
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.info = snd_soc_stream195x_ppm_info,
 		.get = snd_soc_stream195x_ppm_get,
@@ -146,6 +148,7 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
 	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
 	struct simple_dai_props *dai_props = simple_priv_to_props(priv, rtd->num);
+	struct snd_kcontrol *kcontrol;
 
 	unsigned int rate = params_rate(params);
 	unsigned int mclk_rate, pll_rate;
@@ -185,6 +188,12 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	ret = clk_set_rate(pll, pll_rate);
 	if (ret)
 		return ret;
+
+	// Notify userspace that the ppm value was reset to 0
+	kcontrol = snd_soc_card_get_kcontrol(rtd->card, KCONTROL_DRIFT_COMPENSATOR_NAME);
+	if (kcontrol) {
+		snd_ctl_notify(rtd->card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &kcontrol->id);
+	}
 
 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk_rate, SND_SOC_CLOCK_IN);
 	if (ret && ret != -ENOTSUPP)
