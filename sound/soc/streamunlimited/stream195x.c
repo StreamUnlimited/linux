@@ -20,6 +20,7 @@
 #include <sound/soc.h>
 
 /* START SUE addition */
+#include <linux/pm_runtime.h>
 #include <linux/gpio/consumer.h>
 #include "../fsl/fsl_sai.h"
 struct snd_soc_stream195x_dai_link_data {
@@ -48,6 +49,7 @@ struct stream195x_simple_priv {
 	int cur_ppm;
 	struct gpio_desc *powerdown_gpio;
 	struct snd_soc_stream195x_dai_link_data *dai_link_data;
+	bool ignore_suspend;
 	/* END SUE addition 2 */
 };
 
@@ -946,6 +948,66 @@ static int simple_get_dais_count(struct stream195x_simple_priv *priv,
 				    simple_count_dpcm);
 }
 
+/* START SUE addition */
+static ssize_t stream195x_ignore_suspend_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct snd_soc_card *card = dev_get_drvdata(dev);
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", priv->ignore_suspend);
+}
+
+static int stream195x_set_ignore_suspend(struct snd_soc_card *card, bool ignore_suspend)
+{
+	int ret = 0;
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
+	struct device *dev = simple_priv_to_dev(priv);
+	struct snd_soc_component *component;
+
+	if (priv->ignore_suspend == ignore_suspend)
+		return 0;
+	priv->ignore_suspend = ignore_suspend;
+
+	dev_info(dev, "%s suspend, runtime %s components\n", ignore_suspend ? "ignoring" : "not ignoring", !ignore_suspend ? "releasing" : "acquiring");
+
+	// We achieve the "ignore suspend" behavior by increasing the reference counter of all
+	// components, by using `pm_runtime_get_sync()`. To enable the suspend behavior again
+	// we just decrease the reference counter with `pm_runtime_put_sync()`.
+	for_each_card_components(card, component) {
+		ret = priv->ignore_suspend ? pm_runtime_get_sync(component->dev) : pm_runtime_put_sync(component->dev);
+		if (ret < 0 && ret != -ENOSYS) {
+			dev_err(component->dev, "%s() failed: %d\n", priv->ignore_suspend ? "pm_runtime_get_sync" : "pm_runtime_put_sync", ret);
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static ssize_t stream195x_ignore_suspend_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct snd_soc_card *card = dev_get_drvdata(dev);
+	int ret;
+	bool ignore_suspend = true;
+
+	ret = strtobool(buf, &ignore_suspend);
+	if (ret < 0)
+		return ret;
+
+	ret = stream195x_set_ignore_suspend(card, ignore_suspend);
+	if (ret < 0) {
+		dev_err(dev, "failed to set ignore_suspend state: %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+static DEVICE_ATTR(ignore_suspend, 0644, stream195x_ignore_suspend_show, stream195x_ignore_suspend_store);
+/* END SUE addition */
+
 static int simple_soc_probe(struct snd_soc_card *card)
 {
 	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
@@ -966,6 +1028,30 @@ static int simple_soc_probe(struct snd_soc_card *card)
 	return 0;
 }
 
+/* START SUE addition */
+static int simple_soc_late_probe(struct snd_soc_card *card)
+{
+	int ret = 0;
+
+	// We can only call `stream195x_set_ignore_suspend()` in the `late_probe()`
+	// after `devm_snd_soc_register_card()` has pupulated the `component_dev_list`
+	// in the `snd_soc_card` struct.
+	ret = stream195x_set_ignore_suspend(card, true);
+	if (ret < 0) {
+		dev_err(card->dev, "failed to set initial ignore_suspend state: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(card->dev, &dev_attr_ignore_suspend);
+	if (ret < 0) {
+		dev_err(card->dev, "failed to create ignore_suspend sysfs file: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+/* END SUE addition */
+
 static int asoc_simple_probe(struct platform_device *pdev)
 {
 	struct stream195x_simple_priv *priv;
@@ -985,6 +1071,9 @@ static int asoc_simple_probe(struct platform_device *pdev)
 	card->dev		= dev;
 	card->probe		= simple_soc_probe;
 	card->driver_name       = "simple-card";
+	/* START SUE addition */
+	card->late_probe	= simple_soc_late_probe;
+	/* END SUE addition */
 
 	li = devm_kzalloc(dev, sizeof(*li), GFP_KERNEL);
 	if (!li)
