@@ -1870,11 +1870,16 @@ static int fsl_sai_runtime_resume(struct device *dev)
 
 	regcache_cache_only(sai->regmap, false);
 	regcache_mark_dirty(sai->regmap);
-	regmap_write(sai->regmap, FSL_SAI_TCSR(ofs), FSL_SAI_CSR_SR);
-	regmap_write(sai->regmap, FSL_SAI_RCSR(ofs), FSL_SAI_CSR_SR);
-	usleep_range(1000, 2000);
-	regmap_write(sai->regmap, FSL_SAI_TCSR(ofs), 0);
-	regmap_write(sai->regmap, FSL_SAI_RCSR(ofs), 0);
+
+	// Do not perform a reset of the SAI if the continuous clocks are enabled so that
+	// after switching back the pinmux the previous settings are still active.
+	if (!(sai->dai_fmt & SND_SOC_DAIFMT_CONT)) {
+		regmap_write(sai->regmap, FSL_SAI_TCSR(ofs), FSL_SAI_CSR_SR);
+		regmap_write(sai->regmap, FSL_SAI_RCSR(ofs), FSL_SAI_CSR_SR);
+		usleep_range(1000, 2000);
+		regmap_write(sai->regmap, FSL_SAI_TCSR(ofs), 0);
+		regmap_write(sai->regmap, FSL_SAI_RCSR(ofs), 0);
+	}
 
 	ret = regcache_sync(sai->regmap);
 	if (ret)
