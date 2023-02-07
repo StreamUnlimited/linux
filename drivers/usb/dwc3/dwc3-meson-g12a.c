@@ -520,9 +520,11 @@ static irqreturn_t dwc3_meson_g12a_oc_irq(int irq, void *dev_id)
 {
 	struct dwc3_meson_g12a *priv = dev_id;
 
-	/* disable port power and shedule re-enabling in one second from now */
-	dwc3_meson_set_usb_vbus_power(priv, 0);
-	schedule_delayed_work(&priv->oc_work, msecs_to_jiffies(1000));
+	if (priv->otg_phy_mode == PHY_MODE_USB_HOST) {
+		/* disable port power and shedule re-enabling in one second from now */
+		dwc3_meson_set_usb_vbus_power(priv, 0);
+		schedule_delayed_work(&priv->oc_work, msecs_to_jiffies(1000));
+	}
 
 	return IRQ_HANDLED;
 }
@@ -531,8 +533,10 @@ static void dwc3_meson_g12a_oc_irq_thread(struct work_struct *work)
 {
 	struct dwc3_meson_g12a *priv = container_of(work, struct dwc3_meson_g12a, oc_work.work);
 
-	dev_info(priv->dev, "trying to re-enable port power\n");
-	dwc3_meson_set_usb_vbus_power(priv, 1);
+	if (priv->otg_phy_mode == PHY_MODE_USB_HOST) {
+		dev_info(priv->dev, "trying to re-enable port power\n");
+		dwc3_meson_set_usb_vbus_power(priv, 1);
+	}
 }
 
 static int dwc3_meson_g12a_otg_mode_set(struct dwc3_meson_g12a *priv,
@@ -549,7 +553,7 @@ static int dwc3_meson_g12a_otg_mode_set(struct dwc3_meson_g12a *priv,
 		dev_info(priv->dev, "switching to Device Mode\n");
 
 	if (priv->vbus) {
-		dwc3_meson_set_usb_vbus_power(priv, mode == PHY_MODE_USB_DEVICE);
+		dwc3_meson_set_usb_vbus_power(priv, mode == PHY_MODE_USB_HOST);
 	}
 
 	priv->otg_phy_mode = mode;
