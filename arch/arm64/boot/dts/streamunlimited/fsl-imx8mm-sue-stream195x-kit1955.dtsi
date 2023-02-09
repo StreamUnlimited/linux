@@ -256,6 +256,18 @@
 			>;
 		};
 
+		pinctrl_sai1_tx_suspend: sai1txsuspendgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI1_MCLK_GPIO4_IO20		(PAD_CTL_PE_DOWN)
+				MX8MM_IOMUXC_SAI1_TXFS_GPIO4_IO10		(PAD_CTL_PE_DOWN)
+				MX8MM_IOMUXC_SAI1_TXC_GPIO4_IO11		(PAD_CTL_PE_DOWN)
+				MX8MM_IOMUXC_SAI1_TXD0_GPIO4_IO12		(PAD_CTL_PE_DOWN)
+				MX8MM_IOMUXC_SAI1_TXD1_GPIO4_IO13		(PAD_CTL_PE_DOWN)
+				MX8MM_IOMUXC_SAI1_TXD2_GPIO4_IO14		(PAD_CTL_PE_DOWN)
+				MX8MM_IOMUXC_SAI1_TXD3_GPIO4_IO15		(PAD_CTL_PE_DOWN)
+			>;
+		};
+
 		pinctrl_sai2_rx: sai2rxgrp {
 			fsl,pins = <
 				MX8MM_IOMUXC_SAI2_RXD0_SAI2_RX_DATA0		(PAD_CTL_PE_DOWN | PAD_CTL_HYS | PAD_CTL_FAST)
@@ -313,8 +325,9 @@
 
 &sai1 {
 	#sound-dai-cells = <0>;	/* This is required for the simple-audio-card to work */
-	pinctrl-names = "default";
+	pinctrl-names = "default", "suspend";
 	pinctrl-0 = <&pinctrl_sai1_tx>;
+	pinctrl-1 = <&pinctrl_sai1_tx_suspend>;
 	assigned-clocks = <&clk IMX8MM_CLK_SAI1>;
 	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
 	assigned-clock-rates = <24576000>;
