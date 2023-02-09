@@ -591,7 +591,9 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 		/* Clear I2C interrupt */
 		pr_debug("I2C_BIT_R_LP_WAKE_2 \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-		rtk_i2c_isr_slave_handle_sar2_wake(i2c_dev);
+		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
+			rtk_i2c_isr_slave_handle_sar2_wake(i2c_dev);
+		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_LP_WAKE_2);
 	}
@@ -600,7 +602,9 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 		/* Clear I2C interrupt */
 		pr_debug("I2C_BIT_R_LP_WAKE_1 \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-		rtk_i2c_isr_slave_handle_sar1_wake(i2c_dev);
+		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
+			rtk_i2c_isr_slave_handle_sar1_wake(i2c_dev);
+		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_LP_WAKE_1);
 	}
@@ -608,7 +612,9 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 	if (intr_status & I2C_BIT_R_GEN_CALL) {
 		/* Clear I2C interrupt */
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-		rtk_i2c_isr_slave_handle_generall_call(i2c_dev);
+		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
+			rtk_i2c_isr_slave_handle_generall_call(i2c_dev);
+		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_GEN_CALL);
 	}
@@ -646,14 +652,38 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 		//the transmission, indicating that the transmission is done.
 		pr_debug("I2C_BIT_R_RX_DONE \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-        rkt_i2c_isr_slave_handle_res_done(i2c_dev);
+		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
+        		rkt_i2c_isr_slave_handle_res_done(i2c_dev);
+		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RX_DONE);
+	}
+
+	/* I2C STOP DET Intr */
+	if (intr_status & I2C_BIT_M_STOP_DET) {
+		pr_debug("I2C_BIT_M_STOP_DET \n");
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
+        		rkt_i2c_isr_slave_handle_res_done(i2c_dev);
+		}
+#endif // IS_ENABLED(CONFIG_I2C_SLAVE)
+		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_M_STOP_DET);
 	}
 
 	/* I2C TX Abort Intr */
 	if (intr_status & I2C_BIT_R_TX_ABRT) {
 		pr_debug("TX_ABRT = %x\n", rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE));
+#if RTK_I2C_AUTO_RE_RECV
+		/* For xperi, if not recv enough bytes, trigger i2c recv agian automatically by driver.*/
+		if ((rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE)) & I2C_BIT_ABRT_7B_ADDR_NOACK) {
+			/* Read mode: trigger hw retry. */
+			if (((i2c_dev->i2c_manage.dev_status == I2C_STS_RX_ING)
+				|| (i2c_dev->i2c_manage.dev_status == I2C_STS_RX_READY))
+				&& (i2c_dev->i2c_manage.rx_info.data_len)) {
+				rtk_i2c_receive_master(i2c_dev);
+			}
+		}
+#endif
 		if ((rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE)) & I2C_BIT_ARBT_LOST) {
 			/*Acquire the data number in TX FIFO*/
 			i2c_dev->i2c_manage.tx_info.p_data_buf -= rtk_i2c_readl(i2c_dev->base, IC_TXFLR);
@@ -674,7 +704,9 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 	/* I2C RD REQ Intr. It is only for slave. */
 	if (intr_status & I2C_BIT_R_RD_REQ) {
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-		rtk_i2c_isr_slave_handle_rd_req(i2c_dev);
+		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
+			rtk_i2c_isr_slave_handle_rd_req(i2c_dev);
+		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 	}
 

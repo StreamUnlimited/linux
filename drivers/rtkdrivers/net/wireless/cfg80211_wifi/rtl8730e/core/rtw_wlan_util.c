@@ -744,8 +744,12 @@ void WMMOnAssocRsp(_adapter *padapter)
 			ECWMax = (pmlmeinfo->WMM_param.ac_param[i].CW & 0xf0) >> 4;
 			TXOP = le16_to_cpu(pmlmeinfo->WMM_param.ac_param[i].TXOP_limit);
 
+			/* for b mode (WMM) tp. */
+			if (i == ac_be) {
+				TXOP = 0x5e;
+			}
+
 			acParm = AIFS | (ECWMin << 8) | (ECWMax << 12) | (TXOP << 16);
-			rtw_hw_set_edca(padapter, ACI, acParm);
 
 			switch (ACI) {
 			case 0x0:
@@ -770,6 +774,7 @@ void WMMOnAssocRsp(_adapter *padapter)
 			}
 
 			RTW_INFO("WMM(%x): %x, %x\n", ACI, ACM, acParm);
+			rtw_hw_set_edca(padapter, ACI, acParm);
 
 			if (i == ac_be) {
 				padapter->last_edca = acParm;
@@ -1904,7 +1909,20 @@ bool rtw_bcn_key_compare(struct beacon_keys *cur, struct beacon_keys *recv)
 	}
 
 	if (_rtw_memcmp(&tmp, recv, sizeof(*recv)) == _FALSE) {
-		goto exit;
+		if ((recv->ssid_len != tmp.ssid_len) || (_rtw_memcmp(&recv->ssid, &tmp.ssid, recv->ssid_len) == _FALSE)) {
+			/*ssid abnormal.*/
+			goto exit;
+		}
+		if (recv->encryp_protocol != tmp.encryp_protocol || recv->pairwise_cipher != tmp.pairwise_cipher) {
+			/*encryp/psk abnormal.*/
+			goto exit;
+		}
+		if (recv->group_cipher != tmp.group_cipher) {
+			/*group key changed, do not disconnect. update group key.*/
+		}
+		if (recv->akm != tmp.akm) {
+			/*akm changed, do not disconnect. update akm.*/
+		}
 	}
 
 	ret = _TRUE;

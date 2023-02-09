@@ -35,6 +35,7 @@ struct ameba_pcm_dma_params {
 	u64 total_sport_counter;
 	//means the current substream's sport's base addr.
 	void __iomem * sport_base_addr;
+	bool use_mmap;
 };
 
 struct dma_callback_params {

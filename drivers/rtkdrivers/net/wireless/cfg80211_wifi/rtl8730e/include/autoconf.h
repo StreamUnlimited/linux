@@ -33,7 +33,7 @@
 #define DBG_HAL_MEM_MOINTOR
 #endif*/
 #define CONFIG_PHL_USE_KMEM_ALLOC
-#define CONFIG_HW_RTS
+//#define CONFIG_HW_RTS
 
 /*
  * Work around Config
@@ -69,7 +69,7 @@
  * Wi-Fi Functions Config
  */
 
-/*#define CONFIG_RECV_REORDERING_CTRL*/
+#define CONFIG_RECV_REORDERING_CTRL
 
 #define CONFIG_80211N_HT
 #define CONFIG_80211AC_VHT
@@ -150,11 +150,11 @@
 #endif
 
 #ifdef CONFIG_POWER_SAVE
-/* #define CONFIG_RTW_IPS */
-/* #define CONFIG_RTW_LPS */
+#define CONFIG_RTW_IPS
+#define CONFIG_RTW_LPS
 
 #if defined(CONFIG_RTW_IPS) || defined(CONFIG_RTW_LPS)
-#define CONFIG_PS_FW_DBG
+/* #define CONFIG_PS_FW_DBG */
 #endif
 #endif
 
@@ -316,9 +316,11 @@
 #define CONFIG_BCN_POLLING
 //#define RTW_PHL_TEST_FPGA //For 8852A PCIE FPGA TEST
 
+/* disable dynamic rx buffer for efficiency
 #ifndef CONFIG_DYNAMIC_RX_BUF
 #define CONFIG_DYNAMIC_RX_BUF
 #endif
+*/
 
 /*#define CONFIG_RTW_BTM_ROAM*/
 /*#define CONFIG_RTW_80211R*/

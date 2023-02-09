@@ -307,6 +307,7 @@ static int realtek_thermal_remove(struct platform_device *pdev)
 
 static const struct of_device_id realtek_thermal_match[] = {
 	{ .compatible = "realtek,amebad2-thermal"},
+	{ },
 };
 MODULE_DEVICE_TABLE(of, realtek_thermal_match);
 

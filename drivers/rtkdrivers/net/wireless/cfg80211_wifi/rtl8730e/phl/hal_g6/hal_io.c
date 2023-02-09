@@ -90,6 +90,17 @@ u32 _hal_read32(struct rtw_hal_com_t *hal, u32 addr)
 	return r_val;
 }
 
+void _hal_read_mem(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len)
+{
+	struct hal_io_priv *io_priv = &hal->iopriv;
+	void (*_read_mem)(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len);
+
+	_read_mem = io_priv->io_ops._read_mem;
+	_read_mem(hal, addr, buf, len);
+
+	return ;
+}
+
 int _hal_write8(struct rtw_hal_com_t *hal, u32 addr, u8 val)
 {
 	struct hal_io_priv *io_priv = &hal->iopriv;
@@ -170,6 +181,28 @@ int _hal_write32(struct rtw_hal_com_t *hal, u32 addr, u32 val)
 	}
 #endif
 	return ret;
+}
+
+void _hal_write_mem(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len)
+{
+	struct hal_io_priv *io_priv = &hal->iopriv;
+	int (*_write_mem)(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len);
+#ifdef RTW_WKARD_BUS_WRITE
+	int (*_write_post_cfg)(struct rtw_hal_com_t *hal, u32 addr,
+			       u32 value) = NULL;
+#endif
+	int ret;
+
+	_write_mem = io_priv->io_ops._write_mem;
+	ret = _write_mem(hal, addr, buf, len);
+
+#ifdef RTW_WKARD_BUS_WRITE
+	_write_post_cfg = io_priv->io_ops._write_post_cfg;
+	if (NULL != _write_post_cfg) {
+		ret = _write_post_cfg(hal, addr, val);
+	}
+#endif
+	return;
 }
 
 #ifdef CONFIG_AXI_HCI

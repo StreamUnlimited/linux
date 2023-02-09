@@ -14,6 +14,9 @@
  *****************************************************************************/
 #define _PHL_CMD_BTC_C_
 #include "phl_headers.h"
+#include "phl/hal_g6/btc/halbtc_fw.h"
+#include "phl/hal_g6/btc/hal_btc.h"
+#include "phl/hal_g6/hal_struct.h"
 
 #ifdef CONFIG_BTCOEX
 #ifdef CONFIG_PHL_CMD_BTC
@@ -130,6 +133,8 @@ _btc_internal_post_msg_hdlr(struct phl_info_t *phl_info,
 			    struct phl_msg *msg) {
 	enum phl_mdl_ret_code ret = MDL_RET_IGNORE;
 	enum phl_msg_evt_id evt_id = MSG_EVT_ID_FIELD(msg->msg_id);
+        struct hal_info_t *hal = (struct hal_info_t *)phl_info->hal;
+        struct btc_t *btc = (struct btc_t *)hal->btc;
 
 	switch (evt_id)
 	{

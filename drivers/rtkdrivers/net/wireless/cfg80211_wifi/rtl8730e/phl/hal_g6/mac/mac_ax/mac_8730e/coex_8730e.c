@@ -50,16 +50,16 @@ u32 mac_coex_init_8730e(struct mac_ax_adapter *adapter,
 	/* PTA pre_wl_tx enable, WLAN TX can request during gnt_bt=1. 0x4C6[4]=1 */
 	/* wl_tx signal to PTA does not consider EDCCA. 0x4C6[5]=0 */
 	val32 = MAC_REG_R32(REG_PTA_STBC_CTRL);
-	val32 = (val32 | BIT_PTA_WL_TX_EN) & ~BIT_PTA_WL_TX_EN;
+	val32 = (val32 | BIT_PTA_WL_TX_EN) & ~BIT_PTA_EDCCA_EN;
 	MAC_REG_W32(REG_PTA_STBC_CTRL, val32);
 
 	/*GNT_BT=1 while select both, 0x763[4]=1 */
 	val = MAC_REG_R32(REG_WMAC_SWAES_CFG);
 	MAC_REG_W32(REG_WMAC_SWAES_CFG, val | BIT_GNT_BOTH_POL);
 
+	/* Enable BT_ACT_STATISTICS counters, 0x76E[2]=1 */
 	val = MAC_REG_R32(REG_WLAN_ACT_MASK_CTRL_1);
-	MAC_REG_W32(REG_WLAN_ACT_MASK_CTRL_1, val | BIT_EN_WL_ACT_MASK |
-		    BIT_STATIS_BT_EN | BIT_R_GRANTALL_WLMASK);
+	MAC_REG_W32(REG_WLAN_ACT_MASK_CTRL_1, val | BIT_STATIS_BT_EN | BIT_R_GRANTALL_WLMASK);
 
 	/* Disable BT_CCA. 0x523[7]=0 */
 	val = MAC_REG_R32(REG_TXPAUSE_TXPTCL_DISTXREQ_CTRL);
@@ -145,19 +145,25 @@ u32 mac_cfg_gnt_8730e(struct mac_ax_adapter *adapter,
 	}
 
 	MAC_REG_W32(REG_BT_COEX_ENH, val);
-	/*
-	val = (gnt_cfg->band.gnt_bt ? (BIT_R_GNT_BT_RFC_SW |
-		 BIT_R_GNT_BT_BB_SW) : 0) |
-		(gnt_cfg->band.gnt_bt_sw_en ?
-		 (BIT_R_GNT_BT_RFC_SW_EN |
-		  BIT_R_GNT_BT_BB_SW_EN) : 0) |
-		(gnt_cfg->band.gnt_wl ? 0 : (BIT_R_GNT_BT_RFC_SW |
-					  BIT_R_GNT_BT_BB_SW)) |
-		(gnt_cfg->band.gnt_wl_sw_en ? 0 :
-		 (BIT_R_GNT_BT_RFC_SW_EN | BIT_R_GNT_BT_BB_SW_EN));
-	*/
 
+	return MACSUCCESS;
+}
 
+u32 mac_get_scbd_8730e(struct mac_ax_adapter *adapter, u32 *val)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	*val = MAC_REG_R32(REG_SCOREBOARD_RD_BT2WL);
+	*val &= 0x7FFFFFFF;
+
+	return MACSUCCESS;
+}
+
+u32 mac_set_scbd_8730e(struct mac_ax_adapter *adapter, u32 val)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	MAC_REG_W32(REG_SCOREBOARD_CTRL, val);
 
 	return MACSUCCESS;
 }

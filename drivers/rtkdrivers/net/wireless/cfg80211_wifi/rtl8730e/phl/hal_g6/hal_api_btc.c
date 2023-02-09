@@ -80,7 +80,6 @@ static bool _fw_msg_init(struct rtw_hal_com_t *hal_com)
 	fw_msg->fev_cnt = 0;
 
 	_bt_msg_init(hal_com, &fw_msg->btinfo);
-	_bt_msg_init(hal_com, &fw_msg->scbd);
 
 	pq_init(d, &fw_msg->idleq);
 	pq_init(d, &fw_msg->waitq);
@@ -104,7 +103,6 @@ static void _fw_msg_free(struct rtw_hal_com_t *hal_com)
 	struct fw_msg_entry *entry = NULL;
 
 	_bt_msg_deinit(hal_com, &fw_msg->btinfo);
-	_bt_msg_deinit(hal_com, &fw_msg->scbd);
 
 	while (1) {
 		entry = _msg_deq(hal_com, &fw_msg->waitq);
@@ -387,24 +385,6 @@ void rtw_hal_btc_fwinfo_ntfy(void *hinfo)
 		return;
 	}
 
-	/* bt score board notification */
-	while (1) {
-		bmsg = &fmsg->scbd;
-		if (bmsg->cnt) {
-			_os_spinlock(d, &bmsg->lock, _bh, NULL);
-			bmsg->cnt = 0;
-			_os_mem_cpy(d, &bmsg->working[0],
-				    &bmsg->latest[0], bmsg->len);
-			_os_spinunlock(d, &bmsg->lock, _bh, NULL);
-			PHL_TRACE(COMP_PHL_BTC, _PHL_DEBUG_,
-				  "[BTC], scoreboard notify !! \n");
-			ops->ntfy_fwinfo(btc, &bmsg->working[0], bmsg->len,
-					 BTC_CLASS_FEV, BTC_FEV_BT_SCBD);
-		} else {
-			break;
-		}
-	}
-
 	/* bt info notification */
 	while (1) {
 		bmsg = &fmsg->btinfo;
@@ -414,8 +394,7 @@ void rtw_hal_btc_fwinfo_ntfy(void *hinfo)
 			_os_mem_cpy(d, &bmsg->working[0],
 				    &bmsg->latest[0], bmsg->len);
 			_os_spinunlock(d, &bmsg->lock, _bh, NULL);
-			PHL_TRACE(COMP_PHL_BTC, _PHL_DEBUG_,
-				  "[BTC], bt info notify !! \n");
+			PHL_INFO("[BTC], bt info notify !! \n");
 			ops->ntfy_fwinfo(btc, &bmsg->working[0], bmsg->len,
 					 BTC_CLASS_FEV, BTC_FEV_BT_INFO);
 		} else {
@@ -427,8 +406,7 @@ void rtw_hal_btc_fwinfo_ntfy(void *hinfo)
 	while (1) {
 		entry = _msg_deq(hal_com, &fmsg->waitq);
 		if (entry) {
-			PHL_TRACE(COMP_PHL_BTC, _PHL_DEBUG_,
-				  "[BTC], fw event notify !! \n");
+			PHL_INFO("[BTC], fw event notify !! \n");
 			ops->ntfy_fwinfo(btc, entry->buf, entry->len,
 					 entry->c2h_class, entry->c2h_func);
 			_msg_enq(hal_com, &fmsg->idleq, entry);
@@ -558,6 +536,7 @@ u32 rtw_hal_btc_process_c2h(void *hal, struct rtw_c2h_info *c2h)
 {
 	struct hal_info_t *h = (struct hal_info_t *)hal;
 	struct btc_t *btc = (struct btc_t *)h->btc;
+	struct btc_ops *ops = btc->ops;
 	struct rtw_hal_com_t *hal_com = h->hal_com;
 	struct btc_fw_msg *fmsg = &hal_com->btc_msg;
 	void *d = halcom_to_drvpriv(hal_com);
@@ -569,8 +548,6 @@ u32 rtw_hal_btc_process_c2h(void *hal, struct rtw_c2h_info *c2h)
 	if (len && len < RTW_PHL_BTC_FWINFO_BUF) {
 		if (cls == BTC_CLASS_FEV && func == BTC_FEV_BT_INFO) {
 			_copy_btmsg(hal_com, &fmsg->btinfo, len, buf);
-		} else if (cls == BTC_CLASS_FEV && func == BTC_FEV_BT_SCBD) {
-			_copy_btmsg(hal_com, &fmsg->scbd, len, buf);
 		} else {
 			_fw_evnt_enq(hal_com, cls, func, len, buf);
 		}

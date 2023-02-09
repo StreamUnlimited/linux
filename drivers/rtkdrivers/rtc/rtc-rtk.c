@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/pm_wakeirq.h>
 
 
 
@@ -843,6 +844,11 @@ static int rtk_rtc_probe(struct platform_device *pdev)
 	/*set time to 1970-01-01 00:00:00*/
 	rtc_time64_to_tm(0, &tm);
 	rtk_rtc_set_time(&pdev->dev, &tm);
+
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		device_init_wakeup(&pdev->dev, true);
+		dev_pm_set_wake_irq(&pdev->dev, rtc->irq_alarm);
+	}
 
 	return 0;
 

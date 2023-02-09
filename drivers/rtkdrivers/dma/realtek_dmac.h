@@ -398,11 +398,12 @@ enum dma_status_record {
 	DMA_RESUMED_NOW,
 	DMA_ONGOING,
 	DMA_COMPLETED,
+	DMA_TERMINATE,
 };
 
 struct dma_pause_record {
 	enum dma_status_record	status;
-	bool			has_next;
+	int			has_next;
 };
 
 /**

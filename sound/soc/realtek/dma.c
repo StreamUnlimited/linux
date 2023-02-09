@@ -143,9 +143,9 @@ static u64 ameba_get_dai_counter_ntime(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
 	struct ameba_pcm_dma_params *dma_params = dma_private->pcm_params;
+	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
+
 	u64 nsec = 0;
 	//current total i2s counter of audio frames;
 	u64 now_counter = 0;
@@ -156,7 +156,11 @@ static u64 ameba_get_dai_counter_ntime(struct snd_pcm_substream *substream)
 		return -EFAULT;
 	}
 
-	delta_counter = audio_sp_get_tx_count(dma_params->sport_base_addr);
+	if (is_playback)
+		delta_counter = audio_sp_get_tx_count(dma_params->sport_base_addr);
+	else
+		delta_counter = audio_sp_get_rx_count(dma_params->sport_base_addr);
+
 	now_counter = dma_params->total_sport_counter + delta_counter;
 	//this will cause __aeabi_uldivmod compile issue, so need to use div_u64 func.
 	//nsec = now_counter * 1000000000 / runtime->rate;
@@ -242,6 +246,8 @@ static int gdma_mmap(struct snd_pcm_substream *substream,
 	struct vm_area_struct *vma)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
+	dma_private->pcm_params->use_mmap = true;
 
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	return remap_pfn_range(vma, vma->vm_start,
@@ -268,7 +274,7 @@ static void ameba_pcm_release_dma_channel(struct snd_pcm_substream *substream)
 		data_0->chan = NULL;
 	}
 
-	if ( IS_6_8_CHANNEL(runtime->channels) ) {
+	if (IS_6_8_CHANNEL(runtime->channels)) {
 		data_1 = &(dma_private->pcm_data_1);
 		if (data_1->chan) {
 			dma_info(1,component->dev,"release dma for fifo1");
@@ -327,7 +333,7 @@ static int ameba_pcm_request_dma_channel(struct snd_pcm_substream *substream, st
 		return -ENODEV;
 	}
 
-	if ( IS_6_8_CHANNEL(params_channels(params)) ) {
+	if (IS_6_8_CHANNEL(params_channels(params))) {
 		/***request channel***/
 		data_1 = &(dma_private->pcm_data_1);
 		if(is_playback){
@@ -365,7 +371,7 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 	int ret;
 	unsigned int dma_id = 0;
 
-	if ( data == NULL ) {
+	if (data == NULL) {
 		dev_err(component->dev, "%s data is NULL \n", __func__);
 		return -EINVAL;
 	}
@@ -375,13 +381,13 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 
 	if (is_playback) {
 		config.src_addr = runtime->dma_addr + data->dma_addr_offset;   //need double check
-		if ( dma_id == 0 )
+		if (dma_id == 0)
 			config.dst_addr = dma_params->dev_phys_0;
 		else
 			config.dst_addr = dma_params->dev_phys_1;
 		dir = DMA_MEM_TO_DEV;
 	} else {
-		if ( dma_id == 0 )
+		if (dma_id == 0)
 			config.src_addr = dma_params->dev_phys_0;
 		else
 			config.src_addr = dma_params->dev_phys_1;
@@ -395,7 +401,7 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 	config.src_addr_width = dma_params->datawidth;
 	config.dst_addr_width = dma_params->datawidth;
 
-	if ( dma_id == 0 )
+	if (dma_id == 0)
 		config.slave_id = dma_params->handshaking_0;
 	else
 		config.slave_id = dma_params->handshaking_1;
@@ -407,8 +413,6 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 
 	chan = data->chan;
 	desc = data->desc;
-
-	dma_info(1,component->dev,"%s: dma_id:%d, src_addr:%x,dst_addr:%x max_burst:%d,src data width:%d,dst data width:%d,slave_id:%d, dma bytes once:%d\n",__func__,dma_id,config.src_addr,config.dst_addr,config.src_maxburst,config.src_addr_width,config.dst_addr_width,config.slave_id, data->period_bytes);
 
 	ret = dmaengine_slave_config(chan, &config);
 	if (ret) {
@@ -466,8 +470,6 @@ static void restart_dma_transfer(struct snd_pcm_substream *substream, struct ame
 void ameba_alsa_callback_handle(struct dma_callback_params *params){
 	struct snd_pcm_substream *substream = params->substream;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_data * data_0 = NULL;
 	struct ameba_pcm_dma_data * data_1 = NULL;
@@ -476,15 +478,15 @@ void ameba_alsa_callback_handle(struct dma_callback_params *params){
 
 #if TDM_TWO_DMAS_SYNC
 	/*6/8 channel should wait for both dma callback, and then restart both dma, otherwise just return*/
-	if ( IS_6_8_CHANNEL(runtime->channels) ) {
+	if (IS_6_8_CHANNEL(runtime->channels)) {
 		dma_private->sync_dma_0_1 ++;
-		if ( dma_private->sync_dma_0_1 < dma_sync_callback_count)
+		if (dma_private->sync_dma_0_1 < dma_sync_callback_count)
 			return;
 		dma_private->sync_dma_0_1 = 0;
 	}
 #endif
 
-#if ( !TDM_TWO_DMAS_SYNC )
+#if (!TDM_TWO_DMAS_SYNC)
 	if (params->dma_id == 0) {  //each dma transfer no sync with another
 #endif
 
@@ -494,21 +496,19 @@ void ameba_alsa_callback_handle(struct dma_callback_params *params){
 	if (data_0->dma_addr_offset >= data_0->buffer_size  * runtime->channels / data_0->channels)
         data_0->dma_addr_offset = 0;
 
-	dma_info(1,component->dev,"%s:%d dma_id:%d, data_0->dma_addr_offset:%d",__func__,__LINE__, params->dma_id, data_0->dma_addr_offset);
-
 	if (!runtime->no_period_wakeup)
 		snd_pcm_period_elapsed(substream);
 
 	if (data_0->be_running)
 		restart_dma_transfer(substream, data_0);
 
-#if ( !TDM_TWO_DMAS_SYNC )
+#if (!TDM_TWO_DMAS_SYNC)
 	}  //each dma transfer no sync with another
 
 	if (params->dma_id == 1) {  //each dma transfer no sync with another
 #endif
 
-	if ( IS_6_8_CHANNEL(runtime->channels) ) {
+	if (IS_6_8_CHANNEL(runtime->channels)) {
 		data_1 = &(dma_private->pcm_data_1);
 
 		data_1->dma_addr_offset += data_1->period_bytes * runtime->channels / data_1->channels;
@@ -519,7 +519,7 @@ void ameba_alsa_callback_handle(struct dma_callback_params *params){
 			restart_dma_transfer(substream, data_1);
 	}
 
-#if ( !TDM_TWO_DMAS_SYNC )
+#if (!TDM_TWO_DMAS_SYNC)
 	} //each every dma transfer no sync with another
 #endif
 }
@@ -546,7 +546,7 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 	data_0->channels = params_channels(params);
 	data_0->dma_id = 0;
 
-	if ( IS_6_8_CHANNEL(params_channels(params)) ) {
+	if (IS_6_8_CHANNEL(params_channels(params))) {
 		data_0->period_bytes = params_period_bytes(params) * data_0_channels / params_channels(params);
 		data_0->period_num = params_periods(params);
 		data_0->buffer_size = params_buffer_bytes(params) * data_0_channels / params_channels(params);
@@ -558,10 +558,10 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 		data_1->buffer_size = params_buffer_bytes(params) * data_1_channels / params_channels(params);
 		data_1->channels = data_1_channels;
 		data_1->dma_id = 1;
-		dev_info(component->dev,"%s, dma 1 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d; \n",__func__,data_1->period_bytes,data_1->period_num,data_1->buffer_size,data_1->channels,params_width(params),params_format(params));
+		dma_info(1, component->dev,"%s, dma 1 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d; \n",__func__,data_1->period_bytes,data_1->period_num,data_1->buffer_size,data_1->channels,params_width(params),params_format(params));
 	}
 
-	dev_info(component->dev,"%s, dma 0 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d,rate:%d; \n",__func__,data_0->period_bytes,data_0->period_num,data_0->buffer_size,data_0->channels,params_width(params),params_format(params),params_rate(params));
+	dma_info(1, component->dev,"%s, dma 0 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d,rate:%d; \n",__func__,data_0->period_bytes,data_0->period_num,data_0->buffer_size,data_0->channels,params_width(params),params_format(params),params_rate(params));
 
 	dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);     //dma data is set in sport.c
 	if (!dma_params) {
@@ -572,8 +572,10 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 		return 0;
 	}
 
-	if ( !dma_private->pcm_params )
+	if (!dma_private->pcm_params)
 		dma_private->pcm_params = dma_params;
+
+	dma_private->pcm_params->use_mmap = false;
 
 	ret = ameba_pcm_request_dma_channel(substream, params);
 	if (ret)
@@ -602,7 +604,7 @@ static int gdma_prepare(struct snd_pcm_substream *substream)
 	data_0->be_running = 0;
 	data_0->dma_addr_offset = 0;
 
-	if ( IS_6_8_CHANNEL(runtime->channels) ) {
+	if (IS_6_8_CHANNEL(runtime->channels)) {
 		data_1 = &(dma_private->pcm_data_1);
 		data_1->be_running = 0;
 		data_1->dma_addr_offset = data_1->period_bytes * 4 / data_1->channels;
@@ -617,7 +619,7 @@ static int gdma_trigger_start(struct snd_pcm_substream *substream, struct ameba_
 	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
 	int ret;
 
-	if ( data == NULL ) {
+	if (data == NULL) {
 		dev_err(component->dev, "%s data is NULL \n", __func__);
 		return -EINVAL;
 	}
@@ -665,7 +667,7 @@ static int gdma_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	data_0 = &(dma_private->pcm_data_0);
 
-	if ( IS_6_8_CHANNEL(runtime->channels) ) {
+	if (IS_6_8_CHANNEL(runtime->channels)) {
 		data_1 = &(dma_private->pcm_data_1);
 	}
 
@@ -673,18 +675,18 @@ static int gdma_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_START:
 		ret = gdma_trigger_start(substream, data_0);
 
-		if ( IS_6_8_CHANNEL(runtime->channels) ) {
+		if (IS_6_8_CHANNEL(runtime->channels)) {
 			ret = gdma_trigger_start(substream, data_1);
 		}
 		break;
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		if ( data_0->chan )
+		if (data_0->chan)
 			dmaengine_resume(data_0->chan);
 
 		data_0->be_running = 1;
 
-		if ( IS_6_8_CHANNEL(runtime->channels) ) {
+		if (IS_6_8_CHANNEL(runtime->channels)) {
 			if (data_1->chan)
 				dmaengine_resume(data_1->chan);
 			data_1->be_running = 1;
@@ -693,33 +695,34 @@ static int gdma_trigger(struct snd_pcm_substream *substream, int cmd)
 		dma_info(1, component->dev, "%s resume \n",__func__);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-/*		if ( data_0->chan )
-			ret = dmaengine_terminate_async(data_0->chan);   //dma terminate will stop dma immediately,now only set flag here
-		if ( ret ) {
-			dev_err(component->dev,"failed to terminate dma 0: %d\n", ret);
-			return ret;
-		}*/
-
 		data_0->be_running = 0;
-
-		if ( IS_6_8_CHANNEL(runtime->channels) ) {
-/*			if ( data_1->chan )
-				ret = dmaengine_terminate_async(data_1->chan);   //dma terminate will stop dma immediately,now only set flag here
-			if ( ret ) {
-				dev_err(component->dev,"failed to terminate dma 1: %d\n", ret);
+		if (data_0->chan) {
+			ret = dmaengine_terminate_async(data_0->chan);   //dma terminate will stop dma immediately,now only set flag here
+			if (ret) {
+				dev_err(component->dev,"failed to terminate dma 0: %d\n", ret);
 				return ret;
-			}*/
+			}
+		}
+
+		if (IS_6_8_CHANNEL(runtime->channels)) {
 			data_1->be_running = 0;
+			if (data_1->chan) {
+				ret = dmaengine_terminate_async(data_1->chan);   //dma terminate will stop dma immediately,now only set flag here
+				if (ret) {
+					dev_err(component->dev,"failed to terminate dma 1: %d\n", ret);
+					return ret;
+				}
+			}
 		}
 		dma_info(1, component->dev, "%s stop \n",__func__);
 		break;
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		if ( data_0->chan )
+		if (data_0->chan)
 			dmaengine_pause(data_0->chan);
 		data_0->be_running = 0;
 
-		if ( IS_6_8_CHANNEL(runtime->channels) ) {
+		if (IS_6_8_CHANNEL(runtime->channels)) {
 			if (data_1->chan)
 				dmaengine_pause(data_1->chan);
 			data_1->be_running = 0;
@@ -738,8 +741,6 @@ static snd_pcm_uframes_t
 	gdma_pointer(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_data *data_0;
 	struct dma_tx_state state;
@@ -747,10 +748,9 @@ static snd_pcm_uframes_t
 	data_0 = &(dma_private->pcm_data_0);
 	if (runtime->no_period_wakeup) {
 		dmaengine_tx_status(data_0->chan, data_0->cookie, &state);
-		//dev_info(component->dev, "delivered bytes:%d, res:%d", state.residue, res);
+		//dma_info(1, component->dev, "delivered bytes:%d, res:%d", state.residue, res);
 	}
 
-	dma_info(1, component->dev, "gdma_pointer,dma_addr_offset:%x",data_0->dma_addr_offset);
 	if (runtime->no_period_wakeup)
 		return bytes_to_frames(substream->runtime, state.residue);
 	else
@@ -792,7 +792,7 @@ static ssize_t gdma_write(struct snd_pcm_substream *substream,
 	format_bytes = snd_pcm_format_width(substream->runtime->format) / bits_per_byte;
 
 	/*write first 4 channel data to DMA buf*/
-	for ( ; frame_num < frames_to_write; ++frame_num ) {
+	for (; frame_num < frames_to_write; ++frame_num) {
 		if (copy_from_user(get_dma_ptr(substream->runtime, channel, offset_bytes), (void __user *)buf + buf_offset, first_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += first_channels * format_bytes;
@@ -804,7 +804,7 @@ static ssize_t gdma_write(struct snd_pcm_substream *substream,
 	buf_offset = first_channels * format_bytes;
 
 	/*write last 2/4 channel data to DMA buf*/
-	for ( ; frame_num < frames_to_write; ++frame_num ) {
+	for (; frame_num < frames_to_write; ++frame_num) {
 		if (copy_from_user(get_dma_ptr(substream->runtime, channel, offset_bytes), (void __user *)buf + buf_offset, last_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += last_channels * format_bytes;
@@ -837,7 +837,7 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 	dma_info(1, component->dev,"bytes_to_read:%ld, last_channels:%d runtime->channels:%d format_bytes:%d, frames_to_read:%ld\n", bytes, last_channels, runtime->channels, format_bytes, frames_to_read);
 
 	/*read first 4 channel data to user buf*/
-	for ( ; frame_num < frames_to_read; ++frame_num ) {
+	for (; frame_num < frames_to_read; ++frame_num) {
 		if (copy_to_user((void __user *)buf + buf_offset, get_dma_ptr(runtime, channel, offset_bytes), first_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += first_channels * format_bytes;
@@ -849,7 +849,7 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 	buf_offset = first_channels * format_bytes;
 
 	/*read last 2/4 channel data to user buf*/
-	for ( ; frame_num < frames_to_read; ++frame_num ) {
+	for (; frame_num < frames_to_read; ++frame_num) {
 		if (copy_to_user((void __user *)buf + buf_offset, get_dma_ptr(runtime, channel, offset_bytes), last_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += last_channels * format_bytes;
@@ -876,18 +876,17 @@ static int gdma_copy(struct snd_pcm_substream *substream,
 	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
-	dma_info(1, component->dev, " channel:%d", runtime->channels);
 
-	if ( runtime->channels == 1 || runtime->channels == 2 || runtime->channels == 4 ) {
-		if ( is_playback ) {
+	if (runtime->channels == 1 || runtime->channels == 2 || runtime->channels == 4) {
+		if (is_playback) {
 			if (copy_from_user(get_dma_ptr(runtime, channel, hwoff), (void __user *)buf, bytes))
 				return -EFAULT;
 		} else {
 			if (copy_to_user((void __user *)buf, get_dma_ptr(runtime, channel, hwoff), bytes))
 				return -EFAULT;
 		}
-	} else if ( runtime->channels == 6 || runtime->channels == 8 ) {
-		if ( is_playback )
+	} else if (runtime->channels == 6 || runtime->channels == 8) {
+		if (is_playback)
 			gdma_write(substream, channel, hwoff, buf, bytes);
 		else
 			gdma_read(substream, channel, hwoff, buf, bytes);

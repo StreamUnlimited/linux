@@ -22,11 +22,12 @@ Below is the data structure used by _io_handler
 extern u8 _hal_read8(struct rtw_hal_com_t *hal, u32 addr);
 extern u16 _hal_read16(struct rtw_hal_com_t *hal, u32 addr);
 extern u32 _hal_read32(struct rtw_hal_com_t *hal, u32 addr);
-extern void _hal_read_mem(struct rtw_hal_com_t *hal, u32 addr, u32 cnt, u8 *pmem);
+extern void _hal_read_mem(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len);
 
 extern int _hal_write8(struct rtw_hal_com_t *hal, u32 addr, u8 val);
 extern int _hal_write16(struct rtw_hal_com_t *hal, u32 addr, u16 val);
 extern int _hal_write32(struct rtw_hal_com_t *hal, u32 addr, u32 val);
+extern void _hal_write_mem(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len);
 
 #ifdef CONFIG_AXI_HCI
 extern u8 _hal_sys_read8(struct rtw_hal_com_t *hal, u32 base, u32 addr);
@@ -85,10 +86,12 @@ extern int dbg_sys_hal_write32(struct rtw_hal_com_t *hal, u32 base, u32 addr, u3
 #define hal_read8(hal, addr) _hal_read8((hal), (addr))
 #define hal_read16(hal, addr) _hal_read16((hal), (addr))
 #define hal_read32(hal, addr) _hal_read32((hal), (addr))
+#define hal_read_mem(hal, addr, buf, len) _hal_read_mem((hal), (addr), (buf), (len))
 
 #define  hal_write8(hal, addr, val) _hal_write8((hal), (addr), (val))
 #define  hal_write16(hal, addr, val) _hal_write16((hal), (addr), (val))
 #define  hal_write32(hal, addr, val) _hal_write32((hal), (addr), (val))
+#define hal_write_mem(hal, addr, buf, len) _hal_write_mem((hal), (addr), (buf), (len))
 
 #ifdef CONFIG_AXI_HCI
 #define hal_sys_read8(hal, base, addr) _hal_sys_read8((hal), (base), (addr))

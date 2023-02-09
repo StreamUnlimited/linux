@@ -758,7 +758,7 @@ void rtw_hal_dbg_status_dump(void *hal, struct hal_mac_dbg_dump_cfg *cfg);
 enum rtw_hal_status rtw_hal_reset_pkt_ofld_state(void *hal);
 
 enum rtw_hal_status rtw_hal_pkt_ofld(void *hal, u8 *id, u8 op,
-				     u8 *pkt, u16 *len);
+				     u8 *pkt, u16 *len, u8 type);
 enum rtw_hal_status rtw_hal_pkt_update_ids(void *hal,
 		struct pkt_ofld_entry *entry);
 void rtw_hal_fw_cap_pre_config(struct rtw_phl_com_t *phl_com, void *hal);

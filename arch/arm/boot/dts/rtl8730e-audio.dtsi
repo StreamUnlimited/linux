@@ -46,8 +46,6 @@
 			rtk,sport-mode = <0>;
 			rtk,sport-mclk-multiplier = <0>;
 			clocks = <&rcc RTK_CKE_SPORT2>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&i2s2_pins_a>;
 			rtk,sport-clock = <&rcc>;
 			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
 		};
@@ -60,8 +58,6 @@
 			rtk,sport-mode = <0>;
 			rtk,sport-mclk-multiplier = <0>;
 			clocks = <&rcc RTK_CKE_SPORT3>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&i2s3_pins_a>;
 			rtk,sport-clock = <&rcc>;
 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
 		};
@@ -73,9 +69,6 @@
 					<0x4200820C 0x000004>,
 					<0x42008890 0x000004>;
 			clocks = <&rcc RTK_CKE_AC>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&audio_ext_amp_pins>;
-			ext_amp_gpio = <&gpiob 21 0>;
 		};
 	};
 

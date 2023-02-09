@@ -32,6 +32,12 @@ u32 os_axi_read32(struct dvobj_priv *dvobj, u32 addr)
 	return readl((u8 *)dvobj_to_axi(dvobj)->axi_mem_start + addr);
 }
 
+void os_axi_mem_r(struct dvobj_priv *dvobj, u32 addr, u8 *buf, u32 len)
+{
+	memcpy_fromio(buf, (u8 *)dvobj_to_axi(dvobj)->axi_mem_start + addr, len);
+	return;
+}
+
 int os_axi_write8(struct dvobj_priv *dvobj, u32 addr, u8 val)
 {
 	writeb(val, (u8 *)dvobj_to_axi(dvobj)->axi_mem_start + addr);
@@ -48,6 +54,12 @@ int os_axi_write32(struct dvobj_priv *dvobj, u32 addr, u32 val)
 {
 	writel(val, (u8 *)dvobj_to_axi(dvobj)->axi_mem_start + addr);
 	return 4;
+}
+
+void os_axi_mem_w(struct dvobj_priv *dvobj, u32 addr, u8 *buf, u32 len)
+{
+	memcpy_toio((u8 *)dvobj_to_axi(dvobj)->axi_mem_start + addr, buf, len);
+	return;
 }
 
 u8 os_axi_sys_read8(struct dvobj_priv *dvobj, u32 base, u32 addr)

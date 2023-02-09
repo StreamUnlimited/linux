@@ -2111,23 +2111,28 @@ enum rtw_phl_status rtw_phl_rf_on(void *phl)
 	}
 
 	phl_role_recover(phl_info);
+
 #ifdef CONFIG_SYNC_INTERRUPT
 	evt_ops->set_interrupt_caps(phl_to_drvpriv(phl_info), true);
 #else
 	rtw_hal_enable_interrupt(phl_info->phl_com, phl_info->hal);
 #endif /* CONFIG_SYNC_INTERRUPT */
 
-	ctl.id = PHL_MDL_POWER_MGNT;
-	ctl.cmd = PHL_DATA_CTL_SW_TX_RESUME;
-	if (phl_data_ctrler(phl_info, &ctl, NULL) != RTW_PHL_STATUS_SUCCESS) {
-		PHL_WARN("%s: tx resume fail!\n", __func__);
+	phl_status = phl_datapath_start(phl_info);
+	if (phl_status != RTW_PHL_STATUS_SUCCESS) {
+		goto error_phl_datapath_start;
 	}
-	ctl.cmd = PHL_DATA_CTL_SW_RX_RESUME;
-	if (phl_data_ctrler(phl_info, &ctl, NULL) != RTW_PHL_STATUS_SUCCESS) {
-		PHL_WARN("%s: rx resume fail!\n", __func__);
+
+	phl_status = phl_datapath_start_sw(phl_info, PHL_MDL_POWER_MGNT);
+	if (phl_status != RTW_PHL_STATUS_SUCCESS) {
+		goto error_phl_datapath_start_sw;
 	}
 
 	return RTW_PHL_STATUS_SUCCESS;
+error_phl_datapath_start_sw:
+	phl_datapath_stop(phl_info);
+error_phl_datapath_start:
+	rtw_hal_stop(phl_info->phl_com, phl_info->hal);
 error_hal_start:
 	PHL_ERR("error_hal_start\n");
 	return phl_status;
@@ -2142,21 +2147,13 @@ enum rtw_phl_status rtw_phl_rf_off(void *phl)
 #endif /* CONFIG_SYNC_INTERRUPT */
 	struct phl_data_ctl_t ctl = {0};
 
+	phl_datapath_stop_sw(phl_info, PHL_MDL_POWER_MGNT);
+	phl_datapath_stop(phl_info);
 #ifdef CONFIG_SYNC_INTERRUPT
 	evt_ops->set_interrupt_caps(phl_to_drvpriv(phl_info), false);
 #else
 	rtw_hal_disable_interrupt(phl_info->phl_com, phl_info->hal);
 #endif /* CONFIG_SYNC_INTERRUPT */
-
-	ctl.id = PHL_MDL_POWER_MGNT;
-	ctl.cmd = PHL_DATA_CTL_SW_TX_PAUSE;
-	if (phl_data_ctrler(phl_info, &ctl, NULL) != RTW_PHL_STATUS_SUCCESS) {
-		PHL_WARN("%s: tx pause fail!\n", __func__);
-	}
-	ctl.cmd = PHL_DATA_CTL_SW_RX_PAUSE;
-	if (phl_data_ctrler(phl_info, &ctl, NULL) != RTW_PHL_STATUS_SUCCESS) {
-		PHL_WARN("%s: rx pause fail!\n", __func__);
-	}
 
 	phl_role_suspend(phl_info);
 	rtw_hal_stop(phl_info->phl_com, phl_info->hal);
@@ -2512,6 +2509,10 @@ void rtw_phl_disable_interrupt(void *phl)
 bool rtw_phl_recognize_interrupt(void *phl)
 {
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+
+	if (!phl_info || !phl_info->hal) {
+		return false;
+	}
 
 	return rtw_hal_recognize_interrupt(phl_info->hal);
 }

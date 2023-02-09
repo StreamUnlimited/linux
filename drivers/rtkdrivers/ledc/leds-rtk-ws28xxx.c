@@ -1107,13 +1107,13 @@ static int rtk_ws28xxx_led_pattern_set(
 		leds->priv->dma_params.dma_buf_addr = dma_alloc_coherent(leds->priv->dma_params.dma_dev, len, &leds->priv->dma_params.dma_buf_phy_addr, GFP_KERNEL);
 		for (i = 0; i < len * 4; i += 4) {
 			*(leds->priv->dma_params.dma_buf_addr + i) = pattern[i / 4].brightness;
-			pr_debug("check src data [%x]: %x", leds->priv->dma_params.dma_buf_addr + i, *(leds->priv->dma_params.dma_buf_addr + i));
+			pr_debug("check src data [%p]: %x", leds->priv->dma_params.dma_buf_addr + i, *(leds->priv->dma_params.dma_buf_addr + i));
 		}
 	} else {
 		leds->priv->cpu_params.pattern_data_buff = kmalloc(len * 4, GFP_KERNEL);
 		for (i = 0; i < len; i++) {
 			*(leds->priv->cpu_params.pattern_data_buff + i) = pattern[i].brightness;
-			pr_debug("check data [%x]: %x", leds->priv->cpu_params.pattern_data_buff + i, *(leds->priv->cpu_params.pattern_data_buff + i));
+			pr_debug("check data [%p]: %x", leds->priv->cpu_params.pattern_data_buff + i, *(leds->priv->cpu_params.pattern_data_buff + i));
 		}
 	}
 

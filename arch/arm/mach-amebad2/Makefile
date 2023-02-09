@@ -17,6 +17,7 @@ KBUILD_CPPFLAGS += -I$(srctree)/arch/arm/mach-amebad2/ -I$(srctree)/arch/arm/mac
 obj-y := setup.o
 obj-$(CONFIG_SMP) += smp.o headsmp.o
 obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+obj-$(CONFIG_SUSPEND) += pm.o
 
 ##
 ## uncomment following lines for customized linker script

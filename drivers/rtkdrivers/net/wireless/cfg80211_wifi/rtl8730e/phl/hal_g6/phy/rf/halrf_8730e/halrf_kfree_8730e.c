@@ -86,7 +86,7 @@ void _halrf_set_thermal_trim_8730e(struct rf_info *rf,
 		return;
 	}
 
-	offset_lsb = thermal_a & 0x3 | thermal_a & BIT(7); //[1:0]
+	offset_lsb = (thermal_a & 0x3) | (thermal_a & BIT(7)); //[1:0]
 	thermal_a = (thermal_a & 0xfc) >> 2;
 
 	RF_DBG(rf, DBG_RF_THER_TRIM, "Ther_A=0x%x, ther_ofst_lsb=0x%x\n", thermal_a, offset_lsb);

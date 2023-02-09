@@ -240,7 +240,7 @@ struct hal_ops_t {
 #endif
 
 	enum rtw_hal_status(*pkt_ofld)(struct hal_info_t *hal, u8 *id, u8 op,
-				       u8 *pkt, u16 *len);
+				       u8 *pkt, u16 *len, u8 type);
 	enum rtw_hal_status(*pkt_update_ids)(struct hal_info_t *hal,
 					     struct pkt_ofld_entry *entry);
 };

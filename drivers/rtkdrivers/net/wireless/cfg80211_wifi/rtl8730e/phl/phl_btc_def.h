@@ -16,7 +16,7 @@
 #define __PHL_BTC_DEF_H__
 
 #define RTW_PHL_BTC_CTRL_BUF 40
-#define RTW_PHL_BTC_FWINFO_BUF 1280
+#define RTW_PHL_BTC_FWINFO_BUF 22
 
 
 /*****************************************
@@ -35,7 +35,8 @@ enum {
 	BTC_FEV_REPORT = 0,
 	BTC_FEV_BT_INFO = 1,
 	BTC_FEV_BT_SCBD = 2,
-	BTC_FEV_BT_REG = 3
+	BTC_FEV_BT_REG = 3,
+	BTC_FEV_WL_DBG_INFO = 8,
 };
 /*****************************************/
 

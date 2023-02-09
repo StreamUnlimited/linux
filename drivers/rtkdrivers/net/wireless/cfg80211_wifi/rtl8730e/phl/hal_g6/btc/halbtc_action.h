@@ -15,6 +15,8 @@
 #ifndef __INC_BTC_ACTION_H__
 #define __INC_BTC_ACTION_H__
 
+#define TDMA_4SLOT BIT(8)
+
 enum {
 	BTC_PHY_0 = BIT(0),
 	BTC_PHY_1 = BIT(1),
@@ -48,10 +50,10 @@ enum btc_ant_phase {
 enum {
 	BTC_PLT_NONE = 0,
 	BTC_PLT_LTE_RX = BIT(0),
-	BTC_PLT_GNT_BT_TX = BIT(1),
-	BTC_PLT_GNT_BT_RX = BIT(2),
+	BTC_PLT_GNT_BT_TX = BIT(19),
+	BTC_PLT_GNT_BT_RX = BIT(1),
 	BTC_PLT_GNT_WL = BIT(3),
-	BTC_PLT_BT = BIT(1) | BIT(2),
+	BTC_PLT_BT = BTC_PLT_GNT_BT_TX | BTC_PLT_GNT_BT_RX,
 	BTC_PLT_ALL = 0xf
 };
 

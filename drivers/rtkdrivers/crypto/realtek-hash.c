@@ -1318,6 +1318,7 @@ static const struct of_device_id realtek_hash_of_match[] = {
 		.compatible = "realtek,amebad2-hash",
 		.data = &realtek_hash_match_data,
 	},
+	{ }
 };
 
 MODULE_DEVICE_TABLE(of, realtek_hash_of_match);

@@ -31,19 +31,19 @@ static void rtk_timer_change_period(void __iomem *base, u32 period)
 	u32 reg;
 
 	/* Reset the ARR Preload Bit */
-	reg = readl_relaxed((u32) base + REG_TIM_CR);
+	reg = readl_relaxed(base + REG_TIM_CR);
 	reg &= ~TIM_BIT_ARPE;
-	writel_relaxed(reg, (u32) base + REG_TIM_CR);
+	writel_relaxed(reg, base + REG_TIM_CR);
 
 	/* Set the AAR */
-	writel_relaxed(period, (u32) base + REG_TIM_ARR);
+	writel_relaxed(period, base + REG_TIM_ARR);
 
 	/* Generate an update event */
-	writel_relaxed(TIM_PSCReloadMode_Immediate, (u32) base + REG_TIM_EGR);
+	writel_relaxed(TIM_PSCReloadMode_Immediate, base + REG_TIM_EGR);
 
 	/* poll EGR UG done */
 	while (1) {
-		if (readl_relaxed((u32) base + REG_TIM_SR) & TIM_BIT_UG_DONE) {
+		if (readl_relaxed(base + REG_TIM_SR) & TIM_BIT_UG_DONE) {
 			break;
 		}
 	}
@@ -57,27 +57,27 @@ static void rtk_timer_start(void __iomem *base, u32 NewState)
 
 	if (NewState != TIMER_CLK_DISABLE) {
 		/* Enable the TIM Counter, dont do this if timer is RUN */
-		reg = readl_relaxed((u32) base + REG_TIM_EN);
-		if ((readl_relaxed((u32) base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
-			writel_relaxed(TIM_BIT_CNT_START, (u32) base + REG_TIM_EN);
+		reg = readl_relaxed(base + REG_TIM_EN);
+		if ((readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
+			writel_relaxed(TIM_BIT_CNT_START, base + REG_TIM_EN);
 		}
 
 		/* poll if cnt is running, 3*32k cycles */
 		while (1) {
-			if (readl_relaxed((u32) base + REG_TIM_EN) & TIM_BIT_CEN) {
+			if (readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) {
 				break;
 			}
 		}
 	} else {
 		/* Disable the TIM Counter, dont do this if timer is not RUN */
 		/* this action need sync to 32k domain for 100us */
-		if (readl_relaxed((u32) base + REG_TIM_EN) & TIM_BIT_CEN) {
-			writel_relaxed(TIM_BIT_CNT_STOP, (u32) base + REG_TIM_EN);
+		if (readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) {
+			writel_relaxed(TIM_BIT_CNT_STOP, base + REG_TIM_EN);
 		}
 
 		/* poll if cnt is running, aout 100us */
 		while (1) {
-			if ((readl_relaxed((u32) base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
+			if ((readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
 				break;
 			}
 		}
@@ -91,13 +91,13 @@ static void rtk_timer_int_config(void __iomem *base, u32 TIM_IT, u32 NewState)
 {
 	u32 reg;
 
-	reg = readl_relaxed((u32) base + REG_TIM_DIER);
+	reg = readl_relaxed(base + REG_TIM_DIER);
 	if (NewState != TIMER_CLK_DISABLE) {
 		reg |= TIM_IT;
-		writel_relaxed(reg, (u32) base + REG_TIM_DIER);
+		writel_relaxed(reg, base + REG_TIM_DIER);
 	} else {
 		reg &= ~TIM_IT;
-		writel_relaxed(reg, (u32) base + REG_TIM_DIER);
+		writel_relaxed(reg, base + REG_TIM_DIER);
 	}
 }
 
@@ -110,38 +110,38 @@ void rtk_timer_init(void __iomem *base)
 	rtk_timer_start(base, TIMER_CLK_DISABLE);
 
 	/*disable interrupt*/
-	writel_relaxed(0, (u32) base + REG_TIM_DIER);
+	writel_relaxed(0, base + REG_TIM_DIER);
 
 	/*clear all pending bits*/
-	reg = readl_relaxed((u32) base + REG_TIM_SR);
-	writel_relaxed(reg, (u32) base + REG_TIM_SR);
-	reg = readl_relaxed((u32) base + REG_TIM_SR);
+	reg = readl_relaxed(base + REG_TIM_SR);
+	writel_relaxed(reg, base + REG_TIM_SR);
+	reg = readl_relaxed(base + REG_TIM_SR);
 
 	/*set ARR to the max value*/
-	writel_relaxed(UINT_MAX, (u32) base + REG_TIM_ARR);
+	writel_relaxed(UINT_MAX, base + REG_TIM_ARR);
 
 	/*set CR*/
-	reg = readl_relaxed((u32) base + REG_TIM_CR);
+	reg = readl_relaxed(base + REG_TIM_CR);
 	reg |= TIM_BIT_ARPE; 		//period will update immediatly
 	reg |= TIM_BIT_URS;			//set URS bit
 	reg &= ~TIM_BIT_UDIS;		//Set the Update Disable Bit
-	writel_relaxed(reg, (u32) base + REG_TIM_CR);
+	writel_relaxed(reg, base + REG_TIM_CR);
 
 	/*Generate an update event*/
-	writel_relaxed(TIM_PSCReloadMode_Immediate, (u32) base + REG_TIM_EGR);
+	writel_relaxed(TIM_PSCReloadMode_Immediate, base + REG_TIM_EGR);
 
 	while (1) {
-		if (readl_relaxed((u32) base + REG_TIM_SR) & TIM_BIT_UG_DONE) {
+		if (readl_relaxed(base + REG_TIM_SR) & TIM_BIT_UG_DONE) {
 			break;
 		}
 	}
 
 	/* Clear all flags*/
-	reg = readl_relaxed((u32) base + REG_TIM_SR);
-	writel_relaxed(reg, (u32) base + REG_TIM_SR);
+	reg = readl_relaxed(base + REG_TIM_SR);
+	writel_relaxed(reg, base + REG_TIM_SR);
 
 	/*start counter*/
-	rtk_timer_start((u32) base, TIMER_CLK_ENABLE);
+	rtk_timer_start(base, TIMER_CLK_ENABLE);
 
 }
 
@@ -197,9 +197,9 @@ static irqreturn_t rtk_clock_event_handler(int irq, void *dev_id)
 	struct timer_of *to = to_timer_of(clkevt);
 
 	/*clear all pending bits*/
-	reg = readl_relaxed((u32) timer_of_base(to) + REG_TIM_SR);
-	writel_relaxed(reg, (u32) timer_of_base(to) + REG_TIM_SR);
-	reg = readl_relaxed((u32) timer_of_base(to) + REG_TIM_SR);
+	reg = readl_relaxed(timer_of_base(to) + REG_TIM_SR);
+	writel_relaxed(reg, timer_of_base(to) + REG_TIM_SR);
+	reg = readl_relaxed(timer_of_base(to) + REG_TIM_SR);
 
 	if (!clockevent_state_periodic(clkevt)) {
 		rtk_clock_event_shutdown(clkevt);

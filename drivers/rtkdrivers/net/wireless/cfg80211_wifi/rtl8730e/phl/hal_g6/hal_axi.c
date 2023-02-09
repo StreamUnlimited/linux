@@ -28,6 +28,10 @@ static u32 axi_read32(struct rtw_hal_com_t *hal, u32 addr)
 {
 	return _os_read32_axi(hal->drv_priv, addr);
 }
+static void axi_mem_r(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 cnt)
+{
+	_os_mem_r_axi(hal->drv_priv, addr, buf, cnt);
+}
 
 static int axi_write8(struct rtw_hal_com_t *hal, u32 addr, u8 val)
 {
@@ -40,6 +44,13 @@ static int axi_write16(struct rtw_hal_com_t *hal, u32 addr, u16 val)
 static int axi_write32(struct rtw_hal_com_t *hal, u32 addr, u32 val)
 {
 	return _os_write32_axi(hal->drv_priv, addr, val);
+}
+
+static int axi_mem_w(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len)
+{
+	_os_mem_w_axi(hal->drv_priv, addr, buf, len);
+
+	return 1;
 }
 
 static u8 axi_sys_read8(struct rtw_hal_com_t *hal, u32 base, u32 addr)
@@ -91,6 +102,7 @@ void hal_axi_set_io_ops(struct rtw_hal_com_t *hal, struct hal_io_ops *pops)
 	pops->_read8 = &axi_read8;
 	pops->_read16 = &axi_read16;
 	pops->_read32 = &axi_read32;
+	pops->_read_mem = &axi_mem_r;
 
 	pops->_sys_read8 = &axi_sys_read8;
 	pops->_sys_read16 = &axi_sys_read16;
@@ -99,6 +111,7 @@ void hal_axi_set_io_ops(struct rtw_hal_com_t *hal, struct hal_io_ops *pops)
 	pops->_write8 = &axi_write8;
 	pops->_write16 = &axi_write16;
 	pops->_write32 = &axi_write32;
+	pops->_write_mem = &axi_mem_w;
 
 	pops->_sys_write8 = &axi_sys_write8;
 	pops->_sys_write16 = &axi_sys_write16;

@@ -672,7 +672,7 @@ static int ir_rtk_tx(struct rc_dev *dev, unsigned int *buffer,
 
 	dev_dbg(ir_rtk->dev, "origin get count = %d", count);
 	for (i = 0; i < count; i++) {
-		dev_dbg(ir_rtk->dev, "[%x]: %d", buffer, *(buffer + i));
+		dev_dbg(ir_rtk->dev, "[%p]: %d", buffer, *(buffer + i));
 	}
 
 	ir_rtk->ir_manage.ir_status = RTK_IR_TX_ONGOING;

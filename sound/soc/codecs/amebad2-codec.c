@@ -105,7 +105,7 @@ void dumpRegs(struct device *dev, void __iomem * audio_base_addr,void __iomem * 
 	u32 tmp;
 	/***analog reg dump***/
 	struct ameba_priv *codec_priv = dev_get_drvdata(dev);
-	if(codec_priv -> codec_debug == 1){
+	if (codec_priv -> codec_debug == 1){
 		tmp = readl(aud_analog + ADDA_CTL);
 		codec_info(1, dev, "ADDA_CTL:%x",tmp);
 		tmp = readl(aud_analog + HPO_CTL);
@@ -205,7 +205,7 @@ static int alsa_amic_gain_put(struct snd_kcontrol *kcontrol,
 
 	memcpy(codec_priv->amic_gains, ucontrol->value.bytes.data, MAX_AMIC_NUM);
 
-	for ( ; amic_index < MAX_AMIC_NUM; amic_index++)
+	for (; amic_index < MAX_AMIC_NUM; amic_index++)
 		audio_codec_set_adc_gain(amic_index + 1, codec_priv->amic_gains[amic_index], codec_priv->analog_addr);
 
 	return 0;
@@ -235,7 +235,7 @@ static int alsa_output_device_put(struct snd_kcontrol *kcontrol,
 
 	unsigned int val = (unsigned int)ucontrol->value.integer.value[0];
 	codec_priv->output_device = val;
-	if(val == SPEAKER){
+	if (val == SPEAKER){
 		audio_codec_set_hpo_diff(codec_priv->analog_addr);
 		/*wait 10ms for hpo diff to be stable, otherwise,there might be pop noise*/
 		msleep(10);
@@ -383,7 +383,7 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 
 	codec_info(1,component->dev,"%s,channels:%d,sample_rate:%dhz,digital_addr:%p",__func__,params_channels(params),sample_rate,codec_priv->digital_addr);
 
-	if(is_playback){
+	if (is_playback){
 		switch (params_width(params)) {     //params_width - get the number of bits of the sample format,like 16LS
 			case 8:
 				i2s_init.codec_sel_i2s_tx_word_len = WL_8;
@@ -500,7 +500,7 @@ static int amebad2_codec_dai_hw_free(struct snd_pcm_substream *substream,struct 
 
 	codec_info(1,component->dev,"%s",__func__);
 
-	if(is_playback){
+	if (is_playback){
 		codec_init.codec_application = APP_LINE_OUT;
 		audio_codec_i2s_deinit(codec_priv->digital_addr,I2S0);
 	}else{
@@ -549,7 +549,7 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 	int sample_rate = params_rate(params);
 	codec_info(1,component->dev,"%s,channels:%d,sample_rate:%dhz,digital_addr:%p",__func__,params_channels(params),sample_rate,codec_priv->digital_addr);
 
-	if(is_playback){
+	if (is_playback){
 		switch(sample_rate){
 			case 192000:
 				codec_init.codec_dac_sr = SR_192K;
@@ -701,7 +701,7 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 			}
 		}
 
-		for(adc_channel = 0; adc_channel< codec_priv->amic_tdm_num; adc_channel++){
+		for (adc_channel = 0; adc_channel< codec_priv->amic_tdm_num; adc_channel++){
 			if (codec_priv->mic_type == MIC_TYPE_AMIC) {
 			codec_info(1,component->dev,"codec_priv->tdm_amic_numbers[%d] = %d",adc_channel, codec_priv->tdm_amic_numbers[adc_channel]);
 			/*unmute ad channel(AD_CHANNEL_0...) and select AMIC SDM number for the channel(ADC1...)*/
@@ -717,8 +717,6 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 
 			audio_codec_set_adc_mute(adc_channel, false, codec_priv->digital_addr);
 
-			//audio_codec_set_adc_volume_by_channel(adc_channel, 0x2f, codec_priv->digital_addr);  //spec default 0db, no need set here
-
 			audio_codec_set_adc_gain(codec_priv->tdm_amic_numbers[adc_channel], codec_priv->amic_gains[(codec_priv->tdm_amic_numbers[adc_channel])-1], codec_priv->analog_addr);
 			} else {
 				codec_info(1,component->dev,"codec_priv->tdm_dmic_numbers[%d] = %d",adc_channel, codec_priv->tdm_dmic_numbers[adc_channel]);
@@ -730,8 +728,6 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 				audio_codec_enable_dmic_dchpf(true, adc_channel, codec_priv->digital_addr);
 
 				audio_codec_set_adc_mute(adc_channel,false,codec_priv->digital_addr);
-
-				audio_codec_set_adc_volume_by_channel(adc_channel, 0x2f, codec_priv->digital_addr);  //all 0db
 
 			}
 		}
@@ -819,9 +815,12 @@ static int amebad2_codec_component_probe(struct snd_soc_component *component)
 				       ARRAY_SIZE(common_snd_controls));
 
 	msleep(10);
-	gpio_request(codec_priv->gpio_index, NULL);
-	gpio_direction_output(codec_priv->gpio_index, 1);
-	gpio_set_value(codec_priv->gpio_index, 1);
+
+	if (codec_priv->gpio_index >= 0) {
+		gpio_request(codec_priv->gpio_index, NULL);
+		gpio_direction_output(codec_priv->gpio_index, 1);
+		gpio_set_value(codec_priv->gpio_index, 1);
+	}
 
 	return 0;
 }
@@ -968,6 +967,7 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	tmp |= SWR_VOL_L1(9);
 	writel(tmp, swr_on_ctrl0_addr);
 
+	codec_priv->gpio_index = 0;
 	index = of_get_named_gpio_flags(pdev->dev.of_node, "ext_amp_gpio", 0, &flags);
 
 	codec_priv->gpio_index = index;
@@ -1007,7 +1007,7 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	codec_info(1,&pdev->dev,"%s,digital_base:%x,digital_size:%x,analog_base:%x,analog_size:%x\n",__func__,codec_priv->digital_base,codec_priv->digital_size, codec_priv->analog_base, codec_priv->analog_size);	
 	codec_info(1,&pdev->dev,"tdm_amic_0:%d, amic_1:%d, amic_2:%d, amic_3:%d", codec_priv->tdm_amic_numbers[0], codec_priv->tdm_amic_numbers[1], codec_priv->tdm_amic_numbers[2], codec_priv->tdm_amic_numbers[3]);
 
-	if(set_codec_clk(pdev, codec_priv) < 0){
+	if (set_codec_clk(pdev, codec_priv) < 0){
 		dev_err(&pdev->dev, "can't set codec clk");
 		return -ENXIO;
 	}

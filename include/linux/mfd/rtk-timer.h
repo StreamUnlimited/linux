@@ -277,6 +277,10 @@ struct rtk_tim{
 	int valid;
 	int index;
 
+	int period;
+	u32 mode;
+	int enable;
+
 	void (*intr_handler)(void * cbdata);
 	void *cbdata;
 };

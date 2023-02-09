@@ -961,8 +961,6 @@ phl_free_stainfo_hw(struct phl_info_t *phl_info,
 		goto _exit;
 	}
 
-	phl_pkt_ofld_del_entry(phl_info, sta->macid);
-
 	sta->active = false;
 	if (rtw_hal_del_sta_entry(phl_info->hal, sta) == RTW_HAL_STATUS_SUCCESS)
 	{
@@ -1152,15 +1150,11 @@ phl_alloc_stainfo_hw(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta)
 	{
 		PHL_ERR("%s rtw_hal_add_sta_entry failure!\n", __func__);
 		goto _exit;
+	} else {
+		pstatus = RTW_PHL_STATUS_SUCCESS;
 	}
 
 	sta->active = true;
-
-	pstatus = phl_pkt_ofld_add_entry(phl_info, sta->macid);
-	if (RTW_PHL_STATUS_SUCCESS != pstatus)
-	{
-		PHL_ERR("%s phl_pkt_ofld_add_entry failure!\n", __func__);
-	}
 
 _exit:
 	return pstatus;

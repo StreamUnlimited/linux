@@ -399,7 +399,7 @@ struct fbtc_btscan {
 	u8 fver;
 	u8 rsvd;
 	u16 rsvd2;
-	u8 scan[6];
+	u32 scan[6];
 };
 
 #define FCX_BTAFH_VER 1
@@ -416,7 +416,7 @@ struct fbtc_btafh {
 struct fbtc_btdevinfo {
 	u8 fver;
 	u8 rsvd;
-	u16 vendor_id;
+	u8 vendor_id;
 	u32 dev_name; /* only 24 bits valid */
 	u32 flush_time;
 };

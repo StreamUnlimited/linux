@@ -21,20 +21,32 @@
 		#size-cells = <1>;
 		ranges;
 
-		loguart: dwapb@4200c000 {
-			compatible = "realtek,amebad2-loguart";
-			reg = <0x4200c000 0x100>;
-			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-			reg-shift = <2>;
-			reg-io-width = <1>;
-			clock-frequency = <40000000>;
+		adc: adc@42012000 {
+			compatible = "realtek,amebad2-adc";
+			#io-channel-cells = <1>;
+			reg = <0x42012000 0x100>,
+				<0x42012800 0x100>;
+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
+			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
+			rtk,adc-mode = <1>;
+			rtk,adc-channels = <0>, <1>, <2>, <6>;
+			//rtk,adc-diff-channels = <4 5>;
+			status = "disabled";
+
+			comparator: comparator@0 {
+				compatible = "realtek,amebad2-comparator";
+				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+				rtk,cmp-ref0 = <10>;
+				rtk,cmp-ref1 = <30>;
+			};
 		};
 
-		rtc: rtc@4200E000 {
-			compatible = "realtek,amebad2-rtc";
-			reg = <0x4200E000 0x1000>;
-			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_RTC>;
+		aes: aes@400C0000 {
+			compatible = "realtek,amebad2-aes";
+			reg = <0x400C0000 0x2000>;
+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
 		};
 
 		aipc: aipc@41000580 {
@@ -55,43 +67,42 @@
 			reg = <0x40000000 0x80000>; // wifi register base address and length
 		};
 
-		spi0: spi0@0x400E8000 {
-			compatible = "realtek,amebad2-rtk-spi";
-			rtk,spi-index = <0>;
-			reg = <0x400E8000 0x100>,
-					<0x41000000 0x30>; // reg base for spi role setting.
-			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_SPI0>;
-			clock-names = "rtk_spi_clk";
-			dmas = <&dma 3>;
-			dma-names = "dma_spi";
-			spi-max-frequency = <100000000>;
-			spi-deactivate-delay = <0>;
-			rtk,spi-slave-mode = <0>;
-			rtk,spi-dma-en = <0>;
-			rtk,spi-master-poll-mode = <0>;
-			rtk,spi-default-cs = <0>;
-			rtk,max-cs-num = <2>;
+		dma: dma@400E0000 {
+			compatible = "realtek,amebad2-rtk-dmac";
+			reg = <0x400E0000 0x000400>;
+			clocks = <&rcc RTK_CKE_GDMA>;
+			#dma-cells = <1>;
+			dma-channels = <8>;
+			dma-requests = <20>;
+			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
+						<GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+		hash: hash@400C8000 {
+			compatible = "realtek,amebad2-hash";
+			reg = <0x400C8000 0x2000>;
+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
 
-		spi1: spi1@0x400E9000 {
-			compatible = "realtek,amebad2-rtk-spi";
-			rtk,spi-index = <1>;
-			reg = <0x400E9000 0x100>,
-					<0x41000000 0x30>; // reg base for spi role setting.
-			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_SPI1>;
-			clock-names = "rtk_spi_clk";
-			dmas = <&dma 4>;
-			dma-names = "dma_spi";
-			spi-max-frequency = <100000000>;
-			spi-deactivate-delay = <0>;
-			rtk,spi-slave-mode = <1>;
-			rtk,spi-dma-en = <0>;
-			rtk,spi-master-poll-mode = <0>;
-			rtk,spi-default-cs = <0>;
-			rtk,max-cs-num = <2>;
+		ir: ir@0x400EE000 {
+			compatible = "realtek,amebad2-rtk-ir";
+			reg = <0x400EE000 0x30>;
+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_IRDA>;
+			rtk,ir-receiver = <0>; // 0: tx only; 1: rx only.
+			rtk,ir-tx-encode = <1>; // based on tx only. nec encode, usually open = 1.
+			rtk,ir-rx-auto = <1>; // 0: can reject rx; 1: auto rx whenever data arrived.
+			rtk,ir-cnt-thred-type = <1>; // 0: low level; 1: high level.
+			rtk,ir-cnt-threshold = <30000>; // If hw receive no data for 30ms(set 30000 here), represents the end.
+			rtk,ir-rx-trigger-mode = <0>; // 0: fall edge; 1: rising edge; 2: both.
+			rtk,ir-idle-level = <0>; // 0: low level; 1: high level.
 			status = "disabled";
 		};
 
@@ -134,21 +145,8 @@
 			status = "disabled";
 		};
 
-		dma: dma@400E0000 {
-			compatible = "realtek,amebad2-rtk-dmac";
-			reg = <0x400E0000 0x000400>;
-			clocks = <&rcc RTK_CKE_GDMA>;
-			#dma-cells = <1>;
-			dma-channels = <8>;
-			dma-requests = <20>;
-			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
-						<GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+		km4_console: km4_console@0 {
+			compatible = "realtek,amebad2-km4-console";
 		};
 
 		ledc: led-controller@41008000 {
@@ -158,8 +156,6 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			clocks = <&rcc RTK_CKE_LEDC>;
-			dmas = <&dma 2>;
-			dma-names = "dma_leds_tx";
 			rtk,led-nums = <1>;
 			rtk,leds-dma-enable = <0>;
 			rtk,wait-data-timeout = <0x7FFF>;
@@ -169,6 +165,7 @@
 			rtk,data-tx-time1h = <0x27>;
 			rtk,data-tx-time1l = <0xD>;
 			rtk,refresh-time = <0x3A97>;
+			status = "disabled";
 
 			led@0 {
 				label = "common";
@@ -176,24 +173,73 @@
 			};
 		};
 
-		adc: adc@42012000 {
-			compatible = "realtek,amebad2-adc";
-			#io-channel-cells = <1>;
-			reg = <0x42012000 0x100>,
-				<0x42012800 0x100>;
-			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
-			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
-			rtk,adc-mode = <1>;
-			rtk,adc-channels = <0>, <1>, <2>, <6>;
-			rtk,adc-diff-channels = <4 5>;
+		loguart: dwapb@4200c000 {
+			compatible = "realtek,amebad2-loguart";
+			reg = <0x4200c000 0x100>;
+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+			reg-shift = <2>;
+			reg-io-width = <1>;
+			clock-frequency = <40000000>;
+		};
 
-			comparator: comparator@0 {
-				compatible = "realtek,amebad2-comparator";
-				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-				rtk,cmp-ref0 = <10>;
-				rtk,cmp-ref1 = <30>;
-			};
+		lsys: lsys@42008000 {
+			compatible = "realtek,amebad2-system-ctrl-ls";
+			reg = <0x42008000 0x2000>;
+		};
+
+		otp: otp@0 {
+			compatible = "realtek,amebad2-otp";
+		};
+
+		rtc: rtc@4200E000 {
+			compatible = "realtek,amebad2-rtc";
+			reg = <0x4200E000 0x1000>;
+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_RTC>;
+		};
+
+		sdioh: sdioh@400D0000 {
+			compatible = "realtek,amebad2-sdiohost";
+			reg = <0x400D0000 0x8000>;
+			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_SDH>;
+			status = "disabled";
+		};
+
+		spi0: spi0@0x400E8000 {
+			compatible = "realtek,amebad2-rtk-spi";
+			rtk,spi-index = <0>;
+			reg = <0x400E8000 0x100>,
+					<0x41000000 0x30>; // reg base for spi role setting.
+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_SPI0>;
+			clock-names = "rtk_spi_clk";
+			spi-max-frequency = <100000000>;
+			spi-deactivate-delay = <0>;
+			rtk,spi-slave-mode = <0>;
+			rtk,spi-dma-en = <0>;
+			rtk,spi-master-poll-mode = <0>;
+			rtk,spi-default-cs = <0>;
+			rtk,max-cs-num = <2>;
+			status = "disabled";
+		};
+
+		spi1: spi1@0x400E9000 {
+			compatible = "realtek,amebad2-rtk-spi";
+			rtk,spi-index = <1>;
+			reg = <0x400E9000 0x100>,
+					<0x41000000 0x30>; // reg base for spi role setting.
+			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_SPI1>;
+			clock-names = "rtk_spi_clk";
+			spi-max-frequency = <100000000>;
+			spi-deactivate-delay = <0>;
+			rtk,spi-slave-mode = <1>;
+			rtk,spi-dma-en = <0>;
+			rtk,spi-master-poll-mode = <0>;
+			rtk,spi-default-cs = <0>;
+			rtk,max-cs-num = <2>;
+			status = "disabled";
 		};
 
 		thermal: thermal@42013000 {
@@ -203,65 +249,6 @@
 			clocks = <&rcc RTK_CKE_ATIM>, <&rcc RTK_CKE_THM>;
 			clock-names = "rtk_aon_tim_clk", "rtk_thermal_clk";
 			#thermal-sensor-cells = <0>;
-		};
-
-		sdioh: sdioh@400D0000 {
-			compatible = "realtek,amebad2-sdiohost";
-			reg = <0x400D0000 0x8000>;
-			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_SDH>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&sdioh_pins_a>;
-			status = "disabled";
-		};
-
-		uart0: serial@41004000 {
-			compatible = "realtek,amebad2-uart";
-			reg = <0x41004000 0x100>;
-			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_UART0>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&uart0_pins_a>;
-			status = "disabled";
-		};
-
-		uart1: serial@41005000 {
-			compatible = "realtek,amebad2-uart";
-			reg = <0x41005000 0x100>;
-			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_UART1>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&uart1_pins_a>;
-			status = "disabled";
-		};
-
-		uart2: serial@41006000 {
-			compatible = "realtek,amebad2-uart";
-			reg = <0x41006000 0x100>;
-			clocks = <&rcc RTK_CKE_UART2>;
-			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&uart2_pins_a>;
-			status = "disabled";
-		};
-
-		uart3: serial@41007000 {
-			compatible = "realtek,amebad2-uart";
-			reg = <0x41007000 0x100>;
-			clocks = <&rcc RTK_CKE_UART3>;
-			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-		};
-
-		// Watchdog4 is non-secure for linux system.
-		watchdog: wdg@410004C0 {
-			compatible = "realtek,amebad2-rtk-watchdog";
-			reg = <0x410004C0 0x000010>;
-			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-			rtk,wdg-index = <4>;
-			rtk,wdg-max-timeout = <5000>; // linux system ping: 2.5s, hardware refresh threshold 5s.
-			rtk,wdg-window-protection = <0xFFFF>; // 0xFFFF means disable, usually: disabled.
-			rtk,wdg-int-trigger-thres = <50>;
-			rtk,wdg-interrupt-mode = <1>; // To avoid error alram, interrupt mode is recommended to open.
 		};
 
 		timer1: timer@4200B200 {
@@ -324,8 +311,6 @@
 
 			pwm: pwm@0 {
 				compatible = "realtek,amebad2-pwm";
-				pinctrl-names = "default";
-				pinctrl-0 = <&pwm_pins_a>;
 				status = "disabled";
 			};
 		};
@@ -338,38 +323,35 @@
 			status = "disabled";
 		};
 
-		ir: ir@0x400EE000 {
-			compatible = "realtek,amebad2-rtk-ir";
-			reg = <0x400EE000 0x30>;
-			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&rcc RTK_CKE_IRDA>;
-			rtk,ir-receiver = <0>; // 0: tx only; 1: rx only.
-			rtk,ir-tx-encode = <1>; // based on tx only. nec encode, usually open = 1.
-			rtk,ir-rx-auto = <1>; // 0: can reject rx; 1: auto rx whenever data arrived.
-			rtk,ir-cnt-thred-type = <1>; // 0: low level; 1: high level.
-			rtk,ir-cnt-threshold = <30000>; // If hw receive no data for 30ms(set 30000 here), represents the end.
-			rtk,ir-rx-trigger-mode = <0>; // 0: fall edge; 1: rising edge; 2: both.
-			rtk,ir-idle-level = <0>; // 0: low level; 1: high level.
+		uart0: serial@41004000 {
+			compatible = "realtek,amebad2-uart";
+			reg = <0x41004000 0x100>;
+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_UART0>;
+			status = "disabled";
 		};
 
-		otp: otp@0 {
-			compatible = "realtek,amebad2-otp";
+		uart1: serial@41005000 {
+			compatible = "realtek,amebad2-uart";
+			reg = <0x41005000 0x100>;
+			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_UART1>;
+			status = "disabled";
 		};
 
-		km4_console: km4_console@0 {
-			compatible = "realtek,amebad2-km4-console";
+		uart2: serial@41006000 {
+			compatible = "realtek,amebad2-uart";
+			reg = <0x41006000 0x100>;
+			clocks = <&rcc RTK_CKE_UART2>;
+			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+			status = "disabled";
 		};
 
-		aes: aes@400C0000 {
-			compatible = "realtek,amebad2-aes";
-			reg = <0x400C0000 0x2000>;
-			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-		};
-
-		hash: hash@400C8000 {
-			compatible = "realtek,amebad2-hash";
-			reg = <0x400C8000 0x2000>;
-			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+		uart3: serial@41007000 {
+			compatible = "realtek,amebad2-uart";
+			reg = <0x41007000 0x100>;
+			clocks = <&rcc RTK_CKE_UART3>;
+			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		usb_phy: usb-phy@41000000 {
@@ -392,9 +374,17 @@
 			status = "okay";
 		};
 
-		lsys: lsys@42008000 {
-			compatible = "realtek,amebad2-system-ctrl-ls";
-			reg = <0x42008000 0x2000>;
+		// Watchdog4 is non-secure for linux system.
+		watchdog: wdg@410004C0 {
+			compatible = "realtek,amebad2-rtk-watchdog";
+			reg = <0x410004C0 0x000010>;
+			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+			rtk,wdg-index = <4>;
+			rtk,wdg-timeout = <30>; // seconds
+			rtk,wdg-max-timeout-ms = <0xFFFF>; // 1~0xFFFF
+			rtk,wdg-window-protection-ms = <0xFFFF>; // 0xFFFF means disabled, usually: disabled.
+			rtk,wdg-int-trigger-threshold-ms = <50>;
+			rtk,wdg-interrupt-mode = <1>;
 		};
 	};
 
@@ -430,17 +420,16 @@
 	};
 
 	aliases {
-		spic = "/ocp/spi@44000000";
-		spi0 = "/ocp/spi0@0x400E8000";
-		spi1 = "/ocp/spi1@0x400E9000";
+		i2c0 = "/ocp/i2c0@0x4200F000";
+		i2c1 = "/ocp/i2c1@0x400EF000";
+		i2c2 = "/ocp/i2c2@0x400F0000";
 		serial0 = &uart0;
 		serial1 = &uart1;
 		serial2 = &uart2;
 		serial3 = &uart3;
-		i2c0 = "/ocp/i2c0@0x4200F000";
-		i2c1 = "/ocp/i2c1@0x400EF000";
-		i2c2 = "/ocp/i2c2@0x400F0000";
-		watchdog0 = "/ocp/wdg0@0x410004C0";
+		spic = "/ocp/spi@44000000";
+		spi0 = "/ocp/spi0@0x400E8000";
+		spi1 = "/ocp/spi1@0x400E9000";
 		tim1 = &timer1;
 		tim2 = &timer2;
 		tim3 = &timer3;
@@ -450,5 +439,6 @@
 		tim7 = &timer7;
 		tim8 = &timer8;
 		tim9 = &timer9;
+		watchdog0 = "/ocp/wdg0@0x410004C0";
 	};
 };

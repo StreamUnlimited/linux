@@ -67,6 +67,15 @@
 #endif
 #define RSVD_PG_BCNQ2_NUM		0x00
 
+/* page 0-4 for bcn, 4 for null data, 5 for bt qos null, 6 for qos null */
+#define RSVD_PAGE_NULL_DATA (4)
+#define RSVD_PAGE_BT_QOS_NULL (5)
+#define RSVD_PAGE_QOS_NULL (6)
+#define RSVD_PAGE_PROB_RSP (0)
+#define RSVD_PAGE_PS_POLL (0)
+#define RSVD_PAGE_CTS2SELF (0)
+#define RSVD_PAGE_LTECOEX_QOSNULL (0)
+
 #ifdef CONFIG_WOWLAN
 #define RSVD_PG_WOWLAN_NUM		0x07
 #else

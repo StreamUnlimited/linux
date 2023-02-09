@@ -46,9 +46,7 @@ rtw_hal_config_rts_th(void *hal, u8 band_idx, u16 rts_time_th, u16 rts_len_th) {
 u32 rtw_hal_get_btc_req_slot(void *hal)
 {
 #ifdef CONFIG_BTCOEX
-#if CONFIG_BTCOEX
 	return rtw_hal_btc_req_bt_slot_t(hal);
-#endif
 #endif
 	return 0;
 }

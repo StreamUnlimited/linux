@@ -584,7 +584,7 @@ u32 cfg_mac_bw(struct mac_ax_adapter *adapter, struct mac_ax_cfg_bw *cfg)
 
 	chk_val8 = MAC_REG_R8(REG_BCN_AMPDU_CTCL);
 	/* flow freertos */
-	/* chk_val8 = chk_val8 & (~(BIT(0))); /*
+	/* chk_val8 = chk_val8 & (~(BIT(0))); */
 
 	/*Setting for CCK rate in 5G/6G Channel protection*/
 	if (cfg->pri_ch >= CHANNEL_5G) { // remove after phl setting band_type
@@ -867,11 +867,11 @@ u32 mac_read_xcap_reg(struct mac_ax_adapter *adapter, u8 sc_xo, u32 *val)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
 	if (sc_xo) {
-		*val = (SYS_REG_R32(SYSTEM_CTRL_BASE_LP, ANAPAR_XTAL_ON_0) >>
-			BIT_SHIFT_XTAL_SC_XO) & BIT_MASK_XTAL_SC_XO;
+		*val = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, ANAPAR_XTAL_ON_0);
+		*val = (*val >> BIT_SHIFT_XTAL_SC_XO) & BIT_MASK_XTAL_SC_XO;
 	} else {
-		*val = (SYS_REG_R32(SYSTEM_CTRL_BASE_LP, ANAPAR_XTAL_ON_0) >>
-			BIT_SHIFT_XTAL_SC_XI) & BIT_MASK_XTAL_SC_XI;
+		*val = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, ANAPAR_XTAL_ON_0);
+		*val = (*val >> BIT_SHIFT_XTAL_SC_XI) & BIT_MASK_XTAL_SC_XI;
 	}
 
 	return MACSUCCESS;

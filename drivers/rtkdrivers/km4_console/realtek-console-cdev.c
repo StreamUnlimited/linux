@@ -46,7 +46,6 @@ static long realtek_console_ioctl(struct file *file, unsigned int cmd, unsigned 
 	int ret = 0;
 	char preq_msg[CONSOLE_MAX_CHAR];
 	u8 result[CONSOLE_MAX_CHAR];
-	u8 write = 0;
 
 	spin_lock(&lock);
 

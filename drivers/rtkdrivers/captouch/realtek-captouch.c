@@ -456,6 +456,7 @@ static int realtek_captouch_remove(struct platform_device *pdev)
 
 static const struct of_device_id realtek_captouch_match[] = {
 	{ .compatible = "realtek,amebad2-captouch"},
+	{ }
 };
 MODULE_DEVICE_TABLE(of, realtek_captouch_match);
 

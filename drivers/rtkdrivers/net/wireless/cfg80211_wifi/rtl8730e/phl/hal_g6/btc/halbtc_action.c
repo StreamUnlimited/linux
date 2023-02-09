@@ -296,10 +296,19 @@ static void _set_bt_afh_info(struct btc_t *btc)
 	struct btc_wl_role_info *wl_rinfo = &wl->role_info;
 	struct btc_wl_active_role *act_role = NULL;
 	/*struct btc_module *module = &btc->mdinfo;*/
-	u8 en = 0, i, ch = 0, bw = CHANNEL_WIDTH_MAX;
+	u8 op = 0, en = 0, i, ch = 0, bw = CHANNEL_WIDTH_MAX;
 
 	if (btc->ctrl.manual || wl->status.map.scan) {
 		return;
+	}
+
+	if ((wl_rinfo->link_mode == BTC_WLINK_NOLINK)
+	    || (wl_rinfo->link_mode == BTC_WLINK_MAX)) {
+		op = 0;
+	} else if (wl_rinfo->link_mode == BTC_WLINK_5G) {
+		op = 3;
+	} else {
+		op = 1;
 	}
 
 	/* TBD if include module->ant.type == BTC_ANT_SHARED */
@@ -368,14 +377,14 @@ static void _set_bt_afh_info(struct btc_t *btc)
 	}
 
 exit:
-	if (wl->afh_info.en == en &&
+	if (wl->afh_info.op == op &&
 	    wl->afh_info.ch == ch &&
 	    wl->afh_info.bw == bw &&
 	    b->profile_cnt.last == b->profile_cnt.now) {
 		return;
 	}
 
-	wl->afh_info.en = en;
+	wl->afh_info.op = op;
 	wl->afh_info.ch = ch;
 	wl->afh_info.bw = bw;
 	hal_btc_fw_set_bt(btc, SET_BT_WL_CH_INFO, 3, (u8 *)&wl->afh_info);
@@ -475,7 +484,8 @@ static void _set_bt_slot_req(struct btc_t *btc)
 	hal_btc_send_event(btc, (u8 *)&btc->bt_req_len,
 			   4, BTC_HMSG_SET_BT_REQ_SLOT);
 
-	PHL_INFO("[BTC], %s(): bt_req_len=%d\n", __func__, btc->bt_req_len);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s(): bt_req_len=%d\n", __func__, btc->bt_req_len);
 }
 
 static void _set_bt_stbc_req(struct btc_t *btc)
@@ -499,7 +509,8 @@ static void _set_bt_stbc_req(struct btc_t *btc)
 	hal_btc_send_event(btc, (u8 *)&btc->bt_req_stbc,
 			   1, BTC_HMSG_SET_BT_REQ_STBC);
 
-	PHL_INFO("[BTC], %s(): bt_req_stbc=%d\n", __func__, btc->bt_req_stbc);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s(): bt_req_stbc=%d\n", __func__, btc->bt_req_stbc);
 }
 
 static void _set_bt_rx_agc(struct btc_t *btc)
@@ -723,6 +734,9 @@ static void _set_policy(struct btc_t *btc, u16 policy_type, const char *action)
 	u16 dur = 0;
 	u32 tbl_w1, tbl_b1, tbl_b4, noa, tnull1;
 	bool mode = NM_EXEC;
+
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s(): policy_type 0x%04x.\n", __func__, policy_type);
 
 	type = (u8)((policy_type & bMASKB1) >> 8);
 
@@ -1098,6 +1112,76 @@ static void _set_policy(struct btc_t *btc, u16 policy_type, const char *action)
 	_update_poicy(btc, mode, policy_type, action);
 }
 
+static void _set_tdma_timer_base(struct btc_t *btc, u8 type)
+{
+	struct btc_ops *ops = btc->ops;
+	struct btc_wl_info *wl = &btc->cx.wl;
+	struct btc_wl_link_info *link_info = wl->link_info;
+	u16 tbtt_interval = 0;
+	u8 h2c_para[2] = {0xb, 0x1};
+	u8 i = 0;
+
+	if (!ops || !ops->fw_cmd) {
+		return;
+	}
+
+	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
+		if (link_info[i].pid == 0) {
+			break;
+		}
+	}
+	tbtt_interval = link_info[i].bcn_period;
+
+	/* Add for JIRA coex-256 */
+	if (type == 3 && tbtt_interval >= 100) { /* 50ms-slot  */
+		if (wl->tdma_timer_base == 3) {
+			return;
+		}
+
+		h2c_para[1] = (tbtt_interval / 50) - 1;
+		h2c_para[1] = h2c_para[1] | 0xc0; /* 50ms-slot */
+		wl->tdma_timer_base = 3;
+	} else if (tbtt_interval < 80 && tbtt_interval > 0) {
+		if (wl->tdma_timer_base == 2) {
+			return;
+		}
+		h2c_para[1] = (100 / tbtt_interval);
+
+		if (100 % tbtt_interval != 0) {
+			h2c_para[1] = h2c_para[1] + 1;
+		}
+
+		h2c_para[1] = h2c_para[1] & 0x3f;
+		wl->tdma_timer_base = 2;
+	} else if (tbtt_interval >= 180) {
+		if (wl->tdma_timer_base == 1) {
+			return;
+		}
+		h2c_para[1] = (tbtt_interval / 100);
+
+		if (tbtt_interval % 100 <= 80) {
+			h2c_para[1] = h2c_para[1] - 1;
+		}
+
+		h2c_para[1] = h2c_para[1] & 0x3f;
+		h2c_para[1] = h2c_para[1] | 0x80;
+		wl->tdma_timer_base = 1;
+	} else {
+		if (wl->tdma_timer_base == 0) {
+			return;
+		}
+		h2c_para[1] = 0x1;
+		wl->tdma_timer_base = 0;
+	}
+
+	ops->fw_cmd(btc, BTFC_SET, SET_H2C_TEST, h2c_para, 2);
+
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s(): h2c_0x69 = 0x%x\n", __func__, h2c_para[1]);
+
+	return;
+}
+
 void _set_gnt_wl(struct btc_t *btc, u8 phy_map, u8 state)
 {
 	struct rtw_hal_com_t *h = btc->hal;
@@ -1105,7 +1189,7 @@ void _set_gnt_wl(struct btc_t *btc, u8 phy_map, u8 state)
 	struct btc_gnt_ctrl *g = dm->gnt_set;
 	u8 i;
 
-	if (phy_map > BTC_PHY_ALL) {
+	if (phy_map > BTC_PHY_0) {
 		return;
 	}
 
@@ -1130,7 +1214,8 @@ void _set_gnt_wl(struct btc_t *btc, u8 phy_map, u8 state)
 		}
 	}
 
-	rtw_hal_mac_set_grant(h, (u8 *)g);
+	/* Nothing to do for wl ant, only for bt */
+	/* rtw_hal_mac_set_grant(h, (u8 *)g); */
 }
 
 void _set_gnt_bt(struct btc_t *btc, u8 phy_map, u8 state)
@@ -1140,7 +1225,7 @@ void _set_gnt_bt(struct btc_t *btc, u8 phy_map, u8 state)
 	struct btc_gnt_ctrl *g = dm->gnt_set;
 	u8 i;
 
-	if (phy_map > BTC_PHY_ALL) {
+	if (phy_map > BTC_PHY_0) {
 		return;
 	}
 
@@ -1168,7 +1253,7 @@ void _set_gnt_bt(struct btc_t *btc, u8 phy_map, u8 state)
 	rtw_hal_mac_set_grant(h, (u8 *)g);
 }
 
-static void _set_bt_plut(struct btc_t *btc, u8 phy_map, u8 tx_val, u8 rx_val)
+static void _set_bt_plut(struct btc_t *btc, u8 phy_map, u32 tx_val, u32 rx_val)
 {
 	struct btc_wl_info *wl = &btc->cx.wl;
 	struct btc_wl_role_info *wl_rinfo = &wl->role_info;
@@ -1249,25 +1334,31 @@ static void _set_ant(struct btc_t *btc, bool force_exec, u8 phy_map, u8 type)
 	}
 
 	if (!force_exec && (ant_path_type == dm->set_ant_path)) {
-		PHL_INFO("[BTC], %s(): return by no change!!\n", __func__);
+		PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+			  "[BTC], %s(): return by no change!!\n", __func__);
 		return;
 	} else if (bt->rfk_info.map.run) {
-		PHL_INFO("[BTC], %s(): return by bt rfk!!\n", __func__);
+		PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+			  "[BTC], %s(): return by bt rfk!!\n", __func__);
 		return;
 	} else if (!run_rsn("_ntfy_wl_rfk") &&
 		   wl->rfk_info.state != BTC_WRFK_STOP) {
-		PHL_INFO("[BTC], %s(): return by wl rfk!!\n", __func__);
+		PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+			  "[BTC], %s(): return by wl rfk!!\n", __func__);
 		return;
 	}
 
 	dm->set_ant_path = ant_path_type;
 
-	PHL_INFO("[BTC], %s(): path=0x%x, set_type=%s\n", __func__,
-		 phy_map, id_to_str(BTC_STR_ANTPATH, dm->set_ant_path & 0xff));
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s(): path=0x%x, set_type=%s\n", __func__,
+		  phy_map, id_to_str(BTC_STR_ANTPATH, dm->set_ant_path & 0xff));
 
 	switch (type) {
 	case BTC_ANT_WPOWERON:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_BT);
+		_set_gnt_wl(btc, phy_map, BTC_GNT_HW);
+		_set_gnt_bt(btc, phy_map, BTC_GNT_HW);
 		break;
 	case BTC_ANT_WINIT:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
@@ -1279,17 +1370,19 @@ static void _set_ant(struct btc_t *btc, bool force_exec, u8 phy_map, u8 type)
 			_set_gnt_wl(btc, phy_map, BTC_GNT_SW_HI);
 			_set_gnt_bt(btc, phy_map, BTC_GNT_SW_LO);
 		}
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_BT, BTC_PLT_BT);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_BT, BTC_PLT_BT);
 		break;
 	case BTC_ANT_WONLY:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
 		_set_gnt_wl(btc, phy_map, BTC_GNT_SW_HI);
 		_set_gnt_bt(btc, phy_map, BTC_GNT_SW_LO);
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_NONE, BTC_PLT_NONE);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_NONE, BTC_PLT_NONE);
 		break;
 	case BTC_ANT_WOFF:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_BT);
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_NONE, BTC_PLT_NONE);
+		_set_gnt_wl(btc, phy_map, BTC_GNT_SW_LO);
+		_set_gnt_bt(btc, phy_map, BTC_GNT_SW_HI);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_NONE, BTC_PLT_NONE);
 		break;
 	case BTC_ANT_W2G:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
@@ -1299,13 +1392,13 @@ static void _set_ant(struct btc_t *btc, bool force_exec, u8 phy_map, u8 type)
 		}
 		_set_gnt_wl(btc, phy_map, BTC_GNT_HW);
 		_set_gnt_bt(btc, phy_map, BTC_GNT_HW);
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_BT, BTC_PLT_BT);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_BT, BTC_PLT_BT);
 		break;
 	case BTC_ANT_W5G:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
 		_set_gnt_wl(btc, phy_map, BTC_GNT_SW_HI);
 		_set_gnt_bt(btc, phy_map, BTC_GNT_HW);
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_NONE, BTC_PLT_NONE);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_NONE, BTC_PLT_NONE);
 		break;
 	case BTC_ANT_W25G:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
@@ -1315,13 +1408,13 @@ static void _set_ant(struct btc_t *btc, bool force_exec, u8 phy_map, u8 type)
 		}
 		_set_gnt_wl(btc, phy_map, BTC_GNT_HW);
 		_set_gnt_bt(btc, phy_map, BTC_GNT_HW);
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_GNT_WL, BTC_PLT_GNT_WL);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_GNT_WL, BTC_PLT_GNT_WL);
 		break;
 	case BTC_ANT_FREERUN:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
 		_set_gnt_wl(btc, phy_map, BTC_GNT_SW_HI);
 		_set_gnt_bt(btc, phy_map, BTC_GNT_SW_HI);
-		_set_bt_plut(btc, BTC_PHY_ALL, BTC_PLT_NONE, BTC_PLT_NONE);
+		_set_bt_plut(btc, BTC_PHY_0, BTC_PLT_NONE, BTC_PLT_NONE);
 		break;
 	case BTC_ANT_WRFK:
 		_set_cx_ctrl(btc, BTC_CTRL_BY_WL);
@@ -1340,17 +1433,19 @@ static void _set_ant(struct btc_t *btc, bool force_exec, u8 phy_map, u8 type)
 
 void _action_wl_only(struct btc_t *btc)
 {
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 
-	_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_WONLY);
-	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
+	_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_WONLY);
+	_set_policy(btc, BTC_CXP_OFF_WL, __func__);
 }
 
 void _action_wl_init(struct btc_t *btc)
 {
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 
-	_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_WINIT);
+	_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_WINIT);
 	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 }
 
@@ -1358,16 +1453,17 @@ void _action_wl_off(struct btc_t *btc)
 {
 	struct btc_wl_info *wl = &btc->cx.wl;
 
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 
 	/* don't set PTA control if LPS-PG/LPS-CG */
 	if (wl->status.map.rf_off || btc->dm.bt_only) {
-		_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_WOFF);
+		_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_WOFF);
 	} else if (wl->status.map.lps == BTC_LPS_RF_ON) {
 		if (wl->role_info.link_mode == BTC_WLINK_5G) {
-			_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_W5G);
+			_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_W5G);
 		} else {
-			_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+			_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 		}
 	}
 
@@ -1386,34 +1482,38 @@ void _action_wl_off(struct btc_t *btc)
 
 void _action_freerun(struct btc_t *btc)
 {
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 	btc->dm.freerun = true;
 
-	_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_FREERUN);
+	_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_FREERUN);
 	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 }
 
 void _action_bt_whql(struct btc_t *btc)
 {
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 
-	_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 }
 
 void _action_bt_rfk(struct btc_t *btc)
 {
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_BRFK);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_BRFK);
 	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 }
 
 void _action_bt_off(struct btc_t *btc)
 {
-	PHL_INFO("[BTC], %s !!\n", __func__);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s !!\n", __func__);
 
-	_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_WONLY);
+	_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_WONLY);
 	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 }
 
@@ -1463,7 +1563,7 @@ static void _action_bt_idle(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1481,7 +1581,7 @@ static void _action_bt_hfp(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ2;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1503,7 +1603,7 @@ static void _action_bt_hid(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ3;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1548,7 +1648,7 @@ static void _action_bt_a2dp(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1578,7 +1678,7 @@ static void _action_bt_a2dpsink(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1608,7 +1708,7 @@ static void _action_bt_pan(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1651,7 +1751,7 @@ static void _action_bt_a2dp_hid(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1681,7 +1781,7 @@ static void _action_bt_a2dp_pan(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1711,7 +1811,7 @@ static void _action_bt_pan_hid(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1739,19 +1839,19 @@ static void _action_bt_a2dp_pan_hid(struct btc_t *btc)
 		break;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
 void _action_wl_5g(struct btc_t *btc)
 {
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W5G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W5G);
 	_set_policy(btc, BTC_CXP_OFF_EQ0, __func__);
 }
 
 void _action_wl_other(struct btc_t *btc)
 {
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 
 	if (btc->mdinfo.ant.type == BTC_ANT_SHARED) {
 		_set_policy(btc, BTC_CXP_OFFB_BWB0, __func__);
@@ -1762,7 +1862,7 @@ void _action_wl_other(struct btc_t *btc)
 
 void _action_wl_idle(struct btc_t *btc)
 {
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 
 	if (btc->mdinfo.ant.type == BTC_ANT_SHARED) {
 		_set_policy(btc, BTC_CXP_OFFB_BWB0, __func__);
@@ -1773,7 +1873,7 @@ void _action_wl_idle(struct btc_t *btc)
 
 void _action_wl_nc(struct btc_t *btc)
 {
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 }
 
@@ -1785,17 +1885,18 @@ void _action_wl_rfk(struct btc_t *btc)
 		return;
 	}
 
-	PHL_INFO("[BTC], %s(): band = %d\n", __func__, rfk.band);
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_,
+		  "[BTC], %s(): band = %d\n", __func__, rfk.band);
 
-	_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_WRFK);
+	_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_WRFK);
 	_set_policy(btc, BTC_CXP_OFF_WL, __func__);
 
 #if 0
 	if (rfk.band == BAND_ON_24G) {
-		_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_WRFK);
+		_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_WRFK);
 		_set_policy(btc, BTC_CXP_OFF_WL, __func__);
 	} else {
-		_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_FREERUN);
+		_set_ant(btc, FC_EXEC, BTC_PHY_0, BTC_ANT_FREERUN);
 		_set_policy(btc, BTC_CXP_OFF_EQ0, __func__);
 	}
 #endif
@@ -1949,7 +2050,7 @@ void _action_wl_25g_mcc(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W25G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W25G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -1971,7 +2072,7 @@ void _action_wl_2g_mcc(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -2043,7 +2144,7 @@ void _action_wl_2g_scc(struct btc_t *btc)
 	}
 
 exit:
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -2066,7 +2167,7 @@ void _action_wl_2g_ap(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -2088,7 +2189,7 @@ void _action_wl_2g_go(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -2130,7 +2231,7 @@ void _action_wl_2g_gc(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 
@@ -2152,7 +2253,7 @@ void _action_wl_2g_nan(struct btc_t *btc)
 		policy_type = BTC_CXP_OFF_EQ0;
 	}
 
-	_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W2G);
+	_set_ant(btc, NM_EXEC, BTC_PHY_0, BTC_ANT_W2G);
 	_set_policy(btc, policy_type, __func__);
 }
 

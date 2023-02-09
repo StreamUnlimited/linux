@@ -18,18 +18,19 @@
 #include "../hal_btc.h"
 
 #ifdef CONFIG_BTCOEX
-#if 0
 #ifdef CONFIG_RTL8730E
 
 #include "btc_8730e.h"
+#include "mac/halmac_bit2.h"
+#include "mac/halmac_reg2.h"
 
 /* WL rssi threshold in % (dbm = % - 110)
  * array size limit by BTC_WL_RSSI_THMAX
  * BT rssi threshold in % (dbm = % - 100)
  * array size limit by BTC_BT_RSSI_THMAX
  */
-static const u8 btc_8730e_wl_rssi_thres[BTC_WL_RSSI_THMAX] = {60, 50, 40, 30};
-static const u8 btc_8730e_bt_rssi_thres[BTC_BT_RSSI_THMAX] = {40, 36, 31, 28};
+static const u8 btc_8730e_wl_rssi_thres[BTC_WL_RSSI_THMAX] = {60, 50, 44, 35};
+static const u8 btc_8730e_bt_rssi_thres[BTC_BT_RSSI_THMAX] = {4, 12, 20, 25};
 
 static struct btc_chip_ops btc_8730e_ops = {
 	_8730e_rfe_type,
@@ -99,10 +100,11 @@ const struct btc_chip chip_8730e = {
 	0x6, /* desired bt_ver */
 	0x06030000, /* desired wl_fw btc ver */
 	0x1, /* scoreboard version */
-	0x1, /* mailbox version*/
+	0x0, /* mailbox version*/
 	BTC_COEX_RTK_MODE, /* pta_mode */
 	BTC_COEX_INNER, /* pta_direction */
 	6, /* afh_guard_ch */
+	false,
 	btc_8730e_wl_rssi_thres, /* wl rssi threshold level */
 	btc_8730e_bt_rssi_thres, /* bt rssi threshold level */
 	(u8)2, /* rssi tolerance */
@@ -129,18 +131,18 @@ void _8730e_rfe_type(struct btc_t *btc)
 	module->switch_type = BTC_SWITCH_INTERNAL;
 
 #if BTC_NON_SHARED_ANT_FREERUN
-	module->ant.num = 3;
+	module->ant.num = 2;
 #else
 	if (module->rfe_type > 0) {
-		module->ant.num = (module->rfe_type % 2 ?  2 : 3);
+		module->ant.num = (module->rfe_type % 2 ?  1 : 2);
 	} else {
-		module->ant.num = 2;
+		module->ant.num = 1;
 	}
 #endif
 	module->ant.diversity = 0;
 	module->ant.isolation = 10;
 
-	if (module->ant.num == 3) {
+	if (module->ant.num == 2) {
 		module->ant.type = BTC_ANT_DEDICATED;
 		module->bt_pos = BTC_BT_ALONE;
 	} else {
@@ -213,28 +215,10 @@ void _8730e_set_wl_lna2(struct btc_t *btc, u8 level)
 	 */
 	switch (level) {
 	case 0: /* default */
-		_write_wl_rf_reg(btc, RF_PATH_B, 0xef, bMASKRF, 0x1000);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x0);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x15);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x1);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x17);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x2);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x15);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x3);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x17);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0xef, bMASKRF, 0x0);
+		/* todo */
 		break;
 	case 1: /* Fix LNA2=5  */
-		_write_wl_rf_reg(btc, RF_PATH_B, 0xef, bMASKRF, 0x1000);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x0);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x15);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x1);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x5);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x2);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x15);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x33, bMASKRF, 0x3);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0x3f, bMASKRF, 0x5);
-		_write_wl_rf_reg(btc, RF_PATH_B, 0xef, bMASKRF, 0x0);
+		/* todo */
 		break;
 	}
 }
@@ -358,6 +342,9 @@ void _8730e_init_cfg(struct btc_t *btc)
 	/* set WL Tx beacon = Hi-Pri */
 	btc->chip->ops->wl_pri(btc, BTC_PRI_MASK_BEACON, true);
 
+	/* set Tx beacon queue = Hi-Pri  */
+	btc->chip->ops->wl_pri(btc, BTC_PRI_MASK_BEACONQ, true);
+
 	/* set rf gnt debug off*/
 	_write_wl_rf_reg(btc, RF_PATH_A, 0x2, bMASKRF, 0x0);
 	_write_wl_rf_reg(btc, RF_PATH_B, 0x2, bMASKRF, 0x0);
@@ -376,10 +363,10 @@ void _8730e_init_cfg(struct btc_t *btc)
 	/* set PTA break table */
 	_write_cx_reg(btc, R_BTC_BREAK_TABLE, 0xf0ffffff);
 
-	/* enable BT counter 0xda40[16,2] = 2b'11 */
-	val = _read_cx_reg(btc, R_BTC_BT_CNT_CFG);
-	_write_cx_reg(btc, R_BTC_BT_CNT_CFG,
-		      val | B_BTC_BT_CNT_EN | B_BTC_BT_CNT_RST_V1);
+	///* enable BT counter 0xda40[16,2] = 2b'11 */
+	//val = _read_cx_reg(btc, R_BTC_BT_CNT_CFG);
+	//_write_cx_reg(btc, R_BTC_BT_CNT_CFG,
+	//	      val | B_BTC_BT_CNT_EN | B_BTC_BT_CNT_RST_V1);
 }
 
 void _8730e_wl_pri(struct btc_t *btc, u8 map, bool state)
@@ -388,20 +375,36 @@ void _8730e_wl_pri(struct btc_t *btc, u8 map, bool state)
 
 	switch (map) {
 	case BTC_PRI_MASK_TX_RESP:
-		reg = R_BTC_COEX_WL_REQ;
-		bitmap = B_BTC_RSP_ACK_HI;
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_TYPE(0x3);
+		break;
+	case BTC_PRI_MASK_RX_RESP:
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_RX_RESP_V1;
 		break;
 	case BTC_PRI_MASK_BEACON:
-		reg = R_BTC_COEX_WL_REQ;
-		bitmap = B_BTC_TX_BCN_HI;
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_TYPE(0x4);
+		break;
+	case BTC_PRI_MASK_BEACONQ:
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_TXAC(0x10);
 		break;
 	case BTC_PRI_MASK_RX_CCK: /* Hi-Pri if rx_time > 8ms */
-		reg = R_BTC_COEX_WL_REQ;
-		bitmap = B_BTC_PRI_MASK_RX_TIME_V1;
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_RXCCK_V1;
 		break;
 	case BTC_PRI_MASK_TX_CCK: /* Hi-Pri if tx_time > 8ms */
-		reg = R_BTC_COEX_WL_REQ;
-		bitmap = B_BTC_PRI_MASK_TX_TIME;
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_CCK_V1;
+		break;
+	case BTC_PRI_MASK_RX_OFDM: /* Hi-Pri if rx_time > 8ms */
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_RXOFDM_V1;
+		break;
+	case BTC_PRI_MASK_TX_OFDM: /* Hi-Pri if tx_time > 8ms */
+		reg = REG_BT_COEX_TABLE_H_V1;
+		bitmap = BIT_PRI_MASK_OFDM_V1;
 		break;
 	}
 
@@ -417,5 +420,3 @@ void _8730e_wl_pri(struct btc_t *btc, u8 map, bool state)
 
 #endif /* CONFIG_RTL8730E */
 #endif
-#endif
-

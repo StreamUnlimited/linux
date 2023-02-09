@@ -690,6 +690,16 @@ static void _phl_reset_wp_tag(struct phl_info_t *phl_info,
 			phl_recycle_payload(phl_info, dma_ch, wp_seq,
 					    TX_STATUS_TX_FAIL_SW_DROP);
 	}
+
+	/* Reset wd_page parameters. */
+	/* Keep wd_page base unchanged. */
+	wd_page_ring->idle_wd_page_cnt = MAX_WD_PAGE_NUM;
+	wd_page_ring->busy_wd_page_cnt = 0;
+	wd_page_ring->pending_wd_page_cnt = 0;
+	wd_page_ring->wp_seq = 0;
+	wd_page_ring->wp_seq_idx = 0;
+	wd_page_ring->hw_idx = 0;
+	wd_page_ring->wp_seq_start = 0;
 }
 
 static void phl_tx_reset_axi(struct phl_info_t *phl_info)
@@ -869,7 +879,8 @@ phl_release_target_rx_buf(struct phl_info_t *phl_info, void *r, u8 ch,
 		_phl_alloc_dynamic_rxbuf_axi(rx_buf, phl_info);
 	}
 #endif
-	if (&rx_buf_ring[ch] != NULL && rx_buf != NULL)
+	if (&rx_buf_ring[ch] != NULL && rx_buf != NULL
+	    && rx_buf->vir_addr != NULL)
 	{
 		enqueue_idle_rx_buf(phl_info, &rx_buf_ring[ch], rx_buf);
 		pstatus = RTW_PHL_STATUS_SUCCESS;
@@ -1306,7 +1317,7 @@ _phl_alloc_rxbd_axi(struct phl_info_t *phl_info, u8 ch_num) {
 				(_dma *)&rxbd[i].phy_addr_h,
 				buf_len,
 				rxbd[i].cache,
-				DMA_TO_DEVICE,
+				DMA_FROM_DEVICE,
 				&rxbd[i].os_rsvd[0]);
 			if (NULL == rxbd[i].vir_addr) {
 				pstatus = RTW_PHL_STATUS_RESOURCE;
@@ -1352,7 +1363,7 @@ static void _phl_free_txbd_axi(struct phl_info_t *phl_info, u8 *txbd_buf,
 				       (_dma *)&txbd[i].phy_addr_h,
 				       txbd[i].buf_len,
 				       txbd[i].cache,
-				       DMA_FROM_DEVICE,
+				       DMA_TO_DEVICE,
 				       txbd[i].os_rsvd[0]);
 			txbd[i].vir_addr = NULL;
 			txbd[i].cache = 0;
@@ -2422,7 +2433,7 @@ enum rtw_phl_status phl_recycle_busy_wd(struct phl_info_t *phl_info)
 
 static enum rtw_phl_status phl_tx_axi(struct phl_info_t *phl_info)
 {
-	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
+	enum rtw_phl_status pstatus = RTW_PHL_STATUS_SUCCESS;
 	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
 	struct hci_info_t *hci_info = (struct hci_info_t *)phl_info->hci;
 	struct rtw_wd_page_ring *wd_ring = NULL;
@@ -2445,17 +2456,18 @@ static enum rtw_phl_status phl_tx_axi(struct phl_info_t *phl_info)
 
 		if (list_empty(&wd_ring[ch].pending_wd_page_list)) {
 			continue;
+		} else {
+			pstatus = RTW_PHL_STATUS_FAILURE;
 		}
 
 		if (0 == hw_res) {
 			continue;
-
 		} else {
 			txcnt = (hw_res < wd_ring[ch].pending_wd_page_cnt) ?
 				hw_res : wd_ring[ch].pending_wd_page_cnt;
 
 			pstatus = phl_handle_pending_wd(phl_info, &wd_ring[ch],
-							txcnt, ch);
+							txcnt, ch);;
 
 			if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 				continue;
@@ -2551,7 +2563,7 @@ enum rtw_phl_status phl_get_single_rx(struct phl_info_t *phl_info,
 				      hal_spec->rx_bd_info_sz,
 				      DMA_FROM_DEVICE);
 		}
-		target_rxbd = rxbd[ch].vir_addr + 8 * rxbd[ch].host_idx;
+		target_rxbd = rxbd[ch].vir_addr + hal_spec->rx_bd_info_sz * rxbd[ch].host_idx;
 		if (true != rtw_hal_check_rxrdy(phl_info->phl_com,
 						phl_info->hal,
 						target_rxbd,

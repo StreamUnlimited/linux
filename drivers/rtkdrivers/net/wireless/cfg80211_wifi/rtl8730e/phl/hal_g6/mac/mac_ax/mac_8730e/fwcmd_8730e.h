@@ -21,10 +21,10 @@
 #if MAC_AX_8730E_SUPPORT
 
 struct mac_ax_h2creg_offset *
-get_h2creg_offset_8852a(struct mac_ax_adapter *adapter);
+get_h2creg_offset_8730e(struct mac_ax_adapter *adapter);
 
 struct mac_ax_c2hreg_offset *
-get_c2hreg_offset_8852a(struct mac_ax_adapter *adapter);
+get_c2hreg_offset_8730e(struct mac_ax_adapter *adapter);
 
-#endif /* #if MAC_AX_8852A_SUPPORT */
+#endif /* #if MAC_AX_8730E_SUPPORT */
 #endif

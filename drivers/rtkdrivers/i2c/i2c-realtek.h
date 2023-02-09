@@ -44,6 +44,7 @@
 
 #define RTK_I2C_TODO			0
 #define RTK_I2C_DEBUG_EXTEND		0
+#define RTK_I2C_AUTO_RE_RECV		0
 
 /*-----------------------------------------------------------------*/
 /*-------------------------- Hardware Layer -----------------------*/

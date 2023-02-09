@@ -81,7 +81,7 @@ static irqreturn_t rtw_axi_interrupt(int irq, void *priv, struct pt_regs *regs)
 	enum rtw_phl_status pstatus =  RTW_PHL_STATUS_SUCCESS;
 	unsigned long sp_flags;
 
-	if (axi_data->irq_enabled == 0) {
+	if (axi_data->irq_enabled == 0 || !dvobj || !axi_data || !dvobj->phl) {
 		return IRQ_HANDLED;
 	}
 

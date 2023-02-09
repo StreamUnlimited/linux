@@ -105,8 +105,8 @@ struct mac_ax_priv_ops {
 	void (*disable_efuse_sw_pwr_cut)(struct mac_ax_adapter *adapter,
 					 bool is_write);
 	u32(*efuse_get_pwr_state)(struct mac_ax_adapter *adapter);
-	u32(*efuse_read8)(struct mac_ax_adapter *adapter, u32 addr, u8 *data);
-	u32(*efuse_write8)(struct mac_ax_adapter *adapter, u32 addr, u8 data);
+	u32(*efuse_read8)(struct mac_ax_adapter *adapter, u32 addr, u8 *data, int len);
+	u32(*efuse_write8)(struct mac_ax_adapter *adapter, u32 addr, u8 data, int len);
 
 	/*H2C*/
 	struct mac_ax_h2creg_offset *

@@ -129,12 +129,12 @@ static int ameba_update_98P304M_input_clock_status(struct audio_clock_component*
 	if (enabled == true) {
 		//avoid repeated enabling operations
 		tmp = readl(data->addr + REG_PLL_STATE);
-		if ( tmp & PLL_BIT_CKRDY_I2S1 )
+		if (tmp & PLL_BIT_CKRDY_I2S1)
 			return res;
 
 		//Check BandGap power on
 		tmp = readl(data->addr + REG_PLL_AUX_BG);
-		if ( (tmp & PLL_BG_POW_MASK) == 0 ) {
+		if ((tmp & PLL_BG_POW_MASK) == 0) {
 			tmp |= (PLL_BIT_POW_BG | PLL_BIT_POW_I | PLL_BIT_POW_MBIAS);
 			writel(tmp, data->addr + REG_PLL_AUX_BG);
 			//DelayUs(160);
@@ -502,7 +502,6 @@ static int ameba_pll_i2s_24P576M_clk_tune(struct audio_clock_component* acc, u32
 		F0F_new = 5269;
 	}
 
-	//pr_info("%s, acc:0x%x, data->addr:0x%x, ppm:%d, action:%d, F0F_new:%d", __func__, acc, data->addr, ppm, action, F0F_new);
 	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
 	tmp &= (~PLL_MASK_IPLL1_F0F_SDM);
 	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
@@ -571,7 +570,6 @@ static int ameba_pll_i2s_45P158M_clk_tune(struct audio_clock_component* acc, u32
 		F0F_new = 2071;
 	}
 
-	//pr_info("%s, acc:0x%x, data->addr:0x%x, ppm:%d, action:%d, F0F_new:%d", __func__, acc, data->addr, ppm, action, F0F_new);
 	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL3);
 	tmp &= (~PLL_MASK_IPLL2_F0F_SDM);
 	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
@@ -612,7 +610,6 @@ static int ameba_choose_input_clock_for_sport_index(struct audio_clock_component
 	u32 SPORTClk = 0;
 	void __iomem *system_control_base_lp;
 
-	//pr_info("%s sport:%d, clock:%d", __func__, sport_index, clock);
 	struct audio_clock_data* data = get_audio_clock_data(acc);
 	system_control_base_lp = data->system_control_base_lp;
 
@@ -678,20 +675,20 @@ static int ameba_update_fen_cke_sport_status(struct audio_clock_component* acc, 
 
 	struct audio_clock_data* data = get_audio_clock_data(acc);
 	system_control_base_lp = data->system_control_base_lp;
-	//pr_info("%s sport:%d, enabled:%d", __func__, sport_index, enabled);
+
 	if (enabled == true) {
 		tmp = readl(system_control_base_lp + REG_LSYS_CKE_GRP2);
-		tmp |= LSYS_CKE_SPORT( 1 << sport_index );
+		tmp |= LSYS_CKE_SPORT(1 << sport_index);
 		writel(tmp, system_control_base_lp + REG_LSYS_CKE_GRP2);
 		tmp = readl(system_control_base_lp + REG_LSYS_FEN_GRP2);
-		tmp |= LSYS_FEN_SPORT( 1 << sport_index );
+		tmp |= LSYS_FEN_SPORT(1 << sport_index);
 		writel(tmp, system_control_base_lp + REG_LSYS_FEN_GRP2);
 	} else {
 		tmp = readl(system_control_base_lp + REG_LSYS_CKE_GRP2);
-		tmp &= ~LSYS_CKE_SPORT( 1 << sport_index );
+		tmp &= ~LSYS_CKE_SPORT(1 << sport_index);
 		writel(tmp, system_control_base_lp + REG_LSYS_CKE_GRP2);
 		tmp = readl(system_control_base_lp + REG_LSYS_FEN_GRP2);
-		tmp &= ~LSYS_FEN_SPORT( 1 << sport_index );
+		tmp &= ~LSYS_FEN_SPORT(1 << sport_index);
 		writel(tmp, system_control_base_lp + REG_LSYS_FEN_GRP2);
 	}
 	return res;
@@ -710,7 +707,6 @@ static int ameba_set_rate_divider(struct audio_clock_component* acc, unsigned in
 		pr_info("invalid divider:%d", divider);
 		return -EINVAL;
 	}
-	//pr_info("%s sport:%d, divider:%d", __func__, sport_index, divider);
 
 	tmp = readl(system_control_base_lp + REG_LSYS_SPORT_CLK);
 
@@ -837,14 +833,14 @@ static int amebad2_audio_clock_probe(struct platform_device *pdev)
 
 	rcc_node = of_parse_phandle(dev->of_node, "rtk,sport-clock", 0);
 
-	if ( of_address_to_resource(rcc_node, 1, &res) ) {
+	if (of_address_to_resource(rcc_node, 1, &res)) {
 		dev_err(&pdev->dev, "get resource for sport clock error\n");
 		ret = -ENOMEM;
 		return ret;
 	}
 
 	clock_priv->system_control_base_lp = ioremap(res.start, resource_size(&res));
-	if ( !clock_priv->system_control_base_lp ) {
+	if (!clock_priv->system_control_base_lp) {
 			dev_err(&pdev->dev, "ioremap for sport clock error\n");
 			ret = -ENOMEM;
 			return ret;

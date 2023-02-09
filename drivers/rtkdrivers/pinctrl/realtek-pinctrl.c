@@ -209,7 +209,7 @@ static int realtek_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		func = REALTEK_GET_PIN_FUNC(pinfunc);
 
 		if (!realtek_pctrl_is_function_valid(pctl, pin, func)) {
-			dev_err(pctl->dev, "invalid function.\n");
+			dev_err(pctl->dev, "invalid function %d for pin %d.\n", func, pin);
 			err = -EINVAL;
 			goto exit;
 		}

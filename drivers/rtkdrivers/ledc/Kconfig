@@ -4,6 +4,7 @@ config LEDC_RTK_WS28XXX
 	select NEW_LEDS
 	select LEDS_CLASS
 	select LEDS_USER
+	select LEDS_TRIGGERS
 	select LEDS_TRIGGER_PATTERN
 
 	help

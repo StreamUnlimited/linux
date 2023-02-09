@@ -27,6 +27,7 @@
 #include <linux/serial_ameba.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/pm_wakeirq.h>
 
 #define AMEBA_NR_UARTS	1
 
@@ -431,7 +432,7 @@ static void ameba_uart_shutdown(struct uart_port *port)
 	free_irq(port->irq, port);
 #endif
 }
-					   
+
 #ifdef UART_TODO
 /**
   * @brief    get ovsr & ovsr_adj parameters according to the given baudrate and UART IP clock.
@@ -734,12 +735,12 @@ static void ameba_console_write(struct console *co, const char *s,
 								unsigned int count)
 {
 	struct uart_port *port;
-	unsigned long flags;
+	//unsigned long flags;
 	int locked;
 
 	port = &ports[co->index];
 
-	local_irq_save(flags);
+	//local_irq_save(flags);
 	if (port->sysrq) {
 		/* bcm_uart_interrupt() already took the lock */
 		locked = 0;
@@ -759,7 +760,7 @@ static void ameba_console_write(struct console *co, const char *s,
 	if (locked) {
 		spin_unlock(&port->lock);
 	}
-	local_irq_restore(flags);
+	//local_irq_restore(flags);
 }
 
 /*
@@ -918,6 +919,12 @@ static int ameba_uart_probe(struct platform_device *pdev)
 		return ret;
 	}
 	platform_set_drvdata(pdev, port);
+
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		device_init_wakeup(&pdev->dev, true);
+		dev_pm_set_wake_irq(&pdev->dev, port->irq);
+	}
+
 
 	return 0;
 }

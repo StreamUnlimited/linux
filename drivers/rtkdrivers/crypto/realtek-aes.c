@@ -766,7 +766,6 @@ static int realtek_aes_ofb_decrypt(struct ablkcipher_request *req)
 static int realtek_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key, unsigned int keylen)
 {
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
-	int ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ctx->adev->lock, flags);
@@ -799,7 +798,6 @@ static int realtek_aes_cra_init(struct crypto_tfm *tfm)
 static int realtek_aes_gcm_setkey(struct crypto_aead *tfm, const u8 *key, unsigned int keylen)
 {
 	struct realtek_aes_ctx *ctx = crypto_aead_ctx(tfm);
-	int ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ctx->adev->lock, flags);
@@ -1027,6 +1025,7 @@ static int realtek_aes_remove(struct platform_device *pdev)
 
 static const struct of_device_id realtek_aes_of_match[] = {
 	{.compatible = "realtek,amebad2-aes",},
+	{ }
 };
 
 MODULE_DEVICE_TABLE(of, realtek_aes_of_match);

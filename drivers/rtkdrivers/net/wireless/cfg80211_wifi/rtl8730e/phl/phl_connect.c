@@ -13,6 +13,7 @@
  *
  *****************************************************************************/
 #include "phl_headers.h"
+#include "phl_pkt_ofld.h"
 
 #ifdef CONFIG_STA_CMD_DISPR
 enum rtw_phl_status rtw_phl_connect_prepare(void *phl,
@@ -75,6 +76,9 @@ enum rtw_phl_status rtw_phl_connected(void *phl,
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct phl_msg msg = {0};
 	struct phl_msg_attribute attr = {0};
+	struct rtw_pkt_ofld_null_info null_info = {0};
+	void *d = phl_to_drvpriv(phl_info);
+	u32 null_token = 0;
 
 	SET_MSG_MDL_ID_FIELD(msg.msg_id, PHL_FG_MDL_CONNECT);
 	SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_CONNECT_END);
@@ -86,6 +90,23 @@ enum rtw_phl_status rtw_phl_connected(void *phl,
 			  __FUNCTION__);
 		goto exit;
 	}
+
+	_os_mem_cpy(d, &(null_info.a1[0]), &(sta->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(null_info.a2[0]), &(sta->wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(null_info.a3[0]), &(sta->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+	phl_status = RTW_PHL_PKT_OFLD_REQ(phl_info, sta->macid,
+					  PKT_TYPE_NULL_DATA, &null_token, &null_info);
+	if (phl_status != RTW_PHL_STATUS_SUCCESS) {
+		PHL_ERR("%s(): add null pkt ofld fail!\n", __func__);
+		goto exit;
+	}
+	PHL_INFO("%s: null data offload ok, macid(%d), null_token(%d)\n",
+		 __func__, sta->macid, null_token);
 
 exit:
 	return phl_status;
@@ -165,6 +186,9 @@ enum rtw_phl_status rtw_phl_connected(void *phl,
 {
 	enum rtw_phl_status psts = RTW_PHL_STATUS_FAILURE;
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	struct rtw_pkt_ofld_null_info null_info = {0};
+	void *d = phl_to_drvpriv(phl_info);
+	u32 null_token = 0;
 
 	FUNCIN();
 	if (wrole->type == PHL_RTYPE_STATION || wrole->type == PHL_RTYPE_P2P_GC) {
@@ -199,6 +223,22 @@ enum rtw_phl_status rtw_phl_connected(void *phl,
 		goto _exit;
 	}
 #endif
+	_os_mem_cpy(d, &(null_info.a1[0]), &(sta->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(null_info.a2[0]), &(sta->wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(null_info.a3[0]), &(sta->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+	psts = RTW_PHL_PKT_OFLD_REQ(phl_info, sta->macid,
+				    PKT_TYPE_NULL_DATA, &null_token, &null_info);
+	if (psts != RTW_PHL_STATUS_SUCCESS) {
+		PHL_ERR("%s(): add null pkt ofld fail!\n", __func__);
+		goto _exit;
+	}
+	PHL_INFO("%s: null data offload ok, macid(%d), null_token(%d)\n",
+		 __func__, sta->macid, null_token);
 
 	PHL_DUMP_MR_EX(phl_info);
 _exit:
@@ -279,6 +319,12 @@ enum rtw_phl_status rtw_phl_ap_started(void *phl, struct rtw_wifi_role_t *wrole)
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct phl_msg msg = {0};
 	struct phl_msg_attribute attr = {0};
+#ifdef CONFIG_BTCOEX
+	struct rtw_pkt_ofld_qos_null_3addr_info qos_null_info = {0};
+	struct rtw_phl_stainfo_t *phl_sta = NULL;
+	void *d = phl_to_drvpriv(phl_info);
+	u32 qos_null_token = 0;
+#endif
 
 	SET_MSG_MDL_ID_FIELD(msg.msg_id, PHL_FG_MDL_AP_START);
 	SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_AP_START);
@@ -290,6 +336,34 @@ enum rtw_phl_status rtw_phl_ap_started(void *phl, struct rtw_wifi_role_t *wrole)
 			  __FUNCTION__);
 		goto exit;
 	}
+
+#ifdef CONFIG_BTCOEX
+	phl_sta = rtw_phl_get_stainfo_self(phl_info, wrole);
+	if (!phl_sta) {
+		PHL_ERR("%s(): cannot find phl_sta with wrole!\n", __func__);
+		goto exit;
+	}
+
+	_os_mem_cpy(d, &(qos_null_info.a1[0]), &(wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(qos_null_info.a2[0]), &(wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(qos_null_info.a3[0]), &(wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+	qos_null_info.priority = 0;
+	qos_null_info.eosp = 0;
+	qos_null_info.ack_policy = 0;
+	phl_status = RTW_PHL_PKT_OFLD_REQ(phl_info, phl_sta->macid,
+				    PKT_TYPE_BT_QOS_NULL, &qos_null_token, &qos_null_info);
+	if (phl_status != RTW_PHL_STATUS_SUCCESS) {
+		PHL_ERR("%s(): add null pkt ofld fail!\n", __func__);
+		goto exit;
+	}
+	PHL_INFO("%s: bt qos null data offload ok, macid(%d), qos_null_token(%d)\n",
+		 __func__, phl_sta->macid, qos_null_token);
+#endif
 
 exit:
 	return phl_status;
@@ -334,6 +408,12 @@ enum rtw_phl_status rtw_phl_ap_started(void *phl, struct rtw_wifi_role_t *wrole)
 {
 	enum rtw_phl_status psts = RTW_PHL_STATUS_FAILURE;
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+#ifdef CONFIG_BTCOEX
+	struct rtw_pkt_ofld_qos_null_3addr_info qos_null_info = {0};
+	struct rtw_phl_stainfo_t *phl_sta = NULL;
+	void *d = phl_to_drvpriv(phl_info);
+	u32 qos_null_token = 0;
+#endif
 
 	FUNCIN();
 	psts = phl_role_notify(phl_info, wrole);
@@ -362,6 +442,34 @@ enum rtw_phl_status rtw_phl_ap_started(void *phl, struct rtw_wifi_role_t *wrole)
 		PHL_ERR("%s phl_mr_state_upt failed\n", __func__);
 		goto _exit;
 	}
+
+#ifdef CONFIG_BTCOEX
+	phl_sta = rtw_phl_get_stainfo_self(phl_info, wrole);
+	if (!phl_sta) {
+		PHL_ERR("%s(): cannot find phl_sta with wrole!\n", __func__);
+		goto _exit;
+	}
+
+	_os_mem_cpy(d, &(qos_null_info.a1[0]), &(wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(qos_null_info.a2[0]), &(wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+
+	_os_mem_cpy(d, &(qos_null_info.a3[0]), &(wrole->mac_addr[0]),
+		    MAC_ADDRESS_LENGTH);
+	qos_null_info.priority = 0;
+	qos_null_info.eosp = 0;
+	qos_null_info.ack_policy = 0;
+	psts = RTW_PHL_PKT_OFLD_REQ(phl_info, phl_sta->macid,
+				    PKT_TYPE_BT_QOS_NULL, &qos_null_token, &qos_null_info);
+	if (psts != RTW_PHL_STATUS_SUCCESS) {
+		PHL_ERR("%s(): add null pkt ofld fail!\n", __func__);
+		goto _exit;
+	}
+	PHL_INFO("%s: bt qos null data offload ok, macid(%d), qos_null_token(%d)\n",
+		 __func__, phl_sta->macid, qos_null_token);
+#endif
 
 	PHL_DUMP_MR_EX(phl_info);
 

@@ -18,6 +18,7 @@
 #include <linux/time.h>
 #include <linux/module.h>
 #include <linux/mfd/rtk-timer.h>
+#include <linux/pm_wakeirq.h>
 
 #define TIMER_DISABLE		0
 #define TIMER_ENABLE		1
@@ -30,7 +31,8 @@
 static u8 timer_manage[RTK_NR_TIMERS] = {
 	TIMER_TAKEN, TIMER_TAKEN, TIMER_DISABLE,
 	TIMER_DISABLE, TIMER_DISABLE, TIMER_DISABLE,
-	TIMER_DISABLE, TIMER_DISABLE, TIMER_TAKEN, TIMER_TAKEN};
+	TIMER_DISABLE, TIMER_DISABLE, TIMER_TAKEN, TIMER_TAKEN
+};
 spinlock_t	lock;
 
 static struct rtk_tim gtimer[RTK_NR_TIMERS];
@@ -54,14 +56,14 @@ static int dynamic_allocate_timer(void)
 
 static int is_timer_invalid(u32 index)
 {
-	struct rtk_tim * tim;
+	struct rtk_tim *tim;
 
-	if(index > (RTK_NR_TIMERS - 1)) {
+	if (index > (RTK_NR_TIMERS - 1)) {
 		return -1;
 	}
 
 	tim = &gtimer[index];
-	if(tim->valid != 1) {
+	if (tim->valid != 1) {
 		return -1;
 	}
 
@@ -71,11 +73,11 @@ static int is_timer_invalid(u32 index)
 
 static irqreturn_t rtk_gtimer_irq(int irq, void *dev_id)
 {
-	struct rtk_tim * tim = (struct rtk_tim*) dev_id;
+	struct rtk_tim *tim = (struct rtk_tim *) dev_id;
 
 	rtk_gtimer_int_clear(tim->index);
 
-	if(tim->intr_handler) {
+	if (tim->intr_handler) {
 		tim->intr_handler(tim->cbdata);
 	}
 
@@ -95,10 +97,10 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 {
 	u32 reg, arr, psc;
 	u64 div, prd;
-	struct rtk_tim * tim;
-	void __iomem * base;
+	struct rtk_tim *tim;
+	void __iomem *base;
 
-	if(is_timer_invalid(index)) {
+	if (is_timer_invalid(index)) {
 		return  -ENODEV;
 	}
 
@@ -112,7 +114,7 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 	arr = (u32)div;
 	psc = 0;
 
-	if(8 == index || 9 == index) {
+	if (8 == index || 9 == index) {
 		/* Period and prescaler values depends on clock rate */
 		div = (unsigned long long)tim->clk_rate * period_ns;
 
@@ -128,11 +130,12 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 		}
 
 		prd = div;
-		arr = prd -1;
+		arr = prd - 1;
 
 		/*prescaler is 16bit*/
-		if (psc > U16_MAX || prd > U16_MAX)
+		if (psc > U16_MAX || prd > U16_MAX) {
 			return -EINVAL;
+		}
 	}
 
 	/* Reset the ARR Preload Bit */
@@ -143,7 +146,7 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 	/*set ARR*/
 	writel_relaxed(arr, base + REG_TIM_ARR);
 
-	if(psc != 0) {
+	if (psc != 0) {
 		writel_relaxed(psc, base + REG_TIM_PSC);
 	}
 
@@ -152,8 +155,9 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 
 	/* poll EGR UG done */
 	while (1) {
-		if (readl_relaxed(base + REG_TIM_SR) & TIM_BIT_UG_DONE)
+		if (readl_relaxed(base + REG_TIM_SR) & TIM_BIT_UG_DONE) {
 			break;
+		}
 	}
 
 	return 0;
@@ -173,11 +177,11 @@ EXPORT_SYMBOL(rtk_gtimer_change_period);
 int rtk_gtimer_start(u32 index, u32 NewState)
 {
 	u32 reg;
-	struct rtk_tim * tim;
-	void __iomem * base;
+	struct rtk_tim *tim;
+	void __iomem *base;
 
 
-	if(is_timer_invalid(index)) {
+	if (is_timer_invalid(index)) {
 		return -ENODEV;
 	}
 
@@ -193,8 +197,9 @@ int rtk_gtimer_start(u32 index, u32 NewState)
 
 		/* poll if cnt is running, 3*32k cycles */
 		while (1) {
-			if (readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN)
+			if (readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) {
 				break;
+			}
 		}
 	} else {
 		/* Disable the TIM Counter, dont do this if timer is not RUN */
@@ -205,8 +210,9 @@ int rtk_gtimer_start(u32 index, u32 NewState)
 
 		/* poll if cnt is running, aout 100us */
 		while (1) {
-			if ((readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) == 0)
+			if ((readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
 				break;
+			}
 		}
 	}
 
@@ -227,10 +233,10 @@ int rtk_gtimer_int_clear(u32 index)
 {
 	u32 CounterIndex = 0;
 	u32 reg;
-	struct rtk_tim * tim;
-	void __iomem * base;
+	struct rtk_tim *tim;
+	void __iomem *base;
 
-	if(is_timer_invalid(index)) {
+	if (is_timer_invalid(index)) {
 		return  -ENODEV;
 	}
 
@@ -270,10 +276,10 @@ EXPORT_SYMBOL(rtk_gtimer_int_clear);
 int rtk_gtimer_int_config(u32 index, u32 NewState)
 {
 	u32 reg;
-	struct rtk_tim * tim;
-	void __iomem * base;
+	struct rtk_tim *tim;
+	void __iomem *base;
 
-	if(is_timer_invalid(index)) {
+	if (is_timer_invalid(index)) {
 		return  -ENODEV;
 	}
 
@@ -304,15 +310,17 @@ EXPORT_SYMBOL(rtk_gtimer_int_config);
   */
 int rtk_gtimer_deinit(u32 index)
 {
-	struct rtk_tim * tim;
+	struct rtk_tim *tim;
 
-	if(is_timer_invalid(index)) {
+	if (is_timer_invalid(index)) {
 		return  -ENODEV;
 	}
 
 	tim = &gtimer[index];
 
 	rtk_gtimer_start(index, TIMER_DISABLE);
+	tim->intr_handler = NULL;
+	tim->cbdata = NULL;
 	free_irq(tim->irq, tim);
 
 	spin_lock(&lock);
@@ -335,15 +343,14 @@ EXPORT_SYMBOL(rtk_gtimer_deinit);
   * @retval  0: success;
   * 		 non-zero: failed.
   */
-int rtk_gtimer_init(u32 index, u64 period_ns, void * cbhandler, void * cbdata)
+int rtk_gtimer_init(u32 index, u64 period_ns, void *cbhandler, void *cbdata)
 {
 	u32 reg, arr, psc;
 	u64 div, prd;
-	int ret;
-	struct rtk_tim * tim;
-	void __iomem * base;
+	struct rtk_tim *tim;
+	void __iomem *base;
 
-	if(is_timer_invalid(index)) {
+	if (is_timer_invalid(index)) {
 		return  -ENODEV;
 	}
 
@@ -360,7 +367,7 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void * cbhandler, void * cbdata)
 	arr = (u32)div;
 	psc = 0;
 
-	if(8 == index || 9 == index) {
+	if (8 == index || 9 == index) {
 		/* Period and prescaler values depends on clock rate */
 		div = (u64)tim->clk_rate * period_ns;
 
@@ -376,11 +383,12 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void * cbhandler, void * cbdata)
 		}
 
 		prd = div;
-		arr = prd -1;
+		arr = prd - 1;
 
 		/*prescaler is 16bit*/
-		if (psc > U16_MAX || prd > U16_MAX)
+		if (psc > U16_MAX || prd > U16_MAX) {
 			return -EINVAL;
+		}
 	}
 
 	/*disble timer*/
@@ -397,7 +405,7 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void * cbhandler, void * cbdata)
 	/*set ARR*/
 	writel_relaxed(arr, base + REG_TIM_ARR);
 
-	if(psc != 0) {
+	if (psc != 0) {
 		writel_relaxed(psc, base + REG_TIM_PSC);
 	}
 
@@ -420,11 +428,6 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void * cbhandler, void * cbdata)
 	reg = readl_relaxed(base + REG_TIM_SR);
 	writel_relaxed(reg, base + REG_TIM_SR);
 
-	ret = request_irq(tim->irq, (irq_handler_t) rtk_gtimer_irq, 0, NULL, tim);
-	if(ret) {
-		return ret;
-	}
-
 	tim->intr_handler = cbhandler;
 	tim->cbdata = cbdata;
 
@@ -433,17 +436,17 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void * cbhandler, void * cbdata)
 
 EXPORT_SYMBOL(rtk_gtimer_init);
 
-int rtk_gtimer_dynamic_init(u64 period_ns, void * cbhandler, void * cbdata)
+int rtk_gtimer_dynamic_init(u64 period_ns, void *cbhandler, void *cbdata)
 {
 	u32 reg, arr, psc;
 	u64 div;
 	int ret;
-	struct rtk_tim * tim;
-	void __iomem * base;
+	struct rtk_tim *tim;
+	void __iomem *base;
 	u32 index;
 
 	ret = dynamic_allocate_timer();
-	if(ret < 0) {
+	if (ret < 0) {
 		return  -ENODEV;
 	} else {
 		index = ret;
@@ -473,7 +476,7 @@ int rtk_gtimer_dynamic_init(u64 period_ns, void * cbhandler, void * cbdata)
 	/*set ARR*/
 	writel_relaxed(arr, base + REG_TIM_ARR);
 
-	if(psc != 0) {
+	if (psc != 0) {
 		writel_relaxed(psc, base + REG_TIM_PSC);
 	}
 
@@ -496,11 +499,6 @@ int rtk_gtimer_dynamic_init(u64 period_ns, void * cbhandler, void * cbdata)
 	reg = readl_relaxed(base + REG_TIM_SR);
 	writel_relaxed(reg, base + REG_TIM_SR);
 
-	ret = request_irq(tim->irq, (irq_handler_t) rtk_gtimer_irq, 0, NULL, tim);
-	if(ret) {
-		return -ENODEV;
-	}
-
 	tim->intr_handler = cbhandler;
 	tim->cbdata = cbdata;
 
@@ -511,7 +509,7 @@ EXPORT_SYMBOL(rtk_gtimer_dynamic_init);
 static int rtk_gtimer_probe(struct platform_device *pdev)
 {
 	struct resource *res;
-	struct rtk_tim * tim;
+	struct rtk_tim *tim;
 	int ret;
 
 	if (pdev->dev.of_node) {
@@ -531,8 +529,9 @@ static int rtk_gtimer_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	tim->base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(tim->base))
+	if (IS_ERR(tim->base)) {
 		return PTR_ERR(tim->base);
+	}
 
 	tim->tim_clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(tim->tim_clk)) {
@@ -553,12 +552,18 @@ static int rtk_gtimer_probe(struct platform_device *pdev)
 		return tim->irq;
 	}
 
+	ret = request_irq(tim->irq, (irq_handler_t) rtk_gtimer_irq, 0, pdev->name, tim);
+	if (ret) {
+		dev_err(&pdev->dev, "Fail to request irq\n");
+		return ret;
+	}
+
 	tim->valid = 1;
 	tim->index = pdev->id;
 
-	if(0 <= pdev->id && 7 >= pdev->id) {
+	if (0 <= pdev->id && 7 >= pdev->id) {
 		tim->clk_rate = 32768;
-	} else if(8 <= pdev->id && 9 >= pdev->id) {
+	} else if (8 <= pdev->id && 9 >= pdev->id) {
 		tim->clk_rate = 40000000;
 	} else {
 		tim->clk_rate = 1000000;
@@ -574,11 +579,177 @@ static int rtk_gtimer_probe(struct platform_device *pdev)
 		}
 	}
 
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		device_init_wakeup(&pdev->dev, true);
+		dev_pm_set_wake_irq(&pdev->dev, tim->irq);
+	}
+
 	spin_lock_init(&lock);
 
 	return 0;
 }
 
+static void timer_cb_handler(void *cbdata)
+{
+	struct rtk_tim *tim = (struct rtk_tim *) cbdata;
+
+	if (tim->mode == 1) {
+		rtk_gtimer_start(tim->index, 0);
+	}
+}
+
+static ssize_t mode_store(struct device *dev,
+						  struct device_attribute *attr,
+						  const char *buf, size_t size)
+{
+	struct rtk_tim *tim = dev->driver_data;
+
+	if (tim->valid != 1) {
+		pr_err("This timer is not valid!\n");
+		return -1;
+	}
+
+	if (sysfs_streq(buf, "oneshot")) {
+		tim->mode = 1;
+	} else if (sysfs_streq(buf, "periodic")) {
+		tim->mode = 0;
+	} else {
+		return -EINVAL;
+	}
+
+	return size;
+}
+
+static ssize_t mode_show(struct device *dev,
+						 struct device_attribute *attr,
+						 char *buf)
+{
+	struct rtk_tim *tim = dev->driver_data;
+	const char *polarity = "unknown";
+
+	if (tim->valid != 1) {
+		pr_err("This timer is not valid!\n");
+		return -1;
+	}
+
+	switch (tim->mode) {
+	case 0:
+		polarity = "periodic";
+		break;
+
+	case 1:
+		polarity = "oneshot";
+		break;
+	}
+
+	return sprintf(buf, "%s\n", polarity);
+}
+
+static ssize_t enable_store(struct device *dev,
+							struct device_attribute *attr,
+							const char *buf, size_t size)
+{
+	struct rtk_tim *tim = dev->driver_data;
+	int ret;
+	u32 val;
+
+	if (tim->valid != 1) {
+		pr_err("This timer is not valid!\n");
+		return -1;
+	}
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret) {
+		return ret;
+	}
+
+	if (val != 0) {
+		tim->enable = 1;
+		if (tim->period == 0) {
+			tim->period = 1000000;
+		}
+		rtk_gtimer_init(tim->index, (u64) tim->period * 1000000, timer_cb_handler, tim);
+		rtk_gtimer_int_config(tim->index, 1);
+		rtk_gtimer_start(tim->index, 1);
+	} else {
+		tim->enable = 0;
+		rtk_gtimer_deinit(tim->index);
+	}
+
+	return (ret < 0) ? ret : size;
+}
+
+static ssize_t enable_show(struct device *dev,
+						   struct device_attribute *attr,
+						   char *buf)
+{
+	struct rtk_tim *tim = dev->driver_data;
+
+	if (tim->valid != 1) {
+		pr_err("This timer is not valid!\n");
+		return -1;
+	}
+
+	return sprintf(buf, "%u\n", tim->enable);;
+}
+
+static ssize_t time_ms_store(struct device *dev,
+							 struct device_attribute *attr,
+							 const char *buf, size_t size)
+{
+	struct rtk_tim *tim = dev->driver_data;
+
+	int val;
+	int ret;
+
+	if (tim->valid != 1) {
+		pr_err("This timer is not valid!\n");
+		return -1;
+	}
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret) {
+		return ret;
+	}
+
+	tim->period = val;
+
+	if (tim->enable == 1) {
+		rtk_gtimer_change_period(tim->index, (u64) tim->period * 1000000);
+	};
+
+	return (ret < 0) ? ret : size;
+}
+
+static ssize_t time_ms_show(struct device *dev,
+							struct device_attribute *attr,
+							char *buf)
+{
+	struct rtk_tim *tim = dev->driver_data;
+
+	if (tim->valid != 1) {
+		pr_err("This timer is not valid!\n");
+		return -1;
+	}
+
+	return sprintf(buf, "%u\n", tim->period);
+}
+
+
+DEVICE_ATTR_RW(mode);
+DEVICE_ATTR_RW(time_ms);
+DEVICE_ATTR_RW(enable);
+
+
+static struct attribute *timer_config_attrs[] = {
+	&dev_attr_mode.attr,
+	&dev_attr_time_ms.attr,
+	&dev_attr_enable.attr,
+	NULL,
+};
+
+
+ATTRIBUTE_GROUPS(timer_config);
 
 static const struct of_device_id rtk_timer_of_match[] = {
 	{ .compatible = "realtek,amebad2-timer",	},
@@ -590,6 +761,7 @@ static struct platform_driver rtk_timer_driver = {
 	.driver	= {
 		.name = "rtk-mfd-timer",
 		.of_match_table = rtk_timer_of_match,
+		.dev_groups = timer_config_groups,
 	},
 };
 

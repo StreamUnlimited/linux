@@ -98,28 +98,8 @@ u32 mac_get_gnt_8730e(struct mac_ax_adapter *adapter,
  * @{
  */
 
-/**
- * @brief mac_cfg_plt
- *
- * @param *adapter
- * @param *plt
- * @return Please Place Description here.
- * @retval u32
- */
-
-u32 mac_cfg_plt_8852a(struct mac_ax_adapter *adapter, struct mac_ax_plt *plt);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup BTCoex
- * @{
- */
-
+u32 mac_get_scbd_8730e(struct mac_ax_adapter *adapter, u32 *val);
+u32 mac_set_scbd_8730e(struct mac_ax_adapter *adapter, u32 val);
 
 #endif /* #if MAC_AX_8730E_SUPPORT */
 #endif

@@ -1304,6 +1304,7 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 #endif /*CONFIG_PCI_HCI*/
 
 #if defined(CONFIG_AXI_HCI)
+	phl_com->bus_sw_cap.read_txbd_lvl = 0;
 	phl_com->bus_sw_cap.txbd_num = 32;
 	phl_com->bus_sw_cap.rxbd_num = 32;
 #ifdef CONFIG_RXBUF_NUM_1024

@@ -93,6 +93,10 @@
 	adapter->pltfm_cb->reg_w32(adapter->drv_adapter, addr, val)
 
 #if MAC_AX_AXI_SUPPORT
+#define PLTFM_MEM_R(addr, buf, len)                                            \
+	adapter->pltfm_cb->mem_read(adapter->drv_adapter, addr, buf, len)
+#define PLTFM_MEM_W(addr, buf, len)                                            \
+	adapter->pltfm_cb->mem_write(adapter->drv_adapter, addr, buf, len)
 #define PLTFM_SYS_REG_R8(base, addr)                                           \
 	adapter->pltfm_cb->sys_reg_r8(adapter->drv_adapter, base, addr)
 #define PLTFM_SYS_REG_R16(base, addr)                                          \

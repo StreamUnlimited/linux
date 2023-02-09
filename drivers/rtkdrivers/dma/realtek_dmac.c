@@ -496,7 +496,6 @@ static int rtk_dma_start_next_txd(struct rtk_dma_vchan *vchan, u8 last_lli)
 
 	/* Start DMA transfer for this pchan */
 	rtk_dma_channel_enable(rsdma, pchan->id, ENABLE);
-
 	return 0;
 }
 
@@ -518,6 +517,7 @@ static void rtk_dma_free_txd(struct rtk_dma *rsdma, struct rtk_dma_txd *txd)
 
 static void rtk_dma_phy_free(struct rtk_dma *rsdma, struct rtk_dma_vchan *vchan)
 {
+	unsigned long flags;
 	/* Ensure that the physical channel is stopped */
 	/* Other interruptions. */
 
@@ -536,8 +536,31 @@ static void rtk_dma_phy_free(struct rtk_dma *rsdma, struct rtk_dma_vchan *vchan)
 		rtk_dma_terminate_pchan(rsdma, vchan->pchan);
 	}
 
+	spin_lock_irqsave(&rsdma->lock, flags);
 	vchan->pchan->vchan = NULL;
 	vchan->pchan = NULL;
+	spin_unlock_irqrestore(&rsdma->lock, flags);
+}
+
+static void rtk_dma_phy_terminate(struct rtk_dma *rsdma, struct rtk_dma_vchan *vchan)
+{
+	/* Ensure that the physical channel is stopped */
+	/* Other interruptions. */
+
+	dev_dbg(rsdma->dma.dev, "channel usage see %x", rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L));
+
+	if (!vchan->pchan) {
+		return;
+	}
+
+	rtk_dma_set_interrupt_mask(rsdma, vchan->pchan->id, DISABLE);
+
+	if ((vchan->pchan->id < GDMA_MAX_CHANNEL) &&
+		(rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L) &
+		 BIT(vchan->pchan->id))) {
+		dev_dbg(rsdma->dma.dev, "pchan terminate.");
+		rtk_dma_terminate_pchan(rsdma, vchan->pchan);
+	}
 }
 
 static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
@@ -558,7 +581,7 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 
 	vchan = pchan->vchan;
 	if (!vchan) {
-		dev_warn(rsdma->dma.dev, "no vchan attached on pchan %d\n", pchan->id);
+		dev_dbg(rsdma->dma.dev, "no vchan attached on pchan %d\n", pchan->id);
 		rtk_dma_channel_enable(rsdma, channel_num, DISABLE);
 		rtk_dma_clear_channel_interrupts(rsdma, channel_num);
 		return;
@@ -597,7 +620,6 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 			pr_info("error: dma has been paused, but still online.");
 			goto END_SUCCESS;
 		}
-
 		if (has_next == 1) {
 			rtk_dma_start_next_txd(vchan, 1);
 		} else {
@@ -606,6 +628,14 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 	} else {
 		/* Clear IRQ status for this pchan */
 		rtk_dma_clear_channel_interrupts(rsdma, channel_num);
+		if (vchan->pchan->dma_pause.status == DMA_TERMINATE) {
+			goto END_SUCCESS;
+		} else if (vchan->pchan->dma_pause.status == DMA_PAUSE_REQUSTED) {
+			vchan->pchan->dma_pause.has_next = 0;
+		} else if (vchan->pchan->dma_pause.status == DMA_PAUSED_NOW) {
+			pr_info("error: dma has been paused, but still online.");
+			goto END_SUCCESS;
+		}
 		txd->vd.tx_result.result = DMA_TRANS_NOERROR;
 		vchan->pchan->dma_pause.status = DMA_COMPLETED;
 		/* for txd callback function. */
@@ -793,24 +823,35 @@ static int rtk_dma_terminate_all(struct dma_chan *chan)
 	struct rtk_dma *rsdma = to_rtk_dma(chan->device);
 	struct rtk_dma_vchan *vchan = to_rtk_vchan(chan);
 	unsigned long flags;
+	unsigned long timeout;
+	int i = 0;
 	LIST_HEAD(head);
 
 	spin_lock_irqsave(&vchan->vc.lock, flags);
-
-	if (vchan->pchan) {
-		rtk_dma_phy_free(rsdma, vchan);
-	}
-
-	if (vchan->txd) {
-		rtk_dma_desc_free(&vchan->txd->vd);
-		vchan->txd = NULL;
-	}
-
+	/* Set TERMINATE before release all txdesc. */
+	vchan->pchan->dma_pause.status = DMA_TERMINATE;
 	vchan_get_all_descriptors(&vchan->vc, &head);
-	vchan_dma_desc_free_list(&vchan->vc, &head);
-
 	spin_unlock_irqrestore(&vchan->vc.lock, flags);
 
+	vchan_dma_desc_free_list(&vchan->vc, &head);
+
+	/* wait dma transfer complete */
+	timeout = jiffies + msecs_to_jiffies(5000);
+	while (rtk_dma_pchan_busy(rsdma, vchan->pchan)) {
+		if (time_after_eq(jiffies, timeout)) {
+			dev_dbg(rsdma->dma.dev, "chan %d wait timeout\n", vchan->pchan->id);
+			break;
+		}
+		cpu_relax();
+		i++;
+	}
+
+	/* restore to init value */
+	rtk_dma_phy_terminate(rsdma, vchan);
+
+	if (i) {
+		dev_dbg(rsdma->dma.dev, "terminate chan %d loops %d\n",	vchan->pchan->id, i);
+	}
 	return 0;
 }
 
@@ -844,7 +885,7 @@ static int rtk_dma_pause(struct dma_chan *chan)
 		goto END_PAUSE_PROCESS;
 	}
 
-	if (vchan->txd->vd.tx.flags & DMA_PREP_INTERRUPT) {
+	if ((vchan->txd != 0) && (vchan->txd->vd.tx.flags & DMA_PREP_INTERRUPT)) {
 		if (vchan->pchan->dma_pause.status != DMA_ONGOING) {
 			pr_info("vchan %p dma status before pause-requst is %x\n",
 					&vchan->vc, vchan->pchan->dma_pause.status);
@@ -890,13 +931,15 @@ static int rtk_dma_resume(struct dma_chan *chan)
 
 	dev_info(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
 
-	if (vchan->txd->vd.tx.flags & DMA_PREP_INTERRUPT) {
+	if ((vchan->txd != 0) && (vchan->txd->vd.tx.flags & DMA_PREP_INTERRUPT)) {
 		if (vchan->pchan->dma_pause.status == DMA_PAUSED_NOW) {
 			vchan->pchan->dma_pause.status = DMA_RESUME_REQUSTED;
 			if (vchan->pchan->dma_pause.has_next == 1) {
 				rtk_dma_start_next_txd(vchan, 1);
-			} else if (vchan->pchan->dma_pause.has_next == 0) {
+			} else if (vchan->pchan->dma_pause.has_next > 1) {
 				rtk_dma_start_next_txd(vchan, 0);
+			} else {
+				pr_info("Last TXD has been completed. \n");
 			}
 		} else {
 			vchan->pchan->dma_pause.status = DMA_RESUMED_NOW;
@@ -1018,11 +1061,15 @@ static void rtk_dma_issue_pending(struct dma_chan *chan)
 	if (vchan_issue_pending(&vchan->vc)) {
 		if (!vchan->pchan) {
 			rtk_dma_phy_alloc_and_start(vchan);
-		} else if (vchan->pchan->id != vchan->drq) {
+		}
+#if !RTK_DMAC_FLEXIBLE_CHANNEL
+		else if (vchan->pchan->id != vchan->drq) {
 			pr_debug("WARNING: use temp pchan, re-alloc now.");
 			vchan->pchan = NULL;
 			rtk_dma_phy_alloc_and_start(vchan);
-		} else {
+		}
+#endif
+		else {
 			pr_debug("INFO: has pchan, start txd directly.");
 			rtk_dma_start_next_txd(vchan, 0);
 		}

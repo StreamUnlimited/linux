@@ -1552,7 +1552,7 @@ struct dev_cap_t {
 #ifdef RTW_PHL_BCN //phl def
 
 #define BCN_ID_MAX		(0xFF)
-#define MAX_BCN_SIZE	1000
+#define MAX_BCN_SIZE	(128*4 - 40)
 
 enum bcn_offload_flags {
 	BCN_HW_SEQ = 0,
@@ -2792,6 +2792,7 @@ enum pkt_ofld_type {
 	PKT_TYPE_REALWOW_ACK = 10, /* RealWoW Ack Patten */
 	PKT_TYPE_REALWOW_WP = 11, /* RealWoW Wakeup Patten */
 	PKT_TYPE_PROBE_REQ = 12,
+	PKT_TYPE_BT_QOS_NULL = 13,
 	PKT_OFLD_TYPE_MAX,
 };
 

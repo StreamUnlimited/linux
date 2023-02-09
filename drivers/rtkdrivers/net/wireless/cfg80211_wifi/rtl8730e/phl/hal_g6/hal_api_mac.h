@@ -444,7 +444,7 @@ rtw_hal_mac_get_buffer_data(struct rtw_hal_com_t *hal_com, u32 strt_addr,
 			    u8 *buf, u32 len, u32 dbg_path);
 
 enum rtw_hal_status rtw_hal_mac_pkt_ofld(struct hal_info_t *hal, u8 *id, u8 op,
-		u8 *pkt, u16 *len);
+		u8 *pkt, u16 *len, u8 type);
 enum rtw_hal_status rtw_hal_mac_pkt_update_ids(struct hal_info_t *hal,
 		struct pkt_ofld_entry *entry);
 

@@ -90,6 +90,7 @@ static void _cmd_rb(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		    u32 input_num, char *output, u32 out_len)
 {
 	u32 i = 0, type = 0, addr = 0;
+	bool ret = false;
 
 	if (input_num < 3) {
 		goto help;
@@ -104,7 +105,7 @@ static void _cmd_rb(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 
 	btc->dbg.rb_done = false;
 	btc->dbg.rb_val = 0xffffffff;
-	_read_bt_reg(btc, (u8)(type), (u16)addr);
+	ret = _read_bt_reg(btc, (u8)(type), (u16)addr, &btc->dbg.rb_val);
 	for (i = 0; i < 50; i++) {
 		if (!btc->dbg.rb_done) {
 			hal_mdelay(btc->hal, 10);
@@ -114,7 +115,10 @@ static void _cmd_rb(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 	}
 
 exit:
-	if (!btc->dbg.rb_done) {
+	if (!ret) {
+		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
+			 " faled !! \n");
+	} else if (!btc->dbg.rb_done) {
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 			 " timeout !! \n");
 	} else {
@@ -453,18 +457,18 @@ static void _show_bt_info(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		 (bt_linfo->pan_desc.exist ? "PAN," : ""));
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
-		 "multi-link:%s, role:%s, ble-connect:%s, CQDDR:%s, A2DP_active:%s, PAN_active:%s",
+		 "multi-link:%s, role:%s, ble-connect:%s, BT FIX 2M:%s, A2DP_active:%s, PAN_active:%s",
 		 (bt_linfo->multi_link.now ? "Y" : "N"),
 		 (bt_linfo->slave_role ? "Slave" : "Master"),
 		 (bt_linfo->status.map.ble_connect ? "Y" : "N"),
-		 (bt_linfo->cqddr ? "Y" : "N"),
+		 (bt_linfo->fx_2m ? "Y" : "N"),
 		 (bt_linfo->a2dp_desc.active ? "Y" : "N"),
 		 (bt_linfo->pan_desc.active ? "Y" : "N"));
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 		 "\n\r %-15s : rssi:%ddBm, tx_rate:%dM, %s%s%s%s",
 		 "[link]", bt_linfo->rssi - 100,
-		 (bt_linfo->tx_3M ? 3 : 2),
+		 (bt_linfo->fx_2m ? 2 : 3),
 		 (bt->pag ? " paging!!" : ""),
 		 (bt->inq ? " inquirying!!" : ""),
 		 (bt_linfo->status.map.acl_busy ? " acl_busy!!" : ""),
@@ -477,8 +481,8 @@ static void _show_bt_info(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		 afh[5], afh[6], afh[7], afh[8], afh[9]);
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
-		 "wl_ch_map[en:%d/ch:%d/bw:%d]",
-		 wl->afh_info.en, wl->afh_info.ch, wl->afh_info.bw);
+		 "wl_ch_map[op:%d/ch:%d/bw:%d]",
+		 wl->afh_info.op, wl->afh_info.ch, wl->afh_info.bw);
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 		 "\n\r %-15s : retry:%d, relink:%d, rate_chg:%d, reinit:%d, reenable:%d, ",
@@ -1173,6 +1177,7 @@ static void _cmd_dbg(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 
 	switch (type) {
 	case 0: /* H2C-C2H loopback */
+		buf[0] = 0x05;
 		ops->fw_cmd(btc, BTFC_SET, SET_H2C_TEST, buf, (u16)len);
 		btc->dbg.rb_done = false;
 		btc->dbg.rb_val = 0xff;
@@ -1191,19 +1196,13 @@ static void _cmd_dbg(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 			 " timeout !!\n");
 		break;
 	case 1: /* H2C-mailbox */
+		buf[0] = 0x04;
 		ops->fw_cmd(btc, BTFC_SET, SET_H2C_TEST, buf, (u16)len);
 		break;
 	case 2: /* bt slot request */
 		btc->bt_req_len = (u32)buf[1];
 		hal_btc_send_event(btc, (u8 *)&btc->bt_req_len, 4,
 				   BTC_HMSG_SET_BT_REQ_SLOT);
-		break;
-	case 3: /* fw_step debug */
-		if (buf[1] > 0) {
-			hal_btc_fw_en_rpt(btc, RPT_EN_FW_STEP_INFO, 1);
-		} else {
-			hal_btc_fw_en_rpt(btc, RPT_EN_FW_STEP_INFO, 0);
-		}
 		break;
 	}
 
@@ -1579,23 +1578,23 @@ help:
 static void _cmd_bt_afh_map(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 			    u32 input_num, char *output, u32 out_len)
 {
-	u32 en = 0, ch = 0, bw = 0;
+	u32 op = 0, ch = 0, bw = 0;
 
 	if (input_num < 4) {
 		goto help;
 	}
 
-	_os_sscanf(input[1], "%d", &en);
+	_os_sscanf(input[1], "%d", &op);
 	_os_sscanf(input[2], "%d", &ch);
 	_os_sscanf(input[3], "%d", &bw);
 
-	btc->cx.wl.afh_info.en = (u8)en;
+	btc->cx.wl.afh_info.op = (u8)op;
 	btc->cx.wl.afh_info.ch = (u8)ch;
 	btc->cx.wl.afh_info.bw = (u8)bw;
 	hal_btc_fw_set_bt(btc, SET_BT_WL_CH_INFO, 3, (u8 *)&btc->cx.wl.afh_info);
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
-		 " set bt afh map: en=%d, ch=%d, map=%d!!\n", en, ch, bw);
+		 " set bt afh map: op=%d, ch=%d, map=%d!!\n", op, ch, bw);
 	return;
 help:
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
@@ -1675,7 +1674,7 @@ help:
 static void _cmd_set_gnt_wl(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 			    u32 input_num, char *output, u32 out_len)
 {
-	u32 gwl = 0, phy_map = BTC_PHY_ALL;
+	u32 gwl = 0, phy_map = BTC_PHY_0;
 
 	if ((input_num != 2) && (input_num != 3)) {
 		goto help;
@@ -1716,7 +1715,7 @@ help:
 static void _cmd_set_gnt_bt(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 			    u32 input_num, char *output, u32 out_len)
 {
-	u32 gbt = 0, phy_map = BTC_PHY_ALL;
+	u32 gbt = 0, phy_map = BTC_PHY_0;
 
 	if ((input_num != 2) && (input_num != 3)) {
 		goto help;

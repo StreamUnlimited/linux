@@ -27,6 +27,7 @@ enum {
 static u32 rtl8730e_fw_enable(struct mac_ax_adapter *adapter, u8 enable)
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	struct mac_ax_fw_info *fw = &adapter->fw_info;
 	struct rtw_hal_com_t *hal = (struct rtw_hal_com_t *)(adapter->drv_adapter);
 	struct dvobj_priv *dvobj = (struct dvobj_priv *)(hal->drv_priv);
 	PAXI_DATA axi_data = dvobj_to_axi(dvobj);
@@ -66,6 +67,7 @@ static u32 rtl8730e_fw_enable(struct mac_ax_adapter *adapter, u8 enable)
 			adapter->sm.fwdl = MAC_AX_FWDL_INIT_RDY;
 		} else {
 			adapter->sm.fwdl = MAC_AX_FWDL_IDLE;
+			fw->last_hmebox_num = 0;
 		}
 	}
 

@@ -18,7 +18,7 @@
 #ifdef RTW_WKARD_WD0_SER
 #define MAX_WD_PAGE_NUM (256*2)
 #else
-#define MAX_WD_PAGE_NUM 32
+#define MAX_WD_PAGE_NUM 64
 #endif
 
 #define WP_RESERVED_SEQ 0x1FF

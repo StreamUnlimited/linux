@@ -278,8 +278,8 @@ enum rtw_phl_status _leave_ps(struct cmd_ps *ps, bool leave_proto, char *rson)
 
 	cfg.cur_pwr_lvl = ps->cur_pwr_lvl;
 
-	PHL_TRACE(COMP_PHL_PS, _PHL_DEBUG_, "[PS_CMD], %s(): leave %s (macid %d).\n",
-		  __func__, phl_ps_ps_mode_to_str(ps->ps_mode), ps->macid);
+	RTW_PRINT("[PS_CMD], %s(): leave %s (macid %d). Reason: %s\n",
+		  __func__, phl_ps_ps_mode_to_str(ps->ps_mode), ps->macid, rson);
 
 	if (ps->ps_mode == PS_MODE_LPS) {
 		if (!leave_proto) {
@@ -359,8 +359,8 @@ enum rtw_phl_status _enter_ps(struct cmd_ps *ps, u8 ps_mode, u16 macid, char *rs
 
 	cfg.cur_pwr_lvl = ps->cur_pwr_lvl;
 
-	PHL_TRACE(COMP_PHL_PS, _PHL_DEBUG_, "[PS_CMD], %s(): enter %s (macid %d).\n",
-		  __func__, phl_ps_ps_mode_to_str(ps_mode), macid);
+	RTW_PRINT("[PS_CMD], %s(): enter %s (macid %d). Reason: %s\n",
+		  __func__, phl_ps_ps_mode_to_str(ps_mode), macid, rson);
 
 	if (ps_mode == PS_MODE_LPS) {
 		cfg.proto_cfg = (ps->ps_state == PS_STATE_PROTO) ? false : true;

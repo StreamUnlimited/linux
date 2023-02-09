@@ -16,6 +16,7 @@
 #include "power_saving.h"
 #include "coex.h"
 #include "mac_priv.h"
+#include "fwcmd.h"
 
 #define RPWM_SEQ_NUM_MAX                3
 #define CPWM_SEQ_NUM_MAX                3
@@ -44,6 +45,32 @@
 #define B_PS_LDM_32K_EN         BIT(31)
 #define B_PS_LDM_32K_EN_SH      31
 
+struct t_h2c_20 {
+	/* data 0 */
+	u8 mode: 7;
+	u8 clk_request: 1;
+	/* data 1 */
+	u8 rlbm: 4;
+	u8 smartps: 4;
+	/* data 2 */
+	u8 awake_intvl;
+	/* data 3 */
+	u8 b_all_q_uapsd: 1;
+	u8 rsvd1: 1;
+	u8 bcn_early_prt: 1;
+	u8 xtal_sel: 1;
+	u8 rsvd2: 1;
+	u8 port_id: 3;
+	/* data 4 */
+	u8 pwr_state;
+	/* data 5 */
+	u8 rsvd3;
+	/* data 6 */
+	u8 bcn_recv_time: 5;
+	u8 bcn_listen_interval: 2;
+	u8 adopt_bcn_recv_time: 1;
+};
+
 static u32 lps_status[4] = {0};
 static u32 ips_status[4] = {0};
 static u8 rpwm_seq_num = RPWM_SEQ_NUM_MAX;
@@ -52,8 +79,36 @@ static u8 cpwm_seq_num = CPWM_SEQ_NUM_MAX;
 static u32 send_h2c_lps_parm(struct mac_ax_adapter *adapter,
 			     struct lps_parm *parm)
 {
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
+	struct rtw_hal_com_t *hal_com = adapter->drv_adapter;
+	struct t_h2c_20 h2c_data = {0};
+	u8 *p_h2c_data = (u8 *)&h2c_data;
+	u8 pwr_state = 0;
+	u32 ret = 0;
+
+	h2c_data.awake_intvl = parm->awakeinterval;
+	h2c_data.rlbm = parm->rlbm;
+
+	/* pwr_state: AllON(0x0C), RFON(0x04), RFOFF(0x00) */
+	if (parm->psmode > 0) {
+#ifdef CONFIG_BTCOEX
+		/* todo if is bt control lps */
+#endif
+		{
+			pwr_state = 0x00;
+		}
+	} else {
+		pwr_state = 0x0c;
+	}
+	h2c_data.mode = parm->psmode;
+	h2c_data.smartps = parm->smartps;
+	h2c_data.b_all_q_uapsd = 0;
+	h2c_data.pwr_state = pwr_state;
+	h2c_data.port_id = 0;
+
+	ret = rtw_hal_mac_send_h2c_ameba(hal_com, H2C_SET_PWR_MODE,
+					 sizeof(struct t_h2c_20), p_h2c_data);
+
+	return ret;
 }
 
 static void send_rpwm(struct mac_ax_adapter *adapter,
@@ -64,8 +119,8 @@ static void send_rpwm(struct mac_ax_adapter *adapter,
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
 #if 0
-	rpwm_value = MAC_REG_R16(R_AX_RPWM);
-	if (0 == (rpwm_value & PS_RPWM_TOGGLE)) {
+	rpwm_value = MAC_REG_R16(REG_RPWM);
+	if (0 == (rpwm_value & BIT_RPWM_TOGGLING)) {
 		toggle = 1;
 	}
 
@@ -421,17 +476,12 @@ u32 mac_cfg_lps(struct mac_ax_adapter *adapter, u8 macid,
 	u32 ret = 0;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-#if 0
 	switch (ps_mode) {
 	case MAC_AX_PS_MODE_ACTIVE:
 		ret = leave_lps(adapter, macid);
-		/* patch form BT BG/LDO issue */
-		MAC_REG_W8(R_AX_SCOREBOARD + 3, MAC_AX_NOTIFY_TP_MAJOR);
 		break;
 	case MAC_AX_PS_MODE_LEGACY:
 		ret = enter_lps(adapter, macid, lps_info);
-		/* patch form BT BG/LDO issue */
-		MAC_REG_W8(R_AX_SCOREBOARD + 3, MAC_AX_NOTIFY_PWR_MAJOR);
 		break;
 	case MAC_AX_PS_MODE_WMMPS:
 		// TODO:
@@ -443,7 +493,6 @@ u32 mac_cfg_lps(struct mac_ax_adapter *adapter, u8 macid,
 	if (ret) {
 		return ret;
 	}
-#endif
 
 	return MACSUCCESS;
 }

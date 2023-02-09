@@ -22,6 +22,7 @@
 			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_LCDCMIPI>;
 			memory-region = <&mem_drm_reserved>;
+			status = "disabled";
 
 			port {
 				lcdc_out: endpoint {
@@ -35,10 +36,7 @@
 			reg = <0x400EA000 0xC10>;
 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
 			rtk,lcdc-vo-clock = <&rcc>;
-
-			pinctrl-names="default";
-			pinctrl-0 = <&drm_disable_swd_pins>;
-			mipi-gpios = <&gpioa 14 0>;
+			status = "disabled";
 
 			// 0 for input port
 			port {

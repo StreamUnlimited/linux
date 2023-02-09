@@ -346,37 +346,12 @@ phl_ps_lps_cfg(struct phl_info_t *phl_info, struct ps_cfg *cfg, u8 en) {
 static enum rtw_phl_status _lps_enter_proto_cfg(struct phl_info_t *phl_info, struct ps_cfg *cfg)
 {
 	enum rtw_phl_status status = RTW_PHL_STATUS_FAILURE;
-	struct rtw_pkt_ofld_null_info null_info = {0};
-	struct rtw_phl_stainfo_t *phl_sta = NULL;
-	void *d = phl_to_drvpriv(phl_info);
 
 	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS], %s(): \n", __func__);
 
 #ifdef CONFIG_PHL_PS_FW_DBG
 	rtw_hal_cfg_fw_ps_log(phl_info->hal, true);
 #endif
-
-	phl_sta = rtw_phl_get_stainfo_by_macid(phl_info, cfg->macid);
-	if (phl_sta == NULL) {
-		return RTW_PHL_STATUS_FAILURE;
-	}
-
-	_os_mem_cpy(d, &(null_info.a1[0]), &(phl_sta->mac_addr[0]),
-		    MAC_ADDRESS_LENGTH);
-
-	_os_mem_cpy(d, &(null_info.a2[0]), &(phl_sta->wrole->mac_addr[0]),
-		    MAC_ADDRESS_LENGTH);
-
-	_os_mem_cpy(d, &(null_info.a3[0]), &(phl_sta->mac_addr[0]),
-		    MAC_ADDRESS_LENGTH);
-
-	status = RTW_PHL_PKT_OFLD_REQ(phl_info, cfg->macid,
-				      PKT_TYPE_NULL_DATA, cfg->token, &null_info);
-	if (status != RTW_PHL_STATUS_SUCCESS) {
-		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[PS], %s(): add null pkt ofld fail!\n", __func__);
-		return status;
-	}
-
 	status = phl_ps_lps_cfg(phl_info, cfg, true);
 	if (status != RTW_PHL_STATUS_SUCCESS) {
 		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[PS], %s(): config lps fail!\n", __func__);
@@ -395,13 +370,6 @@ static enum rtw_phl_status _lps_leave_proto_cfg(struct phl_info_t *phl_info, str
 	status = phl_ps_lps_cfg(phl_info, cfg, false);
 	if (status != RTW_PHL_STATUS_SUCCESS) {
 		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[PS], %s(): config lps fail!\n", __func__);
-		return status;
-	}
-
-	status = phl_pkt_ofld_cancel(phl_info, cfg->macid,
-				     PKT_TYPE_NULL_DATA, cfg->token);
-	if (status != RTW_PHL_STATUS_SUCCESS) {
-		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[PS], %s(): del null pkt ofld fail!\n", __func__);
 		return status;
 	}
 

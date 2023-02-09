@@ -1627,6 +1627,12 @@ void halbb_ctrl_btc_preagc(struct bb_info *bb, bool bt_en)
 		break;
 #endif
 
+#ifdef BB_8730E_SUPPORT
+	case BB_RTL8730E:
+		halbb_ctrl_btc_preagc_8730e(bb, bt_en);
+		break;
+#endif
+
 	default:
 		break;
 	}

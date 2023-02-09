@@ -484,7 +484,7 @@ bool rtw_hal_recognize_interrupt(void *h)
 	struct hal_info_t *hal = (struct hal_info_t *)h;
 	struct hal_ops_t *hal_ops = hal_get_ops(hal);
 
-	if (hal_ops->recognize_interrupt) {
+	if (hal_ops && hal_ops->recognize_interrupt) {
 		return hal_ops->recognize_interrupt(hal);
 	} else {
 		return false;
@@ -1058,12 +1058,12 @@ enum rtw_hal_status rtw_hal_free_beacon(struct rtw_phl_com_t *phl_com, void *hal
 #endif
 
 enum rtw_hal_status rtw_hal_pkt_ofld(void *hal, u8 *id, u8 op,
-				     u8 *pkt_buf, u16 *pkt_len)
+				     u8 *pkt_buf, u16 *pkt_len, u8 type)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	struct hal_ops_t *hal_ops = hal_get_ops(hal_info);
 
-	return hal_ops->pkt_ofld(hal, id, op, pkt_buf, pkt_len);
+	return hal_ops->pkt_ofld(hal, id, op, pkt_buf, pkt_len, type);
 }
 
 enum rtw_hal_status rtw_hal_pkt_update_ids(void *hal,

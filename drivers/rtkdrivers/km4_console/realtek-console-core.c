@@ -70,7 +70,6 @@ func_exit:
 static void console_ipc_host_console_task(unsigned long data) {
 	struct rtk_console *console_d = (struct rtk_console *)data;
 	struct device *pdev = NULL;
-	int msg_len = 0;
 
 	if (!console_d || !console_d->pconsole_ipc_ch) {
 		dev_err(console_d->dev, "pconsole_ipc_ch is NULL!\n");
@@ -97,7 +96,6 @@ int rtk_console_process(char* data, int len, u8 *result)
     char *preq_msg = data;
     int ret = 0;
     int retry = 0;
-	struct rtk_console *console_d = NULL;
 
     if (console_done) {
         console_done = 0;

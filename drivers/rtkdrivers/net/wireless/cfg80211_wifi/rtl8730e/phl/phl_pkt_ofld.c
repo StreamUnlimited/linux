@@ -26,6 +26,8 @@ _phl_pkt_ofld_get_txt(u8 type)
 		return "NULL DATA";
 	case PKT_TYPE_QOS_NULL:
 		return "QOS NULL";
+	case PKT_TYPE_BT_QOS_NULL:
+		return "BT QOS NULL";
 	case PKT_TYPE_CTS2SELF:
 		return "CTS2SELF";
 	case PKT_TYPE_ARP_RSP:
@@ -76,25 +78,16 @@ static void
 _phl_pkt_ofld_dbg_dump(struct pkt_ofld_obj *ofld_obj)
 {
 	u8 idx;
-	struct pkt_ofld_entry *pos = NULL;
+	struct pkt_ofld_entry *pos = (struct pkt_ofld_entry *)ofld_obj->entry;
 
-	phl_list_for_loop(pos, struct pkt_ofld_entry, &ofld_obj->entry_q, list) {
-
+	for (idx = 0; idx < PKT_OFLD_TYPE_MAX; idx++) {
 		PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
-			  "[PKT] => mac id = %d\n", pos->macid);
-
-		for (idx = 0; idx < PKT_OFLD_TYPE_MAX; idx++) {
-
-			PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
-				  "[PKT] type %-10s:id = %d, req cnt = %d.\n",
-				  _phl_pkt_ofld_get_txt(idx),
-				  pos->pkt_info[idx].id,
-				  pos->pkt_info[idx].req_cnt);
-
-			_phl_pkt_ofld_dbg_dump_pkt_info(ofld_obj,
-							&pos->pkt_info[idx]);
-
-		}
+			  "[PKT] type %-10s:id = %d, req cnt = %d.\n",
+			  _phl_pkt_ofld_get_txt(idx),
+			  pos->pkt_info[idx].id,
+			  pos->pkt_info[idx].req_cnt);
+		_phl_pkt_ofld_dbg_dump_pkt_info(ofld_obj,
+						&pos->pkt_info[idx]);
 	}
 }
 
@@ -206,6 +199,49 @@ _phl_pkt_ofld_construct_null_data(struct pkt_ofld_obj *ofld_obj, u8 **pkt_buf,
 	default:
 		break;
 	}
+	SET_80211_PKT_HDR_DURATION(*pkt_buf, 0);
+	SET_80211_PKT_HDR_FRAGMENT_SEQUENCE(*pkt_buf, 0);
+
+	return RTW_PHL_STATUS_SUCCESS;
+}
+
+static enum rtw_phl_status
+_phl_pkt_ofld_construct_bt_qos_null_data(struct pkt_ofld_obj *ofld_obj, u8 **pkt_buf,
+					 u16 *len, struct rtw_phl_stainfo_t *phl_sta,
+					 struct rtw_pkt_ofld_qos_null_3addr_info *qos_info) {
+	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	struct rtw_wifi_role_t *wrole = phl_sta->wrole;
+	*len = QOS_NULL_PACKET_3ADDR_LEN;
+
+	*pkt_buf = _os_mem_alloc(d, QOS_NULL_PACKET_3ADDR_LEN);
+	if (*pkt_buf == NULL)
+	{
+		return RTW_PHL_STATUS_RESOURCE;
+	}
+
+	_os_mem_set(d, *pkt_buf, 0, QOS_NULL_PACKET_3ADDR_LEN);
+
+	SET_80211_PKT_HDR_FRAME_CONTROL(*pkt_buf, 0);
+	SET_80211_PKT_HDR_TYPE_AND_SUBTYPE(*pkt_buf, TYPE_QOS_NULL_FRAME);
+	SET_80211_PKT_HDR_PWR_MGNT(*pkt_buf, 0);
+
+	switch (wrole->type)
+	{
+	case PHL_RTYPE_STATION:
+		SET_80211_PKT_HDR_TO_DS(*pkt_buf, 1);
+		SET_80211_PKT_HDR_ADDRESS1(d, *pkt_buf, qos_info->a1);
+		SET_80211_PKT_HDR_ADDRESS2(d, *pkt_buf, qos_info->a2);
+		SET_80211_PKT_HDR_ADDRESS3(d, *pkt_buf, qos_info->a3);
+		SET_80211_PKT_HDR_PRI_3ADDR(d, *pkt_buf, qos_info->priority);
+		break;
+	case PHL_RTYPE_AP:
+	case PHL_RTYPE_ADHOC:
+	default:
+		break;
+	}
+	SET_80211_PKT_HDR_EOSP_3ADDR(d, *pkt_buf, qos_info->eosp);
+	SET_80211_PKT_HDR_PRI_3ADDR(d, *pkt_buf, qos_info->priority);
+	SET_80211_PKT_HDR_ACK_POLICY_3ADDR(d, *pkt_buf, qos_info->ack_policy);
 	SET_80211_PKT_HDR_DURATION(*pkt_buf, 0);
 	SET_80211_PKT_HDR_FRAGMENT_SEQUENCE(*pkt_buf, 0);
 
@@ -610,6 +646,10 @@ _phl_pkt_ofld_construct_packet(struct pkt_ofld_obj *ofld_obj, u16 macid,
 		status = _phl_pkt_ofld_construct_null_data(ofld_obj, pkt_buf,
 				len, phl_sta, (struct rtw_pkt_ofld_null_info *) buf);
 		break;
+	case PKT_TYPE_BT_QOS_NULL:
+		status = _phl_pkt_ofld_construct_bt_qos_null_data(ofld_obj, pkt_buf,
+				len, phl_sta, (struct rtw_pkt_ofld_qos_null_3addr_info *) buf);
+		break;
 	case PKT_TYPE_ARP_RSP:
 		status = _phl_pkt_ofld_construct_arp_rsp(ofld_obj, pkt_buf,
 				len, phl_sta, (struct rtw_pkt_ofld_arp_rsp_info *) buf);
@@ -669,35 +709,15 @@ _phl_pkt_ofld_construct_packet(struct pkt_ofld_obj *ofld_obj, u16 macid,
 }
 
 static void
-_phl_pkt_ofld_init_entry(struct pkt_ofld_entry *entry, u16 macid)
+_phl_pkt_ofld_init_entry(struct pkt_ofld_entry *entry)
 {
 	u8 idx;
-
-	INIT_LIST_HEAD(&entry->list);
-	entry->macid = macid;
 
 	for (idx = 0; idx < PKT_OFLD_TYPE_MAX; idx++) {
 		INIT_LIST_HEAD(&entry->pkt_info[idx].req_q);
 		entry->pkt_info[idx].id = NOT_USED;
 		entry->pkt_info[idx].req_cnt = 0;
 	}
-}
-
-static u8
-_phl_pkt_ofld_is_entry_exist(struct pkt_ofld_obj *ofld_obj, u16 macid)
-{
-	struct pkt_ofld_entry *pos = NULL;
-
-	phl_list_for_loop(pos, struct pkt_ofld_entry, &ofld_obj->entry_q, list) {
-		if (pos->macid == macid) {
-
-			PHL_ERR("[PKT] %s, mac id(%d) already in entry queue.\n",
-				__func__, macid);
-			return true;
-		}
-	}
-
-	return false;
 }
 
 static void
@@ -709,7 +729,6 @@ _phl_pkt_ofld_del_all_req(struct pkt_ofld_obj *ofld_obj,
 
 	phl_list_for_loop_safe(pos, n, struct pkt_ofld_req,
 			       &pkt_info->req_q, list) {
-
 		_phl_pkt_ofld_del_req(ofld_obj, pkt_info, pos);
 	}
 }
@@ -747,55 +766,15 @@ _phl_pkt_ofld_reset_entry(struct pkt_ofld_obj *ofld_obj,
 	}
 }
 
-static void
-_phl_pkt_ofld_add_entry(struct pkt_ofld_obj *ofld_obj,
-			struct pkt_ofld_entry *entry, u16 macid)
-{
-	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
-		  "[PKT] New entry %p, mac id = %d\n", entry, macid);
-
-	_phl_pkt_ofld_init_entry(entry, macid);
-	list_add(&entry->list, &ofld_obj->entry_q);
-	ofld_obj->entry_cnt++;
-
-	if (rtw_hal_pkt_update_ids(ofld_obj->phl_info->hal, entry)
-	    != RTW_HAL_STATUS_SUCCESS) {
-		PHL_WARN("%s: init general id failed.\n", __func__);
-	}
-}
-
-static void
-_phl_pkt_ofld_del_entry(struct pkt_ofld_obj *ofld_obj, struct pkt_ofld_entry *entry)
-{
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
-
-	list_del(&entry->list);
-	ofld_obj->entry_cnt--;
-	_os_mem_free(d, entry, sizeof(*entry));
-}
-
 static struct pkt_ofld_entry *
-_phl_pkt_ofld_get_entry(struct pkt_ofld_obj *ofld_obj, u16 macid)
+_phl_pkt_ofld_get_entry(struct pkt_ofld_obj *ofld_obj)
 {
-	struct pkt_ofld_entry *pos = NULL;
-	u8 find = false;
+	return (struct pkt_ofld_entry *)ofld_obj->entry;
 
-	phl_list_for_loop(pos, struct pkt_ofld_entry, &ofld_obj->entry_q, list) {
-		if (pos->macid == macid) {
-			find = true;
-			break;
-		}
-	}
-
-	if (find) {
-		return pos;
-	} else {
-		return NULL;
-	}
 }
 
 static enum rtw_phl_status
-_phl_pkt_ofld_req_type(struct pkt_ofld_obj *ofld_obj,
+_phl_pkt_ofld_req_type(struct pkt_ofld_obj *ofld_obj, u16 macid,
 		       struct pkt_ofld_entry *entry, u8 type, void *buf) {
 	enum rtw_phl_status phl_status;
 	enum rtw_hal_status hal_status;
@@ -812,7 +791,7 @@ _phl_pkt_ofld_req_type(struct pkt_ofld_obj *ofld_obj,
 		return RTW_PHL_STATUS_SUCCESS;
 	}
 
-	phl_status = _phl_pkt_ofld_construct_packet(ofld_obj, entry->macid, type,
+	phl_status = _phl_pkt_ofld_construct_packet(ofld_obj, macid, type,
 			&pkt_buf, &len, buf);
 	if (phl_status != RTW_PHL_STATUS_SUCCESS)
 	{
@@ -821,7 +800,7 @@ _phl_pkt_ofld_req_type(struct pkt_ofld_obj *ofld_obj,
 		return RTW_PHL_STATUS_FAILURE;
 	}
 
-	hal_status = HAL_PKT_OFLD_ADD(ofld_obj, &pkt_info->id, pkt_buf, &len);
+	hal_status = HAL_PKT_OFLD_ADD(ofld_obj, &pkt_info->id, pkt_buf, &len, type);
 
 	_os_mem_free(d, pkt_buf, len);
 
@@ -877,7 +856,8 @@ _phl_pkt_ofld_cancel_type(struct pkt_ofld_obj *ofld_obj,
 enum rtw_phl_status phl_pkt_ofld_init(struct phl_info_t *phl_info)
 {
 	void *d = phl_to_drvpriv(phl_info);
-	struct pkt_ofld_obj *ofld_obj;
+	struct pkt_ofld_obj *ofld_obj = NULL;
+	struct pkt_ofld_entry *entry = NULL;
 
 	ofld_obj = (struct pkt_ofld_obj *)_os_mem_alloc(d, sizeof(*ofld_obj));
 	if (ofld_obj == NULL) {
@@ -886,9 +866,15 @@ enum rtw_phl_status phl_pkt_ofld_init(struct phl_info_t *phl_info)
 
 	phl_info->pkt_ofld = ofld_obj;
 
+	entry = (struct pkt_ofld_entry *)_os_mem_alloc(d, sizeof(struct pkt_ofld_entry));
+	if (entry == NULL) {
+		_os_mem_free(d, ofld_obj, sizeof(*ofld_obj));
+		return RTW_PHL_STATUS_RESOURCE;
+	}
+
+	_phl_pkt_ofld_init_entry(entry);
+	ofld_obj->entry = entry;
 	ofld_obj->phl_info = phl_info;
-	INIT_LIST_HEAD(&ofld_obj->entry_q);
-	ofld_obj->entry_cnt = 0;
 	ofld_obj->cur_seq = 0;
 	_os_mutex_init(d, &ofld_obj->mux);
 
@@ -905,12 +891,9 @@ void phl_pkt_ofld_deinit(struct phl_info_t *phl_info)
 
 	_os_mutex_lock(d, &ofld_obj->mux);
 
-	phl_list_for_loop_safe(pos, n, struct pkt_ofld_entry,
-			       &ofld_obj->entry_q, list) {
+	_phl_pkt_ofld_reset_entry(ofld_obj, (struct pkt_ofld_entry *)ofld_obj->entry);
+	_os_mem_free(d, ofld_obj->entry, sizeof(struct pkt_ofld_entry));
 
-		_phl_pkt_ofld_reset_entry(ofld_obj, pos);
-		_phl_pkt_ofld_del_entry(ofld_obj, pos);
-	}
 
 	_os_mutex_unlock(d, &ofld_obj->mux);
 	_os_mutex_deinit(d, &ofld_obj->mux);
@@ -922,90 +905,14 @@ void phl_pkt_ofld_deinit(struct phl_info_t *phl_info)
 void phl_pkt_ofld_reset_all_entry(struct phl_info_t *phl_info)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	struct pkt_ofld_entry *pos = NULL;
+	struct pkt_ofld_entry *pos = (struct pkt_ofld_entry *)ofld_obj->entry;
 	void *d = phl_to_drvpriv(phl_info);
 
 	_os_mutex_lock(d, &ofld_obj->mux);
 
-	phl_list_for_loop(pos, struct pkt_ofld_entry,
-			  &ofld_obj->entry_q, list) {
-
-		_phl_pkt_ofld_reset_entry(ofld_obj, pos);
-	}
+	_phl_pkt_ofld_reset_entry(ofld_obj, pos);
 
 	_os_mutex_unlock(d, &ofld_obj->mux);
-}
-
-/* For EXTERNAL application to add entry to do packet offload (expose)
- * @phl: refer to rtw_phl_com_t
- * @macid: the mac id of STA
- */
-enum rtw_phl_status phl_pkt_ofld_add_entry(struct phl_info_t *phl_info, u16 macid)
-{
-	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
-	struct pkt_ofld_entry *entry = NULL;
-
-	if (ofld_obj == NULL) {
-		PHL_ERR("[PKT] %s: pkt_ofld_obj is NULL.\n", __func__);
-		return RTW_PHL_STATUS_FAILURE;
-	}
-
-	_os_mutex_lock(d, &ofld_obj->mux);
-
-	if (_phl_pkt_ofld_is_entry_exist(ofld_obj, macid)) {
-		_os_mutex_unlock(d, &ofld_obj->mux);
-		return RTW_PHL_STATUS_FAILURE;
-	}
-
-	entry = _os_mem_alloc(d, sizeof(*entry));
-	if (entry == NULL) {
-		PHL_ERR("[PKT] %s: alloc memory failed.\n", __func__);
-		_os_mutex_unlock(d, &ofld_obj->mux);
-		return RTW_PHL_STATUS_RESOURCE;
-	}
-
-	_phl_pkt_ofld_add_entry(ofld_obj, entry, macid);
-
-	_os_mutex_unlock(d, &ofld_obj->mux);
-
-	return RTW_PHL_STATUS_SUCCESS;
-}
-
-/* For EXTERNAL application to remove entry (expose)
- * @phl: refer to rtw_phl_com_t
- * @macid: the mac id of STA
-*/
-enum rtw_phl_status phl_pkt_ofld_del_entry(struct phl_info_t *phl_info, u16 macid)
-{
-	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
-	struct pkt_ofld_entry *entry = NULL;
-
-	if (ofld_obj == NULL) {
-		PHL_ERR("[PKT] %s: pkt_ofld_obj is NULL.\n", __func__);
-		return RTW_PHL_STATUS_FAILURE;
-	}
-
-	_os_mutex_lock(d, &ofld_obj->mux);
-
-	entry = _phl_pkt_ofld_get_entry(ofld_obj, macid);
-	if (entry == NULL) {
-		_os_mutex_unlock(d, &ofld_obj->mux);
-		PHL_ERR("[PKT] %s, mac id(%d) not found.\n", __func__, macid);
-		return RTW_PHL_STATUS_FAILURE;
-	}
-
-	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
-		  "[PKT] Remove entry %p, mac id = %d\n", entry, macid);
-
-	_phl_pkt_ofld_del_ofld_type(ofld_obj, entry);
-	_phl_pkt_ofld_reset_entry(ofld_obj, entry);
-	_phl_pkt_ofld_del_entry(ofld_obj, entry);
-
-	_os_mutex_unlock(d, &ofld_obj->mux);
-
-	return RTW_PHL_STATUS_SUCCESS;
 }
 
 /* For EXTERNAL application to request packet offload to FW (expose)
@@ -1031,11 +938,11 @@ phl_pkt_ofld_request(struct phl_info_t *phl_info, u16 macid, u8 type,
 
 	_os_mutex_lock(d, &ofld_obj->mux);
 
-	entry = _phl_pkt_ofld_get_entry(ofld_obj, macid);
+	entry = _phl_pkt_ofld_get_entry(ofld_obj);
 	if (entry == NULL)
 	{
 		_os_mutex_unlock(d, &ofld_obj->mux);
-		PHL_ERR("[PKT] %s, mac id(%d) not found.\n", __func__, macid);
+		PHL_ERR("[PKT] %s, pkt_ofld_entry not found.\n", __func__);
 		return RTW_PHL_STATUS_FAILURE;
 	}
 
@@ -1047,7 +954,7 @@ phl_pkt_ofld_request(struct phl_info_t *phl_info, u16 macid, u8 type,
 	}
 	_phl_pkt_ofld_add_req(ofld_obj, &entry->pkt_info[type], req);
 
-	if (_phl_pkt_ofld_req_type(ofld_obj, entry, type, buf) !=
+	if (_phl_pkt_ofld_req_type(ofld_obj, macid, entry, type, buf) !=
 	    RTW_PHL_STATUS_SUCCESS)
 	{
 
@@ -1062,7 +969,7 @@ phl_pkt_ofld_request(struct phl_info_t *phl_info, u16 macid, u8 type,
 
 	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
 		  "[PKT] Request: macid %d, pkt type %s, token %d.\n",
-		  entry->macid, _phl_pkt_ofld_get_txt(type), *token);
+		  macid, _phl_pkt_ofld_get_txt(type), *token);
 
 	return RTW_PHL_STATUS_SUCCESS;
 }
@@ -1089,10 +996,10 @@ enum rtw_phl_status phl_pkt_ofld_cancel(struct phl_info_t *phl_info,
 
 	_os_mutex_lock(d, &ofld_obj->mux);
 
-	entry = _phl_pkt_ofld_get_entry(ofld_obj, macid);
+	entry = _phl_pkt_ofld_get_entry(ofld_obj);
 	if (entry == NULL) {
 		_os_mutex_unlock(d, &ofld_obj->mux);
-		PHL_ERR("[PKT] %s, macid(%d) not found.\n", __func__, macid);
+		PHL_ERR("[PKT] %s, pkt_ofld_entry not found.\n", __func__);
 		return RTW_PHL_STATUS_FAILURE;
 	}
 	pkt_info = &entry->pkt_info[type];
@@ -1106,7 +1013,7 @@ enum rtw_phl_status phl_pkt_ofld_cancel(struct phl_info_t *phl_info,
 
 	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
 		  "[PKT] Cancel: macid %d, type %s, token %d.\n",
-		  entry->macid, _phl_pkt_ofld_get_txt(type), *token);
+		  macid, _phl_pkt_ofld_get_txt(type), *token);
 
 	if (_phl_pkt_ofld_cancel_type(ofld_obj, entry, type)
 	    != RTW_PHL_STATUS_SUCCESS) {
@@ -1154,17 +1061,17 @@ u8 phl_pkt_ofld_get_id(struct phl_info_t *phl_info, u16 macid, u8 type)
 
 	_os_mutex_lock(d, &ofld_obj->mux);
 
-	entry = _phl_pkt_ofld_get_entry(ofld_obj, macid);
+	entry = _phl_pkt_ofld_get_entry(ofld_obj);
 	if (entry == NULL) {
 		_os_mutex_unlock(d, &ofld_obj->mux);
-		PHL_ERR("[PKT] %s, macid(%d) not found.\n", __func__, macid);
+		PHL_ERR("[PKT] %s, pkt_ofld_entry not found.\n", __func__);
 		return RTW_PHL_STATUS_FAILURE;
 	}
 	pkt_info = &entry->pkt_info[type];
 
 	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
 		  "[PKT] Get id: macid %d, pkt type %s, id %d.\n",
-		  entry->macid, _phl_pkt_ofld_get_txt(type),
+		  macid, _phl_pkt_ofld_get_txt(type),
 		  pkt_info->id);
 
 	_os_mutex_unlock(d, &ofld_obj->mux);
@@ -1177,6 +1084,8 @@ const char *phl_get_pkt_ofld_str(enum pkt_ofld_type type)
 	switch (type) {
 	case PKT_TYPE_NULL_DATA:
 		return "PKT_TYPE_NULL_DATA";
+	case PKT_TYPE_BT_QOS_NULL:
+		return "PKT_TYPE_BT_QOS_NULL";
 	case PKT_TYPE_ARP_RSP:
 		return "PKT_TYPE_ARP_RSP";
 	case PKT_TYPE_NDP:

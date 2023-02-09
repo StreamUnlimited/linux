@@ -9,7 +9,7 @@ struct audio_clock_component* acc = NULL;
 
 struct audio_clock_component* create_audio_clock_component(struct device *dev)
 {
-	if( acc != NULL )
+	if (acc != NULL)
 		return acc;
 
 	acc = devm_kzalloc(dev, sizeof(struct audio_clock_component), GFP_KERNEL);
@@ -47,15 +47,15 @@ static bool is_sport_ni_mi_supported(unsigned int clock, unsigned int sr, unsign
 	int max_mi = 131071;
 	bool ni_mi_found = false;
 
-	for ( ; ni <= max_ni ; ni++ ) {
-		if( clock * ni % ( channel_count * chn_len * sr ) == 0 ) {
-			mi = clock * ni / ( channel_count * chn_len * sr );
+	for (; ni <= max_ni ; ni++) {
+		if (clock * ni % (channel_count * chn_len * sr) == 0) {
+			mi = clock * ni / (channel_count * chn_len * sr);
 			//pr_info("check founded: ni : %d, mi: %d \n", ni, mi);
-			if ( mi < 2 * ni ) {
+			if (mi < 2 * ni) {
 				//pr_info("mi <= ni, check fail, try another pll divider or sport mclk divider \n");
 				break;
 			}
-			if ( mi <= max_mi ) {
+			if (mi <= max_mi) {
 				//pr_info("check ni : %d, mi: %d success\n", ni, mi);
 				ni_mi_found = true;
 				break;
@@ -73,31 +73,28 @@ int choose_pll_clock(unsigned int channel_count, unsigned int channel_len, unsig
 	unsigned int pll_div = 1;
 	bool choose_done = false;
 
-	for ( ; sport_mclk_div_index < SPORT_MCLK_DIV_MAX_NUM; sport_mclk_div_index++ ) {
-		//pr_info("sport_mclk_div_index:%d, sport_mclk_div:%d \n", sport_mclk_div_index, acc->sport_mclk_div[sport_mclk_div_index]);
-		for ( ; pll_clock_index < PLL_CLOCK_MAX_NUM; pll_clock_index++ ) {
-			if( (acc->pll_clock[pll_clock_index] / acc->sport_mclk_div[sport_mclk_div_index]) % (codec_multiplier_with_rate * rate) != 0 ) {
-				//pr_info("try: pll_clock:%d, sport_mclk_div:%d not work\n", acc->pll_clock[pll_clock_index], acc->sport_mclk_div[sport_mclk_div_index]);
+	for (; sport_mclk_div_index < SPORT_MCLK_DIV_MAX_NUM; sport_mclk_div_index++) {
+		for (; pll_clock_index < PLL_CLOCK_MAX_NUM; pll_clock_index++) {
+			if ((acc->pll_clock[pll_clock_index] / acc->sport_mclk_div[sport_mclk_div_index]) % (codec_multiplier_with_rate * rate) != 0) {
 				continue;
 			} else {
 				pll_div = (acc->pll_clock[pll_clock_index] / acc->sport_mclk_div[sport_mclk_div_index]) / (codec_multiplier_with_rate * rate);
-				if ( pll_div <= 8 && is_sport_ni_mi_supported((acc->pll_clock[pll_clock_index]/pll_div), rate, channel_count, channel_len)) {
-					pr_info("find the right clock:%d, sport_mclk_div:%d, pll_div:%d", acc->pll_clock[pll_clock_index], acc->sport_mclk_div[sport_mclk_div_index], pll_div);
+				if (pll_div <= 8 && is_sport_ni_mi_supported((acc->pll_clock[pll_clock_index]/pll_div), rate, channel_count, channel_len)) {
+					//pr_info("find the right clock:%d, sport_mclk_div:%d, pll_div:%d", acc->pll_clock[pll_clock_index], acc->sport_mclk_div[sport_mclk_div_index], pll_div);
 					choose_done = true;
 					break;
 				} else {
-					//pr_info("try: pll_clock:%d, pll_div:%d, sport_mclk_div:%d not work\n", acc->pll_clock[pll_clock_index], pll_div, acc->sport_mclk_div[sport_mclk_div_index]);
 					continue;
 				}
 			}
 		}
-		if ( choose_done )
+		if (choose_done)
 			break;
 
 		pll_clock_index = 0;
 	}
 
-	if( !choose_done ) {
+	if (!choose_done) {
 		pr_info("can't find proper clock for the current rate:%d", rate);
 		ret = -EINVAL;
 		return ret;

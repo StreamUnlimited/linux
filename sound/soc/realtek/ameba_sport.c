@@ -9,9 +9,8 @@
 void audio_sp_set_i2s_mode(void __iomem * sportx, u32 mode)
 {
 	u32 tmp;
-	pr_info("%s mode:%d", __func__, mode);
 	tmp = readl(sportx + REG_SP_CTRL0);
-	if (mode == I2S_MODE_SLAVE ) {
+	if (mode == I2S_MODE_SLAVE) {
 		tmp |= SP_BIT_SLAVE_DATA_SEL;
 		writel(tmp, sportx + REG_SP_CTRL0);
 		tmp |= SP_BIT_SLAVE_CLK_SEL;
@@ -55,14 +54,14 @@ void audio_sp_set_tx_clk_div(void __iomem * sportx, unsigned long clock, u32 sr,
 	u32 NI;
 	u32 Bclk_div;
 	int ni = 1;
-	//pr_info("sportx:%x, clock:%d, sr:%d, tdm:%d, chn_len:%d", sportx, clock, sr, tdm, chn_len);
+
 	u32 channel_count = 2;
-	if ( multi_io == SP_TX_MULTIIO_DIS )
-		channel_count = ( tdm + 1 ) * 2;
+	if (multi_io == SP_TX_MULTIIO_DIS)
+		channel_count = (tdm + 1) * 2;
 
 	switch (clock) {
 	case 40000000:
-		if ( multi_io == SP_TX_MULTIIO_EN )
+		if (multi_io == SP_TX_MULTIIO_EN)
 			tdm = SP_TX_NOTDM;
 		if ((!(sr % 4000)) && (sr % 11025)) {  //48k系列
 			MI = 1250;
@@ -82,15 +81,13 @@ void audio_sp_set_tx_clk_div(void __iomem * sportx, unsigned long clock, u32 sr,
 		break;
 	default:  //for other plls:
 		NI = 1;
-		if( clock * NI % ( channel_count * chn_len * sr ) == 0 ) {
-			MI = clock * NI / ( channel_count * chn_len * sr );
+		if (clock * NI % (channel_count * chn_len * sr) == 0) {
+			MI = clock * NI / (channel_count * chn_len * sr);
 		} else {
-			//pr_info("sport bclk auto calculate may take some time...\n", sr);
-			for ( ; ni < 65536 ; ni++ ) {
-				if( clock * ni % ( channel_count * chn_len * sr ) == 0 ) {
+			for (; ni < 65536 ; ni++) {
+				if (clock * ni % (channel_count * chn_len * sr) == 0) {
 					NI = ni;
-					MI = clock * NI / ( channel_count * chn_len * sr );
-					//pr_info("NI : %d, MI: %d \n", NI, MI);
+					MI = clock * NI / (channel_count * chn_len * sr);
 					break;
 				}
 			}
@@ -113,7 +110,7 @@ void audio_sp_set_tx_clk_div(void __iomem * sportx, unsigned long clock, u32 sr,
 
 	}
 
-	pr_info("%s: ni:%d, mi:%d \n", __func__, NI, MI);
+	//pr_info("%s: ni:%d, mi:%d \n", __func__, NI, MI);
 	assert_param(NI <= 0xFFFF);
 	assert_param(MI <= 0xFFFF);
 
@@ -130,7 +127,7 @@ void audio_sp_set_tx_clk_div(void __iomem * sportx, unsigned long clock, u32 sr,
 	} else if (tdm == SP_TX_TDM4) {
 		tmp = readl(sportx + REG_SP_TX_LRCLK);
 		tmp &= ~(SP_MASK_TX_BCLK_DIV_RATIO);
-		if ( multi_io == SP_RX_MULTIIO_DIS )
+		if (multi_io == SP_RX_MULTIIO_DIS)
 			tmp |= SP_TX_BCLK_DIV_RATIO(Bclk_div * 2 - 1);
 		else
 			tmp |= SP_TX_BCLK_DIV_RATIO(Bclk_div - 1);
@@ -138,7 +135,7 @@ void audio_sp_set_tx_clk_div(void __iomem * sportx, unsigned long clock, u32 sr,
 	} else if (tdm == SP_TX_TDM6) {
 		tmp = readl(sportx + REG_SP_TX_LRCLK);
 		tmp &= ~(SP_MASK_TX_BCLK_DIV_RATIO);
-		if ( multi_io == SP_RX_MULTIIO_DIS )
+		if (multi_io == SP_RX_MULTIIO_DIS)
 			tmp |= SP_TX_BCLK_DIV_RATIO(Bclk_div * 3 - 1);
 		else
 			tmp |= SP_TX_BCLK_DIV_RATIO(Bclk_div - 1);
@@ -146,7 +143,7 @@ void audio_sp_set_tx_clk_div(void __iomem * sportx, unsigned long clock, u32 sr,
 	} else {
 		tmp = readl(sportx + REG_SP_TX_LRCLK);
 		tmp &= ~(SP_MASK_TX_BCLK_DIV_RATIO);
-		if ( multi_io == SP_RX_MULTIIO_DIS )
+		if (multi_io == SP_RX_MULTIIO_DIS)
 			tmp |= SP_TX_BCLK_DIV_RATIO(Bclk_div * 4 - 1);
 		else
 			tmp |= SP_TX_BCLK_DIV_RATIO(Bclk_div - 1);
@@ -161,13 +158,15 @@ void audio_sp_set_rx_clk_div(void __iomem * sportx, u32 clock, u32 sr, u32 tdm, 
 	u32 MI;
 	u32 Bclk_div;
 	int ni = 1;
-	//pr_info("sportx:%x, clock:%d, sr:%d, tdm:%d, chn_len:%d", sportx, clock, sr, tdm, chn_len);
+
 	u32 channel_count = 2;
-	if ( multi_io == SP_RX_MULTIIO_DIS )
-		channel_count = ( tdm + 1 ) * 2;
+	if (multi_io == SP_RX_MULTIIO_DIS)
+		channel_count = (tdm + 1) * 2;
 
 	switch (clock) {
 	case 40000000:
+		if (multi_io == SP_RX_MULTIIO_EN)
+			tdm = SP_RX_NOTDM;
 		if ((!(sr % 4000)) && (sr % 11025)) {  //48k系列
 			MI = 1250;
 			NI = (chn_len / 4) * (tdm + 1) * (sr / 4000);
@@ -186,23 +185,19 @@ void audio_sp_set_rx_clk_div(void __iomem * sportx, u32 clock, u32 sr, u32 tdm, 
 		break;
 	default:  //for other plls:
 		NI = 1;
-		if( clock * NI % ( channel_count * chn_len * sr ) == 0 ) {
-			MI = clock * NI / ( channel_count * chn_len * sr );
-			//pr_info("NI : %d, MI: %d \n", NI, MI);
+		if (clock * NI % (channel_count * chn_len * sr) == 0) {
+			MI = clock * NI / (channel_count * chn_len * sr);
 		} else {
-			//pr_info("sport bclk auto calculate may take some time...\n", sr);
-			for ( ; ni < 65536 ; ni++ ) {
-				if( clock * ni % ( channel_count * chn_len * sr ) == 0 ) {
+			for (; ni < 65536 ; ni++) {
+				if (clock * ni % (channel_count * chn_len * sr) == 0) {
 					NI = ni;
-					MI = clock * NI / ( channel_count * chn_len * sr );
-					//pr_info("NI : %d, MI: %d \n", NI, MI);
+					MI = clock * NI / (channel_count * chn_len * sr);
 					break;
 				}
 			}
 		}
 	}
 
-	//pr_info("%s: ni:%d, mi:%d \n", __func__, NI, MI);
 	assert_param(MI <= 0xFFFF);
 	assert_param(NI <= 0xFFFF);
 
@@ -234,7 +229,7 @@ void audio_sp_set_rx_clk_div(void __iomem * sportx, u32 clock, u32 sr, u32 tdm, 
 	} else if (tdm == SP_RX_TDM4) {
 		tmp = readl(sportx + REG_SP_TX_LRCLK);
 		tmp &= ~(SP_MASK_RX_BCLK_DIV_RATIO);
-		if ( multi_io == SP_RX_MULTIIO_DIS )
+		if (multi_io == SP_RX_MULTIIO_DIS)
 			tmp |= SP_RX_BCLK_DIV_RATIO(Bclk_div * 2 - 1);
 		else
 			tmp |= SP_RX_BCLK_DIV_RATIO(Bclk_div - 1);
@@ -242,7 +237,7 @@ void audio_sp_set_rx_clk_div(void __iomem * sportx, u32 clock, u32 sr, u32 tdm, 
 	} else if (tdm == SP_TX_TDM6) {
 		tmp = readl(sportx + REG_SP_TX_LRCLK);
 		tmp &= ~(SP_MASK_RX_BCLK_DIV_RATIO);
-		if ( multi_io == SP_RX_MULTIIO_DIS )
+		if (multi_io == SP_RX_MULTIIO_DIS)
 			tmp |= SP_RX_BCLK_DIV_RATIO(Bclk_div * 3 - 1);
 		else
 			tmp |= SP_RX_BCLK_DIV_RATIO(Bclk_div - 1);
@@ -250,7 +245,7 @@ void audio_sp_set_rx_clk_div(void __iomem * sportx, u32 clock, u32 sr, u32 tdm, 
 	} else {
 		tmp = readl(sportx + REG_SP_TX_LRCLK);
 		tmp &= ~(SP_MASK_RX_BCLK_DIV_RATIO);
-		if ( multi_io == SP_RX_MULTIIO_DIS )
+		if (multi_io == SP_RX_MULTIIO_DIS)
 			tmp |= SP_RX_BCLK_DIV_RATIO(Bclk_div * 4 - 1);
 		else
 			tmp |= SP_RX_BCLK_DIV_RATIO(Bclk_div - 1);
@@ -282,7 +277,6 @@ void audio_sp_rx_init(void __iomem * sportx, sport_init_params *SP_RXInitStruct)
 	u32 tmp;
 	u32 chn_len;
 
-	//pr_info("%s:%p",__func__,sportx);
 	/* Check the parameters*/
 	assert_param(IS_SP_DATA_FMT(SP_RXInitStruct->sp_sel_data_format));
 	assert_param(IS_SP_RX_WL(SP_RXInitStruct->sp_sel_word_len));
@@ -549,12 +543,12 @@ void audio_sp_tx_init(void __iomem * sportx, sport_init_params *SP_TXInitStruct)
 	/* Configure TX FIFO Channel */
 	if (SP_TXInitStruct->sp_sel_fifo == SP_TX_FIFO2) {
 		tmp = readl(sportx + REG_SP_CTRL1);
-		tmp &= ~( SP_BIT_TX_FIFO_0_REG_1_EN | SP_BIT_TX_FIFO_1_REG_0_EN | SP_BIT_TX_FIFO_1_REG_1_EN);
+		tmp &= ~(SP_BIT_TX_FIFO_0_REG_1_EN | SP_BIT_TX_FIFO_1_REG_0_EN | SP_BIT_TX_FIFO_1_REG_1_EN);
 		tmp |= SP_BIT_TX_FIFO_0_REG_0_EN;
 		writel(tmp, sportx + REG_SP_CTRL1);
 	} else if (SP_TXInitStruct->sp_sel_fifo == SP_TX_FIFO4) {
 		tmp = readl(sportx + REG_SP_CTRL1);
-		tmp &= ~( SP_BIT_TX_FIFO_1_REG_0_EN | SP_BIT_TX_FIFO_1_REG_1_EN);
+		tmp &= ~(SP_BIT_TX_FIFO_1_REG_0_EN | SP_BIT_TX_FIFO_1_REG_1_EN);
 		tmp |= SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN;
 		writel(tmp, sportx + REG_SP_CTRL1);
 	} else if (SP_TXInitStruct->sp_sel_fifo == SP_TX_FIFO6) {
@@ -584,7 +578,7 @@ void audio_sp_tx_init(void __iomem * sportx, sport_init_params *SP_TXInitStruct)
 void audio_sp_tx_start(void __iomem * sportx, bool NewState)
 {
 	u32 tmp;
-	//pr_info("sp tx 0 stop 1 start:%d", NewState);
+
 	if (NewState == true) {
 		tmp = readl(sportx + REG_SP_CTRL0);
 		tmp &= ~ SP_BIT_TX_DISABLE;
@@ -603,7 +597,7 @@ void audio_sp_tx_start(void __iomem * sportx, bool NewState)
 void audio_sp_rx_start(void __iomem * sportx, bool NewState)
 {
 	u32 tmp;
-	//pr_info("sp rx 0 stop 1 start:%d", NewState);
+
 	if (NewState == true) {
 		tmp = readl(sportx + REG_SP_CTRL0);
 		tmp &= ~ SP_BIT_RX_DISABLE;
@@ -623,7 +617,7 @@ void audio_sp_rx_start(void __iomem * sportx, bool NewState)
 void audio_sp_dma_cmd(void __iomem * sportx, bool NewState)
 {
 	u32 tmp;
-	//pr_info("%s NewState:%d",__func__,NewState);
+
 	if (NewState == true) {
 		tmp = readl(sportx + REG_SP_CTRL0);
 		tmp &= ~ SP_BIT_DSP_CTL_MODE;
@@ -635,7 +629,6 @@ void audio_sp_dma_cmd(void __iomem * sportx, bool NewState)
 	}
 }
 
-/*TX/RX word length 分别配置，但FIFO0和FIFO1的TX保持一致，FIFO0和FIFO1的RX保持一致*/
 void audio_sp_set_tx_word_len(void __iomem * sportx, u32 SP_TX_WordLen, u32 SP_RX_WordLen)
 {
 	u32 tmp;
@@ -652,7 +645,6 @@ void audio_sp_set_tx_word_len(void __iomem * sportx, u32 SP_TX_WordLen, u32 SP_R
 	writel(tmp, sportx + REG_SP_DIRECT_CTRL1);
 }
 
-/*TX/RX word length 分别配置，但FIFO0和FIFO1的TX保持一致，FIFO0和FIFO1的RX保持一致*/
 void audio_sp_set_rx_word_len(void __iomem * sportx, u32 SP_TX_WordLen, u32 SP_RX_WordLen)
 {
 	u32 tmp;
@@ -681,7 +673,6 @@ u32 audio_sp_get_rx_word_len(void __iomem * sportx)
 	return len_RX;
 }
 
-/*仅配置TX， RX默认配置Stereo,同时配置tRX_same_ch为0*/
 void audio_sp_set_mono_stereo(void __iomem * sportx, u32 SP_MonoStereo)
 {
 	u32 tmp;
@@ -714,7 +705,6 @@ void audio_sp_set_tx_count(void __iomem * sportx, u32 comp_val)
 void audio_sp_disable_tx_count(void __iomem * sportx)
 {
 	u32 tmp;
-	pr_info("disble tx counter\n");
 	tmp = readl(sportx + REG_SP_RX_LRCLK);
 	tmp &= ~SP_BIT_EN_TX_SPORT_INTERRUPT;
 	writel(tmp, sportx + REG_SP_RX_LRCLK);

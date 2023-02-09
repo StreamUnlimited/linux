@@ -43,6 +43,33 @@
  */
 
 /**
+ * @brief efuse_read_8730e
+ *
+ * @param *adapter
+ * @param addr
+ * @param *data
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 efuse_read_8730e(struct mac_ax_adapter *adapter,
+		      u32 addr, u8 *data, int len);
+
+/**
+ * @}
+ */
+
+/**
+ * @brief efuse_write_8730e
+ *
+ * @param *adapter
+ * @param addr
+ * @param data
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 efuse_write_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 data, int len);
+
+/**
  * @brief efuse_read8_8730e
  *
  * @param *adapter
@@ -59,7 +86,7 @@ u32 efuse_read8_8730e(struct mac_ax_adapter *adapter,
  */
 
 /**
- * @brief efuse_read8_8730e
+ * @brief efuse_write8_8730e
  *
  * @param *adapter
  * @param addr

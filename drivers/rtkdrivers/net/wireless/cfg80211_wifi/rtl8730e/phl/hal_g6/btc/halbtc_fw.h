@@ -2,6 +2,7 @@
 #define __INC_BTC_FW_H__
 
 #include "halbtc_fwdef.h"
+#include "mac/mac_ax/fwcmd.h"
 
 #pragma pack(push)
 #pragma pack(1)
@@ -41,16 +42,14 @@ enum bt_h2c_class {
  * BTFC_SET class 0x10 ->function
  */
 enum btf_set {
-	SET_REPORT_EN = 0x0,
+	SET_BT_MP_OPER = 0x0,
 	SET_SLOT_TABLE, /* Slot table  */
 	SET_MREG_TABLE, /* moniter register  */
 	SET_CX_POLICY,
+	SET_B_TYPE_TDMA,
 	SET_GPIO_DBG,
 	SET_DRV_INFO,
 	SET_DRV_EVENT,
-	SET_BT_WREG_ADDR,
-	SET_BT_WREG_VAL,
-	SET_BT_RREG_ADDR,
 	SET_BT_WL_CH_INFO,
 	SET_BT_INFO_REPORT,
 	SET_BT_IGNORE_WLAN_ACT,
@@ -150,8 +149,8 @@ enum btf_fw_event {
 	BTF_EVNT_BT_REG = 3,
 	BTF_EVNT_CX_RUNINFO = 4,
 	BTF_EVNT_BT_PSD = 5,
-	BTF_EVNT_BUF_OVERFLOW,
-	BTF_EVNT_C2H_LOOPBACK,
+	BTF_EVNT_C2H_LOOPBACK = 7,
+	BTF_EVNT_WL_DBG_INFO = 8,
 	BTF_EVNT_MAX
 };
 
@@ -187,6 +186,54 @@ struct btc_rpt_cmn_info {
 	u8 req_fver; /* expected rsp fver */
 	u8 rsp_fver; /* fver from fw */
 	u8 valid;
+};
+
+struct btc_table {
+	u32 bt; /* 0x6C0 */
+	u32 wl; /* 0x6C4 */
+};
+
+struct btc_h2c_tdma { /* H2C 0x60, B_TYPE_TDMA */
+	/* byte 0 */
+	u8 en: 1;
+	u8 r870_in_bt: 1; /*  ValueofReg870InBT */
+	u8 hid_slot_tgl: 1; /* HIDSlotToggle */
+	u8 r870: 1; /* ValueOfReg870 */
+	u8 auto_wkup: 1; /* AutoWakeUp */
+	u8 no_ps: 1; /* NoPS */
+	u8 allow_bt_hi_pri: 1; /* AllowBTHighPriority */
+	u8 r870_in_wl: 1; /* ValueofReg870InWIFI */
+
+	/* byte 1 */
+	u8 tbtt; /* TBTTOnPeriod */
+
+	/* byte 2 */
+	u8 rsvd0: 2;
+	u8 pan_en: 1; /* PanEnable */
+	u8 ps_poll: 1; /* PsPoll */
+	u8 wl_random_slot: 1; /* WifiRandomSlot */
+	u8 wl_win_slot: 1; /* WifiWindowSlot */
+	u8 rsvd1: 2;
+
+	/* byte 3 */
+	u8 no_tx_pause: 1; /* NoTxPause */
+	u8 r778_in_wl: 1; /* Valueof778InWIFI */
+	u8 r778_in_wl_sco: 1; /* Valueof778InWIFIOnSCO */
+	u8 r778: 1; /* ValueofReg778 */
+	u8 sco: 1; /* SCOOption */
+	u8 r860_wl: 1; /* ValueofReg860InWIFI */
+	u8 tow_ant: 1; /* TwoAntenna */
+	u8 reduce_wl_pwr: 1; /* ReduceWIFIPower */
+
+	/* byte 4 */
+	u8 ext_r778: 1; /* Extra Decison of 778 value */
+	u8 cck_pri_tgl: 1; /* CCK_Priority_toggle */
+	u8 bt_auto_slot: 1; /* BtAutoSlot */
+	u8 cts2self: 1; /* CTS2Self */
+	u8 chg_coex_tbl: 1; /* ChangeCoexTable */
+	u8 lg_nav: 1; /* LongNAV */
+	u8 wl_dym_slot: 1; /* WiFi Dynamic Slot  */
+	u8 r778_in_bt: 1; /* ValueofReg778B1InBT */
 };
 
 #pragma pack(pop)
@@ -258,6 +305,18 @@ enum {
 	BTFRE_MAX
 };
 
+struct btc_btmpinfo {
+	u8 oper_seq;
+	u8 exp_seq;
+	u8 rpt_sts;
+	u8 rpt_ver;
+	u8 rpt_op[0x0F];
+	u8 rpt_param[0x0F];
+
+	u8 rsp_data[C2HREG_LEN];
+	u8 rsp_len;
+};
+
 struct btf_fwinfo {
 	u32 cnt_c2h; /* total c2h cnt */
 	u32 cnt_h2c; /* total h2c cnt */
@@ -281,6 +340,7 @@ struct btf_fwinfo {
 	struct btc_fbtc_btscan rpt_fbtc_btscan;
 	struct btc_fbtc_btafh rpt_fbtc_btafh;
 	struct btc_fbtc_btdev rpt_fbtc_btdev;
+	struct btc_btmpinfo  btmpinfo;
 };
 
 /*
@@ -289,9 +349,11 @@ struct btf_fwinfo {
 
 void _chk_btc_err(struct btc_t *btc, u8 type, u32 cnt);
 void hal_btc_fw_event(struct btc_t *btc, u8 evt_id, void *data, u32 len);
-void hal_btc_fw_en_rpt(struct btc_t *btc, u32 rpt_map, u32 rpt_state);
-void hal_btc_fw_set_slots(struct btc_t *btc, u8 num, struct fbtc_slot *s);
-void hal_btc_fw_set_monreg(struct btc_t *btc);
+void hal_btc_fw_btmp_init(struct btc_t *btc);
+void hal_btc_fw_btmp_deinit(struct btc_t *btc);
+bool hal_btc_fw_send_btmp_oper(struct btc_t *btc, u8 op, u8 op_ver,
+			       u8* cmd, u8 size, u8 param);
+void hal_btc_fw_get_bt_rpt(struct btc_t *btc, u8 op);
 bool hal_btc_fw_set_1tdma(struct btc_t *btc,  u16 len, u8 *buf);
 bool hal_btc_fw_set_1slot(struct btc_t *btc,  u16 len, u8 *buf);
 bool hal_btc_fw_set_policy(struct btc_t *btc, bool force_exec, u16 policy_type,

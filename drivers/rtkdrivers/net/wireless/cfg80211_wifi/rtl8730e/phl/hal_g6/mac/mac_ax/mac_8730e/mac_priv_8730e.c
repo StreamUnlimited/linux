@@ -55,10 +55,10 @@ static struct mac_ax_priv_ops mac8730e_priv_ops = {
 	NULL, /* enable_efuse_sw_pwr_cut */
 	NULL, /* disable_efuse_sw_pwr_cut */
 	NULL, /*efuse_get_pwr_state*/
-	efuse_read8_8730e, /*efuse_read8*/
-	efuse_write8_8730e, /*efuse_write*/
-	get_h2creg_offset_8852a, /* get_h2creg_offset */
-	get_c2hreg_offset_8852a, /* get_c2hreg_offset */
+	efuse_read_8730e, /*efuse_read8*/
+	efuse_write_8730e, /*efuse_write*/
+	get_h2creg_offset_8730e, /* get_h2creg_offset */
+	get_c2hreg_offset_8730e, /* get_c2hreg_offset */
 	NULL, /*ser_imr_config*/
 	NULL, /* disconnect_flush_key */
 	sec_info_tbl_init, /* sec_info_tbl_init */

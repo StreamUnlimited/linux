@@ -156,13 +156,13 @@ static struct mac_ax_ops mac8730e_ops = {
 	NULL, /* watchdog */
 	/*FW offload related*/
 	mac_reset_fwofld_state,
-	mac_check_fwofld_done,
+	NULL,
 	mac_read_pkt_ofld,
 	mac_del_pkt_ofld,
 	mac_add_pkt_ofld,
 	mac_pkt_ofld_packet,
 	mac_dump_efuse_ofld,
-	mac_efuse_ofld_map,
+	NULL, /* efuse_ofld_map */
 	NULL, /*update dmac ctrl info, upd_dctl_info*/
 	NULL, /*update cmac ctrl info, upd_cctl_info*/
 	mac_ie_cam_upd, /* ie_cam_upd */
@@ -379,6 +379,8 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_coex_init_8730e, /* coex_init */
 	mac_read_coex_reg, /* coex_read */
 	mac_write_coex_reg, /* coex_write */
+	mac_get_scbd_8730e, /* get_scbd */
+	mac_set_scbd_8730e, /* set_scbd */
 	NULL, /*trigger_cmac_err*/
 	NULL, /*trigger_cmac1_err*/
 	NULL, /*trigger_dmac_err*/
@@ -447,7 +449,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_read_ofld_value, /* read_ofld_value */
 #endif
 	mac_add_cmd_ofld, /* add_cmd_ofld */
-	mac_cmd_ofld, /* cmd_ofld */
+	NULL, /* cmd_ofld */
 	mac_flash_erase,
 	mac_flash_read,
 	mac_flash_write,
@@ -478,8 +480,8 @@ static struct mac_ax_ops mac8730e_ops = {
 #endif
 	NULL,/*get_fw_status*/
 	mac_role_sync,
-	mac_ch_switch_ofld,
-	mac_get_ch_switch_rpt,
+	NULL,
+	NULL,
 	mac_cfg_bcn_filter,
 	mac_bcn_filter_rssi,
 	mac_bcn_filter_tp
@@ -541,12 +543,9 @@ static struct mac_ax_adapter mac_8730e_adapter = {
 		0, 0, 0, 0, 0, DFLT_GPIO_STATE, DFLT_SW_IO_MODE
 	}, /* gpio_info */
 	NULL, /* role table */
-	{NULL, NULL, NULL, 0, 0, 0, 0}, /* read_ofld_info */
-	{0, 0, NULL}, /* read_ofld_value */
-	{NULL, NULL, NULL, 0, 0, 0, 0}, /* write_ofld_info */
-	{NULL}, /* efuse_ofld_info */
-	{NULL, NULL, 0, 0, 0, 0}, /* conf_ofld_info */
-	{PKT_OFLD_OP_MAX, PKT_OFLD_MAX_COUNT - 1, 0, {0}}, /* pkt_ofld_info */
+	{RSVD_PAGE_PROB_RSP, RSVD_PAGE_PS_POLL, RSVD_PAGE_NULL_DATA,
+		RSVD_PAGE_QOS_NULL, RSVD_PAGE_BT_QOS_NULL, RSVD_PAGE_CTS2SELF,
+		RSVD_PAGE_LTECOEX_QOSNULL, 0}, /* pkt_ofld_info */
 	{0, 0, 0, NULL}, /* pkt_ofld_pkt */
 	{NULL, NULL, NULL, 0, 0, 0, 0, 0}, /* cmd_ofld_info */
 	{{{0}, {0}, {0}, {0}}}, /* mcc_group_info */
@@ -577,7 +576,6 @@ static struct mac_ax_adapter mac_8730e_adapter = {
 	{NULL}, /*scan ofld info*/
 	{0}, /*log_cfg*/
 	NULL, /* twt_info */
-	NULL, /*ch_switch_rpt*/
 	NULL, /* dbcc_info */
 };
 

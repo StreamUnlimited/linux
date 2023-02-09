@@ -23,6 +23,8 @@
 #include "trx_desc.h"
 #include "common.h"
 
+#define MAC_TX_PKTBUF_OFFSET (0x20000)
+
 #define READ_OFLD_MAX_LEN 2000
 #define WRITE_OFLD_MAX_LEN 2000
 #define CONF_OFLD_MAX_LEN 2000
@@ -279,72 +281,7 @@ struct scan_chinfo_list {
  * @retval u32
  */
 u32 mac_reset_fwofld_state(struct mac_ax_adapter *adapter, u8 op);
-/**
- * @}
- * @}
- */
 
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_check_fwofld_done
- *
- * @param *adapter
- * @param op
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_check_fwofld_done(struct mac_ax_adapter *adapter, u8 op);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_clear_write_request
- *
- * @param *adapter
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_clear_write_request(struct mac_ax_adapter *adapter);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_add_write_request
- *
- * @param *adapter
- * @param *req
- * @param *value
- * @param *mask
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_add_write_request(struct mac_ax_adapter *adapter,
-			  struct mac_ax_write_req *req,
-			  u8 *value, u8 *mask);
 /**
  * @}
  * @}
@@ -365,48 +302,7 @@ u32 mac_add_write_request(struct mac_ax_adapter *adapter,
  * @retval u32
  */
 u32 mac_write_ofld(struct mac_ax_adapter *adapter);
-/**
- * @}
- * @}
- */
 
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_clear_conf_request
- *
- * @param *adapter
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_clear_conf_request(struct mac_ax_adapter *adapter);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_add_conf_request
- *
- * @param *adapter
- * @param *req
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_add_conf_request(struct mac_ax_adapter *adapter,
-			 struct mac_ax_conf_ofld_req *req);
 /**
  * @}
  * @}
@@ -491,7 +387,8 @@ u32 mac_del_pkt_ofld(struct mac_ax_adapter *adapter, u8 id);
  * @return Please Place Description here.
  * @retval u32
  */
-u32 mac_add_pkt_ofld(struct mac_ax_adapter *adapter, u8 *pkt, u16 len, u8 *id);
+u32 mac_add_pkt_ofld(struct mac_ax_adapter *adapter, u8 *pkt, u16 len, u8 *id,
+		     u8 type);
 /**
  * @}
  * @}
@@ -544,109 +441,6 @@ u32 mac_dump_efuse_ofld(struct mac_ax_adapter *adapter, u32 efuse_size,
  * @}
  */
 
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_efuse_ofld_map
- *
- * @param *adapter
- * @param *efuse_map
- * @param efuse_size
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_efuse_ofld_map(struct mac_ax_adapter *adapter, u8 *efuse_map,
-		       u32 efuse_size);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_clear_read_request
- *
- * @param *adapter
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_clear_read_request(struct mac_ax_adapter *adapter);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_add_read_request
- *
- * @param *adapter
- * @param *req
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_add_read_request(struct mac_ax_adapter *adapter,
-			 struct mac_ax_read_req *req);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_read_ofld
- *
- * @param *adapter
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_read_ofld(struct mac_ax_adapter *adapter);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_read_ofld_value
- *
- * @param *adapter
- * @param **val_buf
- * @param *val_len
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_read_ofld_value(struct mac_ax_adapter *adapter,
-			u8 **val_buf, u16 *val_len);
 /**
  * @}
  * @}
@@ -955,52 +749,7 @@ u32 get_ccxrpt_event(struct mac_ax_adapter *adapter,
  * @retval self test result
  */
 u32 pktofld_self_test(struct mac_ax_adapter *adapter);
-/**
- * @}
- * @}
- */
 
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief ch_switch_ofld
- *
- * ch switch offload
- *
- * @param *adapter
- * @param parm
- * @return 0 for success.
- * @retval ch switch offload h2c status
- */
-u32 mac_ch_switch_ofld(struct mac_ax_adapter *adapter, struct mac_ax_ch_switch_parm parm);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup FW_Offload
- * @{
- */
-
-/**
- * @brief mac_get_ch_switch_rpt
- *
- * get channel switch offload report
- *
- * @param *adapter
- * @param parm
- * @return 0 for success.
- * @retval ch switch offload h2c status
- */
-u32 mac_get_ch_switch_rpt(struct mac_ax_adapter *adapter, struct mac_ax_ch_switch_rpt *rpt);
 /**
  * @}
  * @}

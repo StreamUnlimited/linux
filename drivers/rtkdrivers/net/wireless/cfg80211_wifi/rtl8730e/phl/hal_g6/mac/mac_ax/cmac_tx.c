@@ -94,9 +94,9 @@ u32 set_hw_fast_edca_param(struct mac_ax_adapter *adapter,
 u32 set_hw_edca_param(struct mac_ax_adapter *adapter,
 		      struct mac_ax_edca_param *param)
 {
-	u32 val32;
+	u32 val32 = 0;
 	u32 reg_edca;
-	u32 ret;
+	u32 ret = MACNOITEM;
 	u8 ecw;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
@@ -111,32 +111,34 @@ u32 set_hw_edca_param(struct mac_ax_adapter *adapter,
 	}
 
 	ecw = (param->ecw_max << 4) | param->ecw_min;
-	val32 = MAC_REG_R32(reg_edca);
 
 	switch (param->ac) {
 	case MAC_AX_CMAC_AC_SEL_VO:
-		val32 = BIT_SET_AIFS_VO(val32, param->aifs_us) |
-			BIT_SET_CW_VO(val32, ecw) |
-			BIT_SET_TXOPLIMIT_VO(val32, param->txop_32us);
+		val32 = (param->aifs_us << BIT_SHIFT_AIFS_VO) |
+				(ecw << BIT_SHIFT_CW_VO) |
+				(param->txop_32us << BIT_SHIFT_TXOPLIMIT_VO);
 		break;
 	case MAC_AX_CMAC_AC_SEL_VI:
-		val32 = BIT_SET_AIFS_VI(val32, param->aifs_us) |
-			BIT_SET_CW_VI(val32, ecw) |
-			BIT_SET_TXOPLIMIT_VI(val32, param->txop_32us);
+		val32 = (param->aifs_us << BIT_SHIFT_AIFS_VI) |
+			(ecw << BIT_SHIFT_CW_VI) |
+			(param->txop_32us << BIT_SHIFT_TXOPLIMIT_VI);
 		break;
 	case MAC_AX_CMAC_AC_SEL_BE:
-		val32 = BIT_SET_AIFS_BE(val32, param->aifs_us) |
-			BIT_SET_CW_BE(val32, ecw) |
-			BIT_SET_TXOPLIMIT_BE(val32, param->txop_32us);
+		val32 = (param->aifs_us << BIT_SHIFT_AIFS_BE) |
+				(ecw << BIT_SHIFT_CW_BE) |
+				(param->txop_32us << BIT_SHIFT_TXOPLIMIT_BE);
 		break;
 	case MAC_AX_CMAC_AC_SEL_BK:
-		val32 = BIT_SET_AIFS_BK(val32, param->aifs_us) |
-			BIT_SET_CW_BK(val32, ecw) |
-			BIT_SET_TXOPLIMIT_BK(val32, param->txop_32us);
+		val32 = (param->aifs_us << BIT_SHIFT_AIFS_BK) |
+				(ecw << BIT_SHIFT_CW_BK) |
+				(param->txop_32us << BIT_SHIFT_TXOPLIMIT_BK);
 		break;
 	default:
 		return MACNOITEM;
 	}
+
+	MAC_REG_W32(reg_edca, val32);
+
 
 	return MACSUCCESS;
 }

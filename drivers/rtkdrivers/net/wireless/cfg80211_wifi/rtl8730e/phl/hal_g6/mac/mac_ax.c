@@ -76,6 +76,7 @@ static u8 chk_pltfm_cb(void *drv_adapter, enum mac_ax_intf intf,
 	if (!pltfm_cb->reg_r8 || !pltfm_cb->reg_r16 ||
 	    !pltfm_cb->reg_r32 || !pltfm_cb->reg_w8 ||
 	    !pltfm_cb->reg_w16 || !pltfm_cb->reg_w32 ||
+	    !pltfm_cb->mem_write || !pltfm_cb->mem_read ||
 	    !pltfm_cb->sys_reg_r8 || !pltfm_cb->sys_reg_r16 ||
 	    !pltfm_cb->sys_reg_r32 || !pltfm_cb->sys_reg_w8 ||
 	    !pltfm_cb->sys_reg_w16 || !pltfm_cb->sys_reg_w32) {
@@ -363,12 +364,12 @@ u32 mac_ax_phl_init(void *phl_adapter, struct mac_ax_adapter *mac_adapter)
 #endif
 u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 {
-	u32 ret;
+	u32 ret = MACSUCCESS;
 	struct mac_ax_efuse_param *efuse_param = &adapter->efuse_param;
 	struct mac_ax_cmd_ofld_info *ofld_info = &adapter->cmd_ofld_info;
 	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
-	struct scan_chinfo_list *scan_list;
-	u32 priv_size;
+	struct scan_chinfo_list *scan_list = NULL;
+	u32 priv_size = 0;
 
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]h2c buffer exit %d\n", ret);

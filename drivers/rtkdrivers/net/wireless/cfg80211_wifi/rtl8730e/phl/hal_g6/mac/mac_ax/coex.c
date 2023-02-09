@@ -64,31 +64,21 @@ u32 mac_cfg_plt(struct mac_ax_adapter *adapter, struct mac_ax_plt *plt)
 }
 
 u32 mac_read_coex_reg(struct mac_ax_adapter *adapter,
-		      const u32 offset, u32 *val)
+		      const u32 addr, u32 *val)
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-	if (offset > 0xFF) {
-		PLTFM_MSG_ERR("[ERR]offset exceed coex reg\n");
-		return MACBADDR;
-	}
-
-	//*val = MAC_REG_R32(R_AX_BTC_CFG + offset);
+	*val = MAC_REG_R32(addr);
 
 	return MACSUCCESS;
 }
 
 u32 mac_write_coex_reg(struct mac_ax_adapter *adapter,
-		       const u32 offset, const u32 val)
+		       const u32 addr, const u32 val)
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-	if (offset > 0xFF) {
-		PLTFM_MSG_ERR("[ERR]offset exceed coex reg\n");
-		return MACBADDR;
-	}
-
-	//MAC_REG_W32(R_AX_BTC_CFG + offset, val);
+	MAC_REG_W32(addr, val);
 
 	return MACSUCCESS;
 }

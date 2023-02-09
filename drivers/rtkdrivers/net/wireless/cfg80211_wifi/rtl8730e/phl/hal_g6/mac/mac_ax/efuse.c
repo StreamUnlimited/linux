@@ -624,16 +624,14 @@ static u32 proc_dump_efuse(struct mac_ax_adapter *adapter)
 static u32 read_hw_efuse(struct mac_ax_adapter *adapter, u32 offset,
 			 u32 size, u8 *map)
 {
-	u32 tmp32 = 0, i;
+	u32 tmp32 = 0;
 	u32 ret = MACSUCCESS;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
 
-	for (i = 0; i < size; i++) {
-		ret = p_ops->efuse_read8(adapter, offset + i, map + i);
-		if (ret != MACSUCCESS) {
-			return MACEFUSEREAD;
-		}
+	ret = p_ops->efuse_read8(adapter, offset, map, size);
+	if (ret != MACSUCCESS) {
+		return MACEFUSEREAD;
 	}
 
 	return ret;
@@ -653,7 +651,7 @@ static u32 write_hw_efuse(struct mac_ax_adapter *adapter, u32 offset, u8 value)
 	*bank_efuse_info.log_map_valid = 0;
 	PLTFM_MUTEX_UNLOCK(&efuse_tbl.lock);
 
-	ret = p_ops->efuse_write8(adapter, offset, value);
+	ret = p_ops->efuse_write8(adapter, offset, value, 1);
 	if (ret != MACSUCCESS) {
 		return MACEFUSEWRITE;
 	}
@@ -813,23 +811,23 @@ static u32 proc_write_log_efuse(struct mac_ax_adapter *adapter, u32 offset,
 			return MACEFUSESIZE;
 		}
 
-		ret = p_ops->efuse_write8(adapter, end, 0xFF);//header[7:0]
+		ret = p_ops->efuse_write8(adapter, end, 0xFF, 1);//header[7:0]
 		if (ret != 0) {
 			goto error;
 		}
 
 		ret = p_ops->efuse_write8(adapter, end + 1, (OTP_LBASE_EFUSE << 4) |
-					  ((offset >> 8) & 0x0F));//header[15:8]
+					  ((offset >> 8) & 0x0F), 1);//header[15:8]
 		if (ret != 0) {
 			goto error;
 		}
 
-		ret = p_ops->efuse_write8(adapter, end + 2, value);//header[31:24]
+		ret = p_ops->efuse_write8(adapter, end + 2, value, 1);//header[31:24]
 		if (ret != 0) {
 			goto error;
 		}
 
-		ret = p_ops->efuse_write8(adapter, end + 3, ((OTP_LTYP1 << 4) | 0x0F));
+		ret = p_ops->efuse_write8(adapter, end + 3, ((OTP_LTYP1 << 4) | 0x0F), 1);
 		if (ret != 0) {
 			goto error;
 		}

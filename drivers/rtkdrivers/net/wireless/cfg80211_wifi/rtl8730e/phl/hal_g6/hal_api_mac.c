@@ -23,6 +23,7 @@
 #endif
 #endif
 #include "hal_api.h"
+#include "btc/hal_btc.h"
 
 #define RTL8852A_FPGA_VERIFICATION 1
 
@@ -61,6 +62,7 @@ void hal_mac_get_hwinfo(struct hal_info_t *hal, struct hal_spec_t *hal_spec)
 enum rtw_hal_status
 rtw_hal_mac_watchdog(struct hal_info_t *hal_info, struct rtw_phl_com_t *phl_com) {
 	struct mac_ax_adapter *mac = (struct mac_ax_adapter *)hal_info->mac;
+	struct btc_t *btc = hal_info->btc;
 	struct mac_ax_wdt_param param = {0};
 	u32 ret = 0;
 
@@ -69,6 +71,9 @@ rtw_hal_mac_watchdog(struct hal_info_t *hal_info, struct rtw_phl_com_t *phl_com)
 	param.tp.tx_tp = (u16)(phl_com->phl_stats.tx_tp_kbits >> 10);
 	param.tp.rx_tp = (u16)(phl_com->phl_stats.rx_tp_kbits >> 10);
 
+#ifdef CONFIG_BTCOEX
+	hal_btc_watchdog(btc);
+#endif
 	if (mac->ops->watchdog) {
 		ret = mac->ops->watchdog(mac, &param);
 	}
@@ -428,6 +433,10 @@ static u32 hal_mac_reg_r32(void *h, u32 addr)
 {
 	return hal_read32((struct rtw_hal_com_t *)h, addr);
 }
+static void hal_mac_mem_read(void *h, u32 addr, u8 *buf, u32 len)
+{
+	hal_read_mem((struct rtw_hal_com_t *)h, addr, buf, len);
+}
 static void hal_mac_reg_w8(void *h, u32 addr, u8 val)
 {
 	hal_write8((struct rtw_hal_com_t *)h, addr, val);
@@ -439,6 +448,10 @@ static void hal_mac_reg_w16(void *h, u32 addr, u16 val)
 static void hal_mac_reg_w32(void *h, u32 addr, u32 val)
 {
 	hal_write32((struct rtw_hal_com_t *)h, addr, val);
+}
+static void hal_mac_mem_write(void *h, u32 addr, u8 *buf, u32 len)
+{
+	hal_write_mem((struct rtw_hal_com_t *)h, addr, buf, len);
 }
 
 #ifdef CONFIG_AXI_HCI
@@ -685,9 +698,11 @@ void rtw_plt_cb_init(void)
 	rtw_plt_cb.reg_r8 = hal_mac_reg_r8;
 	rtw_plt_cb.reg_r16 = hal_mac_reg_r16;
 	rtw_plt_cb.reg_r32 = hal_mac_reg_r32;
+	rtw_plt_cb.mem_read = hal_mac_mem_read;
 	rtw_plt_cb.reg_w8 = hal_mac_reg_w8;
 	rtw_plt_cb.reg_w16 = hal_mac_reg_w16;
 	rtw_plt_cb.reg_w32 = hal_mac_reg_w32;
+	rtw_plt_cb.mem_write = hal_mac_mem_write;
 #endif /* CONFIG_PCI_HCI */
 
 #ifdef CONFIG_AXI_HCI
@@ -1074,16 +1089,13 @@ u32 rtw_hal_mac_coex_init(struct rtw_hal_com_t *hal_com, u8 pta_mode, u8 directi
 	return (ops->coex_init(mac, &pta_para));
 }
 
-u32 rtw_hal_mac_coex_reg_read(struct rtw_hal_com_t *hal_com, u32 offset, u32 *value)
+u32 rtw_hal_mac_coex_reg_read(struct rtw_hal_com_t *hal_com, u32 addr, u32 *value)
 {
 	struct hal_info_t *hal = hal_com->hal_priv;
 	struct mac_ax_adapter *mac = hal_to_mac(hal);
 	struct mac_ax_ops *ops = mac->ops;
 
-	/* valid offset -> 0xda00~0xdaff  */
-	offset = offset & 0xff;
-
-	return (ops->coex_read(mac, offset, value));
+	return (ops->coex_read(mac, addr, value));
 }
 
 u32 rtw_hal_mac_set_grant(struct rtw_hal_com_t *hal_com, u8 *value)
@@ -1092,13 +1104,20 @@ u32 rtw_hal_mac_set_grant(struct rtw_hal_com_t *hal_com, u8 *value)
 	struct mac_ax_adapter *mac = hal_to_mac(hal);
 	struct mac_ax_ops *ops = mac->ops;
 	struct mac_ax_coex_gnt gnt_val;
+	u32 ret = MACSUCCESS;
 
-	gnt_val.band.gnt_bt_bb_sw_en = value[0];
-	gnt_val.band.gnt_bt_bb_sw = value[1];
-	gnt_val.band.gnt_bt_rfc_sw_en = value[2];
-	gnt_val.band.gnt_bt_rfc_sw = value[3];
+	if (value[0] == 0) {
+		gnt_val.state = BTC_GNT_HW_PTA;
+		ret = ops->set_hw_value(mac, MAC_AX_HW_SET_COEX_GNT, &gnt_val);
+	} else if ((value[0] == 1) && (value[1] == 0)) {
+		gnt_val.state = BTC_GNT_SW_LOW;
+		ret = ops->set_hw_value(mac, MAC_AX_HW_SET_COEX_GNT, &gnt_val);
+	} else if ((value[0] == 1) && (value[1] == 1)) {
+		gnt_val.state = BTC_GNT_SW_HIGH;
+		ret = ops->set_hw_value(mac, MAC_AX_HW_SET_COEX_GNT, &gnt_val);
+	}
 
-	return (ops->set_hw_value(mac, MAC_AX_HW_SET_COEX_GNT, &gnt_val));
+	return ret;
 }
 
 u32 rtw_hal_mac_get_grant(struct rtw_hal_com_t *hal_com, u8 *value)
@@ -1110,7 +1129,7 @@ u32 rtw_hal_mac_get_grant(struct rtw_hal_com_t *hal_com, u8 *value)
 	return (ops->get_hw_value(mac, MAC_AX_HW_GET_COEX_GNT, value));
 }
 
-u32 rtw_hal_mac_set_polluted(struct rtw_hal_com_t *hal_com, u8 band, u8 tx_val, u8 rx_val)
+u32 rtw_hal_mac_set_polluted(struct rtw_hal_com_t *hal_com, u8 band, u32 tx_val, u32 rx_val)
 {
 	struct hal_info_t *hal = hal_com->hal_priv;
 	struct mac_ax_adapter *mac = hal_to_mac(hal);
@@ -1122,6 +1141,24 @@ u32 rtw_hal_mac_set_polluted(struct rtw_hal_com_t *hal_com, u8 band, u8 tx_val, 
 	plt_val.rx = rx_val;
 
 	return (ops->set_hw_value(mac, MAC_AX_HW_SET_POLLUTED, &plt_val));
+}
+
+u32 rtw_hal_mac_get_scoreboard(struct rtw_hal_com_t *hal_com, u32 *val)
+{
+	struct hal_info_t *hal = hal_com->hal_priv;
+	struct mac_ax_adapter *mac = hal_to_mac(hal);
+	struct mac_ax_ops *ops = mac->ops;
+
+	return (ops->get_scbd(mac, val));
+}
+
+u32 rtw_hal_mac_set_scoreboard(struct rtw_hal_com_t *hal_com, u32 val)
+{
+	struct hal_info_t *hal = hal_com->hal_priv;
+	struct mac_ax_adapter *mac = hal_to_mac(hal);
+	struct mac_ax_ops *ops = mac->ops;
+
+	return (ops->set_scbd(mac, val));
 }
 
 u32 rtw_hal_mac_set_tx_time(struct rtw_hal_com_t *hal_com, u8 is_btc, u8 is_resume, u8 macid, u32 tx_time)
@@ -1267,16 +1304,13 @@ u32 rtw_hal_mac_get_coex_ctrl(struct rtw_hal_com_t *hal_com, u32 *val)
 #endif
 }
 
-u32 rtw_hal_mac_coex_reg_write(struct rtw_hal_com_t *hal_com, u32 offset, u32 value)
+u32 rtw_hal_mac_coex_reg_write(struct rtw_hal_com_t *hal_com, u32 addr, u32 value)
 {
 	struct hal_info_t *hal = hal_com->hal_priv;
 	struct mac_ax_adapter *mac = hal_to_mac(hal);
 	struct mac_ax_ops *ops = mac->ops;
 
-	/* valid offset -> 0xda00~0xdaff  */
-	offset = offset & 0xff;
-
-	return (ops->coex_write(mac, offset, value));
+	return (ops->coex_write(mac, addr, value));
 }
 
 #ifdef CONFIG_AXI_HCI
@@ -4517,35 +4551,14 @@ _hal_mac_chk_pkt_ofld(struct hal_info_t *hal_info) {
 	void *d = hal_to_drvpriv(hal_info);
 	u16 loop_cnt = 0;
 
-	if (mac == NULL)
-	{
-		return RTW_HAL_STATUS_MAC_INIT_FAILURE;
-	}
+	/* not neccessary to check the h2c done */
 
-	do
-	{
-		if (mac->ops->check_fwofld_done(mac, 1) == MACSUCCESS) {
-			break;
-		}
-
-		_os_sleep_ms(d, POLLING_HALMAC_TIME);
-
-		loop_cnt++;
-	} while (loop_cnt < POLLING_HALMAC_CNT);
-
-	if (loop_cnt < POLLING_HALMAC_CNT)
-	{
-		PHL_PRINT("%s, check count = %d.\n", __func__, loop_cnt);
-		return RTW_HAL_STATUS_SUCCESS;
-	} else
-	{
-		PHL_ERR("%s, polling timeout!!!\n", __func__);
-		return RTW_HAL_STATUS_FAILURE;
-	}
+	return RTW_HAL_STATUS_SUCCESS;
 }
 
 enum rtw_hal_status
-_hal_mac_add_pkt_ofld(struct hal_info_t *hal_info, u8 *pkt, u16 len, u8 *id) {
+_hal_mac_add_pkt_ofld(struct hal_info_t *hal_info, u8 *pkt, u16 len, u8 *id,
+		      u8 type) {
 	struct mac_ax_adapter *mac = (struct mac_ax_adapter *)hal_info->mac;
 	u32 status;
 
@@ -4556,7 +4569,7 @@ _hal_mac_add_pkt_ofld(struct hal_info_t *hal_info, u8 *pkt, u16 len, u8 *id) {
 
 	PHL_PRINT("%s: len %d.\n", __func__, len);
 
-	status = mac->ops->add_pkt_ofld(mac, pkt, len, id);
+	status = mac->ops->add_pkt_ofld(mac, pkt, len, id, type);
 	if (status != MACSUCCESS)
 	{
 		PHL_ERR("%s fault, status = %d.\n", __func__, status);
@@ -4621,13 +4634,13 @@ _hal_mac_read_pkt_ofld(struct hal_info_t *hal_info, u8 *id) {
 }
 
 enum rtw_hal_status rtw_hal_mac_pkt_ofld(struct hal_info_t *hal, u8 *id, u8 op,
-		u8 *pkt, u16 *len)
+		u8 *pkt, u16 *len, u8 type)
 {
 	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
 
 	switch (op) {
 	case PKT_OFLD_ADD:
-		status = _hal_mac_add_pkt_ofld(hal, pkt, *len, id);
+		status = _hal_mac_add_pkt_ofld(hal, pkt, *len, id, type);
 		break;
 
 	case PKT_OFLD_DEL:
@@ -4653,19 +4666,19 @@ enum rtw_hal_status rtw_hal_mac_pkt_update_ids(struct hal_info_t *hal,
 	struct mac_ax_general_pkt_ids mac_ids = {0};
 	u32 status;
 
-	mac_ids.macid = (u8)entry->macid;
 	mac_ids.probersp = entry->pkt_info[PKT_TYPE_PROBE_RSP].id;
 	mac_ids.pspoll = entry->pkt_info[PKT_TYPE_PS_POLL].id;
 	mac_ids.nulldata = entry->pkt_info[PKT_TYPE_NULL_DATA].id;
 	mac_ids.qosnull = entry->pkt_info[PKT_TYPE_QOS_NULL].id;
+	mac_ids.btqosnull = entry->pkt_info[PKT_TYPE_BT_QOS_NULL].id;
 	mac_ids.cts2self = entry->pkt_info[PKT_TYPE_CTS2SELF].id;
 
-	PHL_PRINT("macid %d, probersp %d, pspoll %d, nulldata %d, qosnull %d, cts2self %d.\n",
-		  mac_ids.macid,
+	PHL_PRINT("probersp %d, pspoll %d, nulldata %d, qosnull %d, btqosnull %d, cts2self %d.\n",
 		  mac_ids.probersp,
 		  mac_ids.pspoll,
 		  mac_ids.nulldata,
 		  mac_ids.qosnull,
+		  mac_ids.btqosnull,
 		  mac_ids.cts2self);
 
 	status = mac->ops->general_pkt_ids(mac, &mac_ids);
@@ -6266,7 +6279,7 @@ rtw_hal_mac_set_edca(struct rtw_hal_com_t *hal_com, u8 band, u8 wmm, u8 ac,
 	struct mac_ax_edca_param edca = {0};
 	u32 err = 0;
 
-
+	edca.ac = ac;
 	edca.band = band;
 	edca.path = _ac_drv2mac(ac, wmm);
 	edca.txop_32us = param  >> 16;

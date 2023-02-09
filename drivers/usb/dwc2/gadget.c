@@ -4639,6 +4639,9 @@ static int dwc2_hsotg_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct dwc2_hsotg *hsotg = to_hsotg(gadget);
 	unsigned long flags = 0;
+#ifdef CONFIG_ARCH_AMEBAD2
+	int ret = 0;
+#endif
 
 	dev_dbg(hsotg->dev, "%s: is_on: %d op_state: %d\n", __func__, is_on,
 		hsotg->op_state);
@@ -4654,12 +4657,11 @@ static int dwc2_hsotg_pullup(struct usb_gadget *gadget, int is_on)
 		hsotg->enabled = 1;
 		dwc2_hsotg_core_init_disconnected(hsotg, false);
 	#ifdef CONFIG_ARCH_AMEBAD2
-		int ret = 0;
 		ret = rtk_phy_calibrate(hsotg);
 		if (ret != 0) {
 			dev_err(hsotg->dev,"PHY calibration fail\n");
 			return ret;
-                }
+        }
 	#endif
 		/* Enable ACG feature in device mode,if supported */
 		dwc2_enable_acg(hsotg);

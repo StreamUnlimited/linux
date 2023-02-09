@@ -30,6 +30,9 @@
 #include "hv_type.h"
 #endif
 
+#define TX_PKTBUF_OFFSET (0x20000)
+#define TX_PKTBUF_LEN (0x8000)
+
 #define SYSTEM_CTRL_BASE_LP  0x42008000
 #define REG_LSYS_FEN_GRP0  0x208
 #define FEN_WLAFE_CTRL  BIT(24)
@@ -71,7 +74,7 @@
 #define BIT_CLEAR_XTAL_SC_XO(x)			((x) & (~BITS_XTAL_SC_XO))
 #define BIT_SET_XTAL_SC_XO(x, v)	(BIT_CLEAR_XTAL_SC_XO(x) | BIT_XTAL_SC_XO(v))
 
-#define BIT_SHIFT_XTAL_SC_XI		(XTAL_REG_BASE + 10)
+#define BIT_SHIFT_XTAL_SC_XI		10
 #define BIT_MASK_XTAL_SC_XI			0x7F
 #define BIT_XTAL_SC_XI(x)		(((x) & BIT_MASK_XTAL_SC_XI) << BIT_SHIFT_XTAL_SC_XI)
 #define BITS_XTAL_SC_XI				(BIT_MASK_XTAL_SC_XI << BIT_SHIFT_XTAL_SC_XI)
@@ -116,6 +119,12 @@
 #define WLAFE_BIT_WLRFC_SAVE_EN              ((u32)0x00000001 << 2)          /*!<R/W 0  1: backup(save) 0: restore */
 #define WLAFE_BIT_WLRFC_PWC_SEL              ((u32)0x00000001 << 3)          /*!<R/W 1  Option to turn off wlrfc pwr cut 1: enable 0: disable */
 /** @} */
+
+
+#define LSYS_BIT_BT_USE_WL_RFAFE ((u32)0x00000001 << 0) /*!<R/W 0  Indicate BT select WL RFAFE, shall not switch when BT is on */
+
+#define REG_LSYS_BT_CTRL0 0x0250
+
 
 #define PAD_BASE  0x42008A00
 #define GPIOB_04  0x034
@@ -164,6 +173,10 @@
 	adapter->pltfm_cb->reg_w32(adapter->drv_adapter, addr, val)
 
 #if MAC_AX_AXI_SUPPORT
+#define PLTFM_MEM_R(addr, buf, len)                                            \
+	adapter->pltfm_cb->mem_read(adapter->drv_adapter, addr, buf, len)
+#define PLTFM_MEM_W(addr, buf, len)                                            \
+	adapter->pltfm_cb->mem_write(adapter->drv_adapter, addr, buf, len)
 #define PLTFM_SYS_REG_R8(base, addr)                                           \
 	adapter->pltfm_cb->sys_reg_r8(adapter->drv_adapter, base, addr)
 #define PLTFM_SYS_REG_R16(base, addr)                                          \
@@ -7753,11 +7766,14 @@ struct mac_ax_conf_ofld_info {
  * Please Place Description here.
  */
 struct mac_ax_pkt_ofld_info {
-#define PKT_OFLD_MAX_COUNT 256
+	u8 probersp_page;
+	u8 pspoll_page;
+	u8 nulldata_page;
+	u8 qosnull_page;
+	u8 btqosnull_page;
+	u8 cts2self_page;
+	u8 ltecoexqosnull_page;
 	u8 last_op;
-	u16 free_id_count;
-	u16 used_id_count;
-	u8 id_bitmap[PKT_OFLD_MAX_COUNT >> 3];
 };
 
 /**
@@ -7802,11 +7818,11 @@ struct mac_ax_pkt_ofld_pkt {
  * offloaded CSA frame id
  */
 struct mac_ax_general_pkt_ids {
-	u8 macid;
 	u8 probersp;
 	u8 pspoll;
 	u8 nulldata;
 	u8 qosnull;
+	u8 btqosnull;
 	u8 cts2self;
 	u8 probereq;
 	u8 apcsa;
@@ -13249,10 +13265,10 @@ struct mac_ax_rrsr_cfg {
 	u32 dcm_en: 1;
 	u32 dcm_sel: 1;
 	u32 ref_rate_sel: 1;
-	u32 ref_rate: 9;
+	u32 ref_rate: 10;
 	u32 cck_cfg: 4;
 	u32 ftm_rrsr_rate_en: 4;
-	u32 rsvd: 6;
+	u32 rsvd: 2;
 
 	u32 ofdm_cfg: 8;
 	u32 ht_cfg: 8;
@@ -14320,13 +14336,9 @@ struct mac_ax_coex_gnt {
  * Please Place Description here.
  */
 struct mac_ax_plt {
-#define MAC_AX_PLT_LTE_RX BIT(0)
-#define MAC_AX_PLT_GNT_BT_TX BIT(1)
-#define MAC_AX_PLT_GNT_BT_RX BIT(2)
-#define MAC_AX_PLT_GNT_WL BIT(3)
 	u8 band;
-	u8 tx;
-	u8 rx;
+	u32 tx;
+	u32 rx;
 };
 
 /**
@@ -15369,9 +15381,11 @@ struct mac_ax_pltfm_cb {
 	u8(*reg_r8)(void *drv_adapter, u32 addr);
 	u16(*reg_r16)(void *drv_adapter, u32 addr);
 	u32(*reg_r32)(void *drv_adapter, u32 addr);
+	void (*mem_read)(void *drv_adapter, u32 addr, u8 *buf, u32 ken);
 	void (*reg_w8)(void *drv_adapter, u32 addr, u8 val);
 	void (*reg_w16)(void *drv_adapter, u32 addr, u16 val);
 	void (*reg_w32)(void *drv_adapter, u32 addr, u32 val);
+	void (*mem_write)(void *drv_adapter, u32 addr, u8 *buf, u32 ken);
 	u8(*sys_reg_r8)(void *drv_adapter, u32 base, u32 addr);
 	u16(*sys_reg_r16)(void *drv_adapter, u32 base, u32 addr);
 	u32(*sys_reg_r32)(void *drv_adapter, u32 base, u32 addr);
@@ -15497,11 +15511,6 @@ struct mac_ax_adapter {
 	struct mac_ax_dle_info dle_info;
 	struct mac_ax_gpio_info gpio_info;
 	struct mac_role_tbl_head *role_tbl;
-	struct mac_ax_read_ofld_info read_ofld_info;
-	struct mac_ax_read_ofld_value read_ofld_value;
-	struct mac_ax_write_ofld_info write_ofld_info;
-	struct mac_ax_efuse_ofld_info efuse_ofld_info;
-	struct mac_ax_conf_ofld_info conf_ofld_info;
 	struct mac_ax_pkt_ofld_info pkt_ofld_info;
 	struct mac_ax_pkt_ofld_pkt pkt_ofld_pkt;
 	struct mac_ax_cmd_ofld_info cmd_ofld_info;
@@ -15542,7 +15551,6 @@ struct mac_ax_adapter {
 	struct mac_ax_scanofld_info scanofld_info;
 	struct mac_ax_fw_log log_cfg;
 	struct mac_ax_twt_info *twt_info;
-	struct mac_ax_ch_switch_rpt *ch_switch_rpt;
 	struct mac_ax_dbcc_info *dbcc_info;
 	enum halmac_dma_mapping pq_map[HALMAC_PQ_MAP_NUM];
 	struct halmac_txff_allocation txff_alloc;
@@ -16561,7 +16569,7 @@ struct mac_ax_ops {
 	u32(*read_pkt_ofld)(struct mac_ax_adapter *adapter, u8 id);
 	u32(*del_pkt_ofld)(struct mac_ax_adapter *adapter, u8 id);
 	u32(*add_pkt_ofld)(struct mac_ax_adapter *adapter, u8 *pkt,
-			   u16 len, u8 *id);
+			   u16 len, u8 *id, u8 type);
 	u32(*pkt_ofld_packet)(struct mac_ax_adapter *adapter,
 			      u8 **pkt_buf, u16 *pkt_len, u8 *pkt_id);
 	u32(*dump_efuse_ofld)(struct mac_ax_adapter *adapter, u32 efuse_size,
@@ -17022,9 +17030,11 @@ struct mac_ax_ops {
 	u32(*coex_init)(struct mac_ax_adapter *adapter,
 			struct mac_ax_coex *coex);
 	u32(*coex_read)(struct mac_ax_adapter *adapter,
-			const u32 offset, u32 *val);
+			const u32 addr, u32 *val);
 	u32(*coex_write)(struct mac_ax_adapter *adapter,
-			 const u32 offset, const u32 val);
+			 const u32 addr, const u32 val);
+	u32(*get_scbd)(struct mac_ax_adapter *adapter, u32 *val);
+	u32(*set_scbd)(struct mac_ax_adapter *adapter, u32 val);
 	u32(*trigger_cmac_err)(struct mac_ax_adapter *adapter);
 	u32(*trigger_cmac1_err)(struct mac_ax_adapter *adapter);
 	u32(*trigger_dmac_err)(struct mac_ax_adapter *adapter);

@@ -202,6 +202,8 @@ static u32 _hal_get_bd_idx_reg_8730ea(u8 dma_ch)
 	default :
 		PHL_TRACE(COMP_PHL_DBG, _PHL_WARNING_, "[WARNING]unknown channel (%d)\n",
 			  dma_ch);
+		printk("[WARNING]unknown channel (%d)\n",
+			  dma_ch);
 		reg = 0xFFFF;
 		break;
 	}
@@ -661,7 +663,7 @@ hal_update_txbd_8730ea(struct hal_info_t *hal,
 			SET_TXBUFFER_DESC_PSB(target_txbd, RTW_DIV_ROUND_UP(wd_page->total_len, TXBD_PAGE_SIZE));
 			SET_TXBUFFER_DESC_ADD_LOW(target_txbd, wd_page->phy_addr_l);
 
-			add_info = wd_page->phy_addr_l + TX_WIFI_INFO_SIZE;
+			add_info = (u8 *)(wd_page->phy_addr_l + TX_WIFI_INFO_SIZE);
 			sub_seg_num = (int)(wd_page->seg_num);
 
 			SET_TXBUFFER_DESC_MODE_WITH_OFFSET(target_txbd, 1, 1);
@@ -1134,7 +1136,7 @@ static void _hal_trx_init_bd_8730ea(struct hal_info_t *hal, u8 *txbd_buf, u8 *rx
 		if (0 != reg_addr_l) {
 			hal_write32(hal->hal_com, reg_addr_l, value32);
 		} else {
-			PHL_ERR("query txbd desc reg_addr_l fail (bcn queue)\n", i);
+			PHL_ERR("query txbd desc reg_addr_l fail (bcn queue)\n");
 		}
 
 		/* RX queue */

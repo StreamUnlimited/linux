@@ -33,6 +33,9 @@
 #include "ameba_audio_clock.h"
 
 #define NO_MICRO_ADJUST 1
+#define IRQ_COMPENSATE_BASING_ON_DELTA_DELAY 1
+#define COUNTER_COMPENSATE_BASING_ON_DELTA_DELAY 1
+#define MAX_SPORT_IRQ_X 134217727
 
 struct sport_dai {
 	/* Platform device for this DAI */
@@ -76,6 +79,7 @@ struct sport_dai {
 	/* size that LRCLK delivers, that triggers one sport irq */
 	u64 tx_sport_compare_val;
 	u64 rx_sport_compare_val;
+	u64 last_total_delay;
 
 	spinlock_t lock;
 };
@@ -122,7 +126,7 @@ static const struct attribute_group sport_debug_attr_grp = {
 void dumpSportRegs(struct device *dev,void __iomem * sportx){
 	u32 tmp;
 	struct sport_dai *sport = dev_get_drvdata(dev);
-	if ( sport -> sport_debug >= 1 ) {
+	if (sport -> sport_debug >= 1) {
 		tmp = readl(sportx + REG_SP_REG_MUX);
 		sport_info(1, dev, "REG_SP_REG_MUX:%x",tmp);
 		tmp = readl(sportx + REG_SP_CTRL0);
@@ -199,33 +203,41 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	int fifo_bytes = 128;
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
-	switch ( cmd ) {
+	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		audio_sp_dma_cmd(sport->addr, true);
 
-		if ( is_playback ) {
+		if (is_playback) {
+			/*should init last_total_delay as dma buf size, so that irq compensate will succeed*/
+			sport->last_total_delay = sport->tx_sport_compare_val;
 			sport->total_tx_counter_boundary = substream->runtime->boundary;
+			while ((sport->tx_sport_compare_val * 2 <= sport->total_tx_counter_boundary) && (sport->tx_sport_compare_val * 2 <= MAX_SPORT_IRQ_X) )
+				sport->tx_sport_compare_val *= 2;
 			sport->total_tx_counter = 0;
 			sport->irq_tx_count = 0;
 			sport->dma_playback.total_sport_counter = 0;
-			dev_info(&sport->pdev->dev,"tx X:%d, counter boundary:%d", sport->tx_sport_compare_val, sport->total_tx_counter_boundary);
+			sport_info(1,&sport->pdev->dev,"tx X:%llu, counter boundary:%llu", sport->tx_sport_compare_val, sport->total_tx_counter_boundary);
 			audio_sp_tx_start(sport->addr, true);
-			audio_sp_set_tx_count(sport->addr, sport->tx_sport_compare_val);
+			audio_sp_set_tx_count(sport->addr, (u32)(sport->tx_sport_compare_val));
 		} else {
+			/*should init last_total_delay as dma buf size, so that irq compensate will succeed*/
+			sport->last_total_delay = sport->rx_sport_compare_val;
 			sport->total_rx_counter_boundary = substream->runtime->boundary;
+			while ((sport->rx_sport_compare_val * 2 <= sport->total_rx_counter_boundary) && (sport->rx_sport_compare_val * 2 <= MAX_SPORT_IRQ_X) )
+				sport->rx_sport_compare_val *= 2;
 			sport->total_rx_counter = 0;
 			sport->irq_rx_count = 0;
 			sport->dma_capture.total_sport_counter = 0;
-			sport_info(1, &sport->pdev->dev,"rx X:%d, counter boundary:%d", sport->rx_sport_compare_val, sport->total_rx_counter_boundary);
+			sport_info(1,&sport->pdev->dev,"rx X:%llu, counter boundary:%llu", sport->rx_sport_compare_val, sport->total_rx_counter_boundary);
 			audio_sp_rx_start(sport->addr, true);
-			audio_sp_set_rx_count(sport->addr, sport->rx_sport_compare_val);
+			audio_sp_set_rx_count(sport->addr, (u32)(sport->rx_sport_compare_val));
 		}
 
-		if ( sport->sport_debug == 2 ){
+		if (sport->sport_debug == 2 ){
 			msleep(8); //sleep 8ms to wait for rx data to debug
-			if ( !is_playback ){
+			if (!is_playback ){
 				for (i = 0;i < fifo_bytes; i++)
 					sport_verbose(2,&sport->pdev->dev,"trigger sport1 fifo0: %x",readb(sport->addr + REG_SP_RX_FIFO_0_RD_ADDR + i));
 			}
@@ -238,7 +250,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		audio_sp_dma_cmd(sport->addr, false);
 
-		if ( is_playback ) {
+		if (is_playback ) {
 			audio_sp_tx_start(sport->addr, false);
 			audio_sp_disable_tx_count(sport->addr);
 		} else {
@@ -246,7 +258,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 			audio_sp_disable_rx_count(sport->addr);
 		}
 
-		sport_info(1,&sport->pdev->dev,"%s stop done \n",__func__);
+		sport_info(1, &sport->pdev->dev,"%s stop done \n",__func__);
 		break;
 	}
 
@@ -256,23 +268,23 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 static int enable_audio_source_clock(struct clock_params * params, int id, bool enabled)
 {
 	int ret = 0;
-	if ( params->clock == PLL_CLOCK_98P304M ) {
-#if ( !I2S_PLL_ALWAYS_ON )
+	if (params->clock == PLL_CLOCK_98P304M) {
+#if (!I2S_PLL_ALWAYS_ON)
 		update_98MP304M_input_clock_status(enabled);
 #endif
-		if ( enabled )
+		if (enabled)
 			choose_input_clock_for_sport_index(id, CKSL_I2S_PLL98M);
-	} else if ( params->clock == PLL_CLOCK_45P1584M ) {
-#if ( !I2S_PLL_ALWAYS_ON )
+	} else if (params->clock == PLL_CLOCK_45P1584M) {
+#if (!I2S_PLL_ALWAYS_ON)
 		update_45MP158_input_clock_status(enabled);
 #endif
-		if ( enabled )
+		if (enabled)
 			choose_input_clock_for_sport_index(id, CKSL_I2S_PLL45M);
-	} else if ( params->clock == PLL_CLOCK_24P576M ) {
-#if ( !I2S_PLL_ALWAYS_ON )
+	} else if (params->clock == PLL_CLOCK_24P576M) {
+#if (!I2S_PLL_ALWAYS_ON)
 		update_24MP576_input_clock_status(enabled);
 #endif
-		if ( enabled )
+		if (enabled)
 			choose_input_clock_for_sport_index(id, CKSL_I2S_PLL24M);
 	}
 	return ret;
@@ -298,12 +310,21 @@ static snd_pcm_sframes_t sport_delay(struct snd_pcm_substream *substream, struct
 	u64 delay = 0;
 	/* delay(frames) of dma buffer */
 	u64 dma_buf_delay = 0;
+	u64 total_delay = 0;
 	bool is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct sport_dai *sport;
 	sport = snd_soc_dai_get_drvdata(dai);
 
+	if (is_playback) {
+		if (sport->dma_playback.use_mmap == true)
+			return 0;
+	} else {
+		if (sport->dma_capture.use_mmap == true)
+			return 0;
+	}
+
 	spin_lock(&sport->lock);
-	if ( is_playback ) {
+	if (is_playback) {
 		counter = audio_sp_get_tx_count(sport->addr);
 		total_counter = counter + sport->irq_tx_count * sport->tx_sport_compare_val;
 		dma_buf_delay = snd_pcm_playback_hw_avail(substream->runtime);
@@ -313,23 +334,82 @@ static snd_pcm_sframes_t sport_delay(struct snd_pcm_substream *substream, struct
 		dma_buf_delay = snd_pcm_capture_avail(substream->runtime);
 	}
 
-	if ( is_playback ) {
+	if (is_playback) {
 		/* application out of boundary, yet LRCLK frames not out of boundary */
-		if ( substream->runtime->control->appl_ptr < total_counter ) {
+		if (substream->runtime->control->appl_ptr < total_counter) {
 			delay = substream->runtime->boundary - total_counter + substream->runtime->control->appl_ptr - dma_buf_delay;
+			total_delay = substream->runtime->boundary - total_counter + substream->runtime->control->appl_ptr;
 		} else {
 			delay = substream->runtime->control->appl_ptr - total_counter - dma_buf_delay;
+			total_delay = substream->runtime->control->appl_ptr - total_counter;
 		}
 	} else {
-		if ( substream->runtime->control->appl_ptr > total_counter ) {
+		if (substream->runtime->control->appl_ptr > total_counter) {
 			delay = substream->runtime->boundary - substream->runtime->control->appl_ptr + total_counter - dma_buf_delay;
+			total_delay = substream->runtime->boundary - substream->runtime->control->appl_ptr + total_counter;
 		} else {
 			delay = total_counter - substream->runtime->control->appl_ptr - dma_buf_delay;
+			total_delay = total_counter - substream->runtime->control->appl_ptr;
 		}
 	}
 
+#if COUNTER_COMPENSATE_BASING_ON_DELTA_DELAY
+	/*
+	 * Notice that if user add log in dma irq function, then dma may run slower than it should be, so appl_ptr will finally
+	 * be less than total_counter, which will cause problem.
+	 */
+	if ((substream->runtime->control->appl_ptr < total_counter) && (total_delay > substream->runtime->boundary / 2)) {
+		pr_info("total_counter ahead of appl_ptr, make sure no log in dma irq func.");
+		delay = 0 - dma_buf_delay;
+		goto delay_end;
+	}
+#endif
+
+#if IRQ_COMPENSATE_BASING_ON_DELTA_DELAY
+	/* See workaround here.If wifi can fix this, remove workaround in sport here.
+	 * Sometimes if wifi marks all interrupts, then sport interrupt may loss, in this case we need to compensate sport irq predictly.
+	 * If sport irq loss, then the i2s counter will be less than the real value for one counter_boundary size, which is one dma buffer size.
+	 * If the current sw+hw latency suddenly changes big value, we compensate the irq.
+	 * The delay function is always called when (1)appl_ptr is updated, (2)hw_ptr is update. So it should be the prop way to compensate
+	 * sport irq in delay function.
+	 */
+	if (is_playback) {
+		if (substream->runtime->control->appl_ptr >= sport->tx_sport_compare_val) {
+			if ((total_delay > sport->last_total_delay) && (total_delay - sport->last_total_delay > (div_u64(sport->tx_sport_compare_val, 5) * 4))) {
+				//pr_info("may loss tx sport irq, manually compensate");
+				sport->irq_tx_count += 1;
+				sport->total_tx_counter += sport->tx_sport_compare_val;
+				if (sport->total_tx_counter >= sport->total_tx_counter_boundary) {
+					sport->total_tx_counter -= sport->total_tx_counter_boundary;
+					sport->irq_tx_count = 0;
+				}
+				sport->dma_playback.total_sport_counter = sport->total_tx_counter;
+				total_delay -= sport->tx_sport_compare_val;
+				delay -= sport->tx_sport_compare_val;
+			}
+		}
+	} else {
+		if (substream->runtime->control->appl_ptr >= sport->rx_sport_compare_val) {
+			if ((total_delay > sport->last_total_delay) && (total_delay - sport->last_total_delay > (div_u64(sport->rx_sport_compare_val, 5) * 4))) {
+				//pr_info("may loss rx sport irq, manually compensate");
+				sport->irq_rx_count += 1;
+				sport->total_rx_counter += sport->rx_sport_compare_val;
+				if (sport->total_rx_counter >= sport->total_rx_counter_boundary) {
+					sport->total_rx_counter -= sport->total_rx_counter_boundary;
+					sport->irq_rx_count = 0;
+				}
+				sport->dma_capture.total_sport_counter = sport->total_rx_counter;
+				total_delay -= sport->rx_sport_compare_val;
+				delay -= sport->rx_sport_compare_val;
+			}
+		}
+	}
+	sport->last_total_delay = total_delay;
+#endif
+
+delay_end:
 	spin_unlock(&sport->lock);
-	//pr_info("%s counter:%d, appl_ptr:%d total_counter:%d sport->irq_tx_count:%d dma_buf_delay:%d delay:%d\n", __func__, counter, substream->runtime->control->appl_ptr, total_counter, sport->irq_tx_count, dma_buf_delay, delay);
+	//pr_info("%s counter:%llu, appl_ptr:%lu total_counter:%llu sport->irq_tx_count:%llu dma_buf_delay:%llu total_delay:%llu, delay:%lld\n", __func__, counter, substream->runtime->control->appl_ptr, total_counter, sport->irq_tx_count, dma_buf_delay, total_delay, delay);
 
 	return delay;
 }
@@ -348,7 +428,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 
 	sport_info(1,&sport->pdev->dev,"%s: sport addr:%p,channel:%d,rate:%dhz,width:%d",__func__,sport->addr,channel_count,params_rate(params),params_width(params));
 
-	if ( substream->stream == SNDRV_PCM_STREAM_PLAYBACK ){
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
 		sport->tx_sport_compare_val = params_buffer_size(params);
 		sp_tx_init.sp_sel_data_format = SP_DF_LEFT;
 		sp_tx_init.sp_sel_ch = SP_TX_CH_LR;
@@ -359,18 +439,18 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 		sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
 		sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
 
-		if ( sport->sport_multi_io == 1 )
+		if (sport->sport_multi_io == 1)
 			sp_tx_init.sp_set_multi_io = SP_TX_MULTIIO_EN;
 		else
 			sp_tx_init.sp_set_multi_io = SP_TX_MULTIIO_DIS;
 
 		/* this means the external codec MCLK needs to be imported by sport_mclk_multiplier*sport_MCLK */
-		if ( sport->sport_mclk_multiplier != 0 ) {
-			if ( sport->sport_multi_io == 1 ) {
-				if ( choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params)!= 0 )
+		if (sport->sport_mclk_multiplier != 0) {
+			if (sport->sport_multi_io == 1) {
+				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params)!= 0)
 					return -EINVAL;
 			} else {
-				if ( choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
+				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
 					return -EINVAL;
 			}
 			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
@@ -386,7 +466,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 #endif
 		}
 
-		switch ( channel_count ) {     //params_channels - Get the number of channels from the hw params
+		switch (channel_count) {     //params_channels - Get the number of channels from the hw params
 			case 8:
 				sport->dma_playback.datawidth = 4;     //4 byte:32bit
 				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
@@ -424,7 +504,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 
-		switch ( params_width(params) ) {     //params_width - get the number of bits of the sample format,like 16LS
+		switch (params_width(params)) {     //params_width - get the number of bits of the sample format,like 16LS
 			//case 8 is supported in spec, yet fwlib not support it now.
 			case 16:
 				sp_tx_init.sp_sel_word_len = SP_TXWL_16;
@@ -448,7 +528,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 				return -EINVAL;
 		}
 
-		if ( IS_RATE_SUPPORTED(params_rate(params)) ) {
+		if (IS_RATE_SUPPORTED(params_rate(params))) {
 			sport->frmclk = params_rate(params);
 			sp_tx_init.sp_sr = params_rate(params);
 		} else {
@@ -457,7 +537,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 		}
 	}
 
-	if ( substream->stream == SNDRV_PCM_STREAM_CAPTURE ){
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE){
 		sport->rx_sport_compare_val = params_buffer_size(params);
 		sp_rx_init.sp_sel_data_format = SP_DF_LEFT;
 		sp_rx_init.sp_sel_ch = SP_RX_CH_LR;
@@ -468,17 +548,17 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 		sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
 		sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
 
-		if ( sport->sport_multi_io == 1 )
+		if (sport->sport_multi_io == 1)
 			sp_rx_init.sp_set_multi_io = SP_RX_MULTIIO_EN;
 		else
 			sp_rx_init.sp_set_multi_io = SP_RX_MULTIIO_DIS;
 
-		if ( sport->sport_mclk_multiplier != 0 ) {
-			if ( sport->sport_multi_io == 1 ) {
-				if ( choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0 )
+		if (sport->sport_mclk_multiplier != 0) {
+			if (sport->sport_multi_io == 1) {
+				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
 					return -EINVAL;
 			} else {
-				if ( choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0 )
+				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
 					return -EINVAL;
 			}
 			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
@@ -494,7 +574,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 #endif
 		}
 
-		switch ( channel_count ) {     //params_channels - Get the number of channels from the hw params
+		switch (channel_count) {     //params_channels - Get the number of channels from the hw params
 			case 8:
 				sport->dma_capture.datawidth = 4;
 				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
@@ -532,7 +612,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 
-		switch ( params_width(params) ) {     //params_width - get the number of bits of the sample format,like 16LS
+		switch (params_width(params)) {     //params_width - get the number of bits of the sample format,like 16LS
 			//case 8 is supported in spec, yet fwlib not support it now.
 			case 16:
 				sp_rx_init.sp_sel_word_len = SP_RXWL_16;
@@ -556,7 +636,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 
-		if ( IS_RATE_SUPPORTED(params_rate(params)) ) {
+		if (IS_RATE_SUPPORTED(params_rate(params))) {
 			sport->cap_frmclk = params_rate(params);
 			sp_rx_init.sp_sr = params_rate(params);
 		} else {
@@ -567,12 +647,11 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 
 	snd_soc_dai_init_dma_data(dai, &sport->dma_playback, &sport->dma_capture);
 
-	if ( substream->stream == SNDRV_PCM_STREAM_PLAYBACK )
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		audio_sp_tx_init(sport->addr, &sp_tx_init);
-	else if ( substream->stream == SNDRV_PCM_STREAM_CAPTURE )
+	else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		audio_sp_rx_init(sport->addr, &sp_rx_init);
 
-	pr_info("set sport->id:%d, mode:%d\n", sport->id, sport->sport_mode);
 	audio_sp_set_i2s_mode(sport->addr, sport->sport_mode);
 
 	dumpSportRegs(&sport->pdev->dev, sport->addr);
@@ -611,11 +690,11 @@ static int sport_startup(struct snd_pcm_substream *substream,
 
 	/* enable sport clock */
 	ret = clk_prepare_enable(sport->clock);
-	if ( ret < 0 ) {
+	if (ret < 0) {
 		dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
 	}
 
-	if ( (sport -> sport_debug) >= 1 && (sport->sport_mclk_multiplier != 0) )
+	if ((sport -> sport_debug) >= 1 && (sport->sport_mclk_multiplier != 0))
 		audio_clock_dump();
 
 	return 0;
@@ -630,15 +709,15 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 
 	clk_disable_unprepare(sport->clock);
 	//below to be done
-	if ( sport->sport_mclk_multiplier != 0 ) {
+	if (sport->sport_mclk_multiplier != 0) {
 		/* disable sport clock */
 		update_fen_cke_sport_status(sport->id, false);
-		if ( sport -> sport_debug >= 1 )
+		if (sport -> sport_debug >= 1)
 			audio_clock_dump();
 		//enable_audio_source_clock(sport->audio_clock_params, sport->id, false);
 	}
 
-	dev_info(&sport->pdev->dev,"close");
+	sport_info(1, &sport->pdev->dev,"close");
 }
 
 static const struct snd_soc_dai_ops amebad2_sport_dai_ops = {
@@ -666,12 +745,12 @@ static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
 	sport->addr = ioremap(sport->base, sport->reg_size);
-	if ( sport->addr == NULL ) {
+	if (sport->addr == NULL) {
 		dev_err(&sport->pdev->dev, "cannot ioremap registers\n");
 		return -ENXIO;
 	}
 
-	if ( sport->sport_debug == 2 ){
+	if (sport->sport_debug == 2){
 		for (i = 0;i < fifo_byte; i++)
 			sport_verbose(2,&sport->pdev->dev,"sp1 ff0: %x",readb(sport->addr + REG_SP_RX_FIFO_0_RD_ADDR + i));
 	}
@@ -686,6 +765,7 @@ static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
 	sport->dma_playback.chan_name = "tx";
 	sport->dma_playback.total_sport_counter = 0;
 	sport->dma_playback.sport_base_addr = sport->addr;
+	sport->dma_playback.use_mmap = false;
 
 	sport->dma_capture.dev_phys_0 = sport->base + REG_SP_RX_FIFO_0_RD_ADDR;
 	sport->dma_capture.dev_phys_1 = sport->base + REG_SP_RX_FIFO_1_RD_ADDR;
@@ -694,8 +774,9 @@ static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
 	sport->dma_capture.chan_name = "rx";
 	sport->dma_capture.total_sport_counter = 0;
 	sport->dma_capture.sport_base_addr = sport->addr;
+	sport->dma_capture.use_mmap = false;
 
-	switch ( sport->id )
+	switch (sport->id)
 	{
 	case 0:
 		sport->dma_playback.handshaking_0 = GDMA_HANDSHAKE_INTERFACE_SPORT0F0_TX;
@@ -869,7 +950,7 @@ struct sport_dai *sport_alloc_dai(struct platform_device *pdev)
 	struct sport_dai *sport;
 
 	sport = devm_kzalloc(&pdev->dev, sizeof(struct sport_dai), GFP_KERNEL);
-	if ( sport == NULL )
+	if (sport == NULL)
 		return NULL;
 
 	sport->pdev = pdev;
@@ -887,26 +968,25 @@ static irqreturn_t rtk_sport_interrupt(int irq, void * dai)
 	struct sport_dai *sport = dai;
 	spin_lock(&sport->lock);
 
-	if ( audio_sp_is_rx_sport_irq(sport->addr) ) {
+	if (audio_sp_is_rx_sport_irq(sport->addr)) {
 		sport->irq_rx_count++;
 		sport->total_rx_counter += sport->rx_sport_compare_val;
-		if ( sport->total_rx_counter >= sport->total_rx_counter_boundary ) {
+		if (sport->total_rx_counter >= sport->total_rx_counter_boundary) {
 			sport->total_rx_counter -= sport->total_rx_counter_boundary;
 			sport->irq_rx_count = 0;
 		}
 		sport->dma_capture.total_sport_counter = sport->total_rx_counter;
-		//pr_info("total_rx_counter:%lld", sport->total_rx_counter);
+		pr_info("total_rx_counter:%lld", sport->total_rx_counter);
 		audio_sp_clear_rx_sport_irq(sport->addr);
-	} else if ( audio_sp_is_tx_sport_irq(sport->addr) ) {
+	} else if (audio_sp_is_tx_sport_irq(sport->addr)) {
 		sport->irq_tx_count++;
-		//pr_info("irq_tx_count:%d", sport->irq_tx_count);
+		//pr_info("irq_tx_count:%llu", sport->irq_tx_count);
 		sport->total_tx_counter += sport->tx_sport_compare_val;
-		if ( sport->total_tx_counter >= sport->total_tx_counter_boundary ) {
+		if (sport->total_tx_counter >= sport->total_tx_counter_boundary) {
 			sport->total_tx_counter -= sport->total_tx_counter_boundary;
 			sport->irq_tx_count = 0;
 		}
 		sport->dma_playback.total_sport_counter = sport->total_tx_counter;
-		//pr_info("total_tx_counter:%lld, total_sport_counter:%lld", sport->total_tx_counter, sport->dma_playback.total_sport_counter);
 		audio_sp_clear_tx_sport_irq(sport->addr);
 	}
 
@@ -926,7 +1006,7 @@ int set_sport_clk(struct platform_device *pdev, struct sport_dai *sport){
 
 	/* get sport clock */
 	sport->clock = devm_clk_get(&pdev->dev, NULL);
-	if ( IS_ERR(sport->clock) ) {
+	if (IS_ERR(sport->clock)) {
 		dev_err(&pdev->dev, "Fail to get clock %d\n",__LINE__);
 		ret = -1;
 		goto err;
@@ -957,7 +1037,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sportx_reg_size = resource_reg->end - resource_reg->start + 1;
 
 	sport = sport_alloc_dai(pdev);
-	if ( !sport ) {
+	if (!sport) {
 		dev_err(&pdev->dev, "Unable to alloc sport_pri\n");
 		ret = -ENOMEM;
 		return ret;
@@ -967,13 +1047,13 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sport->reg_size = sportx_reg_size;
 
 	sport->sport_debug = 0;
-	if ( sysfs_create_group(&pdev->dev.kobj,&sport_debug_attr_grp) )
+	if (sysfs_create_group(&pdev->dev.kobj,&sport_debug_attr_grp))
 		dev_warn(&pdev->dev, "Error creating sysfs entry\n");
 
 	sport_info(1,&pdev->dev,"%s,sportx_reg_base:%x,sportx_reg_size:%x \n",__func__,sportx_regs_base,sportx_reg_size);
 
-	if ( !request_mem_region(sport->base, sportx_reg_size,
-							"amebad2-sport") ) {
+	if (!request_mem_region(sport->base, sportx_reg_size,
+							"amebad2-sport")) {
 		dev_err(&pdev->dev, "Unable to request SFR region\n");
 		ret = -EBUSY;
 		goto err;
@@ -981,7 +1061,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 
 	/* Reads the channel id from the device tree and stores in data->id */
 	ret = of_property_read_u32_index(dev->of_node, "id", 0, &sport->id);
-	if ( ret < 0 ) {
+	if (ret < 0) {
 		dev_err(&pdev->dev, "id property reading fail\n");
 		goto err;
 	}
@@ -1022,15 +1102,15 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 
 	/*for internal sport0, and sport1, using 40M to support all kinds of samplerates below 192k*/
 	ret = set_sport_clk(pdev, sport);
-	if ( ret < 0 ){
+	if (ret < 0){
 		dev_err(&pdev->dev, "set sport clock err");
 		goto err;
 	}
 
 	/*for external sport2, and sport3, using rcc node to control clocks*/
-	if ( sport->sport_mclk_multiplier != 0 ) {
+	if (sport->sport_mclk_multiplier != 0) {
 		sport->audio_clock_params = devm_kzalloc(dev, sizeof(struct clock_params), GFP_KERNEL);
-		if ( sport->audio_clock_params == NULL ){
+		if (sport->audio_clock_params == NULL){
 			dev_err(&pdev->dev, "alloc audio_clock_params fail");
 			ret = -ENOMEM;
 			goto err;

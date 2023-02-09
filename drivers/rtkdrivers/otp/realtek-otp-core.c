@@ -3,15 +3,22 @@
 static struct rtk_otp *piihp_priv = NULL;
 otp_ipc_rx_res_t *p_recv_res = NULL;
 int otp_done;
-struct mutex otp_lock;
+int otp_channel_busy;
 /**
  * entity of struct aipc_ch_ops. It will associate the channel_recv to
  * otp_ipc_host_event_int_hdl.
  */
 static u32 otp_ipc_host_otp_int_hdl(aipc_ch_t *ch, ipc_msg_struct_t *pmsg);
+static void otp_ipc_channel_empty(struct aipc_ch *ch);
 static struct aipc_ch_ops otp_ipc_otp_ops = {
 	.channel_recv = otp_ipc_host_otp_int_hdl,
+	.channel_empty_indicate = otp_ipc_channel_empty,
 };
+
+static void otp_ipc_channel_empty(struct aipc_ch *ch)
+{
+	otp_channel_busy = 0;
+}
 
 /**
  * @brief  to haddle the otp_d interrupt from ipc device.
@@ -38,7 +45,7 @@ func_exit:
 int otp_ipc_host_otp_send_msg(otp_ipc_host_req_t *preq_msg)
 {
 	struct rtk_otp *otp_d = piihp_priv;
-	int ret = 0;
+	int ret, retry = 0;
 
 	if (!otp_d) {
 		dev_err(otp_d->dev, "host_otp_priv is NULL when to send msg!\n");
@@ -53,8 +60,26 @@ int otp_ipc_host_otp_send_msg(otp_ipc_host_req_t *preq_msg)
 	otp_d->otp_ipc_msg.msg = (u32)otp_d->req_msg_phy_addr;
 	otp_d->otp_ipc_msg.msg_type = IPC_USER_POINT;
 	otp_d->otp_ipc_msg.msg_len = sizeof(otp_ipc_host_req_t);
+	otp_channel_busy = 1;
+	ret = ameba_ipc_channel_send(otp_d->potp_ipc_ch, &(otp_d->otp_ipc_msg));
 
-	ameba_ipc_channel_send(otp_d->potp_ipc_ch, &(otp_d->otp_ipc_msg));
+	if (!otp_channel_busy) {
+		pr_debug("end no wait.");
+	} else {
+		retry = 100;
+		while (retry > 0 && otp_channel_busy) {
+			udelay(50);
+			retry--;
+		}
+		otp_channel_busy = 0;
+		if (retry <= 0) {
+			/* force recover. */
+			otp_channel_busy = 0;
+			dev_err(otp_d->dev, "ipc send has some problem now.");
+		} else {
+			pr_debug("wait and end.");
+		}
+	}
 
 func_exit:
 	return ret;
@@ -68,7 +93,7 @@ static void otp_ipc_host_otp_task(unsigned long data) {
 	if (!otp_d || !otp_d->potp_ipc_ch) {
 		dev_err(otp_d->dev, "potp_ipc_ch is NULL!\n");
 		goto func_exit;
-    }
+	}
 
 	pdev = otp_d->potp_ipc_ch->pdev;
 	if (!pdev) {
@@ -83,7 +108,7 @@ static void otp_ipc_host_otp_task(unsigned long data) {
 	msg_len = otp_d->otp_ipc_msg.msg_len;
 	p_recv_res = phys_to_virt(otp_d->otp_ipc_msg.msg);
 
-    otp_done = 1;
+	otp_done = 1;
 
 func_exit:
 	return;
@@ -102,49 +127,49 @@ func_exit:
 /*		   for EFUSE Remain read, result length is 4*(u8), combined as a (u32) remain value. result[0] is the largest edian. */
 int rtk_otp_process(void* data, u8 *result)
 {
-    otp_ipc_host_req_t *preq_msg = data;
-    int ret = 0;
-    int retry = 0;
+	otp_ipc_host_req_t *preq_msg = data;
+	int ret = 0;
+	int retry = 0;
 	struct rtk_otp *otp_d = NULL;
 
-    if (otp_done) {
-        otp_done = 0;
-    } else {
-        return -EBUSY;
-    }
-
-	mutex_lock(&otp_lock);
+	if (otp_done) {
+		otp_done = 0;
+	} else {
+		return -EBUSY;
+	}
 
 	if (preq_msg->len > OPT_REQ_MSG_PARAM_NUM) {
 		pr_err("OTP parameters requested is too much. Maximum for %d bytes. \n", OPT_REQ_MSG_PARAM_NUM);
 		goto err_ret;
 	}
 
-    ret = otp_ipc_host_otp_send_msg(preq_msg);
-
-    while (!otp_done) {
-        retry++;
-        msleep(2);
-        if (retry > 1000) {
-			goto err_ret;
-        }
-    }
-
-    if (p_recv_res->ret != 1) {
-		pr_warning("OTP failed but has already complete %d", p_recv_res->complete_num);
+	ret = otp_ipc_host_otp_send_msg(preq_msg);
+	if (ret < 0) {
 		goto err_ret;
-    }
+	}
+
+	while (!otp_done) {
+		retry++;
+		udelay(50);
+		if (retry > 1000) {
+			goto err_ret;
+		}
+	}
+
+	if (p_recv_res->ret != 1) {
+			pr_warning("OTP failed but has already complete %d", p_recv_res->complete_num);
+			goto err_ret;
+	}
 
 	otp_d = piihp_priv;
 	ret = p_recv_res->ret;
 	memcpy(result, otp_d->preq_msg->param_buf, preq_msg->len);
 
-	mutex_unlock(&otp_lock);
-    return ret;
+	return ret;
 
 err_ret:
-	mutex_unlock(&otp_lock);
-    return -EINVAL;
+	otp_done = 1;
+	return -EINVAL;
 }
 EXPORT_SYMBOL(rtk_otp_process);
 
@@ -157,7 +182,7 @@ static int rtk_otp_probe(struct platform_device *pdev)
 	if (!otp_d) {
 		return -ENOMEM;
 	}
-    otp_d->dev = &pdev->dev;
+	otp_d->dev = &pdev->dev;
 
 	/* allocate the ipc channel */
 	otp_d->potp_ipc_ch = ameba_ipc_alloc_ch(sizeof(struct rtk_otp));
@@ -170,7 +195,7 @@ static int rtk_otp_probe(struct platform_device *pdev)
 	/* initialize the ipc channel */
 	otp_d->potp_ipc_ch->port_id = AIPC_PORT_NP;
 	otp_d->potp_ipc_ch->ch_id = 6; /* configure channel 6 */
-	otp_d->potp_ipc_ch->ch_config = AIPC_CONFIG_NOTHING;
+	otp_d->potp_ipc_ch->ch_config = AIPC_CONFIG_HANDSAKKE;
 	otp_d->potp_ipc_ch->ops = &otp_ipc_otp_ops;
 	otp_d->potp_ipc_ch->priv_data = otp_d;
 
@@ -195,8 +220,8 @@ static int rtk_otp_probe(struct platform_device *pdev)
 	/* initialize otp_d tasklet */
 	tasklet_init(&(otp_d->otp_tasklet), otp_ipc_host_otp_task, (unsigned long)otp_d);
 	piihp_priv = otp_d;
-    otp_done = 1;
-	mutex_init(&otp_lock);
+	otp_done = 1;
+	otp_channel_busy = 0;
 	goto func_exit;
 
 unregist_ch:

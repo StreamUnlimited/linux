@@ -747,7 +747,7 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		dma_cfg.type = SDIOH_DMA_R2;
 
 		rtk_mmc_sdioh_dma_config(mmc, &dma_cfg);
-		timeout = (mrq->cmd->busy_timeout*1000)?(mrq->cmd->busy_timeout*1000):80000;
+		timeout = (mrq->cmd->busy_timeout != 0) ? (mrq->cmd->busy_timeout*1000) : 80000;
 
 		/*if there is data transfer, dedicated dma is required, prepare for dma*/
 	} else if(mrq->data) {

@@ -16,6 +16,58 @@
 
 #if MAC_AX_8730E_SUPPORT
 
+u32 efuse_read_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 *data, int len)
+{
+	u32 ret = MACSUCCESS;
+	otp_ipc_host_req_t otp_req = {0};
+	u32 max_size = adapter->hw_info->efuse_size;
+	int retry = 100;
+
+	if (addr + len >= max_size) {
+		*data = 0xFF;
+		return MACEFUSEADDR;
+	}
+
+	otp_req.otp_id = LINUX_IPC_OTP_PHY_READ8;
+	otp_req.addr = addr;
+	otp_req.len = len;
+
+	ret = rtk_otp_process(&otp_req, data);
+	while ((retry > 0) && (ret == -EBUSY)) {
+		ret = rtk_otp_process(&otp_req, data);
+		retry--;
+	}
+
+	ret = (ret == 1) ? MACSUCCESS : MACEFUSEREAD;
+
+	return ret;
+}
+
+u32 efuse_write_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 data, int len)
+{
+	u32 ret = MACSUCCESS;
+	otp_ipc_host_req_t otp_req = {0};
+	u32 max_size = adapter->hw_info->efuse_size;
+
+	if (addr + len>= max_size) {
+		return MACEFUSEADDR;
+	}
+
+	if (data == 0xFF) {
+		return MACSUCCESS;
+	}
+
+	otp_req.otp_id = LINUX_IPC_OTP_PHY_WRITE8;
+	otp_req.addr = addr;
+	otp_req.len = len;
+	otp_req.write_lock = 1;
+	if (rtk_otp_process(&otp_req, &data) != 1) {
+		return MACEFUSEWRITE;
+	}
+
+	return ret;
+}
+
 u32 efuse_read8_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 *data)
 {
 	u32 ret = MACSUCCESS;
@@ -62,13 +114,15 @@ u32 efuse_write8_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 data)
 	return ret;
 }
 
+/* Not used now, using dump_log_efuse_8730e. */
 u32 read_log_efuse_8730e(struct mac_ax_adapter *adapter, u32 addr,
 			 u32 size, u8 *val)
 {
 	u32 ret = MACSUCCESS;
 	otp_ipc_host_req_t otp_req = {0};
-	u32 max_size = adapter->hw_info->efuse_size;
+	u32 max_size = adapter->hw_info->log_efuse_size;
 	u8 *tmp_map = NULL;
+	int retry = 100;
 
 	tmp_map = (u8 *)PLTFM_MALLOC(1024);
 	if (!tmp_map) {
@@ -86,12 +140,16 @@ u32 read_log_efuse_8730e(struct mac_ax_adapter *adapter, u32 addr,
 
 	otp_req.otp_id = LINUX_IPC_OTP_LOGI_READ_MAP;
 	otp_req.len = 1024;
-	if (rtk_otp_process(&otp_req, tmp_map) != 1) {
-		return MACEFUSEREAD;
+
+	ret = rtk_otp_process(&otp_req, tmp_map);
+	while (retry && (ret == -EBUSY)) {
+		ret = rtk_otp_process(&otp_req, tmp_map);
+		retry--;
 	}
 
-	PLTFM_MEMCPY(val, tmp_map + addr, size);
+	ret = (ret == 1) ? MACSUCCESS : MACEFUSEREAD;
 
+	PLTFM_MEMCPY(val, tmp_map + addr, size);
 	return ret;
 }
 
@@ -118,6 +176,8 @@ u32 dump_log_efuse_8730e(struct mac_ax_adapter *adapter, u8 *efuse_map)
 	u8 *tmp_map = NULL;
 	otp_ipc_host_req_t otp_req = {0};
 	u32 efuse_size = efuse_info->log_efuse_size;
+	u32 ret = MACSUCCESS;
+	int retry = 100;
 
 	tmp_map = (u8 *)PLTFM_MALLOC(1024);
 	if (!tmp_map) {
@@ -127,9 +187,13 @@ u32 dump_log_efuse_8730e(struct mac_ax_adapter *adapter, u8 *efuse_map)
 
 	otp_req.otp_id = LINUX_IPC_OTP_LOGI_READ_MAP;
 	otp_req.len = 1024;
-	if (rtk_otp_process(&otp_req, tmp_map) != 1) {
-		return MACEFUSEREAD;
+	ret = rtk_otp_process(&otp_req, tmp_map);
+	while ((retry > 0) && (ret == -EBUSY)) {
+		ret = rtk_otp_process(&otp_req, tmp_map);
+		retry--;
 	}
+
+	ret = (ret == 1) ? MACSUCCESS : MACEFUSEREAD;
 
 	if (efuse_size > 1024) {
 		PLTFM_MEMCPY(efuse_map, tmp_map, 1024);
@@ -137,7 +201,7 @@ u32 dump_log_efuse_8730e(struct mac_ax_adapter *adapter, u8 *efuse_map)
 		PLTFM_MEMCPY(efuse_map, tmp_map, efuse_size);
 	}
 
-	return MACSUCCESS;
+	return ret;
 }
 
 #endif /* MAC_AX_8730E_SUPPORT */

@@ -27,6 +27,7 @@ struct mutex misc_mutex;
 
 struct realtek_misc_dev {
 	struct cdev cdev;
+	void __iomem *base;
 	int current_affair;
 };
 struct realtek_misc_dev *realtek_misc_devp;
@@ -36,44 +37,18 @@ struct realtek_misc_dev *realtek_misc_devp;
 /*****************************************************************************************/
 
 /* Example: Share virtual regmap with drivers, using of_iomap. */
-#define REG_LSYS_OTP_SYSCFG0        0x0230
-#define LSYS_GET_BOOT_SELECT(x)     ((u32)(((x >> 20) & 0x00000003)))
-static int read_flash_type(char *result)
+#define REG_LSYS_BOOT_CFG			0x0268
+#define LSYS_GET_ROM_VERSION_SW(x)	((u32)(((x >> 0) & 0x0000FFFF)))
+static int read_rom_info(char *result)
 {
-	u32 val = 0;
-	int ret = 0;
-	char nand[] = "Nand";
-	char nor[] = "Nor";
-	struct device_node *np;
-	void __iomem *base;
+	/* Read ROM version, only for example */
+	u32 val = LSYS_GET_ROM_VERSION_SW(readl(realtek_misc_devp->base + REG_LSYS_BOOT_CFG));
+	sprintf(result, "V%d.%d", val & 0xFF, (val >> 8) & 0xFF);
 
-	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
-	if (np) {
-		base = of_iomap(np, 0);
-		if (base) {
-			val =  readl(base + REG_LSYS_OTP_SYSCFG0);
-		} else {
-			pr_err("%s: of_iomap(plat_lsys_base) failed\n", __FUNCTION__);
-			return -EFAULT;
-		}
-		of_node_put(np);
-	}
-
-	if (LSYS_GET_BOOT_SELECT(val) == 2) {
-		/* Flash type: Nor. */
-		strcpy(result, nor);
-	} else if (LSYS_GET_BOOT_SELECT(val) == 1) {
-		/* Flash type: Nand. */
-		strcpy(result, nand);
-	} else {
-		pr_info("Wrong type.");
-		return -EFAULT;
-	}
-	return ret;
+	return 0;
 }
 
 /* BT functions. */
-#define BIT(__n)       (1<<(__n))
 static uint8_t bt_ant_switch = 0;
 //0, means bt_rfafe        1, means wl_rfafe
 static uint32_t cal_bit_shift(uint32_t Mask)
@@ -134,10 +109,11 @@ static void bt_power_off(void __iomem *reg_base)
 		set_reg_value(reg_base + 0x50, BIT(1) | BIT(2), 0); //0x42008250//disable BT AFE & BT S0 RF
 		mdelay(5);
 	} else {
-		set_reg_value(reg_base + 0x740, BIT(5) | BIT(6), 0);  //0x42008940//disable RFAFE (if WIFI active, keep 2’b11)
+		//will cause wifi enter ps
+		/*set_reg_value(reg_base + 0x740, BIT(5) | BIT(6), 0);  //0x42008940//disable RFAFE (if WIFI active, keep 2’b11)
 		mdelay(5);
 		set_reg_value(reg_base + 0x8, BIT(24), 0); 		//0x42008208//disable WL RFAFE control circuit (if WIFI active, keep 1’b1)
-		mdelay(5);
+		mdelay(5);*/
 		set_reg_value(reg_base + 0x50, BIT(1) | BIT(0), 0);  		//0x42008250//disable BT AFE & BT S0 RF
 		mdelay(5);
 	}
@@ -162,54 +138,27 @@ static void hci_platform_controller_reset(void __iomem *reg_base)
 static int hci_platform_controller_init(unsigned long arg)
 {
 	/* BT Controller Reset */
-	struct device_node *np;
-	void __iomem *reg_base;
-
-	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
-	if (np) {
-		reg_base = of_iomap(np, 0);
-		if (reg_base) {
-			if ((arg != 0) && (arg != 1)) {
-				pr_err("\n%s: error bt ant %llu\n", __FUNCTION__, arg);
-				return -EFAULT;
-			}
-			bt_ant_switch = arg;
-			pr_info("\n%s: bt ant %d\n", __FUNCTION__, bt_ant_switch);
-			hci_platform_controller_reset(reg_base + 0x200);
-		} else {
-			pr_err("%s: of_iomap(plat_lsys_base) failed\n", __FUNCTION__);
-			return -EFAULT;
-		}
-		of_node_put(np);
-	} else {
-		pr_info("\nof_find_compatible_node fail");
+	if ((arg != 0) && (arg != 1)) {
+		pr_err("\n%s: error bt ant %lu\n", __FUNCTION__, arg);
+		return -EFAULT;
 	}
+	bt_ant_switch = arg;
+	pr_info("\n%s: bt ant %d\n", __FUNCTION__, bt_ant_switch);
+	hci_platform_controller_reset(realtek_misc_devp->base + 0x200);
+
 	return 0;
 }
 
 static int hci_platform_controller_deinit(unsigned long arg)
 {
 	/* BT Controller Power Off */
-	struct device_node *np;
-	void __iomem *reg_base;
-
-	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
-	if (np) {
-		reg_base = of_iomap(np, 0);
-		if (reg_base) {
-			if ((arg != 0) && (arg != 1)) {
-				pr_err("\n%s: error bt ant %llu\n", __FUNCTION__, arg);
-				return -EFAULT;
-			}
-			bt_ant_switch = arg;
-			pr_info("\n%s: bt ant %d\n", __FUNCTION__, bt_ant_switch);
-			bt_power_off(reg_base + 0x200);
-		} else {
-			pr_err("%s: of_iomap(plat_lsys_base) failed\n", __FUNCTION__);
-			return -EFAULT;
-		}
-		of_node_put(np);
+	if ((arg != 0) && (arg != 1)) {
+		pr_err("\n%s: error bt ant %lu\n", __FUNCTION__, arg);
+		return -EFAULT;
 	}
+	bt_ant_switch = arg;
+	pr_info("\n%s: bt ant %d\n", __FUNCTION__, bt_ant_switch);
+	bt_power_off(realtek_misc_devp->base + 0x200);
 	return 0;
 }
 
@@ -228,24 +177,24 @@ static int realtek_misc_set_mode(unsigned long arg)
 
 int realtek_misc_open(struct inode *inode, struct file *filp)
 {
-	pr_info("Realtek miscellaneous affairs: open success.");
+	pr_debug("Realtek miscellaneous affairs: open\n");
 	return 0;
 }
 
 int realtek_misc_release(struct inode *inode, struct file *filp)
 {
-	pr_info("\nRealtek miscellaneous affairs: release.");
+	pr_debug("Realtek miscellaneous affairs: release\n");
 
 	switch (realtek_misc_devp->current_affair) {
-	case RTK_CMD_READ_FLASH_TYPE:
+	case RTK_CMD_READ_ROM_INFO:
 		/* May release something. */
-		pr_info("Example: do nothing while release.");
 		break;
 	case RTK_CMD_SET_BT_POWER_ON:
 	case RTK_CMD_SET_BT_POWER_OFF:
 		break;
 	default:
-		pr_info("Please set a misc ioctl affair first.");
+		pr_warn("Please set a misc ioctl affair first\n");
+		break;
 	}
 
 	return 0;
@@ -256,7 +205,7 @@ static ssize_t realtek_misc_read(struct file *filp, char __user *buf, size_t cou
 	char *result;
 	int ret = 0;
 
-	pr_info("\nRealtek miscellaneous affairs: read.");
+	pr_debug("Realtek miscellaneous affairs: read\n");
 	if (!mutex_trylock(&misc_mutex)) {
 		return -EBUSY;
 	}
@@ -265,11 +214,12 @@ static ssize_t realtek_misc_read(struct file *filp, char __user *buf, size_t cou
 	result = kmalloc(count, GFP_KERNEL);
 
 	switch (realtek_misc_devp->current_affair) {
-	case RTK_CMD_READ_FLASH_TYPE:
-		read_flash_type(result);
+	case RTK_CMD_READ_ROM_INFO:
+		read_rom_info(result);
 		break;
 	default:
-		pr_info("Please set the misc ioctl affair first.");
+		pr_warn("Please set the misc ioctl affair first\n");
+		break;
 	}
 
 	/* copy memery from kernel space to user space. */
@@ -284,7 +234,7 @@ static long realtek_misc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 {
 	int ret = 0;
 
-	pr_info("\nRealtek miscellaneous affairs: ioctl.");
+	pr_debug("Realtek miscellaneous affairs: ioctl\n");
 	if (!mutex_trylock(&misc_mutex)) {
 		return -EBUSY;
 	}
@@ -293,7 +243,7 @@ static long realtek_misc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 	case RTK_CMD_SET_MODE:
 		realtek_misc_set_mode(arg);
 		break;
-	case RTK_CMD_READ_FLASH_TYPE:
+	case RTK_CMD_READ_ROM_INFO:
 		/* May add some tasks.. */
 		break;
 	case RTK_CMD_SET_BT_POWER_ON:
@@ -303,7 +253,8 @@ static long realtek_misc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 		hci_platform_controller_deinit(arg);
 		break;
 	default:
-		pr_info("\n\nFree to configure the Realtek miscellaneous affairs in <sdk>/openwrt/realtek/linux-5.4/include/misc/realtek-misc.h.\n");
+		pr_warn("Unsupported misc ioctl cmd: %d\n", cmd);
+		break;
 	}
 
 	mutex_unlock(&misc_mutex);
@@ -327,7 +278,7 @@ static void realtek_misc_setup_cdev(struct realtek_misc_dev *dev, int index)
 	dev->cdev.ops = &realtek_misc_fops;
 	err = cdev_add(&dev->cdev, devno, 1);
 	if (err) {
-		pr_err("Error %d add realtek_misc %d", err, index);
+		pr_err("Fail to add realtek_misc %d: %d\n", index, err);
 	}
 }
 
@@ -335,6 +286,8 @@ int realtek_misc_init(void)
 {
 	int ret;
 	dev_t devno;
+	struct device_node *np;
+	void __iomem *base;
 	struct class *realtek_misc_class;
 
 	ret = alloc_chrdev_region(&devno, 0, 1, "misc-ioctl");
@@ -346,7 +299,7 @@ int realtek_misc_init(void)
 	realtek_misc_devp = kmalloc(sizeof(struct realtek_misc_dev), GFP_KERNEL);
 	if (!realtek_misc_devp) {
 		ret = -ENOMEM;
-		pr_err("Error add realtek_misc");
+		pr_err("%s: Fail to kmalloc realtek_misc_devp\n", __FUNCTION__);
 		goto fail_malloc;
 	}
 
@@ -354,20 +307,44 @@ int realtek_misc_init(void)
 	realtek_misc_setup_cdev(realtek_misc_devp, 0);
 	realtek_misc_devp->current_affair = RTK_CMD_NOT_SET;
 
+	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
+	if (np) {
+		base = of_iomap(np, 0);
+		if (base) {
+			realtek_misc_devp->base = base;
+		} else {
+			pr_err("%s: iomap failed\n", __FUNCTION__);
+			goto fail_iomap;
+		}
+		of_node_put(np);
+	} else {
+		goto fail_of_find_node;
+	}
+
 	realtek_misc_class = class_create(THIS_MODULE, "misc-ioctl");
 	device_create(realtek_misc_class, NULL, MKDEV(realtek_misc_major, 0), NULL, "misc-ioctl");
 	mutex_init(&misc_mutex);
 
 	return 0;
+	
+fail_iomap:
+	of_node_put(np);
+
+fail_of_find_node:
+	kfree(realtek_misc_devp);
+
 fail_malloc:
 	unregister_chrdev_region(devno, 1);
+	return ret;
 }
 
 void realtek_misc_exit(void)
 {
-	pr_info("End realtek_misc");
-	cdev_del(&realtek_misc_devp->cdev);
-	kfree(realtek_misc_devp);
+	if (realtek_misc_devp != NULL) {
+		iounmap(realtek_misc_devp->base);
+		cdev_del(&realtek_misc_devp->cdev);
+		kfree(realtek_misc_devp);
+	}
 	unregister_chrdev_region(MKDEV(realtek_misc_major, 0), 1);
 }
 

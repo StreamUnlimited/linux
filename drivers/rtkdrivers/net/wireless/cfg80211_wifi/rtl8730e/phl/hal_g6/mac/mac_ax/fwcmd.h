@@ -418,6 +418,29 @@ enum h2c_cmd {
 	H2C_MAXID,
 };
 
+/* C2H BT OP CODES, H2C_BT_MP_OPER 0x67. */
+typedef enum _bt_op_code {
+	BT_OP_GET_BT_VERSION = 0x00,
+	BT_OP_WRITE_REG_ADDR = 0x0c,
+	BT_OP_WRITE_REG_VALUE = 0x0d,
+
+	BT_OP_READ_REG = 0x11,
+
+	BT_LO_OP_GET_AFH_MAP_L = 0x1e,
+	BT_LO_OP_GET_AFH_MAP_M = 0x1f,
+	BT_LO_OP_GET_AFH_MAP_H = 0x20,
+
+	BT_OP_GET_BT_COEX_SUPPORTED_FEATURE = 0x2a,
+	BT_OP_GET_BT_COEX_SUPPORTED_VERSION = 0x2b,
+	BT_OP_GET_BT_ANT_DET_VAL = 0x2c,
+	BT_OP_GET_BT_BLE_SCAN_TYPE = 0x2d,
+	BT_OP_GET_BT_BLE_SCAN_PARA = 0x2e,
+	BT_OP_GET_BT_DEVICE_INFO = 0x30,
+	BT_OP_GET_BT_FORBIDDEN_SLOT_VAL = 0x31,
+	BT_OP_SET_BT_LANCONSTRAIN_LEVEL = 0x32,
+	BT_OP_MAX
+} BT_OP_CODE;
+
 #define H2C_INACTIVE_PS_LEN		3
 #define H2C_RSVDPAGE_LOC_LEN		5
 #define H2C_MEDIA_STATUS_RPT_LEN		3
@@ -889,6 +912,14 @@ u8 rtw_hal_set_p2p_wowlan_offload_cmd(struct mac_ax_adapter *adapter);
 #define SET_C2H_SEQ_88XX(_c2h, _val)	SET_BITS_TO_LE_1BYTE(((u8*)(_c2h)) + 1, 0, 8, _val)
 #define SET_C2H_PLEN_88XX(_c2h, _val)	SET_BITS_TO_LE_1BYTE(((u8*)(_c2h)) + 14, 0, 8, _val)
 
+/* C2H_STATUS */
+typedef enum _c2h_status {
+	BT_STS_OK = 0x0,
+	BT_STS_VER_MISMATCH = 0x1,
+	BT_STS_UNKNOWN_OPCODE = 0x2,
+	BT_STS_ERROR_PARAMETER = 0x3
+} C2H_STATUS;
+
 typedef enum _C2H_EVT {
 	C2H_DBG = 0x00,
 	C2H_LB = 0x01,
@@ -920,7 +951,8 @@ typedef enum _C2H_EVT {
 } C2H_EVT;
 
 typedef enum _EXTEND_C2H_EVT {
-	EXTEND_C2H_DBG_PRINT = 0
+	EXTEND_C2H_WIFI_FW_ACTIVE_RSP = 0x00,
+	EXTEND_C2H_TRIG_BY_BT_FW = 0x01
 } EXTEND_C2H_EVT;
 
 #define C2H_REG_LEN 16

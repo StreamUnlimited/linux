@@ -24,6 +24,9 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 
+/* TP test enable */
+#define SPIC_TP_TEST_EN					0
+
 /* Register definitions */
 #define BIT_SCPOL						((u32)0x00000001 << 7)          /* R/W SCPOL_DEF  Indicate serial clock polarity. It is used to select the polarity of the inactive serial clock. 0: inactive state of serial clock is low 1: inactive state of serial clock is high */
 #define BIT_SCPH						((u32)0x00000001 << 6)          /* R/W SCPH_DEF  Indicate serial clock phase. The serial clock phase selects the relationship the serial clock with the slave select signal. 0: serial clock toggles in middle of first data bit 1: serial clock toggles at start of first data bit */
@@ -123,6 +126,9 @@
 #define RXI312_SPI_TMODE_TX				0
 #define RXI312_SPI_TMODE_RX				3
 
+/* FIFO length */
+#define RXI312_FIFO_LENGTH				32
+
 /* Wait status */
 #define WAIT_SPIC_BUSY					0
 #define WAIT_FLASH_BUSY					1
@@ -130,6 +136,9 @@
 #define WAIT_WRITE_EN					3
 #define WAIT_TRANS_COMPLETE				4
 #define WAIT_WRITE_DISABLE				3
+
+/* Get unaligned buffer size */
+#define UNALIGNED32(buf)	((4 - ((u32)(buf) & 0x3)) & 0x3)
 
 /* RXI312 SPI data structure */
 struct rxi312_spi {
@@ -263,24 +272,50 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	struct rxi312_spi *spi = spi_controller_get_devdata(mem->spi->master);
 	struct rxi312_spi_map *map = spi->user_base;
 	int i;
+	int j;
 	int ret = 0;
 	u8 tmod = RXI312_SPI_TMODE_TX;
 	u8 *buf;
+	u32 *aligned32_buf;
 	u32 ctrl0;
 	u32 value;
+	u32 nbytes;
+	u32 unaligned32_bytes;
 	u32 ctrl0_bak;
 	u32 user_length_bak;
+	u32 fifo_level;
+	unsigned long flags;
+
+#if SPIC_TP_TEST_EN
+	u64 total_ns;
+	u64 umode_en_ns;
+	u64 read_ns;
+	u64 write_ns;
+	u64 read_wait_ns;
+	u64 write_wait_ns;
+	u64 umode_dis_ns;
+
+	total_ns = ktime_get_raw_ns();
+#endif
 
 	mutex_lock(&spi->lock);
+	local_irq_save(flags);
 
+	nbytes = op->data.nbytes;
 	ctrl0_bak = map->ctrlr0;
 	user_length_bak = map->user_length;
 
-	if ((op->data.nbytes) && (op->data.dir == SPI_MEM_DATA_IN)) {
+	if ((nbytes) && (op->data.dir == SPI_MEM_DATA_IN)) {
 		tmod = RXI312_SPI_TMODE_RX;
 	}
 
+#if SPIC_TP_TEST_EN
+	umode_en_ns = ktime_get_raw_ns();
+#endif
 	rxi312_spi_usermode_en(map, 1);
+#if SPIC_TP_TEST_EN
+	umode_en_ns = ktime_get_raw_ns() - umode_en_ns;
+#endif
 
 	ctrl0 = map->ctrlr0;
 	ctrl0 &= ~(TMOD(3) | CMD_CH(3) | ADDR_CH(3) | DATA_CH(3));
@@ -312,60 +347,141 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	}
 
 	if (tmod == RXI312_SPI_TMODE_RX) {
-		map->rx_ndf = RX_NDF(op->data.nbytes);
+		map->rx_ndf = RX_NDF(nbytes);
 		map->tx_ndf = TX_NDF(0);
 
 		map->ssienr = BIT_SPIC_EN;
 
+#if SPIC_TP_TEST_EN
+		read_ns = ktime_get_raw_ns();
+#endif
+
 		i = 0;
 		buf = (u8 *)op->data.buf.in;
-		while (i < op->data.nbytes) {
-			if (map->sr & BIT_RFNE) {
-				buf[i] = map->dr[0].byte;
-				i++;
+
+		unaligned32_bytes = UNALIGNED32(buf);
+		while ((i < unaligned32_bytes) && (i < nbytes)) {
+			if (map->rxflr >= 1) {
+				buf[i++] = map->dr[0].byte;
 			}
 		}
 
+		aligned32_buf = (u32 *)&buf[i];
+
+		while (i + 4 <= nbytes) {
+			fifo_level = map->rxflr >> 2;
+			// A safe way to avoid HW error: (j < fifo_level) && (i + 4 <= nbytes)
+			for (j = 0; j < fifo_level; j++) {
+				aligned32_buf[j] = map->dr[0].word;
+			}
+			i += fifo_level << 2;
+			aligned32_buf += fifo_level;
+		}
+
+		while (i < nbytes) {
+			if (map->rxflr >= 1) {
+				buf[i++] = map->dr[0].byte;
+			}
+		}
+
+#if SPIC_TP_TEST_EN
+		read_ns = ktime_get_raw_ns() - read_ns;
+		read_wait_ns = ktime_get_raw_ns();
+#endif
 		rxi312_spi_waitbusy(map, WAIT_TRANS_COMPLETE);
+#if SPIC_TP_TEST_EN
+		read_wait_ns = ktime_get_raw_ns() - read_wait_ns;
+#endif
 	} else {
-		map->tx_ndf = TX_NDF(op->data.nbytes);
+		map->tx_ndf = TX_NDF(nbytes);
 		map->rx_ndf = RX_NDF(0);
-
-		/* Pre-load data before enabling, but there are just 16 - 4 = 12 bytes fifo afer cmd+addr */
-		if (op->data.nbytes) {
-			buf = (u8 *)op->data.buf.out;
-			for (i = 0; i < op->data.nbytes;) {
-				if (map->sr & BIT_TFNF) {
-					map->dr[0].byte = buf[i];
-					i++;
-				} else {
-					break;
-				}
-			}
-		}
-
 		map->ssienr = BIT_SPIC_EN;
 
+#if SPIC_TP_TEST_EN
+		write_ns = ktime_get_raw_ns();
+#endif
+
 		/* write the remaining data into fifo */
-		if (op->data.nbytes) {
+		if (nbytes) {
+			i = 0;
 			buf = (u8 *)op->data.buf.out;
-			while (i < op->data.nbytes) {
-				if (map->sr & BIT_TFNF) {
-					map->dr[0].byte = buf[i];
-					i++;
+
+			unaligned32_bytes = UNALIGNED32(buf);
+			while ((i < unaligned32_bytes) && (i < nbytes)) {
+				if (map->txflr <= RXI312_FIFO_LENGTH - 1) {
+					map->dr[0].byte = buf[i++];
+				}
+			}
+
+			aligned32_buf = (u32 *)&buf[i];
+
+			while (i + 4 <= nbytes) {
+				fifo_level = (RXI312_FIFO_LENGTH - map->txflr) >> 2;
+				for (j = 0; (j < fifo_level) && (i + 4 <= nbytes); j++) {
+					map->dr[0].word = aligned32_buf[j];
+					i += 4;
+				}
+				aligned32_buf += fifo_level;
+			}
+
+			while (i < nbytes) {
+				if (map->txflr <= RXI312_FIFO_LENGTH - 1) {
+					map->dr[0].byte = buf[i++];
 				}
 			}
 		}
 
+#if SPIC_TP_TEST_EN
+		write_ns = ktime_get_raw_ns() - write_ns;
+		write_wait_ns = ktime_get_raw_ns();
+#endif
 		rxi312_spi_waitbusy(map, WAIT_TRANS_COMPLETE);
+#if SPIC_TP_TEST_EN
+		write_wait_ns = ktime_get_raw_ns() - write_wait_ns;
+#endif
 	}
 
 	map->user_length = user_length_bak;
 	map->ctrlr0 = ctrl0_bak;
 
+#if SPIC_TP_TEST_EN
+	umode_dis_ns = ktime_get_raw_ns();
+#endif
 	rxi312_spi_usermode_en(map, 0);
+#if SPIC_TP_TEST_EN
+	umode_dis_ns = ktime_get_raw_ns() - umode_dis_ns;
+#endif
 
+	local_irq_restore(flags);
 	mutex_unlock(&spi->lock);
+
+#if SPIC_TP_TEST_EN
+	total_ns = ktime_get_raw_ns() - total_ns;
+
+	if (nbytes >= 2048) {
+		if (tmod == RXI312_SPI_TMODE_RX) {
+			pr_info("[RTP] byte=%u total=%llu umode_en=%llu read=%llu wait=%llu umode_dis=%llu addrbw=%d databw=%d\n",
+				nbytes,
+				total_ns,
+				umode_en_ns,
+				read_ns,
+				read_wait_ns,
+				umode_dis_ns,
+				op->addr.buswidth,
+				op->data.buswidth);
+		} else {
+			pr_info("[WTP] byte=%u total=%llu umode_en=%llu write=%llu wait=%llu umode_dis=%llu addrbw=%d databw=%d\n",
+				nbytes,
+				total_ns,
+				umode_en_ns,
+				write_ns,
+				write_wait_ns,
+				umode_dis_ns,
+				op->addr.buswidth,
+				op->data.buswidth);
+		}
+	}
+#endif
 
 	return ret;
 }
@@ -398,14 +514,10 @@ static int rxi312_spi_setup(struct spi_device *sdev)
 		sdev->mode |= SPI_CPHA;
 	}
 
-	if (valid_cmd & BIT_RD_QUAD_IO) {
+	if (((valid_cmd & BIT_RD_QUAD_IO) != 0) || ((valid_cmd & BIT_RD_QUAD_O) != 0)) {
 		sdev->mode |= SPI_TX_QUAD | SPI_RX_QUAD;
-	} else if (valid_cmd & BIT_RD_QUAD_O) {
-		sdev->mode |= SPI_RX_QUAD;
-	} else if (valid_cmd & BIT_RD_DUAL_IO) {
+	} else if (((valid_cmd & BIT_RD_DUAL_IO) != 0) || ((valid_cmd & BIT_RD_DUAL_I) != 0)) {
 		sdev->mode |= SPI_TX_DUAL | SPI_RX_DUAL;
-	} else if (valid_cmd & BIT_RD_DUAL_I) {
-		sdev->mode |= SPI_RX_DUAL;
 	}
 
 	dev_info(&sdev->dev, "spi mode 0x%04X\n", sdev->mode);
@@ -419,6 +531,7 @@ static const struct of_device_id rxi312_spi_of_match_table[] = {
 	{
 		.compatible = "realtek,rxi312-spi-nand",
 	},
+	{ },
 };
 
 MODULE_DEVICE_TABLE(of, rxi312_spi_of_match_table);

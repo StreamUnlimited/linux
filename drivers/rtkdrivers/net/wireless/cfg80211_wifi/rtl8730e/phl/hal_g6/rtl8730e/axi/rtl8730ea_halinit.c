@@ -430,8 +430,13 @@ void hal_config_int_8730ea(struct hal_info_t *hal, enum rtw_phl_config_int int_m
 
 bool hal_recognize_int_8730ea(struct hal_info_t *hal)
 {
-	struct rtw_hal_com_t *hal_com = hal->hal_com;
 	bool recognized = false;
+	struct rtw_hal_com_t *hal_com = NULL;
+
+	if (!hal || !hal->hal_com) {
+		return recognized;
+	}
+	hal_com = hal->hal_com;
 
 #ifndef CONFIG_SYNC_INTERRUPT
 	/* disable imr before cleaning isr */
@@ -479,6 +484,14 @@ bool hal_recognize_int_8730ea(struct hal_info_t *hal)
 	hal_write32(hal_com, REG_HEMR, hal_com->int_mask[2] & 0xFFFFFFFF);
 	hal_write32(hal_com, REG_HIMR2, hal_com->int_mask[3] & 0xFFFFFFFF);
 #endif /* CONFIG_SYNC_INTERRUPT */
+	if (hal_com->int_array[0] & BIT_HISR1_INT) {
+		hal_com->int_array[0] &= ~BIT_HISR1_INT;
+	}
+
+	if (hal_com->int_array[0] & BIT_HISR2_INT) {
+		hal_com->int_array[0] &= ~BIT_HISR2_INT;
+	}
+
 	return recognized;
 }
 
@@ -602,6 +615,8 @@ static u32 hal_tx_handler_8730ea(struct hal_info_t *hal, u32 *handled)
 	if ((event1 != 0) || (event0 != 0)) {
 		ret = 1;
 	}
+
+	event0 = hal_com->int_array[0] & BIT_TXFF_FIFO_INT;
 
 	handled[0] |= event0;
 	handled[1] |= event1;

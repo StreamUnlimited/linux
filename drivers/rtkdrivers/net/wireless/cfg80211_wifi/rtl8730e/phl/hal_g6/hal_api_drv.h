@@ -16,11 +16,13 @@
 #define _HAL_API_DRV_H_
 
 u32 rtw_hal_mac_coex_init(struct rtw_hal_com_t *hal_com, u8 pta_mode, u8 direction);
-u32 rtw_hal_mac_coex_reg_read(struct rtw_hal_com_t *hal_com, u32 offset, u32 *value);
-u32 rtw_hal_mac_coex_reg_write(struct rtw_hal_com_t *hal_com, u32 offset, u32 value);
+u32 rtw_hal_mac_coex_reg_read(struct rtw_hal_com_t *hal_com, u32 addr, u32 *value);
+u32 rtw_hal_mac_coex_reg_write(struct rtw_hal_com_t *hal_com, u32 addr, u32 value);
 u32 rtw_hal_mac_set_grant(struct rtw_hal_com_t *hal_com, u8 *value);
 u32 rtw_hal_mac_get_grant(struct rtw_hal_com_t *hal_com, u8 *value);
-u32 rtw_hal_mac_set_polluted(struct rtw_hal_com_t *hal_com, u8 band, u8 tx_val, u8 rx_val);
+u32 rtw_hal_mac_set_polluted(struct rtw_hal_com_t *hal_com, u8 band, u32 tx_val, u32 rx_val);
+u32 rtw_hal_mac_get_scoreboard(struct rtw_hal_com_t *hal_com, u32 *val);
+u32 rtw_hal_mac_set_scoreboard(struct rtw_hal_com_t *hal_com, u32 val);
 u32 rtw_hal_mac_set_tx_time(struct rtw_hal_com_t *hal_com, u8 is_btc,
 			    u8 is_resume, u8 macid, u32 tx_time);
 u32 rtw_hal_mac_get_tx_time(struct rtw_hal_com_t *hal_com, u8 macid, u32 *tx_time);

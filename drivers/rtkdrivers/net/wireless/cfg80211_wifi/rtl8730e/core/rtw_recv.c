@@ -3574,12 +3574,19 @@ static int recv_indicatepkts_in_order(_adapter *padapter, struct recv_reorder_ct
 			/* Indicate packets */
 			/* RT_ASSERT((index<=REORDER_WIN_SIZE), ("RxReorderIndicatePacket(): Rx Reorder buffer full!!\n")); */
 
-
 			/* indicate this recv_frame */
 			/* DbgPrint("recv_indicatepkts_in_order, indicate_seq=%d, seq_num=%d\n", precvpriv->indicate_seq, pattrib->seq_num); */
+#ifdef RTW_PHL_RX
+			if (rtw_core_rx_data_post_process(padapter, prframe) == CORE_RX_DONE) {
+				padapter->recvinfo.rx_pkts++;
+			} else {
+				precvinfo->dbg_rx_drop_count++;
+			}
+#else
 			if (recv_process_mpdu(padapter, prframe) != _SUCCESS) {
 				precvinfo->dbg_rx_drop_count++;
 			}
+#endif
 
 			/* Update local variables. */
 			bPktInBuf = _FALSE;
@@ -5376,6 +5383,7 @@ enum rtw_phl_status rtw_core_rx_process(void *drv_priv)
 	u16 rx_pkt_num = 0;
 	struct recv_priv *precvpriv = &dvobj->recvpriv;
 	s32 pre_process_ret = CORE_RX_CONTINUE;
+	int ret = 0;
 
 	rx_pkt_num = rtw_phl_query_new_rx_num(GET_PHL_INFO(dvobj));
 
@@ -5435,10 +5443,26 @@ enum rtw_phl_status rtw_core_rx_process(void *drv_priv)
 			goto rx_next;
 		}
 
+#if defined(CONFIG_80211N_HT) && defined(CONFIG_RECV_REORDERING_CTRL)
+		/* including perform A-MPDU Rx Ordering Buffer Control */
+		ret = recv_indicatepkt_reorder(adapter, prframe);
+		if (ret == _FAIL) {
+			adapter->recvinfo.dbg_rx_drop_count++;
+			goto rx_next;
+		} else if (ret == RTW_RX_HANDLED) { /* queued OR indicated in order */
+			continue;
+		} else {
+			if (rtw_core_rx_data_post_process(adapter, prframe) == CORE_RX_DONE) {
+				adapter->recvinfo.rx_pkts++;
+				continue;
+			}
+		}
+#else
 		if (rtw_core_rx_data_post_process(adapter, prframe) == CORE_RX_DONE) {
 			adapter->recvinfo.rx_pkts++;
 			continue;
 		}
+#endif
 
 rx_next:
 		rtw_free_recvframe(prframe);

@@ -15,6 +15,11 @@
 
 #include "fwdl.h"
 #include "fwofld.h"
+#include "mac/mac_def.h"
+#include "hal_headers_le.h"
+#include "drv_types.h"
+#include "hal_struct.h"
+#include "rtw_security.h"
 
 static u32 get_io_ofld_cap(struct mac_ax_adapter *adapter, u32 *val)
 {
@@ -71,56 +76,6 @@ u32 mac_reset_fwofld_state(struct mac_ax_adapter *adapter, u8 op)
 	return MACSUCCESS;
 }
 
-u32 mac_check_fwofld_done(struct mac_ax_adapter *adapter, u8 op)
-{
-	struct mac_ax_pkt_ofld_info *ofld_info = &adapter->pkt_ofld_info;
-
-	switch (op) {
-	case FW_OFLD_OP_DUMP_EFUSE:
-		if (adapter->sm.efuse_ofld == MAC_AX_OFLD_H2C_IDLE) {
-			return MACSUCCESS;
-		}
-		break;
-
-	case FW_OFLD_OP_PACKET_OFLD:
-		if (ofld_info->last_op == PKT_OFLD_OP_READ) {
-			if (adapter->sm.pkt_ofld == MAC_AX_OFLD_H2C_DONE) {
-				return MACSUCCESS;
-			}
-		} else {
-			if (adapter->sm.pkt_ofld == MAC_AX_OFLD_H2C_IDLE) {
-				return MACSUCCESS;
-			}
-		}
-		break;
-	case FW_OFLD_OP_READ_OFLD:
-		if (adapter->sm.read_h2c == MAC_AX_OFLD_H2C_DONE) {
-			return MACSUCCESS;
-		}
-		break;
-	case FW_OFLD_OP_WRITE_OFLD:
-		if (adapter->sm.write_h2c == MAC_AX_OFLD_H2C_IDLE) {
-			return MACSUCCESS;
-		}
-		break;
-	case FW_OFLD_OP_CONF_OFLD:
-		if (adapter->sm.conf_h2c == MAC_AX_OFLD_H2C_IDLE) {
-			return MACSUCCESS;
-		}
-		break;
-	case FW_OFLD_OP_CH_SWITCH:
-		if (adapter->sm.ch_switch == MAC_AX_OFLD_H2C_IDLE ||
-		    adapter->sm.ch_switch == MAC_AX_CH_SWITCH_GET_RPT) {
-			return MACSUCCESS;
-		}
-		break;
-	default:
-		return MACNOITEM;
-	}
-
-	return MACPROCBUSY;
-}
-
 static u32 cnv_write_ofld_state(struct mac_ax_adapter *adapter, u8 dest)
 {
 	u8 state;
@@ -155,258 +110,10 @@ static u32 cnv_write_ofld_state(struct mac_ax_adapter *adapter, u8 dest)
 	return MACSUCCESS;
 }
 
-u32 mac_clear_write_request(struct mac_ax_adapter *adapter)
-{
-	if (adapter->sm.write_request == MAC_AX_OFLD_REQ_H2C_SENT) {
-		return MACPROCERR;
-	}
-
-	if (cnv_write_ofld_state(adapter, MAC_AX_OFLD_REQ_CLEANED)
-	    != MACSUCCESS) {
-		return MACPROCERR;
-	}
-
-	PLTFM_FREE(adapter->write_ofld_info.buf,
-		   adapter->write_ofld_info.buf_size);
-	adapter->write_ofld_info.buf = NULL;
-	adapter->write_ofld_info.buf_wptr = NULL;
-	adapter->write_ofld_info.last_req = NULL;
-	adapter->write_ofld_info.buf_size = 0;
-	adapter->write_ofld_info.avl_buf_size = 0;
-	adapter->write_ofld_info.used_size = 0;
-	adapter->write_ofld_info.req_num = 0;
-
-	return MACSUCCESS;
-}
-
-u32 mac_add_write_request(struct mac_ax_adapter *adapter,
-			  struct mac_ax_write_req *req, u8 *value, u8 *mask)
-{
-	struct mac_ax_write_ofld_info *ofld_info = &adapter->write_ofld_info;
-	struct fwcmd_write_ofld_req *write_ptr;
-	u32 data_len = 0;
-	u8 state;
-
-	state = adapter->sm.write_request;
-
-	if (!(state == MAC_AX_OFLD_REQ_CREATED ||
-	      state == MAC_AX_OFLD_REQ_CLEANED)) {
-		return MACPROCERR;
-	}
-
-	if (!ofld_info->buf) {
-		ofld_info->buf = (u8 *)PLTFM_MALLOC(WRITE_OFLD_MAX_LEN);
-		if (!ofld_info->buf) {
-			return MACNPTR;
-		}
-		ofld_info->buf_wptr = ofld_info->buf;
-		ofld_info->buf_size = WRITE_OFLD_MAX_LEN;
-		ofld_info->avl_buf_size = WRITE_OFLD_MAX_LEN;
-		ofld_info->used_size = 0;
-		ofld_info->req_num = 0;
-	}
-
-	data_len = sizeof(struct mac_ax_write_req);
-	data_len += req->value_len;
-	if (req->mask_en == 1) {
-		data_len += req->value_len;
-	}
-
-	if (ofld_info->avl_buf_size < data_len) {
-		return MACNOBUF;
-	}
-
-	if (!value) {
-		return MACNPTR;
-	}
-
-	if (req->mask_en == 1 && !mask) {
-		return MACNPTR;
-	}
-
-	if (cnv_write_ofld_state(adapter,
-				 MAC_AX_OFLD_REQ_CREATED) != MACSUCCESS) {
-		return MACPROCERR;
-	}
-
-	if (ofld_info->req_num != 0) {
-		ofld_info->last_req->ls = 0;
-	}
-
-	ofld_info->last_req = (struct mac_ax_write_req *)ofld_info->buf_wptr;
-
-	req->ls = 1;
-
-	write_ptr = (struct fwcmd_write_ofld_req *)ofld_info->buf_wptr;
-	write_ptr->dword0 =
-		cpu_to_le32(SET_WORD(req->value_len,
-				     FWCMD_H2C_WRITE_OFLD_REQ_VALUE_LEN) |
-			    SET_WORD(req->ofld_id,
-				     FWCMD_H2C_WRITE_OFLD_REQ_OFLD_ID) |
-			    SET_WORD(req->entry_num,
-				     FWCMD_H2C_WRITE_OFLD_REQ_ENTRY_NUM) |
-			    req->polling | req->mask_en | req->ls
-			   );
-
-	write_ptr->dword1 =
-		cpu_to_le32(SET_WORD(req->offset,
-				     FWCMD_H2C_WRITE_OFLD_REQ_OFFSET)
-			   );
-
-	ofld_info->buf_wptr += sizeof(struct mac_ax_write_req);
-	ofld_info->avl_buf_size -= sizeof(struct mac_ax_write_req);
-	ofld_info->used_size += sizeof(struct mac_ax_write_req);
-
-	PLTFM_MEMCPY(ofld_info->buf_wptr, value, req->value_len);
-
-	ofld_info->buf_wptr += req->value_len;
-	ofld_info->avl_buf_size -= req->value_len;
-	ofld_info->used_size += req->value_len;
-
-	if (req->mask_en == 1) {
-		PLTFM_MEMCPY(ofld_info->buf_wptr, mask, req->value_len);
-		ofld_info->buf_wptr += req->value_len;
-		ofld_info->avl_buf_size -= req->value_len;
-		ofld_info->used_size += req->value_len;
-	}
-
-	ofld_info->req_num++;
-
-	return MACSUCCESS;
-}
-
 u32 mac_write_ofld(struct mac_ax_adapter *adapter)
 {
 	printk("%s: H2C Packet not supported.", __FUNCTION__);
 	return 0;
-}
-
-static u32 cnv_conf_ofld_state(struct mac_ax_adapter *adapter, u8 dest)
-{
-	u8 state;
-
-	state = adapter->sm.conf_request;
-
-	if (state > MAC_AX_OFLD_REQ_CLEANED) {
-		return MACPROCERR;
-	}
-
-	if (dest == MAC_AX_OFLD_REQ_IDLE) {
-		if (state != MAC_AX_OFLD_REQ_H2C_SENT) {
-			return MACPROCERR;
-		}
-	} else if (dest == MAC_AX_OFLD_REQ_CLEANED) {
-		if (state == MAC_AX_OFLD_REQ_H2C_SENT) {
-			return MACPROCERR;
-		}
-	} else if (dest == MAC_AX_OFLD_REQ_CREATED) {
-		if (state == MAC_AX_OFLD_REQ_IDLE ||
-		    state == MAC_AX_OFLD_REQ_H2C_SENT) {
-			return MACPROCERR;
-		}
-	} else if (dest == MAC_AX_OFLD_REQ_H2C_SENT) {
-		if (state != MAC_AX_OFLD_REQ_CREATED) {
-			return MACPROCERR;
-		}
-	}
-
-	adapter->sm.conf_request = dest;
-
-	return MACSUCCESS;
-}
-
-u32 mac_clear_conf_request(struct mac_ax_adapter *adapter)
-{
-	if (adapter->sm.conf_request == MAC_AX_OFLD_REQ_H2C_SENT) {
-		return MACPROCERR;
-	}
-
-	if (cnv_conf_ofld_state(adapter, MAC_AX_OFLD_REQ_CLEANED) !=
-	    MACSUCCESS) {
-		return MACPROCERR;
-	}
-
-	PLTFM_FREE(adapter->conf_ofld_info.buf,
-		   adapter->conf_ofld_info.buf_size);
-	adapter->conf_ofld_info.buf = NULL;
-	adapter->conf_ofld_info.buf_wptr = NULL;
-	adapter->conf_ofld_info.buf_size = 0;
-	adapter->conf_ofld_info.avl_buf_size = 0;
-	adapter->conf_ofld_info.used_size = 0;
-	adapter->conf_ofld_info.req_num = 0;
-
-	return MACSUCCESS;
-}
-
-u32 mac_add_conf_request(struct mac_ax_adapter *adapter,
-			 struct mac_ax_conf_ofld_req *req)
-{
-	struct mac_ax_conf_ofld_info *ofld_info = &adapter->conf_ofld_info;
-	struct fwcmd_conf_ofld_req_cmd *write_ptr;
-	u8 state;
-
-	if (adapter->sm.fwdl != MAC_AX_FWDL_INIT_RDY) {
-		return MACNOFW;
-	}
-
-	state = adapter->sm.conf_request;
-
-	if (!(state == MAC_AX_OFLD_REQ_CREATED ||
-	      state == MAC_AX_OFLD_REQ_CLEANED)) {
-		return MACPROCERR;
-	}
-
-	if (!ofld_info->buf) {
-		ofld_info->buf = (u8 *)PLTFM_MALLOC(CONF_OFLD_MAX_LEN);
-		if (!ofld_info->buf) {
-			return MACNPTR;
-		}
-		ofld_info->buf_wptr = ofld_info->buf;
-		ofld_info->buf_size = CONF_OFLD_MAX_LEN;
-		ofld_info->avl_buf_size = CONF_OFLD_MAX_LEN;
-		ofld_info->used_size = 0;
-		ofld_info->req_num = 0;
-	}
-
-	if (ofld_info->avl_buf_size < sizeof(struct mac_ax_conf_ofld_req)) {
-		return MACNOBUF;
-	}
-
-	if (cnv_conf_ofld_state(adapter, MAC_AX_OFLD_REQ_CREATED) != MACSUCCESS) {
-		return MACPROCERR;
-	}
-
-	write_ptr = (struct fwcmd_conf_ofld_req_cmd *)ofld_info->buf_wptr;
-	write_ptr->dword0 =
-		cpu_to_le32(SET_WORD(req->device,
-				     FWCMD_H2C_CONF_OFLD_REQ_CMD_DEVICE)
-			   );
-
-	write_ptr->dword1 =
-		cpu_to_le32(SET_WORD(req->req.hioe.hioe_op,
-				     FWCMD_H2C_CONF_OFLD_REQ_CMD_HIOE_OP) |
-			    SET_WORD(req->req.hioe.inst_type,
-				     FWCMD_H2C_CONF_OFLD_REQ_CMD_INST_TYPE) |
-			    SET_WORD(req->req.hioe.data_mode,
-				     FWCMD_H2C_CONF_OFLD_REQ_CMD_DATA_MODE)
-			   );
-
-	write_ptr->dword2 = cpu_to_le32(req->req.hioe.param0.register_addr);
-
-	write_ptr->dword3 =
-		cpu_to_le32(SET_WORD(req->req.hioe.param1.byte_data_h,
-				     FWCMD_H2C_CONF_OFLD_REQ_CMD_BYTE_DATA_H) |
-			    SET_WORD(req->req.hioe.param2.byte_data_l,
-				     FWCMD_H2C_CONF_OFLD_REQ_CMD_BYTE_DATA_L)
-			   );
-
-	ofld_info->buf_wptr += sizeof(struct mac_ax_conf_ofld_req);
-	ofld_info->avl_buf_size -= sizeof(struct mac_ax_conf_ofld_req);
-	ofld_info->used_size += sizeof(struct mac_ax_conf_ofld_req);
-
-	ofld_info->req_num++;
-
-	return MACSUCCESS;
 }
 
 u32 mac_conf_ofld(struct mac_ax_adapter *adapter)
@@ -415,37 +122,196 @@ u32 mac_conf_ofld(struct mac_ax_adapter *adapter)
 	return 0;
 }
 
-static inline void mac_pkt_ofld_set_bitmap(u8 *bitmap, u16 index)
+static void
+__mac_pkt_ofld_fill_txd(struct mac_ax_adapter *adapter,
+			u8 *buf, u16 len, u8 type)
 {
-	bitmap[index >> 3] |= (1 << (index & 7));
-}
+	struct rtw_phl_com_t *phl_com = (struct rtw_phl_com_t *)adapter->phl_adapter;
+	struct dvobj_priv *pdvobj = (struct dvobj_priv *)(phl_com->drv_priv);
+	struct _ADAPTER *drv_adapter = dvobj_get_primary_adapter(pdvobj);
+	struct security_priv *psecuritypriv = &drv_adapter->securitypriv;
+	struct rtw_t_meta_data mdata = {0};
+	u32 txd_len = 0;
 
-static inline void mac_pkt_ofld_unset_bitmap(u8 *bitmap, u16 index)
-{
-	bitmap[index >> 3] &= ~(1 << (index & 7));
-}
+	txd_len = adapter->ops->txdesc_len(adapter, &mdata);
+	mdata.offset = txd_len;
+	mdata.pktlen = len;
+	mdata.qsel = RTW_TX_QSEL_MGT;
+	mdata.type = RTW_PHL_PKT_TYPE_MGNT;
 
-static inline u8 mac_pkt_ofld_get_bitmap(u8 *bitmap, u16 index)
-{
-	return bitmap[index / 8] & (1 << (index & 7)) ? 1 : 0;
+	if (type == PKT_TYPE_PS_POLL) {
+		mdata.nav_use_hdr = 1;
+	} else {
+		mdata.hw_seq_mode = 1;
+		mdata.hw_ssn_sel = 0;
+		mdata.spe_rpt = 1;
+	}
+
+	if (type == PKT_TYPE_BT_QOS_NULL) {
+		mdata.bt_int = 1;
+	}
+
+	mdata.userate_sel = 1;
+	mdata.f_rate = RTW_DATA_RATE_CCK1;
+
+	if (type == PKT_TYPE_ARP_RSP) {
+		switch (psecuritypriv->dot11PrivacyAlgrthm) {
+		case _NO_PRIVACY_:
+			mdata.sec_hw_enc = 0;
+			mdata.sec_type = RTW_ENC_NONE;
+			break;
+		case _WEP40_:
+			mdata.sec_hw_enc = 1;
+			mdata.sec_type = RTW_ENC_WEP40;
+			break;
+		case _TKIP_:
+		case _TKIP_WTMIC_:
+			mdata.sec_hw_enc = 1;
+			mdata.sec_type = RTW_ENC_TKIP;
+			break;
+		case _AES_:
+			mdata.sec_hw_enc = 1;
+			mdata.sec_type = RTW_ENC_CCMP;
+			break;
+		case _WEP104_:
+			mdata.sec_hw_enc = 1;
+			mdata.sec_type = RTW_ENC_WEP104;
+			break;
+		case _SMS4_:
+			mdata.sec_hw_enc = 1;
+			mdata.sec_type = RTW_ENC_GCMSMS4;
+			break;
+		case _GCMP_:
+			mdata.sec_hw_enc = 1;
+			mdata.sec_type = RTW_ENC_GCMP;
+			break;
+		default:
+			mdata.sec_hw_enc = 0;
+			mdata.sec_type = RTW_ENC_NONE;
+			break;
+		}
+	}
+
+	adapter->ops->build_txdesc(adapter, &mdata, buf, txd_len);
 }
 
 u32 mac_read_pkt_ofld(struct mac_ax_adapter *adapter, u8 id)
 {
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
+	struct halmac_txff_allocation *txff_info = &adapter->txff_alloc;
+	struct mac_ax_pkt_ofld_info *ofld_info = &adapter->pkt_ofld_info;
+	struct mac_ax_pkt_ofld_pkt *ofld_pkt = &adapter->pkt_ofld_pkt;
+	u32 addr = 0;
+	u8 buf[128] = {0};
+	u32 txd_len = 0;
+	u8 *pkt_buff = NULL;
+
+	if (id == 0) {
+		PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_ERR_,
+			  "id must be nonzore!\n");
+		return MACNOTSUP;
+	}
+
+	txd_len = adapter->ops->txdesc_len(adapter, NULL);
+	addr = MAC_TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + id) * 128;
+	PLTFM_MEM_W(addr, buf, 128);
+	ofld_pkt->pkt_len = (u16)buf[0] | ((u16)buf[1] << 8);
+	if (ofld_pkt->pkt_len) {
+		if (ofld_pkt->pkt) {
+			PLTFM_FREE(ofld_pkt->pkt, ofld_pkt->pkt_len);
+		}
+
+		pkt_buff = (u8 *)PLTFM_MALLOC(ofld_pkt->pkt_len);
+		if (!pkt_buff) {
+			return MACBUFALLOC;
+		}
+
+		PLTFM_MEMCPY(pkt_buff, buf + txd_len, ofld_pkt->pkt_len);
+		ofld_pkt->pkt_id = id;
+		ofld_pkt->pkt = pkt_buff;
+	}
+
+	ofld_info->last_op = PKT_OFLD_OP_READ;
+
+	return MACSUCCESS;
 }
 
 u32 mac_del_pkt_ofld(struct mac_ax_adapter *adapter, u8 id)
 {
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
+	struct halmac_txff_allocation *txff_info = &adapter->txff_alloc;
+	struct mac_ax_pkt_ofld_info *ofld_info = &adapter->pkt_ofld_info;
+	u32 addr = 0;
+	u8 buf[128] = {0};
+
+	if (id == 0) {
+		PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_ERR_,
+			  "id must be nonzore!\n");
+		return MACNOTSUP;
+	}
+
+	addr = MAC_TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + id) * 128;
+	PLTFM_MEMSET(buf, 0, 128);
+	PLTFM_MEM_W(addr, buf, 128);
+
+	ofld_info->last_op = PKT_OFLD_OP_DEL;
+
+	return MACSUCCESS;
 }
 
-u32 mac_add_pkt_ofld(struct mac_ax_adapter *adapter, u8 *pkt, u16 len, u8 *id)
+u32 mac_add_pkt_ofld(struct mac_ax_adapter *adapter, u8 *pkt, u16 len, u8 *id,
+		     u8 type)
 {
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
+	struct halmac_txff_allocation *txff_info = &adapter->txff_alloc;
+	struct mac_ax_pkt_ofld_info *ofld_info = &adapter->pkt_ofld_info;
+	u32 addr = 0;
+	u32 page_num = 0;
+	u32 txd_len = 0;
+	u8 *ptxd = NULL;
+
+	switch (type) {
+	case PKT_TYPE_NULL_DATA:
+		page_num = ofld_info->nulldata_page;
+		break;
+	case PKT_TYPE_BT_QOS_NULL:
+		page_num = ofld_info->btqosnull_page;
+		break;
+	case PKT_TYPE_QOS_NULL:
+		page_num = ofld_info->qosnull_page;;
+		break;
+	default:
+		page_num = 0;
+		break;
+	}
+
+	if (page_num == 0) {
+		PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_ERR_,
+			  "unsupported type %d.\n",
+			  type);
+		return MACNOTSUP;
+	}
+
+	txd_len = adapter->ops->txdesc_len(adapter, NULL);
+	ptxd = PLTFM_MALLOC(txd_len);
+	if (ptxd == NULL) {
+		return MACBUFALLOC;
+	}
+	__mac_pkt_ofld_fill_txd(adapter, ptxd, len, type);
+
+	addr = MAC_TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + page_num) * 128;
+
+	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
+		  "write pkt to address 0x%06x of tx pkt buffer, page %d\n",
+		 addr, txff_info->rsvd_bcnq_addr + page_num);
+	PLTFM_MEM_W(addr, ptxd, txd_len);
+	PLTFM_MEM_W(addr + txd_len, pkt, len);
+	*id = page_num;
+
+	if (ptxd) {
+		PLTFM_FREE(ptxd, txd_len);
+	}
+
+	ofld_info->last_op = PKT_OFLD_OP_ADD;
+
+	return MACSUCCESS;
 }
 
 u32 mac_pkt_ofld_packet(struct mac_ax_adapter *adapter,
@@ -453,10 +319,6 @@ u32 mac_pkt_ofld_packet(struct mac_ax_adapter *adapter,
 {
 	struct mac_ax_pkt_ofld_pkt *pkt_info = &adapter->pkt_ofld_pkt;
 	*pkt_buf = NULL;
-
-	if (adapter->sm.pkt_ofld != MAC_AX_OFLD_H2C_DONE) {
-		return MACPROCERR;
-	}
 
 	*pkt_buf = (u8 *)PLTFM_MALLOC(pkt_info->pkt_len);
 	if (!*pkt_buf) {
@@ -478,23 +340,6 @@ u32 mac_dump_efuse_ofld(struct mac_ax_adapter *adapter, u32 efuse_size,
 {
 	printk("%s: H2C Packet not supported.", __FUNCTION__);
 	return 0;
-}
-
-u32 mac_efuse_ofld_map(struct mac_ax_adapter *adapter, u8 *efuse_map,
-		       u32 efuse_size)
-{
-	u32 size = efuse_size;
-	struct mac_ax_efuse_ofld_info *ofld_info = &adapter->efuse_ofld_info;
-
-	if (adapter->sm.efuse_ofld != MAC_AX_OFLD_H2C_DONE) {
-		return MACPROCERR;
-	}
-
-	PLTFM_MEMCPY(efuse_map, ofld_info->buf, size);
-
-	adapter->sm.efuse_ofld = MAC_AX_OFLD_H2C_IDLE;
-
-	return MACSUCCESS;
 }
 
 static u32 cnv_read_ofld_state(struct mac_ax_adapter *adapter, u8 dest)
@@ -531,125 +376,6 @@ static u32 cnv_read_ofld_state(struct mac_ax_adapter *adapter, u8 dest)
 	return MACSUCCESS;
 }
 
-u32 mac_clear_read_request(struct mac_ax_adapter *adapter)
-{
-	if (adapter->sm.read_request == MAC_AX_OFLD_REQ_H2C_SENT) {
-		return MACPROCERR;
-	}
-
-	if (cnv_read_ofld_state(adapter, MAC_AX_OFLD_REQ_CLEANED)
-	    != MACSUCCESS) {
-		return MACPROCERR;
-	}
-
-	PLTFM_FREE(adapter->read_ofld_info.buf,
-		   adapter->read_ofld_info.buf_size);
-	adapter->read_ofld_info.buf = NULL;
-	adapter->read_ofld_info.buf_wptr = NULL;
-	adapter->read_ofld_info.last_req = NULL;
-	adapter->read_ofld_info.buf_size = 0;
-	adapter->read_ofld_info.avl_buf_size = 0;
-	adapter->read_ofld_info.used_size = 0;
-	adapter->read_ofld_info.req_num = 0;
-
-	return MACSUCCESS;
-}
-
-u32 mac_add_read_request(struct mac_ax_adapter *adapter,
-			 struct mac_ax_read_req *req)
-{
-	struct mac_ax_read_ofld_info *ofld_info = &adapter->read_ofld_info;
-	struct fwcmd_read_ofld_req *write_ptr;
-	u8 state;
-
-	state = adapter->sm.read_request;
-
-	if (!(state == MAC_AX_OFLD_REQ_CREATED ||
-	      state == MAC_AX_OFLD_REQ_CLEANED)) {
-		return MACPROCERR;
-	}
-
-	if (!ofld_info->buf) {
-		ofld_info->buf = (u8 *)PLTFM_MALLOC(READ_OFLD_MAX_LEN);
-		if (!ofld_info->buf) {
-			return MACNPTR;
-		}
-		ofld_info->buf_wptr = ofld_info->buf;
-		ofld_info->buf_size = READ_OFLD_MAX_LEN;
-		ofld_info->avl_buf_size = READ_OFLD_MAX_LEN;
-		ofld_info->used_size = 0;
-		ofld_info->req_num = 0;
-	}
-
-	if (ofld_info->avl_buf_size < sizeof(struct mac_ax_read_req)) {
-		return MACNOBUF;
-	}
-
-	if (cnv_read_ofld_state(adapter, MAC_AX_OFLD_REQ_CREATED) != MACSUCCESS) {
-		return MACPROCERR;
-	}
-
-	if (ofld_info->req_num != 0) {
-		ofld_info->last_req->ls = 0;
-	}
-
-	ofld_info->last_req = (struct mac_ax_read_req *)ofld_info->buf_wptr;
-
-	req->ls = 1;
-
-	write_ptr = (struct fwcmd_read_ofld_req *)ofld_info->buf_wptr;
-	write_ptr->dword0 =
-		cpu_to_le32(SET_WORD(req->value_len,
-				     FWCMD_H2C_READ_OFLD_REQ_VALUE_LEN) |
-			    SET_WORD(req->ofld_id,
-				     FWCMD_H2C_READ_OFLD_REQ_OFLD_ID) |
-			    SET_WORD(req->entry_num,
-				     FWCMD_H2C_READ_OFLD_REQ_ENTRY_NUM) | req->ls
-			   );
-
-	write_ptr->dword1 =
-		cpu_to_le32(SET_WORD(req->offset,
-				     FWCMD_H2C_READ_OFLD_REQ_OFFSET)
-			   );
-
-	ofld_info->buf_wptr += sizeof(struct mac_ax_read_req);
-	ofld_info->avl_buf_size -= sizeof(struct mac_ax_read_req);
-	ofld_info->used_size += sizeof(struct mac_ax_read_req);
-	ofld_info->req_num++;
-
-	return MACSUCCESS;
-}
-
-u32 mac_read_ofld(struct mac_ax_adapter *adapter)
-{
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
-}
-
-u32 mac_read_ofld_value(struct mac_ax_adapter *adapter,
-			u8 **val_buf, u16 *val_len)
-{
-	struct mac_ax_read_ofld_value *value_info = &adapter->read_ofld_value;
-	*val_buf = NULL;
-
-	if (adapter->sm.read_h2c != MAC_AX_OFLD_H2C_DONE) {
-		return MACPROCERR;
-	}
-
-	*val_buf = (u8 *)PLTFM_MALLOC(value_info->len);
-	if (!*val_buf) {
-		return MACBUFALLOC;
-	}
-
-	PLTFM_MEMCPY(*val_buf, value_info->buf, value_info->len);
-
-	*val_len = value_info->len;
-
-	adapter->sm.read_h2c = MAC_AX_OFLD_H2C_IDLE;
-
-	return MACSUCCESS;
-}
-
 u32 mac_general_pkt_ids(struct mac_ax_adapter *adapter,
 			struct mac_ax_general_pkt_ids *ids)
 {
@@ -664,71 +390,10 @@ u32 mac_general_pkt_ids(struct mac_ax_adapter *adapter,
 	fwcmd_tbl.data1 = ids->pspoll;
 	fwcmd_tbl.data2 = ids->nulldata;
 	fwcmd_tbl.data3 = ids->qosnull;
-	fwcmd_tbl.data4 = 0;	// unknown here.
+	fwcmd_tbl.data4 = ids->btqosnull;
 	fwcmd_tbl.data5 = ids->cts2self;
-	fwcmd_tbl.data6 = 0;	// unknown here.
+	fwcmd_tbl.data6 = 0; // unknown here.
 	ret = rtw_hal_mac_send_h2c_ameba(hal_com, fwcmd_tbl.cmd_id, sizeof(struct fwcmd_rsvdpage) - 1, &fwcmd_tbl.data0);
-
-	return ret;
-}
-
-static u32 add_cmd(struct mac_ax_adapter *adapter, struct rtw_mac_cmd *cmd)
-{
-	printk("%s: function not supported.", __FUNCTION__);
-	return 0;
-}
-
-static u32 chk_cmd_ofld_reg(struct mac_ax_adapter *adapter)
-{
-	printk("%s: function not supported.", __FUNCTION__);
-	return 0;
-}
-
-static u32 chk_cmd_ofld_pkt(struct mac_ax_adapter *adapter)
-{
-	printk("%s: function not supported.", __FUNCTION__);
-	return 0;
-}
-
-static u32 chk_cmd_ofld(struct mac_ax_adapter *adapter, u8 rx_ok)
-{
-	u32 ret;
-
-	if (rx_ok) {
-		ret = chk_cmd_ofld_pkt(adapter);
-	} else {
-		ret = chk_cmd_ofld_reg(adapter);
-	}
-
-	return ret;
-}
-
-static u32 cmd_ofld(struct mac_ax_adapter *adapter)
-{
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
-}
-
-u32 mac_cmd_ofld(struct mac_ax_adapter *adapter)
-{
-	struct mac_ax_cmd_ofld_info *ofld_info = &adapter->cmd_ofld_info;
-	struct mac_ax_state_mach *sm = &adapter->sm;
-	u32 ret = MACSUCCESS;
-
-	PLTFM_MUTEX_LOCK(&ofld_info->cmd_ofld_lock);
-	if (sm->cmd_state != MAC_AX_CMD_OFLD_IDLE) {
-		PLTFM_MSG_ERR("%s: IO offload is busy\n", __func__);
-		PLTFM_MUTEX_UNLOCK(&ofld_info->cmd_ofld_lock);
-		return MACPROCERR;
-	}
-	sm->cmd_state = MAC_AX_CMD_OFLD_PROC;
-	PLTFM_MUTEX_UNLOCK(&ofld_info->cmd_ofld_lock);
-
-	ret = cmd_ofld(adapter);
-
-	PLTFM_MUTEX_LOCK(&ofld_info->cmd_ofld_lock);
-	sm->cmd_state = MAC_AX_CMD_OFLD_IDLE;
-	PLTFM_MUTEX_UNLOCK(&ofld_info->cmd_ofld_lock);
 
 	return ret;
 }
@@ -1021,7 +686,7 @@ u32 pktofld_self_test(struct mac_ax_adapter *adapter)
 		pkt[i] = 15 - i;
 	}
 
-	ret = mac_add_pkt_ofld(adapter, pkt, pkt_len, &pkt_id);
+	ret = mac_add_pkt_ofld(adapter, pkt, pkt_len, &pkt_id, 0);
 	if (ret != 0) {
 		PLTFM_FREE(pkt, pkt_len);
 		pkt = NULL;
@@ -1047,18 +712,6 @@ u32 pktofld_self_test(struct mac_ax_adapter *adapter)
 	if (ret != 0) {
 		PLTFM_MSG_ERR("Packet ofld self test fail at READ\n");
 		return ret;
-	}
-
-	for (poll_cnt = 1000; poll_cnt > 0; poll_cnt--) {
-		state = adapter->sm.pkt_ofld;
-		if (state == MAC_AX_OFLD_H2C_DONE) {
-			break;
-		}
-		PLTFM_DELAY_MS(1);
-	}
-	if (poll_cnt == 0) {
-		PLTFM_MSG_ERR("Packet ofld self test timout at READ\n");
-		return MACPOLLTO;
 	}
 
 	ret = mac_pkt_ofld_packet(adapter, &pkt, &pkt_len, &pkt_id);
@@ -1095,24 +748,6 @@ u32 pktofld_self_test(struct mac_ax_adapter *adapter)
 	}
 	PLTFM_MSG_TRACE("Packet ofld self test pass\n");
 
-	return MACSUCCESS;
-}
-
-u32 mac_ch_switch_ofld(struct mac_ax_adapter *adapter, struct mac_ax_ch_switch_parm parm)
-{
-	printk("%s: H2C Packet not supported.", __FUNCTION__);
-	return 0;
-}
-
-u32 mac_get_ch_switch_rpt(struct mac_ax_adapter *adapter, struct mac_ax_ch_switch_rpt *rpt)
-{
-	struct mac_ax_state_mach *sm = &adapter->sm;
-
-	if (sm->ch_switch != MAC_AX_CH_SWITCH_GET_RPT) {
-		return MACPROCERR;
-	}
-	PLTFM_MEMCPY(rpt, adapter->ch_switch_rpt, sizeof(struct mac_ax_ch_switch_rpt));
-	sm->ch_switch = MAC_AX_OFLD_H2C_IDLE;
 	return MACSUCCESS;
 }
 

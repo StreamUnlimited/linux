@@ -4,7 +4,7 @@ config ADC_RTK_AMEBA
 	select IIO
 	select IIO_BUFFER
 	select IIO_TRIGGERED_BUFFER
-	select IIO_SYSFS_TRIGGRTK_ER
+	select IIO_SYSFS_TRIGGER
 	help
 	 Say yes here to build support for Ameba Analog
 	 to Digital Converter (ADC).

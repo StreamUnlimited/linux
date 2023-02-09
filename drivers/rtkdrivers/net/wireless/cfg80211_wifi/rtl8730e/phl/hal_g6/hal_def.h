@@ -164,7 +164,6 @@ struct btc_fw_msg {
 	u32 fev_cnt; /* fw event cnt, need to be protected by lock */
 
 	struct hal_bt_msg btinfo;
-	struct hal_bt_msg scbd;
 
 	/* common fwinfo queue */
 	struct phl_queue idleq;
@@ -378,12 +377,12 @@ struct hal_io_ops {
 	u8(*_read8)(struct rtw_hal_com_t *hal, u32 addr);
 	u16(*_read16)(struct rtw_hal_com_t *hal, u32 addr);
 	u32(*_read32)(struct rtw_hal_com_t *hal, u32 addr);
-	void (*_read_mem)(struct rtw_hal_com_t *hal, u32 addr, u32 cnt, u8 *pmem);
+	void (*_read_mem)(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len);
 
 	int (*_write8)(struct rtw_hal_com_t *hal, u32 addr, u8 val);
 	int (*_write16)(struct rtw_hal_com_t *hal, u32 addr, u16 val);
 	int (*_write32)(struct rtw_hal_com_t *hal, u32 addr, u32 val);
-	int (*_write_mem)(struct rtw_hal_com_t *hal, u32 addr, u32 length, u8 *pdata);
+	int (*_write_mem)(struct rtw_hal_com_t *hal, u32 addr, u8 *buf, u32 len);
 
 #ifdef CONFIG_AXI_HCI
 	u8(*_sys_read8)(struct rtw_hal_com_t *hal, u32 base, u32 addr);
@@ -1155,8 +1154,6 @@ struct pkt_ofld_info {
 };
 
 struct pkt_ofld_entry {
-	struct list_head list;
-	u16 macid;
 	struct pkt_ofld_info pkt_info[PKT_OFLD_TYPE_MAX];
 };
 

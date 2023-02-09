@@ -105,7 +105,8 @@ void rtk_i2c_isr_slave_handle_rx_full(struct rtk_i2c_dev *i2c_dev)
 	}
 }
 
-/* Master inform slave that (master)rx-(slave)tx has been finished. */
+/* Master inform slave that (master)rx-(slave)tx has been finished with NAK. */
+/* Add I2C_BIT_M_STOP_DET to indicate i2c transfer is stopped. */
 void rkt_i2c_isr_slave_handle_res_done(struct rtk_i2c_dev *i2c_dev)
 {
 	if (!i2c_dev->slave_dev->current_slave) {
@@ -115,6 +116,12 @@ void rkt_i2c_isr_slave_handle_res_done(struct rtk_i2c_dev *i2c_dev)
 	if (i2c_dev->slave_dev->current_slave->slave) {
 		i2c_slave_event(i2c_dev->slave_dev->current_slave->slave, I2C_SLAVE_STOP, NULL);
 	}
+
+	/* Master-end stop request data from slave, clear RD_REQ irq. */
+	if (i2c_dev->i2c_manage.dev_status == I2C_STS_TX_ING) {
+		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RD_REQ);
+	}
+
 	i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
 	i2c_dev->slave_dev->current_slave = NULL;
 	i2c_dev->slave_dev->broadcast = 0;
@@ -165,6 +172,7 @@ static hal_status rtk_i2c_prepare_slave_interrupts(
 							I2C_BIT_M_GEN_CALL |
 							I2C_BIT_M_RX_FULL |
 							I2C_BIT_M_RX_DONE |
+							I2C_BIT_M_STOP_DET |
 							I2C_BIT_M_TX_ABRT |
 							I2C_BIT_M_TX_OVER |
 							I2C_BIT_M_RD_REQ |

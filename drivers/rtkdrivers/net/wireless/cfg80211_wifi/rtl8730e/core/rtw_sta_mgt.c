@@ -733,7 +733,12 @@ u32 static _rtw_free_core_stainfo(_adapter *padapter, struct sta_info *psta)
 	struct hw_xmit *phwxmit;
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-
+#ifdef CONFIG_RECV_REORDERING_CTRL
+	_queue *ppending_recvframe_queue;
+#endif
+	_list	*phead, *plist;
+	_queue *pdefrag_q = &psta->sta_recvpriv.defrag_q;
+	union recv_frame *prframe;
 	int pending_qcnt[4];
 	u8 is_pre_link_sta = _FALSE;
 
@@ -861,10 +866,6 @@ u32 static _rtw_free_core_stainfo(_adapter *padapter, struct sta_info *psta)
 		rtw_clear_bit(RTW_RECV_ACK_OR_TIMEOUT, &preorder_ctrl->rec_abba_rsp_ack);
 
 #ifdef CONFIG_RECV_REORDERING_CTRL
-		_list	*phead, *plist;
-		union recv_frame *prframe;
-		_queue *ppending_recvframe_queue;
-
 		_cancel_timer_ex(&preorder_ctrl->reordering_ctrl_timer);
 
 		ppending_recvframe_queue = &preorder_ctrl->pending_recvframe_queue;
@@ -890,10 +891,6 @@ u32 static _rtw_free_core_stainfo(_adapter *padapter, struct sta_info *psta)
 
 	/* CVE-2020-24586, clear defrag queue */
 	{
-		_list	*phead, *plist;
-		_queue *pfree_sta_queue, *pdefrag_q = &psta->sta_recvpriv.defrag_q;
-		union recv_frame *prframe;
-
 		_rtw_spinlock_bh(&pdefrag_q->lock);
 		phead = get_list_head(pdefrag_q);
 		plist = get_next(phead);
@@ -1113,11 +1110,11 @@ struct sta_info *rtw_get_stainfo(struct sta_priv *pstapriv, const u8 *hwaddr)
 	struct rtw_wifi_role_t *phl_role;
 	u32 index;
 
-	if (hwaddr == NULL) {
+	if (hwaddr == NULL || phl == NULL) {
 		return NULL;
 	}
 
-	if (pstapriv->padapter->phl_role == NULL) {
+	if (!pstapriv->padapter || pstapriv->padapter->phl_role == NULL) {
 		RTW_ERR(FUNC_ADPT_FMT" phl_role == NULL\n", FUNC_ADPT_ARG(pstapriv->padapter));
 		rtw_warn_on(1);
 		return NULL;

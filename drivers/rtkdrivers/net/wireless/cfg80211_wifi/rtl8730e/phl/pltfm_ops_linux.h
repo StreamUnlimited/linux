@@ -816,6 +816,11 @@ static inline u32 _os_read32_axi(void *d, u32 addr)
 	return os_axi_read32((struct dvobj_priv *)d, addr);
 }
 
+static inline void _os_mem_r_axi(void *d, u32 addr, u8 *buf, u32 len)
+{
+	os_axi_mem_r((struct dvobj_priv *)d, addr, buf, len);
+}
+
 static inline int _os_write8_axi(void *d, u32 addr, u8 val)
 {
 	return os_axi_write8((struct dvobj_priv *)d, addr, val);
@@ -827,6 +832,11 @@ static inline int _os_write16_axi(void *d, u32 addr, u16 val)
 static inline int _os_write32_axi(void *d, u32 addr, u32 val)
 {
 	return os_axi_write32((struct dvobj_priv *)d, addr, val);
+}
+
+static inline void _os_mem_w_axi(void *d, u32 addr, u8 *buf, u32 len)
+{
+	os_axi_mem_w((struct dvobj_priv *)d, addr, buf, len);
 }
 
 static inline u8 _os_sys_read8_axi(void *d, u32 base, u32 addr)

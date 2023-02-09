@@ -2028,6 +2028,7 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 	uint len = precv_frame->u.hdr.len;
 	WLAN_BSSID_EX *pbss;
 	int ret = _SUCCESS;
+	static u8 bcn_changed = 0;	// static for count, sync by rtos
 #ifdef CONFIG_TDLS
 	struct sta_info *ptdls_sta;
 	struct tdls_info *ptdlsinfo = &padapter->tdlsinfo;
@@ -2180,6 +2181,15 @@ unsigned int OnBeacon(_adapter *padapter, union recv_frame *precv_frame)
 #else
 				ret = rtw_check_bcn_info(padapter, pframe, len);
 #endif
+
+				// disconnect only when continuous two beacons changed
+				if (!bcn_changed && !ret) {
+					bcn_changed = 1;
+					return _SUCCESS;
+				} else {
+					bcn_changed = 0;
+				}
+
 				if (!ret) {
 					RTW_PRINT(FUNC_ADPT_FMT" ap has changed, disconnect now\n", FUNC_ADPT_ARG(padapter));
 					receive_disconnect(padapter, pmlmeinfo->network.MacAddress, 0, _FALSE);

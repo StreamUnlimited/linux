@@ -35,15 +35,15 @@ CONFIG_AXI_HCI = y
 CONFIG_MP_INCLUDED = n
 CONFIG_CONCURRENT_MODE = y
 CONFIG_POWER_SAVING = n
-CONFIG_POWER_SAVE = n
+CONFIG_POWER_SAVE = y
 CONFIG_IPS_MODE = default
 CONFIG_LPS_MODE = default
-CONFIG_BTC = n
+CONFIG_BTC = y
 CONFIG_WAPI_SUPPORT = n
 CONFIG_EFUSE_CONFIG_FILE = n
 CONFIG_EXT_CLK = n
 CONFIG_TRAFFIC_PROTECT = n
-CONFIG_LOAD_PHY_PARA_FROM_FILE = y
+CONFIG_LOAD_PHY_PARA_FROM_FILE = n
 # Remember to set CONFIG_FILE_FWIMG when set CONFIG_FILE_FWIMG to y,
 # or driver will fail on ifconfig up because can't find firmware file
 CONFIG_FILE_FWIMG = n
@@ -102,10 +102,10 @@ EXTRA_CFLAGS += -DCONFIG_RTW_ANDROID=$(CONFIG_RTW_ANDROID)
 endif
 
 ########################## Debug ###########################
-CONFIG_RTW_DEBUG = n
+CONFIG_RTW_DEBUG = y
 # default log level is _DRV_INFO_ = 4,
 # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
-CONFIG_RTW_LOG_LEVEL = 4
+CONFIG_RTW_LOG_LEVEL = 1
 
 # enable /proc/net/rtlxxxx/ debug interfaces
 CONFIG_PROC_DEBUG = y
