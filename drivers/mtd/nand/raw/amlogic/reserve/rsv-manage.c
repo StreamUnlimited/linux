@@ -341,7 +341,7 @@ RE_RSV_INFO:
 	memset((u8 *)&oobinfo, 0, sizeof(struct oobinfo_t));
 
 	error = mtd->_read_oob(mtd, offset, &oob_ops);
-	if (error != 0 && error != -EUCLEAN) {
+	if (error < 0 && error != -EUCLEAN) {
 		pr_info("blk check good but read failed: %llx, %d\n",
 			(u64)offset, error);
 		offset += rsv_info->size;
@@ -455,7 +455,7 @@ RE_RSV_INFO:
 		offset *= mtd->erasesize;
 		offset += i * mtd->writesize;
 		error = mtd->_read_oob(mtd, offset, &oob_ops);
-		if (error != 0 && error != -EUCLEAN) {
+		if (error < 0 && error != -EUCLEAN) {
 			pr_info("blk good but read failed:%llx,%d\n",
 				(u64)offset, error);
 			rsv_info->valid_node->status |= ECC_ABNORMAL_FLAG;
@@ -546,7 +546,7 @@ READ_RSV_AGAIN:
 		memset((u8 *)&oobinfo, 0, oob_ops.ooblen);
 
 		ret = mtd->_read_oob(mtd, offset, &oob_ops);
-		if (ret != 0 && ret != -EUCLEAN) {
+		if (ret < 0 && ret != -EUCLEAN) {
 			pr_info("blk good but read failed: %llx, %d\n",
 				(u64)offset, ret);
 			ret = meson_rsv_scan(rsv_info);
