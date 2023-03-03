@@ -1,0 +1,64 @@
+/ {
+	ocp {
+		spic: spi@44000000 {
+			compatible = "realtek,rxi312-spi-nand";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			bus_num = <2>;
+			reg = <0x44000000 0x200>;
+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+			spi-max-frequency = <100000000>;
+
+			flash0: flash@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "spi-nand";
+				spi-max-frequency = <100000000>;
+				reg = <0>;
+
+				partitions {
+					compatible = "fixed-partitions";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					partition@0 {
+						label="boot_a";
+						reg=<0x00000000 0x00120000>;
+					};
+					partition@1 {
+						label="fip_a";
+						reg=<0x00120000 0x00120000>;
+					};
+					partition@2 {
+						label="boot_b";
+						reg=<0x00240000 0x00120000>;
+					};
+					partition@3 {
+						label="fip_b";
+						reg=<0x00360000 0x00120000>;
+					};
+					partition@4 {
+						label="environment";
+						reg=<0x00480000 0x00080000>;
+					};
+					partition@5 {
+						label="constants";
+						reg=<0x00500000 0x00080000>;
+					};
+					partition@6 {
+						label="swufit";
+						reg=<0x00580000 0x01200000>;
+					};
+					partition@7 {
+						label="fit";
+						reg=<0x01780000 0x00700000>;
+					};
+					partition@8 {
+						label="data";
+						reg=<0x01E80000 0x0E180000>;
+					};
+				};
+			};
+		};
+	};
+};
