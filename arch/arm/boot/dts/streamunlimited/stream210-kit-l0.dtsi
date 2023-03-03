@@ -1,0 +1,237 @@
+#include "../rtl8730e-drm.dtsi"
+#include "../rtl8730e-captouch.dtsi"
+
+/ {
+	sue {
+		carrierboard = "streamkit210";
+		daughterboard = "dabfm";
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		// Reserve 6 MiB for graphics, this is enough do drive a
+		// 480x800 32-bpp display with double-buffering using DRM.
+		// There is probably some more optimizations to be done,
+		// but for now let's keep it like that.
+		mem_drm_reserved: drm_buffer@0x64000000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x64000000 0x600000>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&rgb_led_pins>;
+		led_r {
+			label = "led_r";
+			gpios = <&gpiob 14 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led_g {
+			label = "led_g";
+			gpios = <&gpiob 15 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led_b {
+			label = "led_b";
+			gpios = <&gpiob 16 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+};
+
+&captouch {
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&captouch_pins>;
+	pinctrl-1 = <&captouch_pins>;
+
+	rtk,ctc-diffthr = <800>, <800>, <800>, <800>, <800>, <800>, <800>, <800>, <800>;
+	rtk,ctc-mbias = <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>;
+	rtk,ctc-nnoise = <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>;
+	rtk,ctc-pnoise = <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>;
+	rtk,ctc-ch-status = <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>;
+	rtk,ctc-keycodes = <KEY_DOWN>,
+			   <KEY_SLEEP>,
+			   <KEY_PREVIOUSSONG>,
+			   <KEY_VOLUMEDOWN>,
+			   <KEY_PLAYPAUSE>,
+			   <KEY_UP>,
+			   <KEY_VOLUMEUP>,
+			   <KEY_NEXTSONG>,
+			   <KEY_MUTE>;
+	status = "okay";
+};
+
+&drm {
+	status = "okay";
+};
+
+&dsi {
+	status = "okay";
+};
+
+&rtkpanel {
+	compatible = "kingtech,pv04005td25e";
+	pinctrl-names = "default";
+	pinctrl-0 = <&lcd_rst_n_pin>;
+	mipi-gpios = <&gpiob 31 GPIO_ACTIVE_LOW>;
+	status = "okay";
+};
+
+&codec {
+	status = "okay";
+};
+
+&gpioa {
+	pinctrl-names = "default";
+	pinctrl-0 = <&amp_pins>;
+
+	// TODO: Move this to a driver
+	amp_enable {
+		gpio-hog;
+		gpios = <16 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "AMP_ENABLE";
+	};
+
+	// TODO: Move this to a driver
+	amp_mute_n {
+		gpio-hog;
+		gpios = <15 GPIO_ACTIVE_LOW>;
+		output-low;
+		line-name = "AMP_MUTE_N";
+	};
+};
+
+&gpiob {
+	pinctrl-names = "default";
+	pinctrl-0 = <&usb_drvvbus_pin &hp_mute_n_pin>;
+
+	// TODO: Move this to a driver
+	hp_mute_n {
+		gpio-hog;
+		gpios = <19 GPIO_ACTIVE_LOW>;
+		output-low;
+		line-name = "HP_MUTE_N";
+	};
+};
+
+&hash {
+	// TODO: Enable it and figure out if it works nicely
+	status = "disabled";
+};
+
+&i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins>;
+	status = "okay";
+};
+
+&ledc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&ledc_pin>;
+	rtk,led-nums = <5>;
+	rtk,output-RGB-mode = <0>;
+
+	// Timings for SKC6812 RGB LEDs
+	rtk,data-tx-time0h = <12>;	// ~300 ns
+	rtk,data-tx-time0l = <36>;	// ~900 ns
+	rtk,data-tx-time1h = <30>;	// ~750 ns
+	rtk,data-tx-time1l = <12>;	// ~300 ns
+	rtk,refresh-time = <8000>;	// ~200 us
+	status = "okay";
+};
+
+&pinctrl {
+	amp_pins: amp_pins {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 15, GPIO)>,	// AMP_MUTE_N
+				 <REALTEK_PINMUX('A', 16, GPIO)>;	// AMP_ENABLE
+			bias-pull-down;
+		};
+	};
+
+	hp_mute_n_pin: hp_mute_n_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 19, GPIO)>;
+			bias-pull-down;
+		};
+	};
+
+	lcd_rst_n_pin: lcd_rst_n_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 31, GPIO)>;
+			bias-pull-down;
+		};
+	};
+
+	ledc_pin: ledc_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 27, LEDC)>;
+			bias-pull-up;
+		};
+	};
+
+	rgb_led_pins: rgb_led_pins {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 14, GPIO)>,
+				 <REALTEK_PINMUX('B', 15, GPIO)>,
+				 <REALTEK_PINMUX('B', 16, GPIO)>;
+			bias-pull-up;
+		};
+	};
+
+	spi1_dabfm_pins: spi1_dabfm_pins {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 12, GPIO)>,	// SPI1_CS
+				 <REALTEK_PINMUX('A', 11, SPI)>,	// SPI1_CLK
+				 <REALTEK_PINMUX('A', 10, SPI)>,	// SPI1_MISO
+				 <REALTEK_PINMUX('A', 9, SPI)>;		// SPI1_MOSI
+		};
+	};
+};
+
+&spi0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pins>;
+	status = "disabled";
+};
+
+&spi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_dabfm_pins>;
+	status = "okay";
+
+	rtk,spi-slave-mode = <0>;
+	rtk,spi-cs-gpios = <&gpioa 12 0>;
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	dabfm: dabfm@0 {
+		status = "okay";
+		reg = <0>;
+		compatible = "sue,dabfm";
+		spi-max-frequency = <10000000>;
+	};
+};
+
+&sport2 {
+	rtk,sport-multi-io = <1>;
+	rtk,sport-mode = <1>;
+	rtk,sport-mclk-multiplier = <256>;
+};
+
+&sport3 {
+	rtk,sport-multi-io = <1>;
+	rtk,sport-mode = <0>;
+	rtk,sport-mclk-multiplier = <0>;
+};

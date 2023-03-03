@@ -1,0 +1,101 @@
+#include <dt-bindings/gpio/gpio.h>
+
+#include "../rtl8730e.dtsi"
+#include "stream210-nand-256m.dtsi"
+
+/ {
+	model = "StreamUnlimited Stream210 module (Realtek Ameba)";
+	compatible = "sue,stream210", "realtek,ameba";
+
+	chosen {
+		stdout-path = &loguart;
+	};
+
+	cpus {
+		cpu@0 {
+			// This removes the last few (1.24 to 1.48 GHz) entries from
+			// the frequency table as per Realtek confirmation the chip is
+			// only stable up to 1.2 GHz.
+			freq_tab = <800000 840000 880000 920000 960000 1000000
+					1040000 1080000 1120000 1160000 1200000>;
+		};
+
+		cpu@1 {
+			// This removes the last few (1.24 to 1.48 GHz) entries from
+			// the frequency table as per Realtek confirmation the chip is
+			// only stable up to 1.2 GHz.
+			freq_tab = <800000 840000 880000 920000 960000 1000000
+					1040000 1080000 1120000 1160000 1200000>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x60800000 0xF800000>;  // 256MB -- exclude 8 MiB secure memory
+	};
+};
+
+&axi_wlan {
+	// According to Realtek these pins are supposedly to be used for antenna
+	// switching, etc. However they are currently not handeled by the driver
+	// and create a conflict on our module, so let's remove them.
+	/delete-property/pinctrl-names;
+	/delete-property/pinctrl-0;
+};
+
+&codec {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dmic_pins_stream210>;
+};
+
+&gpiob {
+	pinctrl-names = "default";
+	pinctrl-0 = <&usb_drvvbus_pin>;
+
+	usb_drvvbus {
+		gpio-hog;
+		gpios = <28 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "USB_DRVVBUS";
+	};
+};
+
+&loguart {
+	wakeup-source;
+};
+
+&pinctrl {
+	usb_drvvbus_pin: usb_drvvbus_pin@0 {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 28, GPIO)>;
+			bias-pull-down;
+		};
+	};
+
+	dmic_pins_stream210: dmic_pins_stream210@0 {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 7, DMIC)>,		// DMIC0_CLK
+					<REALTEK_PINMUX('B', 9, DMIC)>,		// DMIC0_DATA0
+					<REALTEK_PINMUX('B', 10, DMIC)>;	// DMIC0_DATA1
+			bias-disable;
+		};
+	};
+};
+
+&i2c0 {
+	// The default is something like 2 seconds which is way too
+	// long as it seem to stop the kernel for that amount of time.
+	rtk,wait-timeout = <100>;
+};
+
+&i2c1 {
+	// The default is something like 2 seconds which is way too
+	// long as it seem to stop the kernel for that amount of time.
+	rtk,wait-timeout = <100>;
+};
+
+&i2c2 {
+	// The default is something like 2 seconds which is way too
+	// long as it seem to stop the kernel for that amount of time.
+	rtk,wait-timeout = <100>;
+};

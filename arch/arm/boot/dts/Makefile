@@ -12,3 +12,5 @@ dtb-$(CONFIG_ARCH_AMEBAD2) += \
 	rtl8730elh-va8-full.dtb \
 	rtl8730elh-va8-tests.dtb \
 	rtl8730elh-va8-recovery.dtb
+
+subdir-y += streamunlimited
