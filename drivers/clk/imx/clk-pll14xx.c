@@ -91,12 +91,19 @@ struct imx_pll14xx_clk imx_1443x_pll = {
 };
 EXPORT_SYMBOL_GPL(imx_1443x_pll);
 
-struct imx_pll14xx_clk imx_1443x_audio_pll = {
+struct imx_pll14xx_clk imx_1443x_audio_pll1 = {
 		.type = PLL_1443X_SKEWABLE,
 		.rate_table = imx_pll1443x_audiopll_tbl,
 		.rate_count = ARRAY_SIZE(imx_pll1443x_audiopll_tbl),
 };
-EXPORT_SYMBOL_GPL(imx_1443x_audio_pll);
+EXPORT_SYMBOL_GPL(imx_1443x_audio_pll1);
+
+struct imx_pll14xx_clk imx_1443x_audio_pll2 = {
+		.type = PLL_1443X_SKEWABLE,
+		.rate_table = imx_pll1443x_audiopll_tbl,
+		.rate_count = ARRAY_SIZE(imx_pll1443x_audiopll_tbl),
+};
+EXPORT_SYMBOL_GPL(imx_1443x_audio_pll2);
 
 struct imx_pll14xx_clk imx_1443x_dram_pll = {
 	.type = PLL_1443X,

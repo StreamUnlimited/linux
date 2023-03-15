@@ -324,6 +324,44 @@ static int imx_clk_init_on(struct device_node *np,
 	return 0;
 }
 
+static int of_parse_audio_pll_table(struct device_node *np, const char *prop, struct imx_pll14xx_clk *pllclk)
+{
+	int ret;
+
+	ret = of_property_count_u32_elems(np, prop);
+	if (ret > 0 && (ret % 5 == 0)) {
+		int num_entries = ret / 5;
+		u32 *audio_pll_table = kzalloc(num_entries * 5 * sizeof(u32), GFP_KERNEL);
+
+		ret = of_property_read_u32_array(np, prop, audio_pll_table, num_entries * 5);
+		if (ret == 0) {
+			int i;
+			struct imx_pll14xx_rate_table *imx8mm_audiopll_dts_tbl = kzalloc(sizeof(*imx8mm_audiopll_dts_tbl) * num_entries, GFP_KERNEL);
+			for (i = 0; i < num_entries; i++) {
+				imx8mm_audiopll_dts_tbl[i].rate = audio_pll_table[i * 5];
+				imx8mm_audiopll_dts_tbl[i].mdiv = audio_pll_table[i * 5 + 1];
+				imx8mm_audiopll_dts_tbl[i].pdiv = audio_pll_table[i * 5 + 2];
+				imx8mm_audiopll_dts_tbl[i].sdiv = audio_pll_table[i * 5 + 3];
+				imx8mm_audiopll_dts_tbl[i].kdiv = audio_pll_table[i * 5 + 4];
+			}
+
+			pllclk->rate_table = imx8mm_audiopll_dts_tbl;
+			pllclk->rate_count = num_entries;
+
+		} else {
+			kfree(audio_pll_table);
+			return -EINVAL;
+		}
+
+		kfree(audio_pll_table);
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+
 static int imx8mm_clocks_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -357,6 +395,15 @@ static int imx8mm_clocks_probe(struct platform_device *pdev)
 	if (WARN_ON(!base))
 		return -ENOMEM;
 
+	ret = of_parse_audio_pll_table(dev->of_node, "audio-pll1-table", &imx_1443x_audio_pll1);
+	if (ret < 0)
+		dev_warn(dev, "Failed to read device-tree table for audio PLL1: %d\n", ret);
+
+	ret = of_parse_audio_pll_table(dev->of_node, "audio-pll2-table", &imx_1443x_audio_pll2);
+	if (ret < 0)
+		dev_warn(dev, "Failed to read device-tree table for audio PLL2: %d\n", ret);
+
+
 	hws[IMX8MM_AUDIO_PLL1_PAD_SEL] = imx_clk_hw_mux("audio_pll1_pad_sel", base + 0x0, 2, 2, clk_pad_sels, ARRAY_SIZE(clk_pad_sels));
 	hws[IMX8MM_AUDIO_PLL2_PAD_SEL] = imx_clk_hw_mux("audio_pll2_pad_sel", base + 0x14, 2, 2, clk_pad_sels, ARRAY_SIZE(clk_pad_sels));
 	hws[IMX8MM_AUDIO_PLL1_REF_SEL] = imx_clk_hw_mux("audio_pll1_ref_sel", base + 0x0, 0, 2, audio_pll1_ref_sels, ARRAY_SIZE(audio_pll1_ref_sels));
@@ -368,8 +415,8 @@ static int imx8mm_clocks_probe(struct platform_device *pdev)
 	hws[IMX8MM_ARM_PLL_REF_SEL] = imx_clk_hw_mux("arm_pll_ref_sel", base + 0x84, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
 	hws[IMX8MM_SYS_PLL3_REF_SEL] = imx_clk_hw_mux("sys_pll3_ref_sel", base + 0x114, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
 
-	hws[IMX8MM_AUDIO_PLL1] = imx_clk_hw_pll14xx("audio_pll1", "audio_pll1_ref_sel", base, &imx_1443x_audio_pll);
-	hws[IMX8MM_AUDIO_PLL2] = imx_clk_hw_pll14xx("audio_pll2", "audio_pll2_ref_sel", base + 0x14, &imx_1443x_audio_pll);
+	hws[IMX8MM_AUDIO_PLL1] = imx_clk_hw_pll14xx("audio_pll1", "audio_pll1_ref_sel", base, &imx_1443x_audio_pll1);
+	hws[IMX8MM_AUDIO_PLL2] = imx_clk_hw_pll14xx("audio_pll2", "audio_pll2_ref_sel", base + 0x14, &imx_1443x_audio_pll2);
 	hws[IMX8MM_VIDEO_PLL1] = imx_clk_hw_pll14xx("video_pll1", "video_pll1_ref_sel", base + 0x28, &imx_1443x_pll);
 	hws[IMX8MM_DRAM_PLL] = imx_clk_hw_pll14xx("dram_pll", "dram_pll_ref_sel", base + 0x50, &imx_1443x_dram_pll);
 	hws[IMX8MM_GPU_PLL] = imx_clk_hw_pll14xx("gpu_pll", "gpu_pll_ref_sel", base + 0x64, &imx_1416x_pll);
