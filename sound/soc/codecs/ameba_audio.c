@@ -816,27 +816,32 @@ void audio_codec_amic_power(void __iomem	* audio_base_addr,void __iomem	* aud_an
 
 		/*default:5 amic differential mode*/
 		tmp = readl(aud_analog + MICBST_CTL0);
-		tmp |= AUD_BIT_MICBST_ENDFL | AUD_BIT_MICBST_ENDFR | AUD_BIT_MICBST2_ENDFL	| AUD_BIT_MICBST2_ENDFR;
+		tmp &= ~(AUD_BIT_MICBST_ENDFL | AUD_BIT_MICBST_ENDFR);
 		writel(tmp, aud_analog + MICBST_CTL0);
 		tmp = readl(aud_analog + MICBST_CTL1);
-		tmp |= AUD_BIT_MICBST3_ENDF;
+		tmp &= ~AUD_BIT_MICBST3_ENDF;
 		writel(tmp, aud_analog + MICBST_CTL1);
 
-		/*micbst gain select: dufault 30dB*/
+		tmp = readl(aud_analog + MICBST_CTL0);
+		tmp &= ~(AUD_MASK_MICBST2_GSELL | AUD_MASK_MICBST2_GSELR | AUD_BIT_MICBST2_ENDFL | AUD_BIT_MICBST2_ENDFR);
+		tmp |= AUD_MICBST2_GSELL(MICBST_GAIN_0DB) | AUD_MICBST2_GSELR(MICBST_GAIN_0DB);
+		writel(tmp,aud_analog + MICBST_CTL0);
+
+		/*micbst gain select: dufault 0dB*/
 		tmp = readl(aud_analog + MICBST_CTL0);
 		tmp &= ~(AUD_MASK_MICBST_GSELL | AUD_MASK_MICBST_GSELR);
 		writel(tmp, aud_analog + MICBST_CTL0);
 
 		tmp = readl(aud_analog + MICBST_CTL0);
-		tmp |= (AUD_MICBST_GSELL(MICBST_GAIN_30DB) | AUD_MICBST_GSELR(MICBST_GAIN_30DB));
+		tmp |= (AUD_MICBST_GSELL(MICBST_GAIN_0DB) | AUD_MICBST_GSELR(MICBST_GAIN_0DB));
 		writel(tmp, aud_analog + MICBST_CTL0);
-		/*added by anna set micbst3 gain 30dB for ADC5*/
+		/*added by anna set micbst3 gain 0dB for ADC5*/
 		tmp = readl(aud_analog + MICBST_CTL1);
 		tmp &= ~AUD_MASK_MICBST3_GSEL;
 		writel(tmp, aud_analog + MICBST_CTL1);
 
 		tmp = readl(aud_analog + MICBST_CTL1);
-		tmp |= AUD_MICBST3_GSEL(MICBST_GAIN_30DB);
+		tmp |= AUD_MICBST3_GSEL(MICBST_GAIN_0DB);
 		writel(tmp, aud_analog + MICBST_CTL1);
 
 		/*unmute amic enable*/
