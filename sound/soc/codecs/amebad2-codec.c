@@ -1016,11 +1016,11 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	codec_priv->tdm_dmic_numbers[6] = (u8)DMIC4;
 	codec_priv->tdm_dmic_numbers[7] = (u8)DMIC4;
 
-	codec_priv->amic_gains[0] = MICBST_GAIN_30DB;
-	codec_priv->amic_gains[1] = MICBST_GAIN_30DB;
-	codec_priv->amic_gains[2] = MICBST_GAIN_30DB;
-	codec_priv->amic_gains[3] = MICBST_GAIN_30DB;
-	codec_priv->amic_gains[4] = MICBST_GAIN_30DB;
+	codec_priv->amic_gains[0] = MICBST_GAIN_0DB;
+	codec_priv->amic_gains[1] = MICBST_GAIN_0DB;
+	codec_priv->amic_gains[2] = MICBST_GAIN_0DB;
+	codec_priv->amic_gains[3] = MICBST_GAIN_0DB;
+	codec_priv->amic_gains[4] = MICBST_GAIN_0DB;
 
 	codec_priv->dai_fmt[0] = DF_LEFT;
 	codec_priv->dai_fmt[1] = DF_LEFT;
