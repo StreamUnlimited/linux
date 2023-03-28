@@ -206,6 +206,7 @@
 			no-map;
 		};
 		/delete-node/ secmon@5000000;
+		/delete-node/ hwrom@0;
 		secmon_reserved:linux,secmon {
 			compatible = "shared-dma-pool";
 			reusable;
