@@ -458,7 +458,8 @@ typedef struct {
 #define LCDC_LAYER_LAYER1					(0x0)
 #define LCDC_LAYER_LAYER2					(0x1)
 #define LCDC_LAYER_LAYER3					(0x2)
-#define LCDC_LAYER_MAX_NUM					(0x3)
+// The default here is 3 layers, but we don't need it and can save a bit of reserved memory for DRM
+#define LCDC_LAYER_MAX_NUM					(0x1)
 #define IS_LCDC_A_VALID_LAYER(LayerID) 		((u32)(LayerID) <= LCDC_LAYER_LAYER3)
 /** @} */
 
