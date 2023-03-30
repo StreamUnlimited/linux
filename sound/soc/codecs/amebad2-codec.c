@@ -421,6 +421,7 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 				i2s_init.codec_sel_i2s_tx_ch_len = CL_32;
 				break;
 			case 24:
+			case 32:
 				i2s_init.codec_sel_i2s_tx_word_len = WL_24;
 				i2s_init.codec_sel_i2s_tx_ch_len = CL_32;
 				break;
@@ -446,6 +447,7 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 				i2s_init.codec_sel_i2s_rx_ch_len = CL_32;
 				break;
 			case 24:
+			case 32:
 				i2s_init.codec_sel_i2s_rx_word_len = WL_24;
 				i2s_init.codec_sel_i2s_rx_ch_len = CL_32;
 				break;
@@ -786,7 +788,8 @@ static struct snd_soc_dai_driver amebad2_dai[] = {
 			.rate_min = 8000,
 			.rate_max = 192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-						SNDRV_PCM_FMTBIT_S24_LE,
+						SNDRV_PCM_FMTBIT_S24_LE |
+						SNDRV_PCM_FMTBIT_S32_LE,
 			.sig_bits = 24,
 		},
 		.ops = &amebad2_aif_dai_ops,
@@ -802,7 +805,8 @@ static struct snd_soc_dai_driver amebad2_dai[] = {
 			.rate_min = 8000,
 			.rate_max = 192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-						SNDRV_PCM_FMTBIT_S24_LE,
+						SNDRV_PCM_FMTBIT_S24_LE |
+						SNDRV_PCM_FMTBIT_S32_LE,
 			.sig_bits = 24,
 		},
 		.ops = &amebad2_aif_dai_ops,
