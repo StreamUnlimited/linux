@@ -24,7 +24,7 @@
 #define IS_6_8_CHANNEL(NUM) (((NUM) == 6) || \
 								((NUM) == 8))
 #define TDM_TWO_DMAS_SYNC 1
-#define USING_COUNTER     1
+#define USING_COUNTER     0
 
 struct dev_data{
 	int dma_debug;

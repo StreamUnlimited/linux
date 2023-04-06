@@ -29,7 +29,7 @@
 #define IRQ_COMPENSATE_BASING_ON_DELTA_DELAY 1
 #define COUNTER_COMPENSATE_BASING_ON_DELTA_DELAY 1
 #define MAX_SPORT_IRQ_X 134217727
-#define USING_COUNTER 1
+#define USING_COUNTER 0
 
 struct sport_dai {
 	/* Platform device for this DAI */
