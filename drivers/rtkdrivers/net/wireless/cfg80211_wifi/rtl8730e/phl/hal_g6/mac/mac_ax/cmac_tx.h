@@ -541,9 +541,12 @@ u32 mac_tx_duty_stop(struct mac_ax_adapter *adapter);
  * @}
  */
 
-void u16_2_sch(struct mac_ax_adapter *adapter,
-	       struct mac_ax_sch_tx_en *tx_en, u16 val16);
 void u32_2_sch(struct mac_ax_adapter *adapter,
 	       struct mac_ax_sch_tx_en *tx_en, u32 val32);
+
+u32 stop_macid_tx(struct mac_ax_adapter *adapter, struct mac_role_tbl *role,
+		  enum tb_stop_sel stop_sel, struct macid_tx_bak *bak);
+u32 resume_macid_tx(struct mac_ax_adapter *adapter, struct mac_role_tbl *role,
+		    struct macid_tx_bak *bak);
 
 #endif

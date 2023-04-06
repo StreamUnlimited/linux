@@ -24,7 +24,7 @@
  *****************************************************************************/
 
 #include "halbb_precomp.h"
-
+#ifdef HALBB_SPUR_SUPPRESS_SUPPORT
 bool halbb_spur_location(struct bb_info *bb, u8 central_ch,
 			 enum channel_width bw, enum band_type band, u32 *intf)
 {
@@ -327,3 +327,4 @@ void halbb_cr_cfg_spur_init(struct bb_info *bb)
 	}
 
 }
+#endif

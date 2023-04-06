@@ -47,7 +47,12 @@
 /*halbb halrf config*/
 #define DRV_BB_RUA_DISABLE
 #define DRV_BB_LA_MODE_DISABLE
+#define DRV_BB_TDMADIG_DISABLE
 #define DRV_BB_DIG_MCC_DISABLE
+#define DRV_BB_PWR_CTRL_DISABLE
+//#define DRV_BB_ENV_MNTR_DISABLE
+#define DRV_BB_DFS_DISABLE
+//#define DRV_RF_DBG_TRACE_DISABLE
 
 /***** temporarily flag *******/
 /*
@@ -159,7 +164,7 @@
 #endif
 
 #ifdef CONFIG_WOWLAN
-#define CONFIG_GTK_OL
+//#define CONFIG_GTK_OL
 /* #define CONFIG_ARP_KEEP_ALIVE */
 #endif /* CONFIG_WOWLAN */
 

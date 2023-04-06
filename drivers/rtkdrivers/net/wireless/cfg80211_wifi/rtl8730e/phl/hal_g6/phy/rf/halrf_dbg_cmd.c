@@ -93,7 +93,6 @@ struct halrf_cmd_info halrf_cmd_i[] = {
 void halrf_cmd_parser(struct rf_info *rf, char input[][RF_MAX_ARGV],
 		      u32 input_num, char *output, u32 out_len)
 {
-
 	struct rf_dbg_cmd_info	*rf_dbg_cmd = &rf->rf_dbg_cmd_i;
 
 	u32 used = 0;
@@ -241,10 +240,9 @@ void halrf_cmd_parser(struct rf_info *rf, char input[][RF_MAX_ARGV],
 		u32 value[10] = {0};
 		u8 i;
 
-		for (i = 0; i < 4; i++)
-			if (input[i + 1]) {
-				_os_sscanf(input[i + 1], "%d", &value[i]);
-			}
+		for (i = 0; i < 4; i++) {
+			_os_sscanf(input[i + 1], "%d", &value[i]);
+		}
 
 		if (_os_strcmp(input[1], "-h") == 0) {
 			RF_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -267,17 +265,11 @@ void halrf_cmd_parser(struct rf_info *rf, char input[][RF_MAX_ARGV],
 
 			halrf_btc_rfk_ntfy(rf, (BIT(HW_PHY_0) << 4), RF_BTC_TSSI, RFK_START);
 			halrf_tmac_tx_pause(rf, HW_PHY_0, true);
-
-			halrf_hw_tx(rf, (u8)value[1], (u16)value[2],
-				    (s16)(value[3] * 4), T_HT_MF, 0, 1);
 		}
 
 		if (value[0] == 0) {
 			RF_DBG_CNSL(out_len, used, output + used, out_len - used,
 				    "HW TX Stop\n");
-
-			halrf_hw_tx(rf, (u8)value[1], (u16)value[2],
-				    (s16)(value[3] * 4), T_HT_MF, 0, 0);
 
 			halrf_tx_mode_switch(rf, HW_PHY_0, 0);
 
@@ -291,8 +283,8 @@ void halrf_cmd_parser(struct rf_info *rf, char input[][RF_MAX_ARGV],
 			    "Do not support this command\n");
 		break;
 	}
-
 }
+
 void halrf_cmd_parser_init(struct rf_info *rf)
 {
 	struct rf_dbg_cmd_info	*rf_dbg_cmd = &rf->rf_dbg_cmd_i;

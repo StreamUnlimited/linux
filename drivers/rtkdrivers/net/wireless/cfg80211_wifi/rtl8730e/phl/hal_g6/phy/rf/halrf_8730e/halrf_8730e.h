@@ -26,25 +26,40 @@
 #define __HALRF_8730E_H__
 #ifdef RF_8730E_SUPPORT
 
-#define RXDCK_VER_8730E 0x1
-#define RCK_VER_8730E 0x1
+//#define RXDCK_VER_8730E 0x1
+//#define RCK_VER_8730E 0x1
 
-#define LCK_TH_8730E 0x20
+//#define LCK_TH_8730E 0x20
 
-void halrf_lo_test_8730e(struct rf_info *rf, bool is_on, enum rf_path path);
+void halrf_lo_test_8730e(struct rf_info *rf, bool is_on);
 u8 halrf_kpath_8730e(struct rf_info *rf, enum phl_phy_idx phy_idx);
-void halrf_set_rx_dck_8730e(struct rf_info *rf, enum phl_phy_idx phy, enum rf_path path, bool is_afe);
-void halrf_rx_dck_8730e(struct rf_info *rf, enum phl_phy_idx phy, bool is_afe);
+void halrf_set_rx_dck_8730e(struct rf_info *rf,  bool is_afe);
+void halrf_set_rx_dck_8730e_bcut(struct rf_info *rf, bool band);
+
+void halrf_rx_dck_8730e(struct rf_info *rf, bool init);
+
+void halrf_rx_dck_8730e_bcut(struct rf_info *rf,  bool init);
 void halrf_rxdck_track_8730e(struct rf_info *rf);
-void halrf_set_rx_path_8730e(struct rf_info *rf, enum phl_phy_idx phy, bool rx_path);
-void halrf_rx_dck_onoff_8730e(struct rf_info *rf, bool is_enable);
-void halrf_rck_8730e(struct rf_info *rf);
-void halrf_rf_direct_cntrl_8730e(struct rf_info *rf, enum rf_path path, bool is_bybb);
-void halrf_drf_direct_cntrl_8730e(struct rf_info *rf, enum rf_path path, bool is_bybb);
-void halrf_bf_config_rf_8730e(struct rf_info *rf);
+void halrf_spur_compensation_8730e(struct rf_info *rf);
+void halrf_set_rx_path_8730e(struct rf_info *rf, bool rx_path);
+
+void halrf_rf_direct_cntrl_8730e(struct rf_info *rf, bool is_bybb);
+void halrf_drf_direct_cntrl_8730e(struct rf_info *rf, bool is_bybb);
+
 extern struct rfk_iqk_info rf_iqk_hwspec_8730e;
 void halrf_dpk_init_8730e(struct rf_info *rf);
+bool halrf_ctrl_bw_8730e(struct rf_info *rf, enum channel_width bw);
+void halrf_rx_dck_8730e_band_bcut(struct rf_info *rf,  bool band);
 bool halrf_ctrl_ch_8730e(struct rf_info *rf,  u8 central_ch, enum band_type band);
+
+void halrf_btc_rf_para_8730e(struct rf_info *rf, bool bt_s1);
+
+void halrf_s1_bt_on_rf_band_8730e(struct rf_info *rf);
+
+#if 0
+void halrf_rx_dck_onoff_8730e(struct rf_info *rf, bool is_enable);
+void halrf_rck_8730e(struct rf_info *rf);
+void halrf_bf_config_rf_8730e(struct rf_info *rf);
 bool halrf_ctrl_bw_8730e(struct rf_info *rf, enum channel_width bw);
 void halrf_rxbb_bw_8730e(struct rf_info *rf, enum phl_phy_idx phy, enum channel_width bw);
 void halrf_fw_ntfy_8730e(struct rf_info *rf, enum phl_phy_idx phy_idx);
@@ -54,6 +69,7 @@ void halrf_quick_checkrf_8730e(struct rf_info *rf);
 
 void halrf_before_one_shot_enable_8730e(struct rf_info *rf);
 bool halrf_one_shot_nctl_done_check_8730e(struct rf_info *rf, enum rf_path path);
+#endif
 void halrf_synk_8730e(struct rf_info *rf);
 void halrf_lck_8730e(struct rf_info *rf);
 void halrf_lck_tracking_8730e(struct rf_info *rf);

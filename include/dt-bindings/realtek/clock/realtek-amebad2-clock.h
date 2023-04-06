@@ -153,6 +153,13 @@
 #define RTK_CKE_AP				203 /* CKE_AP */
 
 /*
+ * hSYS clocks
+ */
+
+/* MUX clocks */
+#define RTK_CKSL_TIM9			204
+
+/*
  * Fixed-factor clocks
  */
 
@@ -161,6 +168,7 @@
 #define RTK_CLK_HAPB			222	/* HP_APB_CLK */
 #define RTK_CLK_HBUS			223	/* HBUS_CLK */
 #define RTK_CLK_PLFM			224 /* PLFM_CLK */
+
 
 #define RTK_CLK_MAX_NUM			RTK_CLK_PLFM
 

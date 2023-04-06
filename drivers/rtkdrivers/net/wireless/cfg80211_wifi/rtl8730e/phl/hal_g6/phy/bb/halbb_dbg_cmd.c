@@ -103,9 +103,10 @@ void halbb_bbcr_rw_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 void halbb_bb_td_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		     char *output, u32 *_out_len)
 {
+#ifdef HALBB_TDMA_CR_SUPPORT
 	struct bb_dbg_info *dbg = &bb->bb_dbg_i;
+#endif
 	u32 val[10] = {0};
-	u32 tmp = 0;
 
 	if (_os_strcmp(input[1], "-h") == 0) {
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
@@ -197,7 +198,6 @@ void halbb_bb_td_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 void halbb_bb_fd_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		     char *output, u32 *_out_len)
 {
-	u32 val[10] = {0};
 
 	if (_os_strcmp(input[1], "-h") == 0) {
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
@@ -265,9 +265,7 @@ void halbb_trace_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 i = 0;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1]) {
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
-		}
 	}
 	comp = bb->dbg_component;
 	pre_debug_components = bb->dbg_component;
@@ -487,28 +485,33 @@ void halbb_cmd_parser(struct bb_info *bb_0, char input_in[][MAX_ARGV],
 		      u32 input_num, char *output, u32 out_len)
 {
 	struct bb_info *bb = bb_0;
-	struct bb_echo_cmd_info	*echo_cmd = &bb_0->bb_cmn_hooker->bb_echo_cmd_i;
 	char input[MAX_ARGC][MAX_ARGV];
 	u32 used = 0;
 	u8 id = 0;
-	u32 var1[10] = {0};
 	u32 i;
 	u32 halbb_ary_size = sizeof(halbb_cmd_i) / sizeof(struct halbb_cmd_info);//echo_cmd->cmd_size;
 	u32 directory = 0;
-	char char_temp = ' ';
+#if defined(HALBB_DBCC_SUPPORT) || defined (HALBB_DBG_TRACE_SUPPORT)
 	enum phl_phy_idx  phy_idx_tmp = HW_PHY_0;
+#endif
 
 	//BB_TRACE("[IN ] %s %s %s %s %s\n", input_in[0], input_in[1], input_in[2], input_in[3], input_in[4]);
 	/* 8720e/8730e: halbb_mem_cmp() same is 1 */
 	if (1 == halbb_mem_cmp(bb_0, input_in[0], (void *)"bb", 2)) {
+#if defined(HALBB_DBCC_SUPPORT) || defined (HALBB_DBG_TRACE_SUPPORT)
 		phy_idx_tmp = (0 == _os_strcmp((input_in[0] + 2), "1")) ? HW_PHY_1 : HW_PHY_0;
+#endif
 		BB_TRACE("phy_idx_tmp = %d\n", phy_idx_tmp);
 		halbb_mem_cpy(bb_0, input, &input_in[1], ((MAX_ARGC - 1) * MAX_ARGV));
 	} else if (1 == halbb_mem_cmp(bb_0, input_in[0], (void *)"0", 1)) {
+#ifdef HALBB_DBCC_SUPPORT
 		phy_idx_tmp = HW_PHY_0;
+#endif
 		halbb_mem_cpy(bb_0, input, &input_in[1], ((MAX_ARGC - 1) * MAX_ARGV));
 	} else if (1 == halbb_mem_cmp(bb_0, input_in[0], (void *)"1", 1)) {
+#ifdef HALBB_DBCC_SUPPORT
 		phy_idx_tmp = HW_PHY_1;
+#endif
 		halbb_mem_cpy(bb_0, input, &input_in[1], ((MAX_ARGC - 1) * MAX_ARGV));
 	} else {
 		halbb_mem_cpy(bb_0, input, &input_in[0], (MAX_ARGC * MAX_ARGV));
@@ -611,7 +614,9 @@ void halbb_cmd_parser(struct bb_info *bb_0, char input_in[][MAX_ARGV],
 		break;
 
 	case HALBB_MP_DBG:
+#ifdef CONFIG_MP_INCLUDED
 		halbb_mp_dbg(bb, input, &used, output, &out_len);
+#endif
 		break;
 
 	case HALBB_SUPPORT_ABILITY:
@@ -623,7 +628,9 @@ void halbb_cmd_parser(struct bb_info *bb_0, char input_in[][MAX_ARGV],
 		break;
 
 	case HALBB_SPUR_SUPP:
+#ifdef HALBB_SPUR_SUPPRESS_SUPPORT
 		halbb_spur_dbg(bb, input, &used, output, &out_len);
+#endif
 		break;
 
 	case HALBB_PROFILE:
@@ -827,10 +834,11 @@ void halbb_cmd_parser(struct bb_info *bb_0, char input_in[][MAX_ARGV],
 		halbb_pathdiv_dbg(bb, input, &used, output, &out_len);
 		break;
 #endif
-
+#ifdef HALBB_PWR_CTRL_SUPPORT
 	case HALBB_DTP:
 		halbb_pwr_ctrl_dbg(bb, input, &used, output, &out_len);
 		break;
+#endif
 	case HALBB_TX_INFO:
 		halbb_tx_info_dbg(bb, input, &used, output, &out_len);
 		break;
@@ -892,13 +900,11 @@ void halbb_fwdbg_trace(struct bb_info *bb, u32 dbg_comp, u8 fw_trace_en)
 	struct bb_fw_dbg_cmn_info *bb_fwdbg = &bb->bb_fwdbg_i;
 	u32 *bb_h2c = (u32 *) bb_fwdbg;
 	u8 cmdlen = sizeof(struct bb_fw_dbg_cmn_info);
-	bool ret_val = false;
-	u8 ret_v0, ret_v1, ret_v2;
 #if!defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT)
 	/* Set fwdbg api, mac api need driver package*/
-	ret_v0 = rtw_hal_fw_log_cfg(bb->hal_com, FL_CFG_OP_SET, FL_CFG_TYPE_LEVEL, FL_LV_LOUD);
-	ret_v1 = rtw_hal_fw_log_cfg(bb->hal_com, FL_CFG_OP_SET, FL_CFG_TYPE_OUTPUT, FL_OP_C2H);
-	ret_v2 = rtw_hal_fw_log_cfg(bb->hal_com, FL_CFG_OP_SET, FL_CFG_TYPE_COMP, FL_COMP_BB);
+	rtw_hal_fw_log_cfg(bb->hal_com, FL_CFG_OP_SET, FL_CFG_TYPE_LEVEL, FL_LV_LOUD);
+	rtw_hal_fw_log_cfg(bb->hal_com, FL_CFG_OP_SET, FL_CFG_TYPE_OUTPUT, FL_OP_C2H);
+	rtw_hal_fw_log_cfg(bb->hal_com, FL_CFG_OP_SET, FL_CFG_TYPE_COMP, FL_COMP_BB);
 #endif
 	/* Set fwbb debug component */
 	bb_fwdbg->fw_dbg_comp[0] = (u8)(dbg_comp & 0x000000ff);
@@ -907,7 +913,7 @@ void halbb_fwdbg_trace(struct bb_info *bb, u32 dbg_comp, u8 fw_trace_en)
 	bb_fwdbg->fw_dbg_comp[3] = (u8)(dbg_comp & 0xff000000);
 	bb_fwdbg->fw_dbg_trace = fw_trace_en;
 	BB_DBG(bb, DBG_FW_INFO, "FW TRACE: %x %x\n", bb_h2c[0], bb_h2c[1]);
-	ret_val = halbb_fill_h2c_cmd(bb, cmdlen, DM_H2C_FWTRACE, HALBB_H2C_DM, bb_h2c);
+	halbb_fill_h2c_cmd(bb, cmdlen, DM_H2C_FWTRACE, HALBB_H2C_DM, bb_h2c);
 }
 
 void halbb_fw_dbg(struct bb_info *bb, char input[][16], u32 *_used,

@@ -126,11 +126,11 @@ static int realtek_gpio_direction_output(struct gpio_chip *chip,
 	u32 reg_value;
 
 	spin_lock_irqsave(&bank->lock, flags);
+	realtek_gpio_set_internal(chip, offset, value);
+
 	reg_value = readl(bank->reg_base + GPIO_DDR);
 	reg_value |= BIT(offset);
 	writel(reg_value, bank->reg_base + GPIO_DDR);
-
-	realtek_gpio_set_internal(chip, offset, value);
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;

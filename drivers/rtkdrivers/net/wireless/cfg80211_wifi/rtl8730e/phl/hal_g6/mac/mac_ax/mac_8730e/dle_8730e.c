@@ -15,6 +15,31 @@
 #include "dle_8730e.h"
 
 #if MAC_AX_8730E_SUPPORT
+
+u32 mac_is_txq_empty_8730e(struct mac_ax_adapter *adapter,
+			   struct mac_ax_tx_queue_empty *val)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 val32 = 0;
+	u32 i = 0;
+
+	PLTFM_MEMSET(val, 0xFF, sizeof(struct mac_ax_tx_queue_empty));
+
+	val32 = MAC_REG_R32(REG_QUE_EMPTY_BCNQ_INFO);
+
+	for (i = 0; i < WDE_QEMPTY_ACQ_NUM_MAX; i++) {
+		val->macid_txq_empty[i] = (val32 & BIT(16 + i)) ? 1 : 0;
+	}
+	val->mgnt_empty = (val32 & BIT_MQQ_EMPTY) ? 1 : 0;
+
+	val32 &= (BIT_MGQ_CPU_EMPTY | BIT_HQQ_EMPTY | BIT_BCNQ_EMPTY \
+		  | BIT_EVTQ_EMPTY | BIT_BCNQ_EMPTY_P0 | BIT_BCNQ_EMPTY_P1 \
+		  | BIT_BCNQ_EMPTY_P2);
+	val->others_empty = (val32) ? 1 : 0;
+
+	return MACSUCCESS;
+}
+
 #if 0
 static struct mac_ax_dle_dfi_info dle_dfi_wde_bufmgn_freepg = {
 	0,

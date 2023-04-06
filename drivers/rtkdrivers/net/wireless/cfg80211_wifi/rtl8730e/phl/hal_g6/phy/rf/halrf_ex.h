@@ -39,11 +39,8 @@ enum rtw_hal_status halrf_rx_dck_trigger(void *rf_void,
 enum rtw_hal_status halrf_iqk_trigger(void *rf_void,
 				      enum phl_phy_idx phy_idx,
 				      bool force);
-enum rtw_hal_status halrf_spur_compensation(void *rf_void,
-		enum phl_phy_idx phy_idx);
-void halrf_cca_disable(void *rf_void,
-		       enum phl_phy_idx phy_idx,
-		       bool is_dis_cca);
+enum rtw_hal_status halrf_spur_compensation(void *rf_void);
+void halrf_set_bias(void *rf_void);
 void halrf_synk_trigger(void *rf_void);
 void halrf_lck_trigger(void *rf_void);
 void halrf_lck_tracking(void *rf_void);
@@ -72,21 +69,14 @@ void halrf_dpk_init(void *rf_void);
 void halrf_rx_dck_onoff(void *rf_void, bool is_enable);
 void halrf_rx_dck_track_onoff(void *rf_void, bool is_enable);
 void halrf_rx_dck_init(void *rf_void);
-void halrf_gapk_onoff(void *rf_void, bool is_enable);
 void halrf_dack_onoff(void *rf_void, bool is_enable);
-void halrf_tssi_onoff(void *rf_void, bool is_enable);
-bool halrf_get_iqk_onoff(void *rf_void);
 bool halrf_get_dpk_onoff(void *rf_void);
 bool halrf_get_dpk_track_onoff(void *rf_void);
-bool halrf_get_gapk_onoff(void *rf_void);
-bool halrf_get_dack_onoff(void *rf_void);
-bool halrf_get_tssi_onoff(void *rf_void);
 void halrf_lo_test(void *rf_void, bool is_on, enum rf_path path);
 int halrf_get_predefined_pw_lmt_regu_type_from_str(const char *str);
 const char *const *halrf_get_predefined_pw_lmt_regu_type_str_array(u8 *num);
 const char *halrf_get_pw_lmt_regu_type_str(struct rf_info *rf, u8 band);
 s8 halrf_get_power_by_rate(struct rf_info *rf,
-			   enum phl_phy_idx phy,
 			   u8 rf_path, u16 rate, u8 dcm, u8 offset);
 s8 halrf_get_power_by_rate_band(struct rf_info *rf,
 				enum phl_phy_idx phy, u16 rate, u8 dcm, u8 offset, u32 band);
@@ -96,9 +86,9 @@ s8 halrf_get_power_limit(struct rf_info *rf,
 s8 halrf_get_power_limit_ru(struct rf_info *rf,
 			    enum phl_phy_idx phy, u8 rf_path, u16 rate, u8 bandwidth,
 			    u8 tx_num, u8 channel);
-s16 halrf_get_power(void *rf_void,
-		    u8 rf_path, u16 rate, u8 dcm, u8 offset, u8 bandwidth,
-		    u8 beamforming, u8 channel);
+s8 halrf_get_power(void *rf_void,
+		   u8 rf_path, u16 rate, u8 dcm, u8 offset, u8 bandwidth,
+		   u8 beamforming, u8 channel);
 s16 halrf_get_band_power(void *rf_void, enum phl_phy_idx phy,
 			 u8 rf_path, u16 rate, u8 dcm, u8 offset, u8 bandwidth,
 			 u8 beamforming, u8 channel);
@@ -133,7 +123,6 @@ enum rtw_hal_status  halrf_init(struct rtw_phl_com_t *phl_com,
 void halrf_deinit(struct rtw_phl_com_t *phl_com,
 		  struct rtw_hal_com_t *hal_com, void *rf);
 /**************halrf_hw_cfg.c**************/
-bool halrf_init_reg_by_hdr(void *rf_void);
 bool halrf_nctl_init_reg_by_hdr(void *rf_void);
 bool halrf_config_radio_a_reg(void *rf_void, bool is_form_folder,
 			      u32 folder_len, u32 *folder_array);
@@ -151,7 +140,8 @@ bool halrf_config_store_xtal_track(void *rf_void,
 				   bool is_form_folder, u32 folder_len, u32 *folder_array);
 bool halrf_config_radio(void *rf_void, enum phl_phy_idx phy);
 void halrf_config_rf_parameter(void *rf_void, enum phl_phy_idx phy);
-
+s8 halrf_config_power_limit_by_ch(void *rf_void, u8 limit_rate, u8 regulation, u8 chnl);
+s8 halrf_config_power_limit_ru_by_ch(void *rf_void, u8 regulation, u8 bandwith, u8 chnl);
 void halrf_gapk_save_tx_gain(struct rf_info *rf);
 void halrf_gapk_reload_tx_gain(struct rf_info *rf);
 /*******************************************/
@@ -177,11 +167,7 @@ bool halrf_set_dbcc(void *rf_void, bool dbcc_en);
 
 bool halrf_wl_tx_power_control(void *rf_void, u32 tx_power_val);
 
-void halrf_get_efuse_rx_gain_k(void *rf_void, enum phl_phy_idx phy_idx);
-
 void halrf_get_efuse_trim(void *rf_void, enum phl_phy_idx phy_idx);
-
-void halrf_do_rx_gain_k(void *rf_void, enum phl_phy_idx phy_idx);
 
 enum rtw_hal_status halrf_dpk_tracking(void *rf_void);
 
@@ -271,10 +257,7 @@ u32 halrf_mac_get_pwr_reg(void *rf_void, enum phl_phy_idx phy,
 s8 halrf_get_ther_protected_threshold(void *rf_void);
 
 s8 halrf_xtal_tracking_offset(void *rf_void, enum phl_phy_idx phy_idx);
-
-void halrf_hw_tx(void *rf_void, u8 path, u16 cnt, s16 dbm, u32 rate, u8 bw,
-		 bool enable);
-
+//s8 halrf_xtal_tracking_offset_iot(void *rf_void);
 void halrf_set_mp_regulation(void *rf_void, enum phl_phy_idx phy, u8 regulation);
 u32 halrf_tssi_get_final(void *rf_void, enum phl_phy_idx phy_idx, u8 path);
 

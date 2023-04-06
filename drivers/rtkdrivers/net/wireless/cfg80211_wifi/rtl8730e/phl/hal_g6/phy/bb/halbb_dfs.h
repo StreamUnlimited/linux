@@ -25,7 +25,7 @@
 #ifndef __HALBB_DFS_H__
 #define __HALBB_DFS_H__
 /*@--------------------------[Define] ---------------------------------------*/
-#define DFS_RPT_LENGTH 8
+#define DFS_RPT_LENGTH 4
 #define DFS_RDR_TYP_NUM 8
 #define DFS_L_RDR_IDX 6
 #define DFS_SPCL_RDR_IDX_ETSI 3
@@ -265,23 +265,10 @@ struct bb_rdr_info {
 	u8 rdr_info_sg0_pw_l: 7;
 
 	u8 rdr_info_sg0_pw_m: 3;
-	u8 rdr_info_sg1_chirp_flag: 1;	/*[37:28],[27:20],[19]*/
-	u8 rdr_info_sg1_pri_l: 4;
+	u8 rdr_info_seq_l: 5;	/*[37:28],[27:20],[19]*/
 
-	u8 rdr_info_sg1_pri_m: 4;
-	u8 rdr_info_sg1_pw_l: 4;
-
-	u8 rdr_info_sg1_pw_m: 6;
-	u8 rdr_info_zw_chirp_flag: 1;	/*[56:47],[46:39],[38]*/
-	u8 rdr_info_zw_pri_l: 1;
-
-	u8 rdr_info_zw_pri_m: 7;
-	u8 rdr_info_zw_pw_l: 1;
-
-	u8 rdr_info_zw_pw_m;
-
-	u8 rdr_info_zw_pw_h: 1;
-	u8 rdr_info_seq: 7;
+	u8 rdr_info_seq_h: 2;
+	u8 rdr_info_rsvd: 6;
 };
 #else
 struct bb_rdr_info {
@@ -291,24 +278,11 @@ struct bb_rdr_info {
 	u8 rdr_info_sg0_pw_l: 7;
 	u8 rdr_info_sg0_pri_m: 1;
 
-	u8 rdr_info_sg1_pri_l: 4;
-	u8 rdr_info_sg1_chirp_flag: 1;
+	u8 rdr_info_seq_l: 5;
 	u8 rdr_info_sg0_pw_m: 3;
 
-	u8 rdr_info_sg1_pw_l: 4;
-	u8 rdr_info_sg1_pri_m: 4;
-
-	u8 rdr_info_zw_pri_l: 1;
-	u8 rdr_info_zw_chirp_flag: 1;
-	u8 rdr_info_sg1_pw_m: 6;
-
-	u8 rdr_info_zw_pw_l: 1;
-	u8 rdr_info_zw_pri_m: 7;
-
-	u8 rdr_info_zw_pw_m;
-
-	u8 rdr_info_seq: 7;
-	u8 rdr_info_zw_pw_h: 1;
+	u8 rdr_info_rsvd: 6;
+	u8 rdr_info_seq_h: 2;
 };
 #endif
 #endif

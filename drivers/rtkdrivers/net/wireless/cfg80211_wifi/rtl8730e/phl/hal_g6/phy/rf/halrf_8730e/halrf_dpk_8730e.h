@@ -26,23 +26,22 @@
 #define __HALRF_DPK_8730EH__
 #ifdef RF_8730E_SUPPORT
 /*--------------------------Define Parameters-------------------------------*/
-#define DPK_VER_8730E 0x0
+#define DPK_VER_8730E 0x4
 #define DPK_RF_PATH_MAX_8730E 1
-#define DPK_KIP_REG_NUM_8730E 3
-#define DPK_BB_REG_NUM_8730E 3
-#define DPK_RF_REG_NUM_8730E 8
-#define DPK_PATH_A_8730E 1
-/*#define DPK_PATH_B_8730E 1*/
-#define PATH_OFST_8730E 0x100
-#define CH_OFST_8730E 0x4
-#define PHY_OFST_8730E 0x80
-#define DPK_BY_NCTL_8730E 1
+#define DPK_KIP_REG_NUM_8730E 5
+#define DPK_BB_REG_NUM_8730E 6
+#define DPK_RF_REG_NUM_8730E 5
 #define DPK_RELOAD_EN_8730E 0
-#define DPK_REG_DBG 0
+//#define DPK_REG_DBG 0
+#define DPK_NCTL_RXAGC_8730E 0x15
+//#define DPK_NCTL_TXAGC_8730E 0x16	//LS + ramp PAScan
+//#define DPK_NCTL_LMS_8730E 0x12	//LMS flow (LS + ramp)
+#define DPK_NCTL_TXAGC_8730E 0x17	//Cordic PAscan
+#define DPK_NCTL_LMS_8730E 0x18		//LMS flow (Cordic)
 
 /*---------------------------End Define Parameters----------------------------*/
 
-void halrf_dpk_8730e(struct rf_info *rf, enum phl_phy_idx phy_idx, bool force);
+void halrf_dpk_8730e(struct rf_info *rf, bool force);
 
 void halrf_dpk_onoff_8730e(struct rf_info *rf, enum rf_path path, bool off);
 

@@ -139,8 +139,6 @@ enum rtw_hal_status rtw_hal_notify_switch_band(void *hinfo,
 	rtw_hal_btc_switch_band_ntfy(hal_info, phy_idx, band);
 #endif
 
-	//rtw_hal_bb_fw_edcca(hal_info);
-
 	rtw_hal_rf_set_power(hal_info, phy_idx, PWR_BY_RATE);
 
 	rtw_hal_rf_do_tssi_scan(hal_info, phy_idx);

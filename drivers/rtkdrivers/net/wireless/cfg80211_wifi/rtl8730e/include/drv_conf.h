@@ -505,8 +505,8 @@
 
 #endif/*(CONFIG_IFACE_NUMBER > 2)*/
 
-#define MACID_NUM_SW_LIMIT 32
-#define SEC_CAM_ENT_NUM_SW_LIMIT 32
+#define MACID_NUM_SW_LIMIT 16
+#define SEC_CAM_ENT_NUM_SW_LIMIT 16
 
 
 /*

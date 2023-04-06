@@ -14,6 +14,7 @@
  *****************************************************************************/
 #include "halrf_precomp.h"
 
+#ifdef	RFDBG_TRACE_EN
 const char *const _pw_lmt_regu_type_str[PW_LMT_MAX_REGULATION_NUM] = {
 	/* elements not listed here will get NULL */
 	[PW_LMT_REGU_WW13]		= "WW",
@@ -39,20 +40,27 @@ int halrf_get_predefined_pw_lmt_regu_type_from_str(const char *str)
 {
 	int i;
 
+#ifdef	RFDBG_TRACE_EN
 	for (i = 0; i < PW_LMT_MAX_REGULATION_NUM; i++)
 		if (_pw_lmt_regu_type_str[i] && _os_strcmp(_pw_lmt_regu_type_str[i], str) == 0) {
 			return i;
 		}
+#endif
 	return -1;
 }
 
 const char *const *halrf_get_predefined_pw_lmt_regu_type_str_array(u8 *num)
 {
+#ifdef	RFDBG_TRACE_EN
 	if (num) {
 		*num = PW_LMT_REGU_PREDEF_NUM;
 	}
 	return _pw_lmt_regu_type_str;
+#else
+	return NULL;
+#endif
 }
+#endif
 
 const enum halrf_pw_lmt_regulation_type _regulation_to_pw_lmt_regu_type[REGULATION_MAX] = {
 	/* elements not listed here will get PW_LMT_REGU_WW13(0) */
@@ -84,15 +92,15 @@ u8 halrf_get_regulation_info(struct rf_info *rf, u8 band)
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	enum halrf_pw_lmt_regulation_type pw_lmt_type = PW_LMT_REGU_NULL;
 	u8 reg = REGULATION_NA;
+#ifdef	RFDBG_TRACE_EN
 	const char *bstr =  NULL;
+#endif
 
 	halrf_query_regulation_info(rf, &rg_info);
-
 	RF_DBG(rf, DBG_RF_INIT, "======>%s band=%d\n", __func__, band);
 
-	RF_DBG(rf, DBG_RF_INIT, "domain_code=%d   regulation_2g=%d   regulation_5g=%d   regulation_6g=%d   chplan_ver=%d   country_ver=%d   rg_info.tpor=%d\n",
+	RF_DBG(rf, DBG_RF_INIT, "domain_code=%d   regulation_2g=%d   regulation_5g=%d   regulation_6g=%d   chplan_ver=%d   country_ver=%d   rg_info.tpo=%d\n",
 	       rg_info.domain_code, rg_info.regulation_2g, rg_info.regulation_5g, rg_info.regulation_6g, rg_info.chplan_ver, rg_info.country_ver, rg_info.tpo);
-
 	if (pwr->extra_regd_idx != 0xff) {
 		RF_DBG(rf, DBG_RF_INIT, "======>%s   pwr->extra_regd_idx=%d\n", __func__, pwr->extra_regd_idx);
 		return (u8)pwr->extra_regd_idx;
@@ -103,23 +111,32 @@ u8 halrf_get_regulation_info(struct rf_info *rf, u8 band)
 		return pwr->regulation_idx;
 	}
 #else
+
 	if (band == BAND_ON_24G) {
 		reg = rg_info.regulation_2g;
-		bstr = "2g";
 	} else if (band == BAND_ON_5G) {
 		reg = rg_info.regulation_5g;
-		bstr = "5g";
 	} else if (band == BAND_ON_6G) {
 		reg = rg_info.regulation_6g;
-		bstr = "6g";
 	}
 
+#ifdef	RFDBG_TRACE_EN
+	if (band == BAND_ON_24G) {
+		bstr = "2g";
+	} else if (band == BAND_ON_5G) {
+		bstr = "5g";
+	} else if (band == BAND_ON_6G) {
+		bstr = "6g";
+	}
+#endif
 	/* TODO: consider _hal_file_regd_ext */
 
 	if (rg_info.tpo != TPO_NA) {
 		pw_lmt_type = tpo_to_pw_lmt_regu_type(rg_info.tpo);
+#ifdef	RFDBG_TRACE_EN
 		RF_DBG(rf, DBG_RF_INIT, "%s extra pw_lmt_regu=%s(%d)\n",
 		       bstr, pw_lmt_regu_type_str(pw_lmt_type), pw_lmt_type);
+#endif
 	} else {
 		if (reg == REGULATION_NA) {
 			return PW_LMT_REGU_NULL;        /* return this to distinguish from PW_LMT_REGU_NA done by NONE option from TXPWR_LMT.txt */
@@ -128,8 +145,10 @@ u8 halrf_get_regulation_info(struct rf_info *rf, u8 band)
 	}
 
 	if (pwr->regulation[band][pw_lmt_type] != true) {
+#ifdef	RFDBG_TRACE_EN
 		RF_DBG(rf, DBG_RF_INIT, "%s pw_lmt_regu=%s(%d) is not exist return WW13 !!!\n",
 		       bstr, pw_lmt_regu_type_str(pw_lmt_type), pw_lmt_type);
+#endif
 		return PW_LMT_REGU_WW13;
 	}
 #endif
@@ -171,7 +190,6 @@ void halrf_power_by_rate_store_to_array(struct rf_info *rf,
 
 	RF_DBG(rf, DBG_RF_INIT, "======>%s band=%d tx_num=%d rate_id=%d data=0x%x\n",
 	       __func__, band, tx_num, rate_id, data);
-
 	if (band != (u32)BAND_ON_24G && band != (u32)BAND_ON_5G && band != (u32)BAND_ON_6G) {
 		RF_DBG(rf, DBG_RF_INIT, "Invalid Band %d Return!!!\n", band);
 		return;
@@ -312,6 +330,7 @@ void halrf_power_by_rate_store_to_array(struct rf_info *rf,
 #endif
 }
 
+#ifndef IOT_SMALL_RAM
 u8 halrf_get_ch_idx_to_limit_array(struct rf_info *rf, u8 channel)
 {
 	u8	channelIndex;
@@ -330,6 +349,42 @@ u8 halrf_get_ch_idx_to_limit_array(struct rf_info *rf, u8 channel)
 
 	return channelIndex;
 }
+
+#else
+u8 halrf_get_bwch_idx_to_limit_array(struct rf_info *rf, u8 channel, u8 bw)
+{
+	u8	channelIndex;
+
+	if (bw == CHANNEL_WIDTH_20) {
+		/*2G:0-13; 5GLB:0-7; 5GMB:8-19; 5GHB:20-27*/
+		if (channel >= 1 && channel <= 14) {
+			channelIndex = channel - 1;
+		} else if (channel >= 36 && channel <= 64) {
+			channelIndex = (channel - 36) / 4;
+		} else if (channel >= 100 && channel <= 144) {
+			channelIndex = ((channel - 100) / 4) + 8;
+		} else if (channel >= 149 && channel <= 177) {
+			channelIndex = ((channel - 149) / 4) + 20;
+		} else {
+			channelIndex = 0;
+		}
+	} else if (bw == CHANNEL_WIDTH_40) {
+		/*2G:0-13; 5GLB:0-3; 5GMB:4-9; 5GHB:10-13*/
+		if (channel >= 1 && channel <= 14) {
+			channelIndex = channel - 1;
+		} else if (channel >= 36 && channel <= 62) {
+			channelIndex = (channel - 38) / 8;
+		} else if (channel >= 102 && channel <= 142) {
+			channelIndex = ((channel - 102) / 8) + 4;
+		} else if (channel >= 151 && channel <= 175) {
+			channelIndex = ((channel - 151) / 8) + 10;
+		} else {
+			channelIndex = 0;
+		}
+	}
+	return channelIndex;
+}
+#endif
 
 u8 halrf_get_ch_idx_to_6g_limit_array(struct rf_info *rf, u8 channel)
 {
@@ -361,25 +416,24 @@ u8 halrf_get_ch_idx_to_6g_limit_array(struct rf_info *rf, u8 channel)
 u8 halrf_get_limit_ch_idx_to_ch_idx(struct rf_info *rf, u8 band, u8 channel)
 {
 	u8	channelIndex;
-
+	channel += 1;
 	if (band == PW_LMT_BAND_2_4G) {
-		if (channel >= 0 && channel <= 13) {
-			channelIndex = channel + 1;
+		if (channel >= 1 && channel <= 14) {
+			channelIndex = channel ;
 		} else {
 			channelIndex = 0;
 		}
 	} else {
-		if (channel >= 0 && channel <= 14) {
-			channelIndex = channel * 2 + 36;
-		} else if (channel >= 15 && channel <= 37) {
-			channelIndex = (channel - 15) * 2 + 100;
-		} else if (channel >= 38 && channel <= 52) {
-			channelIndex = (channel - 38) * 2 + 149;
+		if (channel >= 1 && channel <= 15) {
+			channelIndex = channel * 2 + 34;
+		} else if (channel >= 16 && channel <= 38) {
+			channelIndex = (channel - 16) * 2 + 100;
+		} else if (channel >= 39 && channel <= 53) {
+			channelIndex = (channel - 39) * 2 + 149;
 		} else {
 			channelIndex = 0;
 		}
 	}
-
 	return channelIndex;
 }
 
@@ -834,7 +888,7 @@ u16 halrf_get_dcm_offset_pwr_by_rate(struct rf_info *rf, u16 rate,
 		if (rate >= RTW_DATA_RATE_OFDM6 && rate <= RTW_DATA_RATE_OFDM54) {
 			rate_tmp = HALRF_DATA_RATE_OFDM_OFFSET;
 		}
-		if (rate >= RTW_DATA_RATE_CCK1 && rate <= RTW_DATA_RATE_CCK11) {
+		if (rate <= RTW_DATA_RATE_CCK11) {
 			rate_tmp = HALRF_DATA_RATE_CCK_OFFSET;
 		}
 
@@ -846,7 +900,7 @@ u16 halrf_get_dcm_offset_pwr_by_rate(struct rf_info *rf, u16 rate,
 
 u8 halrf_hw_rate_to_limit_rate_tx_num(struct rf_info *rf, u16 rate)
 {
-	if (rate >= RTW_DATA_RATE_CCK1 && rate <= RTW_DATA_RATE_CCK11) {
+	if (rate <= RTW_DATA_RATE_CCK11) {
 		return PW_LMT_RS_CCK;
 	} else if (rate >= RTW_DATA_RATE_OFDM6 && rate <= RTW_DATA_RATE_OFDM54) {
 		return PW_LMT_RS_OFDM;
@@ -880,6 +934,7 @@ u8 halrf_hw_rate_to_limit_rate_tx_num(struct rf_info *rf, u16 rate)
 
 }
 
+#ifndef IOT_SMALL_RAM
 void halrf_power_limit_store_to_array(struct rf_info *rf,
 				      u8 regulation, u8 band, u8 bandwidth, u8 rate,
 				      u8 tx_num, u8 beamforming, u8 chnl, s8 val)
@@ -1401,44 +1456,40 @@ void halrf_power_limit_set_ext_pwr_limit_ru_table(struct rf_info *rf,
 	RF_DBG(rf, DBG_RF_INIT, "<======%s finish!!!\n", __func__);
 #endif
 }
+#endif
 
 
 s8 halrf_get_power_by_rate(struct rf_info *rf,
-			   enum phl_phy_idx phy,
 			   u8 rf_path, u16 rate, u8 dcm, u8 offset)
 {
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
-	u32 band = rf->hal_com->band[phy].cur_chandef.band;
+	u32 band = rf->hal_com->band[0].cur_chandef.band;
 	u16 rate_tmp;
 	s8 pwr_by_rate;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s rf_path=%d rate=0x%x dcm=%d\n",
 	       __func__, rf_path, rate, dcm);
-
 	if (band >= PW_LMT_MAX_BAND) {
 		RF_DBG(rf, DBG_RF_POWER, "======>%s band(%d) >= PW_LMT_MAX_BAND(%d) Return!!!\n",
 		       __func__, band, PW_LMT_MAX_BAND);
-
 		return 0;
 	}
 
 	rate_tmp = halrf_get_dcm_offset_pwr_by_rate(rf, rate, dcm, offset);
 
-	if ((rate_tmp >= HALRF_DATA_RATE_CCK1 && rate_tmp <= HALRF_DATA_RATE_CCK11) ||
+	if ((rate_tmp <= HALRF_DATA_RATE_CCK11) ||
 	    rate_tmp == HALRF_DATA_RATE_CCK_OFFSET) {
 		pwr_by_rate = pwr->tx_pwr_by_rate[PW_LMT_BAND_2_4G][rate_tmp];
-
 		RF_DBG(rf, DBG_RF_POWER, "pwr_by_rate(%d)=pwr->tx_pwr_by_rate[%d][%d] band=%d\n",
 		       pwr_by_rate, PW_LMT_BAND_2_4G, rate_tmp, band);
 	} else {
 		pwr_by_rate = pwr->tx_pwr_by_rate[band][rate_tmp];
-
 		RF_DBG(rf, DBG_RF_POWER, "pwr_by_rate(%d)=pwr->tx_pwr_by_rate[%d][%d] band=%d\n",
 		       pwr_by_rate, band, rate_tmp, band);
 	}
 
 	if (offset == 0) {
-		return pwr_by_rate + halrf_get_pwr_control(rf, phy);
+		return pwr_by_rate + halrf_get_pwr_control(rf);
 	} else {
 		return pwr_by_rate;
 	}
@@ -1453,7 +1504,6 @@ s8 halrf_get_power_by_rate_band(struct rf_info *rf,
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s rate=0x%x dcm=%d band=%d\n",
 	       __func__, rate, dcm, band);
-
 	if (band >= PW_LMT_MAX_BAND) {
 		RF_DBG(rf, DBG_RF_POWER, "======>%s band(%d) >= PW_LMT_MAX_BAND(%d) Return!!!\n",
 		       __func__, band, PW_LMT_MAX_BAND);
@@ -1462,15 +1512,13 @@ s8 halrf_get_power_by_rate_band(struct rf_info *rf,
 
 	rate_tmp = halrf_get_dcm_offset_pwr_by_rate(rf, rate, dcm, offset);
 
-	if ((rate_tmp >= HALRF_DATA_RATE_CCK1 && rate_tmp <= HALRF_DATA_RATE_CCK11) ||
+	if ((rate_tmp <= HALRF_DATA_RATE_CCK11) ||
 	    rate_tmp == HALRF_DATA_RATE_CCK_OFFSET) {
 		pwr_by_rate = pwr->tx_pwr_by_rate[PW_LMT_BAND_2_4G][rate_tmp];
-
 		RF_DBG(rf, DBG_RF_POWER, "pwr_by_rate(%d)=pwr->tx_pwr_by_rate[%d][%d] band=%d\n",
 		       pwr_by_rate, PW_LMT_BAND_2_4G, rate_tmp, band);
 	} else {
 		pwr_by_rate = pwr->tx_pwr_by_rate[band][rate_tmp];
-
 		RF_DBG(rf, DBG_RF_POWER, "pwr_by_rate(%d)=pwr->tx_pwr_by_rate[%d][%d] band=%d\n",
 		       pwr_by_rate, band, rate_tmp, band);
 	}
@@ -1478,6 +1526,7 @@ s8 halrf_get_power_by_rate_band(struct rf_info *rf,
 	return pwr_by_rate;
 }
 
+#ifndef IOT_SMALL_RAM
 s8 halrf_get_power_limit(struct rf_info *rf,
 			 enum phl_phy_idx phy, u8 rf_path, u16 rate, u8 bandwidth,
 			 u8 beamforming, u8 tx_num, u8 channel)
@@ -1544,7 +1593,7 @@ s8 halrf_get_power_limit(struct rf_info *rf,
 		pwr_limit = 0;
 	}
 
-	return pwr_limit + halrf_get_pwr_control(rf, phy);
+	return pwr_limit + halrf_get_pwr_control(rf);
 }
 
 s8 halrf_get_power_limit_ru(struct rf_info *rf,
@@ -1613,7 +1662,7 @@ s8 halrf_get_power_limit_ru(struct rf_info *rf,
 		pwr_limit_ru = 0;
 	}
 
-	return pwr_limit_ru + halrf_get_pwr_control(rf, phy);
+	return pwr_limit_ru + halrf_get_pwr_control(rf);
 }
 
 s16 halrf_get_power(void *rf_void,
@@ -1732,6 +1781,96 @@ s16 halrf_get_band_power(void *rf_void, enum phl_phy_idx phy,
 	return power;
 }
 
+#else
+s8 halrf_get_power_limit(struct rf_info *rf,
+			 enum phl_phy_idx phy, u8 rf_path, u16 rate, u8 bandwidth,
+			 u8 beamforming, u8 tx_num, u8 channel)
+{
+	u8 band = rf->hal_com->band[phy].cur_chandef.band;
+	s8 pwr_limit = 0;
+	u8 limit_rate = PW_LMT_RS_CCK, limit_ch, reg;
+
+	RF_DBG(rf, DBG_RF_POWER, "======>%s rf_path=%d rate=0x%x beamforming=%d\n",
+	       __func__, rf_path, rate, beamforming);
+	reg = halrf_get_regulation_info(rf, band);
+	limit_ch = halrf_get_bwch_idx_to_limit_array(rf, channel, bandwidth);
+	limit_rate = halrf_hw_rate_to_limit_rate_tx_num(rf, rate);
+
+	if (bandwidth == CHANNEL_WIDTH_40 && limit_rate == PW_LMT_RS_HE) {
+		limit_rate = PW_LMT_RS_HE_B40;
+	}
+	if (band == BAND_ON_5G && limit_rate != 0) { //5G limit table no CCK
+		limit_rate -= 1;
+	}
+
+	pwr_limit = halrf_config_power_limit_by_ch(rf, limit_rate, reg, limit_ch);
+
+	RF_DBG(rf, DBG_RF_POWER, "[ch%d][bw%d][rate%d][bf%d][txnum%d][reg%d]pwr_limit = %d\n",
+	       channel, bandwidth, limit_rate, beamforming, tx_num, reg, pwr_limit);
+	if (pwr_limit == 127) {
+		pwr_limit = 0;
+	}
+
+	return pwr_limit + halrf_get_pwr_control(rf);
+}
+
+s8 halrf_get_power_limit_ru(struct rf_info *rf,
+			    enum phl_phy_idx phy, u8 rf_path, u16 rate, u8 bandwidth,
+			    u8 tx_num, u8 channel)
+{
+	u8 band = rf->hal_com->band[phy].cur_chandef.band;
+	s8 pwr_limit_ru = 0;
+	u8 limit_ch, reg;
+
+	RF_DBG(rf, DBG_RF_POWER, "======>%s phy=%d rf_path=%d rate=0x%x\n",
+	       __func__, HW_PHY_0, rf_path, rate);
+	reg = halrf_get_regulation_info(rf, band);
+	limit_ch = halrf_get_bwch_idx_to_limit_array(rf, channel, 0);
+
+	pwr_limit_ru = halrf_config_power_limit_ru_by_ch(rf, reg, bandwidth, limit_ch);
+
+	RF_DBG(rf, DBG_RF_POWER, "[ch%d][bw%d][reg%d][txnum%d]pwr_limit_ru = %d\n",
+	       channel, bandwidth, reg, tx_num, pwr_limit_ru);
+	if (pwr_limit_ru == 127) {
+		pwr_limit_ru = 0;
+	}
+
+	return pwr_limit_ru + halrf_get_pwr_control(rf);
+}
+
+s8 halrf_get_power(void *rf_void,
+		   u8 rf_path, u16 rate, u8 dcm, u8 offset, u8 bandwidth,
+		   u8 beamforming, u8 channel)
+{
+	struct rf_info *rf = (struct rf_info *)rf_void;
+	struct halrf_pwr_info *pwr = &rf->pwr_info;
+	u8 band = rf->hal_com->band[rf_path].cur_chandef.band;
+	u16 rate_tmp;
+	s8 pwr_by_rate, pwr_limit, power;
+
+	RF_DBG(rf, DBG_RF_INIT, "======>%s rf_path=%d rate=%d dcm=%d bw=%d bf=%d ch=%d\n",
+	       __func__, rf_path, rate, dcm, bandwidth, beamforming, channel);
+	rate_tmp = halrf_get_dcm_offset_pwr_by_rate(rf, rate, dcm, offset);
+
+	pwr_by_rate = pwr->tx_pwr_by_rate[band][rate_tmp];
+
+	pwr_limit = halrf_get_power_limit(rf, 0, rf_path, rate, bandwidth, beamforming, PW_LMT_PH_1T, channel);
+
+	RF_DBG(rf, DBG_RF_INIT, "pwr_by_rate(%d)=(s16)pwr->tx_pwr_by_rate[%d][%d]\n",
+	       pwr_by_rate, band, rate_tmp);
+	RF_DBG(rf, DBG_RF_INIT, "[ch%d][bw%d]pwr_limit(%d) = \n",
+	       channel, bandwidth, pwr_limit);
+
+	if (pwr_by_rate > pwr_limit) {
+		power = pwr_limit;
+	} else {
+		power = pwr_by_rate;
+	}
+
+	RF_DBG(rf, DBG_RF_INIT, "power = %d\n", power);
+	return power;
+}
+#endif
 
 bool halrf_set_power(struct rf_info *rf, enum phl_phy_idx phy,
 		     enum phl_pwr_table pwr_table)
@@ -1742,50 +1881,15 @@ bool halrf_set_power(struct rf_info *rf, enum phl_phy_idx phy,
 #if  (!defined(RF_8730E_SUPPORT) && !defined(RF_8720E_SUPPORT))
 	halrf_get_power_limit_extra(rf);
 #endif
-#ifdef RF_8852A_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852A) {
-		halrf_set_power_8852a(rf, phy, pwr_table);
-	}
-#endif
-
-#ifdef RF_8852B_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852B) {
-		halrf_set_power_8852b(rf, phy, pwr_table);
-	}
-#endif
-
-#ifdef RF_8852C_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852C) {
-		halrf_set_power_8852c(rf, phy, pwr_table);
-	}
-#endif
-
-#ifdef RF_8832BR_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8832BR) {
-		halrf_set_power_8832br(rf, phy, pwr_table);
-	}
-#endif
-
-#ifdef RF_8192XB_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8192XB) {
-		halrf_set_power_8192xb(rf, phy, pwr_table);
-	}
-#endif
-
-#ifdef RF_8852BP_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852BP) {
-		halrf_set_power_8852bp(rf, phy, pwr_table);
-	}
-#endif
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_set_power_8730e(rf, phy, pwr_table);
+		halrf_set_power_8730e(rf, pwr_table);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_set_power_8720e(rf, phy, pwr_table);
+		halrf_set_power_8720e(rf, pwr_table);
 	}
 #endif
 
@@ -2030,12 +2134,12 @@ void halrf_modify_pwr_table_bitmask(struct rf_info *rf,
 	}
 }
 
-s8 halrf_get_pwr_control(struct rf_info *rf, enum phl_phy_idx phy)
+s8 halrf_get_pwr_control(struct rf_info *rf)
 {
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	s8 tmp;
 
-	tmp = (pwr->power_constraint[phy] * -1) + pwr->dpk_mcc_power;
+	tmp = (pwr->power_constraint[0] * -1) + pwr->dpk_mcc_power;
 
 	return tmp;
 }

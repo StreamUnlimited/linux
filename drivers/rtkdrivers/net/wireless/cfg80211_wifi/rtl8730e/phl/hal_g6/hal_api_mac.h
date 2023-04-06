@@ -201,10 +201,6 @@ rtw_hal_mac_cfg_nlo(struct hal_info_t *hal, u16 macid, u8 en,
 		    struct rtw_nlo_info *cfg);
 
 #endif /* CONFIG_WOWLAN */
-#ifdef RTW_PHL_BCN_IOT
-enum rtw_hal_status
-rtw_hal_mac_ax_fill_bcn_desc(void *mac, struct rtw_t_meta_data *mdata);
-#endif
 
 enum rtw_hal_status
 rtw_hal_mac_ax_fill_txdesc(void *mac, struct rtw_xmit_req *treq,
@@ -471,6 +467,8 @@ enum rtw_hal_status
 rtw_hal_mac_fw_dbg_dump(struct hal_info_t *hal_info);
 enum rtw_hal_status
 rtw_hal_mac_ps_notify_wake(struct hal_info_t *hal_info);
+enum rtw_hal_status
+rtw_hal_mac_ps_set_32k(struct hal_info_t *hal_info, bool en_32k, bool en_ack);
 enum rtw_hal_status
 rtw_hal_mac_req_pwr_state(struct hal_info_t *hal_info, u8 pwr_state);
 enum rtw_hal_status

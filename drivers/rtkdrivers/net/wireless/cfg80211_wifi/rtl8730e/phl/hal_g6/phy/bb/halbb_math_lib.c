@@ -364,6 +364,7 @@ s64 halbb_cnvrt_2_sign_64(u64 val, u8 bit_num)
 void halbb_print_sign_frac_digit(struct bb_info *bb, u32 val, u8 total_bit_num,
 				 u8 frac_bit_num, char *buf, u16 buf_size)
 {
+#ifdef CONFIG_PHYDM_CMD
 	s32 val_s32 = (s32)val;
 	u32 val_abs = 0;
 	u32 mask_frac = 0;
@@ -398,6 +399,7 @@ void halbb_print_sign_frac_digit(struct bb_info *bb, u32 val, u8 total_bit_num,
 		_os_snprintf(buf, buf_size, "%s%d.%08d", (val_s32 >= 0) ? "" : "-",
 			     val_abs >> frac_bit_num, frac_digit);
 	}
+#endif
 }
 
 char *halbb_print_sign_frac_digit2(struct bb_info *bb, u32 val, u8 total_bit_num,

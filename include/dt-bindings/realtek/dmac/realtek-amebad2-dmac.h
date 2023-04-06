@@ -1,3 +1,6 @@
+#ifndef _DT_BINDINGS_REALTEK_AMEBAD2_DMAC_H
+#define _DT_BINDINGS_REALTEK_AMEBAD2_DMAC_H
+
 /** @defgroup GDMA0_HS_Interface_definition GDMA HandShake Interface Definition
   * @{
   */
@@ -66,3 +69,4 @@
   * @}
   */
 
+#endif

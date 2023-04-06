@@ -36,6 +36,7 @@
 #define IRQ_COMPENSATE_BASING_ON_DELTA_DELAY 1
 #define COUNTER_COMPENSATE_BASING_ON_DELTA_DELAY 1
 #define MAX_SPORT_IRQ_X 134217727
+#define USING_COUNTER 1
 
 struct sport_dai {
 	/* Platform device for this DAI */
@@ -722,7 +723,9 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 
 static const struct snd_soc_dai_ops amebad2_sport_dai_ops = {
 	.trigger   = sport_trigger,
+	#if USING_COUNTER
 	.delay     = sport_delay,
+	#endif
 	.hw_params = sport_hw_params,
 	.hw_free   = sport_hw_free,
 	.set_fmt   = sport_set_fmt,
@@ -976,7 +979,6 @@ static irqreturn_t rtk_sport_interrupt(int irq, void * dai)
 			sport->irq_rx_count = 0;
 		}
 		sport->dma_capture.total_sport_counter = sport->total_rx_counter;
-		pr_info("total_rx_counter:%lld", sport->total_rx_counter);
 		audio_sp_clear_rx_sport_irq(sport->addr);
 	} else if (audio_sp_is_tx_sport_irq(sport->addr)) {
 		sport->irq_tx_count++;
@@ -1070,23 +1072,20 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sport->sport_mclk_multiplier = 0;
 	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-mclk-multiplier", 0, &sport->sport_mclk_multiplier);
-	dev_info(&pdev->dev, "multiplier:%d", sport->sport_mclk_multiplier);
 
 	/* default sport_multi_io 0 */
 	sport->sport_multi_io = 0;
 	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-multi-io", 0, &sport->sport_multi_io);
-	dev_info(&pdev->dev, "multi-io:%d", sport->sport_multi_io);
 
 	/* default sport_multi_io 0(master) */
 	sport->sport_mode = 0;
 	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-mode", 0, &sport->sport_mode);
-	dev_info(&pdev->dev, "sport-mode:%d", sport->sport_mode);
 
 	/* Read irq of sport */
 	sport->irq = platform_get_irq(pdev, 0);
-	dev_info(&pdev->dev, "irq:%d", sport->irq);
+
 	/* request irq with irq func. */
 	ret = devm_request_irq(&pdev->dev, sport->irq, rtk_sport_interrupt, 0, dev_name(&pdev->dev), sport);
 	sport->total_tx_counter = 0;

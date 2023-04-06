@@ -328,33 +328,41 @@
 #define CKD_SPORT3_WIDTH					3
 
 /*******************************
- * AmebaD2 APSYS RCC registers *
+ * AmebaD2 CA32 RCC registers *
  ******************************/
-#define AMEBAD2_REG_C0_MISC_CTRL			(RTK_SYS_AP | 0x00)
-#define AMEBAD2_REG_C0_RST_CTRL				(RTK_SYS_AP | 0x04)
-#define AMEBAD2_REG_APLL_CTRL0				(RTK_SYS_AP | 0x40)
-#define AMEBAD2_REG_APLL_CTRL1				(RTK_SYS_AP | 0x44)
-#define AMEBAD2_REG_APLL_CTRL2				(RTK_SYS_AP | 0x48)
-#define AMEBAD2_REG_APLL_CTRL3				(RTK_SYS_AP | 0x4C)
-#define AMEBAD2_REG_APLL_CTRL4				(RTK_SYS_AP | 0x50)
-#define AMEBAD2_REG_APLL_CTRL5				(RTK_SYS_AP | 0x54)
+#define AMEBAD2_REG_APLL_BASE			(RTK_SYS_AP | 0x100)
 
 
-/* AMEBAD2_REG_C0_MISC_CTRL */
-#define CKE_AP_CPU							4
-#define CKSL_AP_CPU_SHIFT					6
-#define CKSL_AP_CPU_MASK					1
-#define CKD_AP_CPU_SHIFT					2
-#define CKD_AP_CPU_WIDTH					2
-
-#define REG_APLL_CTRL0		0x40
-#define REG_APLL_CTRL1		0x44
-#define REG_APLL_CTRL5		0x54
+#define REG_APLL_CTRL0		0x0
+#define REG_APLL_CTRL1		0x04
+#define REG_APLL_CTRL5		0x14
 
 #define APLL_POW_PI_BIT		BIT(3)
 #define APLL_POW_PLL_BIT	BIT(0)
 #define APLL_CK_RDY_BIT		BIT(31)
 #define APLL_SDM_DIVM_MSK	(0xff << 0)
+
+
+/*******************************
+ * AmebaD2 HP RCC registers *
+ ******************************/
+#define AMEBAD2_REG_HP_CKE				(RTK_SYS_HP | 0xC)
+#define AMEBAD2_REG_HP_CKSL				(RTK_SYS_HP | 0x10)
+#define AMEBAD2_REG_DUMMY_1E0			(RTK_SYS_HP | 0x1E0)
+
+/* AMEBAD2_REG_HP_CKE */
+#define CKE_AP_CPU							0
+
+/* AMEBAD2_REG_HP_CKSL */
+#define CKSL_AP_CPU_SHIFT					2
+#define CKSL_AP_CPU_MASK					1
+#define CKD_AP_CPU_SHIFT					0
+#define CKD_AP_CPU_WIDTH					2
+
+
+/* AMEBAD2_REG_DUMMY_1E0 */
+#define CKSL_TIM9_SHIFT		2
+#define CKSL_TIM9_MASK		1
 
 /* AmebaD2 PLL registers */
 

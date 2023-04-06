@@ -15,6 +15,7 @@
 
 #include "wowlan.h"
 #include "mac_priv.h"
+#include "mac_8730e/init_8730e.h"
 
 static u32 wow_bk_status[4] = {0};
 static u32 tgt_ind_orig;
@@ -37,13 +38,13 @@ u8 rtl8730e_set_keep_alive_cmd(struct mac_ax_adapter *adapter, struct keep_alive
 	check_period = parm->period;
 	SET_H2CCMD_KEEPALIVE_PARM_ENABLE(u1H2CKeepAliveParm, enable);
 	SET_H2CCMD_KEEPALIVE_PARM_ADOPT(u1H2CKeepAliveParm, adopt);
-	SET_H2CCMD_KEEPALIVE_PARM_PKT_TYPE(u1H2CKeepAliveParm, parm->packet_id);
+	SET_H2CCMD_KEEPALIVE_PARM_PKT_TYPE(u1H2CKeepAliveParm, parm->packet_type);
 	SET_H2CCMD_KEEPALIVE_PARM_CHECK_PERIOD(u1H2CKeepAliveParm, check_period);
 
 	ret = rtw_hal_mac_send_h2c_ameba(hal_com,
-							   H2C_KEEP_ALIVE,
-							   H2C_KEEP_ALIVE_CTRL_LEN,
-							   u1H2CKeepAliveParm);
+					 H2C_KEEP_ALIVE,
+					 H2C_KEEP_ALIVE_CTRL_LEN,
+					 u1H2CKeepAliveParm);
 
 	return ret;
 }
@@ -69,24 +70,47 @@ u8 rtl8730e_set_disconnect_decision_cmd(struct mac_ax_adapter *adapter,
 	SET_H2CCMD_DISCONDECISION_PARM_TRY_OK_BCN_FAIL_COUNT_EN(u1H2CDisconDecisionParm, parm->tryok_bcnfail_count_en);
 
 	ret = rtw_hal_mac_send_h2c_ameba(hal_com,
-							   H2C_DISCON_DECISION,
-							   H2C_DISCON_DECISION_LEN,
-							   u1H2CDisconDecisionParm);
+					 H2C_DISCON_DECISION,
+					 H2C_DISCON_DECISION_LEN,
+					 u1H2CDisconDecisionParm);
 	return ret;
 }
 
 /* km */
-u8 rtl8730e_set_remote_wake_ctrl_cmd(struct mac_ax_adapter *adapter, struct wow_global *parm)
+u32 rtl8730e_set_remote_wake_ctrl_cmd(struct mac_ax_adapter *adapter, struct wow_global *parm)
 {
 	struct rtw_hal_com_t *hal_com = adapter->drv_adapter;
+	struct rtw_phl_com_t *phl_com = (struct rtw_phl_com_t *)adapter->phl_adapter;
+	struct dvobj_priv *pdvobj = (struct dvobj_priv *)(phl_com->drv_priv);
+	struct _ADAPTER *drv_adapter = dvobj_get_primary_adapter(pdvobj);
+	struct halmac_txff_allocation *txff_info = &adapter->txff_alloc;
+	struct security_priv *psecuritypriv = &drv_adapter->securitypriv;
 	u8 u1H2CRemoteWakeCtrlParm[H2C_REMOTE_WAKE_CTRL_LEN] = {0};
-	u8 ret = _FAIL, count = 0;
+	u8 h2c_aoac_rsvdpage[H2C_AOAC_RSVDPAGE_LOC_LEN] = {0};
+	u32 addr = 0;
+	u32 page_num = RSVD_PAGE_REMOTE_CTRL_INFO;
+	u32 ret = RTW_HAL_STATUS_FAILURE, count = 0;
 	u8 enable = parm->wow_en;
+
+	/* copy remote control information to reserved page. */
+	addr = TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + page_num) * 128;
+	PLTFM_MEM_W(addr, (u8 *)&parm->rmcl_info_c,
+		    sizeof(struct mac_ax_remotectrl_info_parm_));
+
+	SET_H2CCMD_AOAC_RSVDPAGE_LOC_REMOTE_WAKE_CTRL_INFO(h2c_aoac_rsvdpage, RSVD_PAGE_REMOTE_CTRL_INFO);
+	SET_H2CCMD_AOAC_RSVDPAGE_LOC_ARP_RSP(h2c_aoac_rsvdpage, RSVD_PAGE_ARP_RSP);
+	ret = rtw_hal_mac_send_h2c_ameba(hal_com,
+					 H2C_AOAC_RSVD_PAGE,
+					 H2C_AOAC_RSVDPAGE_LOC_LEN,
+					 h2c_aoac_rsvdpage);
+	if (ret != RTW_HAL_STATUS_SUCCESS) {
+		PLTFM_MSG_ERR("set AOAC_RSVDPAGE_LOC failed!\n");
+		return ret;
+	}
 
 	SET_H2CCMD_REMOTE_WAKECTRL_ENABLE(u1H2CRemoteWakeCtrlParm, enable);
 	SET_H2CCMD_REMOTE_WAKE_CTRL_ARP_OFFLOAD_EN(u1H2CRemoteWakeCtrlParm, 1);
-#if 0 //CONFIG_GTK_OL
-	struct security_priv *psecuritypriv = &(adapter->securitypriv);
+#ifdef CONFIG_GTK_OL
 	if (psecuritypriv->binstallKCK_KEK == _TRUE &&
 		psecuritypriv->dot11PrivacyAlgrthm == _AES_) {
 		SET_H2CCMD_REMOTE_WAKE_CTRL_GTK_OFFLOAD_EN(u1H2CRemoteWakeCtrlParm, 1);
@@ -105,7 +129,7 @@ u8 rtl8730e_set_remote_wake_ctrl_cmd(struct mac_ax_adapter *adapter, struct wow_
 	 */
 	SET_H2CCMD_REMOTE_WAKE_CTRL_NBNS_FILTER_EN(u1H2CRemoteWakeCtrlParm, 1);
 
-#if 0
+
 	if ((psecuritypriv->dot11PrivacyAlgrthm == _AES_) ||
 		(psecuritypriv->dot11PrivacyAlgrthm == _NO_PRIVACY_) ||
 		(psecuritypriv->dot11PrivacyAlgrthm == _WEP40_) ||
@@ -114,17 +138,14 @@ u8 rtl8730e_set_remote_wake_ctrl_cmd(struct mac_ax_adapter *adapter, struct wow_
 	} else {
 		SET_H2CCMD_REMOTE_WAKE_CTRL_ARP_ACTION(u1H2CRemoteWakeCtrlParm, 1);
 	}
-#else
-	SET_H2CCMD_REMOTE_WAKE_CTRL_ARP_ACTION(u1H2CRemoteWakeCtrlParm, 1);
-#endif
 
 	SET_H2CCMD_REMOTE_WAKE_CTRL_FW_PARSING_UNTIL_WAKEUP(u1H2CRemoteWakeCtrlParm, 1);
 
 
 	ret = rtw_hal_mac_send_h2c_ameba(hal_com,
-							   H2C_REMOTE_WAKE_CTRL,
-							   H2C_REMOTE_WAKE_CTRL_LEN,
-							   u1H2CRemoteWakeCtrlParm);
+					 H2C_REMOTE_WAKE_CTRL,
+					 H2C_REMOTE_WAKE_CTRL_LEN,
+					 u1H2CRemoteWakeCtrlParm);
 	return ret;
 }
 
@@ -207,7 +228,7 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 	struct wow_global parm1;
 	struct wakeup_ctrl parm2;
 	struct mac_role_tbl *role;
-	struct mac_ax_sec_iv_info sec_iv_info = {0};
+	//struct mac_ax_sec_iv_info sec_iv_info = {0};
 	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
 
 	if (adapter->sm.fwdl != MAC_AX_FWDL_INIT_RDY) {
@@ -235,12 +256,11 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 	parm1.mac_id = macid;
 	parm1.pairwise_sec_algo = info->pairwise_sec_algo;
 	parm1.group_sec_algo = info->group_sec_algo;
-	//parm1.remotectrl_info_content =
-	//info->remotectrl_info_content;
-	if (content)
-		PLTFM_MEMCPY(&parm1.remotectrl_info_content,
+	if (content) {
+		PLTFM_MEMCPY(parm1.rmcl_info_c,
 			     content,
 			     sizeof(struct mac_ax_remotectrl_info_parm_));
+	}
 
 	if (info->wow_en) {
 		role = mac_role_srch(adapter, macid);
@@ -255,14 +275,14 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 			role->info.wol_uc = info->hw_unicast_en;
 			role->info.wol_magic = info->magic_en;
 
-			sec_iv_info.macid = macid;
+			/*sec_iv_info.macid = macid;
 			if (content)
 				for (i = 0 ; i < IV_LENGTH ; i++)
 					sec_iv_info.ptktxiv[i] =
 						content->ptktxiv[i];
 
 			sec_iv_info.opcode = SEC_IV_UPD_TYPE_WRITE;
-			ret = p_ops->mac_wowlan_secinfo(adapter, &sec_iv_info);
+			ret = p_ops->mac_wowlan_secinfo(adapter, &sec_iv_info);*/
 
 			ret = mac_change_role(adapter, &role->info);
 			if (ret) {
@@ -274,14 +294,14 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 			return MACNOITEM;
 		}
 	} else {
-		sec_iv_info.macid = macid;
+		/*sec_iv_info.macid = macid;
 		sec_iv_info.opcode = SEC_IV_UPD_TYPE_READ;
 		ret = p_ops->mac_wowlan_secinfo(adapter, &sec_iv_info);
 		if (ret) {
 			PLTFM_MSG_ERR("refresh_security_cam_info failed %d\n", ret);
 		} else {
 			PLTFM_MSG_TRACE("refresh_security_cam_info success!\n");
-		}
+		}*/
 
 		if (wow_bk_status[(macid >> 5)] & BIT(macid & 0x1F)) {
 			//restore address cam
@@ -355,7 +375,7 @@ u32 mac_cfg_keep_alive(struct mac_ax_adapter *adapter,
 	}
 
 	parm.keepalive_en = info->keepalive_en;
-	parm.packet_id = info->packet_id;
+	parm.packet_type = info->packet_type;
 	parm.period = info->period;
 	parm.mac_id = macid;
 

@@ -89,10 +89,10 @@
 			}\
 		} while (0)
 #else
-#define BB_DBG
-#define BB_TRACE
-#define BB_TRACE1
-#define BB_WARNING
+#define BB_DBG(...)   do {} while(0)
+#define BB_TRACE(...)   do {} while(0)
+#define BB_TRACE1(...)   do {} while(0)
+#define BB_WARNING(...)   do {} while(0)
 #define	BB_DBG_CNSL2(in_cnsl, max_buff_len, used_len, buff_addr, remain_len, fmt, ...)\
 		do {								\
 			u32 *used_len_tmp = &(used_len);				\
@@ -100,6 +100,11 @@
 				*used_len_tmp += _os_snprintf(buff_addr, remain_len, fmt, ##__VA_ARGS__);\
 		} while (0)
 #endif
+
+#define BB_BRIEF(fmt, ...)     \
+	do {\
+		_os_dbgdump("[BB]" fmt, ##__VA_ARGS__);\
+	} while (0)
 
 #define BB_DBG_VAST(max_buff_len, used_len, buff_addr, remain_len, fmt, ...)\
 	do {\

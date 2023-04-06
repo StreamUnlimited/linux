@@ -16,9 +16,6 @@
 #include "../phl_headers.h"
 #include "phl_trx_axi.h"
 #include "hal_struct.h"
-#ifdef RTW_PHL_BCN_IOT
-#include "mac/mac_ax/bcn.h"
-#endif
 #include "rtw_xmit.h"
 
 #define target_in_area(target, start, end) \
@@ -721,9 +718,6 @@ static void phl_tx_reset_axi(struct phl_info_t *phl_info)
 		wd_ring[ch].cur_hw_res = 0;
 		_phl_reset_wp_tag(phl_info, &wd_ring[ch], ch);
 	}
-#ifdef RTW_PHL_BCN_IOT
-	_phl_reset_txbd(phl_info, &txbd[BCN_QUEUE_INX]);
-#endif
 }
 
 
@@ -1649,52 +1643,6 @@ static void _phl_release_tx_done_res(struct phl_info_t *phl_info)
 	return;
 }
 
-#ifdef RTW_PHL_BCN_IOT
-static void _phl_bcn_callback_axi(void *context)
-{
-	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
-	struct rtw_phl_handler *phl_handler
-		= (struct rtw_phl_handler *)phl_container_of(context,
-				struct rtw_phl_handler,
-				os_handler);
-	struct phl_info_t *phl_info = (struct phl_info_t *)phl_handler->context;
-	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
-	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)phl_com->bcn_info;
-	struct hci_info_t *hci_info = (struct hci_info_t *)phl_info->hci;
-	struct phl_hci_trx_ops *hci_trx_ops = phl_info->hci_trx_ops;
-	void *drvpriv = phl_to_drvpriv(phl_info);
-	struct rtw_t_meta_data mdata = {0};
-
-	FUNCIN_WSTS(pstatus);
-
-	_os_spinlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
-
-	mdata.type = RTW_PHL_PKT_TYPE_MGNT;
-	mdata.offset = TX_WIFI_INFO_SIZE;
-	mdata.macid = bcn_info->macid;
-	mdata.mbssid = bcn_info->mbssid;
-	mdata.band = bcn_info->band;
-	mdata.qsel = AX_TXDESC_QSEL_BCN;
-	mdata.bc = 1;
-	mdata.pktlen = bcn_info->bcn_len;
-	mdata.port_id = bcn_info->port;
-	mdata.userate_sel = 1;
-	mdata.f_rate = bcn_info->rate_sel;
-	mdata.hw_seq_mode = bcn_info->ssn_mode;
-	mdata.sw_seq = bcn_info->ssn_sel;
-	mdata.wdinfo_en = 1;
-	rtw_hal_fill_bcn_desc(phl_info->hal, &mdata);
-
-	rtw_hal_update_bcn_txbd(phl_info->hal, hci_info->txbd_buf, bcn_info);
-
-	rtw_hal_trigger_bcn(phl_info->hal);
-
-	_os_spinunlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
-
-	FUNCOUT_WSTS(pstatus);
-}
-#endif
-
 static void _phl_tx_callback_axi(void *context)
 {
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
@@ -1893,13 +1841,9 @@ void phl_trx_deinit_axi(struct phl_info_t *phl_info)
 			      hci_info->total_txch_num);
 	hci_info->wd_ring = NULL;
 
-#ifdef RTW_PHL_BCN_IOT
-	_phl_free_txbd_axi(phl_info, hci_info->txbd_buf,
-			   hci_info->total_txch_num + 1);
-#else
 	_phl_free_txbd_axi(phl_info, hci_info->txbd_buf,
 			   hci_info->total_txch_num);
-#endif
+
 	hci_info->txbd_buf = NULL;
 	FUNCOUT();
 }
@@ -1910,9 +1854,6 @@ enum rtw_phl_status phl_trx_init_axi(struct phl_info_t *phl_info)
 	struct hci_info_t *hci_info = phl_info->hci;
 	struct rtw_phl_handler *tx_handler = &phl_info->phl_tx_handler;
 	struct rtw_phl_handler *rx_handler = &phl_info->phl_rx_handler;
-#ifdef RTW_PHL_BCN_IOT
-	struct rtw_phl_handler *bcn_handler = &phl_info->phl_bcn_handler;
-#endif
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
 	u8 txch_num = 0, rxch_num = 0;
@@ -1939,27 +1880,11 @@ enum rtw_phl_status phl_trx_init_axi(struct phl_info_t *phl_info)
 			break;
 		}
 
-#ifdef RTW_PHL_BCN_IOT
-		bcn_handler->type = RTW_PHL_HANDLER_PRIO_HIGH; /* tasklet */
-		bcn_handler->callback = _phl_bcn_callback_axi;
-		bcn_handler->context = phl_info;
-		bcn_handler->drv_priv = drv_priv;
-		pstatus = phl_register_handler(phl_info->phl_com, bcn_handler);
-		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
-			break;
-		}
-#endif
-
 		/* axi tx sw resource */
 		txch_num = rtw_hal_query_txch_num(phl_info->hal);
 		hci_info->total_txch_num = txch_num;
 		/* allocate tx bd */
-#ifdef RTW_PHL_BCN_IOT
-		/* add the tx bcn txbd */
-		pstatus = _phl_alloc_txbd_axi(phl_info, txch_num + 1);
-#else
 		pstatus = _phl_alloc_txbd_axi(phl_info, txch_num);
-#endif
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 			break;
 		}
@@ -3083,9 +3008,6 @@ enum rtw_phl_status phl_register_trx_hdlr_axi(struct phl_info_t *phl_info)
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
 	struct rtw_phl_handler *tx_handler = &phl_info->phl_tx_handler;
 	struct rtw_phl_handler *rx_handler = &phl_info->phl_rx_handler;
-#ifdef RTW_PHL_BCN_IOT
-	struct rtw_phl_handler *bcn_handler = &phl_info->phl_bcn_handler;
-#endif
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
 	tx_handler->type = RTW_PHL_HANDLER_PRIO_HIGH; /* tasklet */
@@ -3105,17 +3027,6 @@ enum rtw_phl_status phl_register_trx_hdlr_axi(struct phl_info_t *phl_info)
 	if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 		PHL_ERR("%s : register rx_handler fail.\n", __FUNCTION__);
 	}
-
-#ifdef RTW_PHL_BCN_IOT
-	bcn_handler->type = RTW_PHL_HANDLER_PRIO_HIGH;
-	bcn_handler->callback = _phl_bcn_callback_axi;
-	bcn_handler->context = phl_info;
-	bcn_handler->drv_priv = drv_priv;
-	pstatus = phl_register_handler(phl_info->phl_com, bcn_handler);
-	if (RTW_PHL_STATUS_SUCCESS != pstatus) {
-		PHL_ERR("%s : register bcn_handler fail.\n", __FUNCTION__);
-	}
-#endif
 
 	return pstatus;
 }

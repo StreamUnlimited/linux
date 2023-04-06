@@ -23,8 +23,6 @@
 #include "trx_desc.h"
 #include "common.h"
 
-#define MAC_TX_PKTBUF_OFFSET (0x20000)
-
 #define READ_OFLD_MAX_LEN 2000
 #define WRITE_OFLD_MAX_LEN 2000
 #define CONF_OFLD_MAX_LEN 2000

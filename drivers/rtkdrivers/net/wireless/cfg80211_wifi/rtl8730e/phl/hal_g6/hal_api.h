@@ -368,8 +368,6 @@ s8 rtw_hal_rf_get_power_limit(void *hal, enum phl_phy_idx phy,
 			      u16 rate, u8 bandwidth, u8 beamforming, u8 tx_num, u8 channel);
 enum rtw_hal_status rtw_hal_set_power_lmt(void *hal, u8 band_idx);
 void rtw_hal_set_ext_pwr_lmt_en(void *hal, bool enable);
-void rtw_hal_enable_ext_pwr_lmt(void *hal, u8 hw_band,
-				struct rtw_tpu_ext_pwr_lmt_info *ext_pwr_lmt_info);
 
 #ifdef CONFIG_RTW_ACS
 void rtw_hal_acs_mntr_trigger(void *hal, struct acs_mntr_parm *parm);
@@ -446,7 +444,7 @@ u16 rtw_hal_handle_wp_rpt(void *hal, u8 *rp, u16 len, u8 *sw_retry, u8 *dma_ch,
 u8 rtw_hal_check_rxrdy(struct rtw_phl_com_t *phl_com, void *hal, u8 *rxbuf, u8 dma_ch);
 u8 rtw_hal_handle_rxbd_info(void *hal, u8 *rxbuf, u16 *buf_size);
 void rtw_hal_clear_bdidx(void *hal);
-void rtw_hal_rst_bdram(void *hal);
+//void rtw_hal_rst_bdram(void *hal);
 bool rtw_hal_poll_txdma_idle(void *hal);
 void rtw_hal_cfg_dma_io(void *hal, u8 en);
 
@@ -476,10 +474,7 @@ enum rtw_hal_status
 rtw_hal_update_txbd(void *hal, void *txbd, void *wd, u8 dma_ch, u16 wd_num);
 
 #ifdef RTW_PHL_BCN_IOT
-enum rtw_hal_status
-rtw_hal_update_bcn_txbd(void *hal, void *txbd, void *bcn_info);
-
-enum rtw_hal_status rtw_hal_trigger_bcn(void *hal);
+enum rtw_hal_status rtw_hal_trigger_bcn(void *hal, u32 port);
 #endif
 
 /**
@@ -519,7 +514,7 @@ enum rtw_hal_status rtw_hal_notify_rxdone(void *hal, void *rxbd, u8 ch,
 u8 rtw_hal_check_rxrdy(struct rtw_phl_com_t *phl_com, void *hal, u8 *rxbuf, u8 dma_ch);
 u8 rtw_hal_handle_rxbd_info(void *hal, u8 *rxbuf, u16 *buf_size);
 void rtw_hal_clear_bdidx(void *hal);
-void rtw_hal_rst_bdram(void *hal);
+//void rtw_hal_rst_bdram(void *hal);
 bool rtw_hal_poll_txdma_idle(void *hal);
 void rtw_hal_cfg_dma_io(void *hal, u8 en);
 
@@ -776,6 +771,8 @@ enum rtw_hal_status
 rtw_hal_ps_pwr_lvl_cfg(struct rtw_phl_com_t *phl_com, void *hal,
 		       u32 req_pwr_lvl);
 enum rtw_hal_status
+rtw_hal_ps_set_32k(void *hal, bool en_32k, bool en_ack);
+enum rtw_hal_status
 rtw_hal_ps_lps_cfg(void *hal, struct rtw_hal_lps_info *lps_info);
 enum rtw_hal_status
 rtw_hal_ps_ips_cfg(void *hal, struct rtw_hal_ips_info *ips_info);
@@ -871,10 +868,6 @@ enum rtw_hal_status
 rtw_hal_tsf_sync(void *hal, u8 wrole_sync_from, u8 wrole_sync_to,
 		 enum phl_band_idx band, s32 sync_offset_tu,
 		 enum hal_tsf_sync_act act);
-
-#ifdef RTW_PHL_BCN_IOT
-enum rtw_hal_status rtw_hal_fill_bcn_desc(void *hal, struct rtw_t_meta_data *mdata);
-#endif
 
 /**
  * rtw_hal_fill_txdesc() - Fill hardware tx header
@@ -1022,6 +1015,10 @@ enum rtw_hal_status rtw_hal_set_tx_power(void *hal, u8 band_idx,
 
 enum rtw_hal_status rtw_hal_get_txinfo_power(
 	void *hal, s16 *txinfo_power_dbm);
+
+enum rtw_hal_status
+rtw_hal_mac_cfg_macid(void *hal,
+		      struct rtw_phl_stainfo_t *sta);
 /*****************************************************************************/
 
 u32 rtw_hal_get_phy_stat_info(void *hal, enum phl_band_idx hw_band,

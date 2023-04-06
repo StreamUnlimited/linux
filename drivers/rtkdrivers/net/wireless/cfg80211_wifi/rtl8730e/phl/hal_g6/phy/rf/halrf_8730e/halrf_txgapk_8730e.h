@@ -28,33 +28,34 @@
 
 #ifdef RF_8730E_SUPPORT
 
-#define TXGAPK_VER_8730E 0x06
+#define TXGAPK_VER_8730E 0x04
 
 /*--------------------------Define Parameters-------------------------------*/
-#define TXGAPK_RF_PATH_MAX_8730E 2
+//#define TXGAPK_RF_PATH_MAX_8730E 1
+//#define TXGAPK_RF_REG_NUM_8730E 1
+//#define GAPK_REG_DBG_8730E 0
+//#define TXGAP_TB_ADDR_8730E			0x10033
+//#define TXGAP_TB_VAL_8730E			0x1003F
 
-#define TXGAPK_RF_REG_NUM_8730E 1
+#define GAPK_TRK_K_8730E 0
+#define GAPK_TRK_WTA_8730E 1
+#define GAPK_PWR_K_8730E 2
+#define GAPK_PWR_WTA_8730E 3
+#define GAPK_RPT_DBG_8730E 1
+#define GAPK_TRACK_EN_8730E 1
+#define GAPK_POWER_EN_8730E 1
 
-#define TXGAPK_DEBUGMASK_8730E		0x100EE
-
-#define TXGAP_TB_ADDR_8730E			0x10033
-
-#define TXGAP_TB_VAL_8730E			0x1003F
 /*---------------------------End Define Parameters----------------------------*/
 
-
-
-
+void halrf_do_txgapk_8730e(struct rf_info *rf);
+#if 0
 void halrf_txgapk_enable_8730e
 (struct rf_info *rf, enum phl_phy_idx phy);
 
 void halrf_txgapk_write_table_default_8730e
 (struct rf_info *rf, enum phl_phy_idx phy);
 
-void halrf_do_txgapk_8730e(struct rf_info *rf, enum phl_phy_idx phy);
-
-
 void halrf_txgapk_init_8730e(struct rf_info *rf);
-
+#endif
 #endif /* RF_8730E_SUPPORT */
 #endif /*#ifndef __HALRF_TXGAPK_8730E_H__*/

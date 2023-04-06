@@ -29,8 +29,12 @@
 #define HALRF_WATCHDOG_PERIOD	2 /*second*/
 
 
-
+#ifndef DRV_RF_DBG_TRACE_DISABLE
 #define RFDBG_TRACE_EN
+#endif
+
+//#define RFDBG_TRACE_EN
+
 #ifdef RFDBG_TRACE_EN
 #define RF_DBG(rf, comp, fmt, ...)     \
 		do {\
@@ -60,11 +64,11 @@
 				*used_len_tmp += _os_snprintf(buff_addr, remain_len, fmt, ##__VA_ARGS__);\
 		} while (0)
 #else
-#define RF_DBG
-#define RF_TRACE
-#define RF_WARNING
-#define RF_DBG_CNSL		/*Print on Consol,CLI */
-#define RF_DBG_VAST		/*Print to Comport, Debug View*/
+#define RF_DBG(...)  do {} while(0)
+#define RF_TRACE(...)  do {} while(0)
+#define RF_WARNING(...)  do {} while(0)
+#define RF_DBG_CNSL(...)  do {} while(0)  /*Print on Consol,CLI */
+#define RF_DBG_VAST(...)	 do {} while(0)  /*Print to Comport, Debug View*/
 #endif
 
 

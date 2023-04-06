@@ -88,6 +88,8 @@ struct bb_env_mntr_cr_info {
 	u32 ccx_trig_m;
 	u32 ccx_edcca_opt;
 	u32 ccx_edcca_opt_m;
+	u32 ccx_txon_opt;// For IFS 0: txon = rftxen 1:txon = phytxon
+	u32 ccx_txon_opt_m;//
 	u32 ccx_source_sel;
 	u32 ccx_source_sel_m;
 	u32 clm_unit_idx;
@@ -100,6 +102,14 @@ struct bb_env_mntr_cr_info {
 	u32 clm_period_m;
 	u32 clm_dbg_sel;
 	u32 clm_dbg_sel_m;
+	u32 clm_idmatch_en; //mac_id_match_option for clm
+	u32 clm_idmatch_en_m;
+	u32 clm_nav_en; // enable the option to OR mac_virtual_ccawith CCA_for_clm
+	u32 clm_nav_en_m;
+	u32	clm_rssi_th_en;  //
+	u32 clm_rssi_th_en_m;
+	u32	clm_rssi_th;
+	u32	clm_rssi_th_m; //
 	u32 clm_cnt;
 	u32 clm_cnt_m;
 	u32 clm_rdy;
@@ -124,6 +134,18 @@ struct bb_env_mntr_cr_info {
 	u32 nhm_unit_idx_m;
 	u32 nhm_inclu_cca;
 	u32 nhm_inclu_cca_m;
+	u32 nhm_idmatch_en; // nhm mac id match
+	u32 nhm_idmatch_en_m;
+	u32 nhm_nav_en;
+	u32 nhm_nav_en_m;
+	u32 nhm_rssi_th_en;
+	u32 nhm_rssi_th_en_m;
+	u32 nhm_rssi_th;
+	u32 nhm_rssi_th_m;
+	u32 nhm_valid_zigbee_en; // nhm zigbee valid option
+	u32 nhm_valid_zigbee_en_m;
+	u32 nhm_cnt_zigbee_en; // nhm zigbee cnt option
+	u32 nhm_cnt_zigbee_en_m;
 	u32 nhm_th0;
 	u32 nhm_th0_m;
 	u32 nhm_th1;
@@ -352,6 +374,7 @@ struct bb_env_mntr_info {
 	u32				ccx_trigger_time;
 	u8				ccx_rpt_stamp;
 	u8				ccx_watchdog_result;
+	u8				ccx_chk_result;
 	bool				ccx_ongoing;
 	u8				ccx_rac_lv;
 	bool				ccx_manual_ctrl;
@@ -378,7 +401,9 @@ struct bb_env_mntr_info {
 	u8				ccx_unit_idx;
 	enum ccx_edcca_opt_bw_idx	ccx_edcca_opt_bw_idx;
 	enum clm_opt_input		clm_input_opt;
+	enum clm_idmatch_input  clm_input_idmatch;
 	enum nhm_option_cca_all		nhm_include_cca;
+	enum nhm_idmatch_input  nhm_input_idmatch;
 	u8				nhm_th[NHM_TH_NUM];
 	u16				ifs_clm_th_l[IFS_CLM_NUM];
 	u16				ifs_clm_th_h[IFS_CLM_NUM];
@@ -481,4 +506,5 @@ void halbb_env_mntr_init(struct bb_info *bb);
 void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			char *output, u32 *_out_len);
 void halbb_cr_cfg_env_mntr_init(struct bb_info *bb);
+
 #endif

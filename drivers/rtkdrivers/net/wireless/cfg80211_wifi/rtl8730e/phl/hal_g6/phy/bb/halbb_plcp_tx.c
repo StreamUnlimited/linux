@@ -1282,6 +1282,8 @@ enum plcp_sts halbb_plcp_gen(struct bb_info *bb, struct halbb_plcp_info *in,
 			} else {
 				in_plcp.usr[i].ru_size_idx = 5;
 			}
+
+			in->usr[i].ru_alloc = (in->usr[i].ru_alloc << 1);
 			BB_DBG(bb, DBG_PHY_CONFIG, "[SIGB] User%d RU_alloc = %d\n", i, in->usr[i].ru_alloc);
 		}
 	}
@@ -1302,6 +1304,8 @@ enum plcp_sts halbb_plcp_gen(struct bb_info *bb, struct halbb_plcp_info *in,
 		} else {
 			in_plcp.usr[0].ru_size_idx = 5;
 		}
+
+		in->usr[0].ru_alloc = (in->usr[0].ru_alloc << 1);
 	}
 
 	// CCK
@@ -1331,9 +1335,9 @@ enum plcp_sts halbb_plcp_gen(struct bb_info *bb, struct halbb_plcp_info *in,
 	}
 	// Tx Info
 	halbb_cfg_txinfo(bb, in, &out, phy_idx);
-
+#if 0
 	halbb_ic_cfg(bb, in, cr, phy_idx);
-
+#endif
 	if (bb->ic_type == BB_RTL8192XB) {
 		if (in->ppdu_type == HT_MF_FMT) {
 			ht_mcs = in->usr[0].mcs % 8;
@@ -2345,13 +2349,6 @@ void halbb_plcp_init(struct bb_info *bb)
 {
 	bb->dyn_pmac_tri_en = true;
 	bb->pmac_tri_en = false;
-}
-#else
-
-enum plcp_sts halbb_plcp_gen(struct bb_info *bb, struct halbb_plcp_info *in,
-			     struct usr_plcp_gen_in *user, enum phl_phy_idx phy_idx)
-{
-	return SPEC_INVALID;
 }
 
 #endif

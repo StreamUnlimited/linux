@@ -1786,13 +1786,13 @@ void start_bss_network(_adapter *padapter, struct createbss_parm *parm)
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX *pnetwork_mlmeext = &(pmlmeinfo->network);
 	struct dvobj_priv *pdvobj = padapter->dvobj;
+	struct rtw_phl_com_t *phl_com = GET_PHL_COM(pdvobj);
 	s16 req_ch = REQ_CH_NONE, req_bw = REQ_BW_NONE, req_offset = REQ_OFFSET_NONE;
 	struct rtw_chan_def chdef_to_set = {0};
 	u8 do_rfk = _FALSE;
 	int i;
 	u8 ifbmp_ch_changed = 0;
 #ifdef CONFIG_MCC_MODE
-	struct rtw_phl_com_t *phl_com = GET_PHL_COM(pdvobj);
 	u8 mcc_sup = phl_com->dev_cap.mcc_sup;
 #endif
 	if (parm->req_ch != 0) {
@@ -1823,6 +1823,7 @@ void start_bss_network(_adapter *padapter, struct createbss_parm *parm)
 	/* and at first time the security ie ( RSN/WPA IE) will not include in beacon. */
 	if (NULL == rtw_get_wps_ie(pnetwork->IEs + _FIXED_IE_LENGTH_, pnetwork->IELength - _FIXED_IE_LENGTH_, NULL, NULL)) {
 		pmlmeext->bstart_bss = _TRUE;
+		phl_com->ap_on = _TRUE;
 	}
 
 	/* todo: update wmm, ht cap */
@@ -4490,6 +4491,8 @@ void stop_ap_mode(_adapter *padapter)
 	struct sta_info *psta = NULL;
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct dvobj_priv *pdvobj = padapter->dvobj;
+	struct rtw_phl_com_t *phl_com = GET_PHL_COM(pdvobj);
 	int chanctx_num = 0;
 	struct rtw_chan_def chan_def = {0};
 
@@ -4536,6 +4539,7 @@ void stop_ap_mode(_adapter *padapter)
 	rtw_free_mlme_priv_ie_data(pmlmepriv);
 
 	pmlmeext->bstart_bss = _FALSE;
+	phl_com->ap_on = _FALSE;
 
 	rtw_hal_rcr_set_chk_bssid(padapter, self_action);
 #ifdef CONFIG_RTW_MULTI_AP

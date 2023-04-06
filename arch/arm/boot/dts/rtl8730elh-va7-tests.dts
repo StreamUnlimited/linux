@@ -236,6 +236,11 @@
 	status = "okay";
 };
 
+&usb {
+	dr_mode = "otg"; // "host", "peripheral", "otg"
+};
+
 &watchdog {
 	rtk,wdg-interrupt-mode = <0>;
 };
+

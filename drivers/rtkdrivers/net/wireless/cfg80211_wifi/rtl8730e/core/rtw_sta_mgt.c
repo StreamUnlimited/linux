@@ -682,6 +682,14 @@ static void _rtw_alloc_phl_stainfo(struct sta_info *sta, struct	sta_priv *stapri
 						    PHL_CMD_DIRECTLY, 0);
 
 		if (sta->phl_sta) {
+			pstatus = rtw_phl_mac_cfg_macid(phl, sta->phl_sta);
+			if (pstatus != RTW_PHL_STATUS_SUCCESS) {
+				RTW_ERR(FUNC_ADPT_FMT ": fail to set macid desc "
+					"for " MAC_FMT " (status=%d)!\n",
+					FUNC_ADPT_ARG(stapriv->padapter),
+					MAC_ARG(hwaddr),
+					pstatus);
+			}
 			rtw_dump_phl_sta_info(RTW_DBGDUMP, sta);
 		} else {
 			RTW_ERR(FUNC_ADPT_FMT ": fail to alloc PHL sta "

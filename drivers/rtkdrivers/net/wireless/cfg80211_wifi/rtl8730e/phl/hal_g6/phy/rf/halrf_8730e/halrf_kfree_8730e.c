@@ -24,7 +24,6 @@ void _halrf_get_total_efuse_8730e(struct rf_info *rf,
 
 	halrf_phy_efuse_get_info(rf, HIDE_EFUSE_START_ADDR_8730E,
 				 HIDE_EFUSE_SIZE_8730E, kfree->efuse_content);
-
 	for (i = 0; i < HIDE_EFUSE_SIZE_8730E; i++)
 		RF_DBG(rf, DBG_RF_TSSI_TRIM, "======> %s   efuse_con[0x%x] = 0x%x\n",
 		       __func__, i + HIDE_EFUSE_START_ADDR_8730E, kfree->efuse_content[i]);
@@ -42,7 +41,7 @@ void _halrf_get_1byte_efuse_8730e(struct rf_info *rf, u32 addr, u8 *value)
 
 	*value = kfree->efuse_content[addr - HIDE_EFUSE_START_ADDR_8730E];
 }
-
+/*
 s8 _halrf_efuse_exchange_8730e(struct rf_info *rf, u8 value, u8 mask)
 {
 	s8 tmp = 0;
@@ -63,14 +62,13 @@ s8 _halrf_efuse_exchange_8730e(struct rf_info *rf, u8 value, u8 mask)
 
 	return tmp;
 }
-
+*/
 void _halrf_set_thermal_trim_8730e(struct rf_info *rf,
 				   enum phl_phy_idx phy)
 {
 	u8 thermal_a, offset_lsb;
 
 	RF_DBG(rf, DBG_RF_THER_TRIM, "======> %s   phy=%d\n", __func__, phy);
-
 	if (!(rf->support_ability & HAL_RF_THER_TRIM)) {
 		RF_DBG(rf, DBG_RF_THER_TRIM, "<== %s phy=%d support_ability=%d Ther Trim Off!!!\n",
 		       __func__, phy, rf->support_ability);
@@ -78,9 +76,7 @@ void _halrf_set_thermal_trim_8730e(struct rf_info *rf,
 	}
 
 	_halrf_get_1byte_efuse_8730e(rf, THERMAL_TRIM_HIDE_EFUSE_A_8730E, &thermal_a);
-
 	RF_DBG(rf, DBG_RF_THER_TRIM, "efuse Ther_A=0x%x\n", thermal_a);
-
 	if (thermal_a == 0xff) {
 		RF_DBG(rf, DBG_RF_THER_TRIM, "Ther_A=0xff no PG Return!!!\n");
 		return;
@@ -88,7 +84,6 @@ void _halrf_set_thermal_trim_8730e(struct rf_info *rf,
 
 	offset_lsb = (thermal_a & 0x3) | (thermal_a & BIT(7)); //[1:0]
 	thermal_a = (thermal_a & 0xfc) >> 2;
-
 	RF_DBG(rf, DBG_RF_THER_TRIM, "Ther_A=0x%x, ther_ofst_lsb=0x%x\n", thermal_a, offset_lsb);
 	halrf_wrf(rf, RF_PATH_A, 0x42, 0x3f000, thermal_a);
 	rf->ther_ofst_lsb = offset_lsb;
@@ -101,7 +96,6 @@ void _halrf_set_pa_bias_trim_8730e(struct rf_info *rf,
 	s8 pa_bias_a_2g, pa_bias_a_5g;
 
 	RF_DBG(rf, DBG_RF_PABIAS_TRIM, "======> %s   phy=%d\n", __func__, phy);
-
 	if (!(rf->support_ability & HAL_RF_PABIAS_TRIM)) {
 		RF_DBG(rf, DBG_RF_PABIAS_TRIM, "<== %s phy=%d support_ability=%d PA Bias K Off!!!\n",
 		       __func__, phy, rf->support_ability);
@@ -109,7 +103,6 @@ void _halrf_set_pa_bias_trim_8730e(struct rf_info *rf,
 	}
 
 	_halrf_get_1byte_efuse_8730e(rf, PABIAS_TRIM_HIDE_EFUSE_A_8730E, &value_tmp);
-
 	RF_DBG(rf, DBG_RF_PABIAS_TRIM, "efuse PA_Bias_A=0x%x\n", value_tmp);
 
 	if (value_tmp == 0xff) {
@@ -133,10 +126,8 @@ void _halrf_set_pa_bias_trim_8730e(struct rf_info *rf,
 	} else {
 		pa_bias_a_5g = pa_bias_a & 0x7;
 	}
-
 	RF_DBG(rf, DBG_RF_PABIAS_TRIM, "After Calculate PA_Bias_A_2G=0x%x PA_Bias_A_5G=0x%x\n",
 	       pa_bias_a_2g, pa_bias_a_5g);
-
 	halrf_wrf(rf, RF_PATH_A, 0x60, 0x0000000f, pa_bias_a_2g); //0x60[3:0] TXG_OFS_FT_PA_IB
 	halrf_wrf(rf, RF_PATH_A, 0x60, 0x00000f00, pa_bias_a_5g); //0x60[11:8] TXA_OFS_FT_PA_IB[3:0]
 }
@@ -148,7 +139,6 @@ void _halrf_get_tssi_trim_8730e(struct rf_info *rf,
 	u8 i, j, check_tmp = 0;
 
 	RF_DBG(rf, DBG_RF_TSSI_TRIM, "======> %s   phy=%d\n", __func__, phy);
-
 	if (!(rf->support_ability & HAL_RF_TSSI_TRIM)) {
 		RF_DBG(rf, DBG_RF_TSSI_TRIM, "<== %s phy=%d support_ability=%d TSSI Trim Off!!!\n",
 		       __func__, phy, rf->support_ability);
@@ -181,16 +171,13 @@ void _halrf_get_tssi_trim_8730e(struct rf_info *rf,
 			}
 		}
 	}
-
 	RF_DBG(rf, DBG_RF_TSSI_TRIM, "check_tmp=%d\n", check_tmp);
-
 	if (check_tmp == 2 * TSSI_HIDE_EFUSE_NUM) {
 		for (i = 0; i < 1; i++) {
 			for (j = 0; j < TSSI_HIDE_EFUSE_NUM; j++) {
 				tssi->tssi_trim[i][j] = 0;
 			}
 		}
-
 		RF_DBG(rf, DBG_RF_TSSI_TRIM, "TSSI Trim no PG tssi->tssi_trim=0x0\n");
 	}
 

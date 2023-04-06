@@ -43,11 +43,6 @@
  * 1 ============================================================
  ***************************************************************/
 
-enum halbb_api_host {
-	RUN_IN_FW		= 0,
-	RUN_IN_DRIVER		= 1
-};
-
 enum halbb_backup_type {
 	HALBB_BACKUP	= 1,
 	HALBB_RESTORE	= 2

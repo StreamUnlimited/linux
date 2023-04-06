@@ -517,10 +517,10 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 		crtc_* is the display position
 		src_*  is the source display position
 	*/
-	DRM_TEST_PRINTK("here %s-%d[id=%d,fmt=%d][%d*%d][%d-%d-%d-%d][%d-%d-%d-%d] \n", __func__, __LINE__,
-					idx, fmt, fb->width, fb->height,
-					state->crtc_x, state->crtc_y, state->crtc_w, state->crtc_h,
-					src_x, src_y, src_w, src_h);
+	//DRM_TEST_PRINTK("here %s-%d[id=%d,fmt=%d][%d*%d][%d-%d-%d-%d][%d-%d-%d-%d] \n", __func__, __LINE__,
+	//				idx, fmt, fb->width, fb->height,
+	//				state->crtc_x, state->crtc_y, state->crtc_w, state->crtc_h,
+	//				src_x, src_y, src_w, src_h);
 
 	///check the params , x <  display_width ; y < display_height
 	if (state->crtc_x >= display_width || state->crtc_y >= display_height) {
@@ -566,7 +566,7 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 			int y ;
 			u32 bpp = getBppFromFormat(fb->format->format);
 			//2.do copy
-			DRM_TEST_PRINTK("here %s-%d[id=%d][%d-%d-%d-%d]width=%d/bpp=%d \n", __func__, __LINE__,idx, dest_x, dest_y, dest_w, dest_h, fb->width, bpp);
+			//DRM_TEST_PRINTK("here %s-%d[id=%d][%d-%d-%d-%d]width=%d/bpp=%d \n", __func__, __LINE__,idx, dest_x, dest_y, dest_w, dest_h, fb->width, bpp);
 			for (y = 0; y < dest_h ; ++y) {
 				memcpy((uint8_t *)sec_layer_info[idx].sec_vaddr + (y * dest_w * bpp),
 					   (uint8_t *)gem_cma_obj->vaddr + ((y + src_y) * (fb->width) * bpp) + (bpp * src_x),
@@ -604,7 +604,7 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 	if (dest_y + dest_h > display_height) {
 		dest_h = display_height - dest_y;
 	}
-	DRM_TEST_PRINTK("%s-%d[area:%d-%d-%d-%d] \n", __func__, __LINE__, dest_x, dest_y, dest_x + dest_w, dest_y + dest_h);
+	//DRM_TEST_PRINTK("%s-%d[area:%d-%d-%d-%d] \n", __func__, __LINE__, dest_x, dest_y, dest_x + dest_w, dest_y + dest_h);
 	ameba_lcdc_layer_pos(lcdc_tmp, idx, dest_x, dest_x + dest_w, dest_y, dest_y + dest_h);
 
 	ameba_lcdc_update_layer_reg(lcdc_local->reg_base_addr, idx, &(lcdc_tmp->layerx[idx]));
@@ -652,7 +652,7 @@ void ameba_drm_gem_free_object(struct drm_gem_object *gem_obj)
 			//ameba_lcdc_config_setvalid(lcdc_local->reg_base_addr, lcdc_tmp);
 			ameba_lcdc_update_layer_reg(lcdc_local->reg_base_addr, i, &(lcdc_tmp->layerx[i]));
 			ameba_lcdc_enable_SHW(lcdc_local->reg_base_addr);
-			DRM_TEST_PRINTK("%s-%d [destory %d layer] \n", __func__, __LINE__, i);
+			//DRM_TEST_PRINTK("%s-%d [destory %d layer] \n", __func__, __LINE__, i);
 			sec_layer_info[i].layer_address = 0 ;
 			sec_layer_info[i].use_sec_buffer = 0 ;
 

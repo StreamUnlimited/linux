@@ -15,12 +15,7 @@
 #ifndef _PHL_TRX_DEF_AXI_H_
 #define _PHL_TRX_DEF_AXI_H_
 
-#ifdef RTW_WKARD_WD0_SER
-#define MAX_WD_PAGE_NUM (256*2)
-#else
 #define MAX_WD_PAGE_NUM 64
-#endif
-
 #define WP_RESERVED_SEQ 0x1FF
 #define WP_MAX_SEQ_NUMBER WP_RESERVED_SEQ
 

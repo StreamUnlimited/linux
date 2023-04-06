@@ -87,6 +87,9 @@ struct bb_ch_rpt_info {
 	struct bb_ch_rpt_size_info bb_ch_rpt_size_i;
 	struct bb_ch_info_raw_info	bb_ch_info_raw_i; /*save dumped ch-info data*/
 	struct bb_ch_info_physts_info bb_ch_info_physts_i;
+#ifdef CONFIG_MSFT
+	struct bb_ch_info_snr_bin_info bb_ch_info_snr_bin_i;
+#endif
 };
 
 struct bb_info;

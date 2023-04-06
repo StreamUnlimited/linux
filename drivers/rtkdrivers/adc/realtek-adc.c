@@ -806,6 +806,7 @@ static int realtek_adc_remove(struct platform_device *pdev)
 
 static const struct of_device_id realtek_adc_match[] = {
 	{.compatible = "realtek,amebad2-adc",},
+	{},
 };
 MODULE_DEVICE_TABLE(of, realtek_adc_match);
 

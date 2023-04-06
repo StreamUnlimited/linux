@@ -33,6 +33,5 @@
 
 /*@--------------------------[Prptotype]-------------------------------------*/
 struct rf_info;
-bool halrf_init_reg_by_hdr(void *rf_void);
 bool halrf_nctl_init_reg_by_hdr(void *rf_void);
 #endif

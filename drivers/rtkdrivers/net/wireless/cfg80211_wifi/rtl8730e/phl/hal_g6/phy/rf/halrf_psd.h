@@ -16,9 +16,23 @@
 #define _HALRF_PSD_H_
 
 /*@--------------------------Define Parameters-------------------------------*/
+
+#ifndef IOT_SMALL_RAM
 #define PSD_RF_PATH_MAX 4
 #define PSD_RF_REG_NUM 10
+#define PSD_BB_REG_NUM 100
+#else
+#define PSD_RF_PATH_MAX 1
+#define PSD_RF_REG_NUM 5
+#define PSD_BB_REG_NUM 19
+#endif
+
+#ifdef CONFIG_MP_INCLUDED
 #define PSD_RF_DATA_NUM 320
+#else
+#define PSD_RF_DATA_NUM 1
+#endif
+
 
 /*@-----------------------End Define Parameters-----------------------*/
 struct halrf_psd_data {
@@ -34,7 +48,7 @@ struct halrf_psd_data {
 	u32 psd_data[PSD_RF_DATA_NUM];
 	u32 psd_progress;
 	u8 psd_result_running;
-	u32 psd_reg_backup[100];
+	u32 psd_reg_backup[PSD_BB_REG_NUM];
 	u32 rf_bkup[PSD_RF_PATH_MAX][PSD_RF_REG_NUM];
 };
 

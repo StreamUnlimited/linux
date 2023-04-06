@@ -46,11 +46,13 @@ enum bb_band_t {
 	BB_BAND_5G_L	= 1,
 	BB_BAND_5G_M	= 2,
 	BB_BAND_5G_H	= 3,
-	BB_BAND_6G_L	= 4,
-	BB_BAND_6G_M	= 5,
-	BB_BAND_6G_H	= 6,
-	BB_BAND_6G_UH	= 7,
-	BB_GAIN_BAND_NUM	= 8
+	BB_BAND_2G_L_AUX	= 4,
+	BB_BAND_5G_L_AUX	= 5,
+	BB_BAND_5G_M_AUX	= 6,
+	BB_BAND_5G_H_AUX	= 7,
+	BB_BAND_2G_BBGM	= 8,
+	BB_BAND_2G_BBGM_AUX	= 9,
+	BB_GAIN_BAND_NUM	= 10
 };
 /*@--------------------------[Structure]-------------------------------------*/
 

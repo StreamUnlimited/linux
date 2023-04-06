@@ -29,6 +29,7 @@ u32 mac_pwr_on_8730e(struct mac_ax_adapter *adapter)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u32 val32;
 	u32 ret;
+	struct rtw_hal_com_t *hal_com = (struct rtw_hal_com_t *)adapter->drv_adapter;
 
 	/*0x42008208[24]=1 enable WL RFAFE control circuit*/
 	val32 = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, REG_LSYS_FEN_GRP0);
@@ -65,10 +66,45 @@ u32 mac_pwr_on_8730e(struct mac_ax_adapter *adapter)
 		return ret;
 	}
 
+	if (hal_com->cv != CAV) {
+		/* reset WLRFC  0x8960,set[7:0]=0,then set [7:0]=0xff,enable RFC clk */
+		val32 = MAC_REG_R32(REG_SYS_PWC_ISO_CTRL);
+		val32 &= ~BIT_WL_SAVE_EN;
+		MAC_REG_W32(REG_SYS_PWC_ISO_CTRL, val32);
+
+		val32 = MAC_REG_R32(REG_WL_FUNC_EN);
+		val32 &= ~BIT_FEN_WLOFF;
+		MAC_REG_W32(REG_WL_FUNC_EN, val32);
+
+		val32 = MAC_REG_R32(REG_WL_FUNC_EN);
+		val32 |= BIT_FEN_WLOFF;
+		MAC_REG_W32(REG_WL_FUNC_EN, val32);
+	}
+
 	/*0x40000004[17:16]=2'b11 release BB reset and enable CCK/OFDM*/
 	val32 = MAC_REG_R32(REG_WL_FUNC_EN);
 	MAC_REG_W32(REG_WL_FUNC_EN, val32 | BIT_FEN_BB_GLB_RSTN_V2 |
 		    BIT_FEN_BBRSTB_V2);
+
+	if (hal_com->cv != CAV) {
+		val32 = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, WLAFE_ANAPAR_RFC);
+		val32 &= ~WLAFE_MASK_ANAPOW_RFC;
+		SYS_REG_W32(SYSTEM_CTRL_BASE_LP, WLAFE_ANAPAR_RFC, val32);
+
+		val32 = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, WLAFE_ANAPAR_RFC);
+		val32 |= WLAFE_MASK_ANAPOW_RFC;
+		SYS_REG_W32(SYSTEM_CTRL_BASE_LP, WLAFE_ANAPAR_RFC, val32);
+
+		val32 = MAC_REG_R32(REG_CLKDIV_CKSEL);
+		val32 |= BIT_WL_CKRFC_EN;
+		MAC_REG_W32(REG_CLKDIV_CKSEL, val32);
+
+#ifdef CONFIG_BTCOEX
+		val32 = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, WLAFE_WLRFC_CTRL);
+		val32 &= ~WLAFE_BIT_WLRFC_PWC_SEL;
+		SYS_REG_W32(SYSTEM_CTRL_BASE_LP, WLAFE_WLRFC_CTRL, val32);
+#endif
+	}
 
 	adapter->sm.pwr = MAC_AX_PWR_ON;
 	adapter->sm.plat = MAC_AX_PLAT_ON;
@@ -88,6 +124,11 @@ u32 mac_pwr_off_8730e(struct mac_ax_adapter *adapter)
 	val32 = MAC_REG_R32(REG_WL_FUNC_EN);
 	MAC_REG_W32(REG_WL_FUNC_EN, val32 & ~(BIT_FEN_BB_GLB_RSTN_V2 |
 		    BIT_FEN_BBRSTB_V2));
+
+	/* for A cut bug wloff error 0.4V */
+	val32 = MAC_REG_R32(REG_SYS_PWC_ISO_CTRL);
+	val32 |= BIT_WL_SAVE_EN;
+	MAC_REG_W32(REG_SYS_PWC_ISO_CTRL, val32);
 
 	/* 42008968[2]=1,RFC retention mode */
 	val32 = SYS_REG_R32(SYSTEM_CTRL_BASE_LP, WLAFE_WLRFC_CTRL);

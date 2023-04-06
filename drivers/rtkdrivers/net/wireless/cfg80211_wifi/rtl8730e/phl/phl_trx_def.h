@@ -18,9 +18,12 @@
 #define MAC_AX_8730E_SUPPORT 1
 
 /* core / phl common structrue */
-#define PHL_TX_BCN_OK BIT(0)
-#define PHL_TX_BCN_ERR BIT(1)
-#define PHL_TX_BCN_EARLY BIT(2)
+#define PHL_P0_TX_BCN_OK BIT(0)
+#define PHL_P0_TX_BCN_ERR BIT(1)
+#define PHL_P0_TX_BCN_EARLY BIT(2)
+#define PHL_P1_TX_BCN_OK BIT(3)
+#define PHL_P1_TX_BCN_ERR BIT(4)
+#define PHL_P1_TX_BCN_EARLY BIT(5)
 
 #define MAX_PHL_RING_ENTRY_NUM 32
 #define MAX_PHL_RING_CAT_NUM 10 /* 8 tid + 1 mgnt + 1 hiq*/
@@ -504,7 +507,7 @@ struct rtw_r_meta_data {
 	u8 eof;			/* DW2 [8:8] */
 	u8 scrambler;		/* DW2 [9:15] */
 	u8 ndp_ok_latch;	/* DW2 [16:16] */
-	u8 txrptmid_srch;	/* DW2 [17:23] */
+	u8 macid_rxdesc;	/* DW2 [17:23] */
 	u8 mbidsrch_rpt;	/* DW2 [24:28] */
 	u8 txrptmid;		/* DW2 [29:29] */
 	u8 a3_match;		/* DW2 [30:30] */

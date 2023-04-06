@@ -33,8 +33,11 @@
 #define is_sta_active(sta)	((sta) && (sta->active))
 #define HALBB_SNPRINT_SIZE	200
 #define HALBB_SNPRINT_SIZE_S	20
-
+#ifdef BB_8720E_SUPPORT
+#define BB_EFUSE_BAND_NUM	2
+#else
 #define BB_EFUSE_BAND_NUM	5
+#endif
 #define IC_LNA_NUM		7
 #define IC_TIA_NUM		2
 #define IC_RXBB_NUM 1
@@ -165,7 +168,7 @@ struct bb_gain_info {
 	bool gain_chk;
 	bool bypass_gain_chk;
 	s8 lna_gain[BB_GAIN_BAND_NUM][HALBB_MAX_PATH][IC_LNA_NUM];
-	s8 tia_gain[BB_GAIN_BAND_NUM][HALBB_MAX_PATH][IC_TIA_NUM];
+	u8 tia_gain[BB_GAIN_BAND_NUM][HALBB_MAX_PATH][IC_TIA_NUM];
 	s8 rxbb_gain[BB_GAIN_BAND_NUM][HALBB_MAX_PATH][IC_RXBB_NUM];
 	s8 pin_for_gain_idx[BB_GAIN_BAND_NUM][HALBB_MAX_PATH][PIN_for_gain_NUM];
 	s8 lna_gain_bypass[BB_GAIN_BAND_NUM][HALBB_MAX_PATH][IC_LNA_NUM];
@@ -341,6 +344,7 @@ struct bb_info {
 	bool			is_disable_phy_api;
 	/*[Dummy]*/
 	bool			bool_dummy;
+	s8			s8_dummy;
 	u8			u8_dummy;
 	u16			u16_dummy;
 	u32			u32_dummy;
@@ -392,9 +396,8 @@ struct bb_info {
 #ifdef HALBB_LA_MODE_SUPPORT
 	struct bb_la_mode_info	bb_la_mode_i;
 #endif
-
-#ifdef HALBB_PWR_CTRL_SUPPORT
 	struct bb_pwr_ctrl_info	bb_pwr_ctrl_i;
+#ifdef HALBB_PWR_CTRL_SUPPORT
 	struct bb_dyncca_info	bb_dyncca_i;
 #endif
 
@@ -455,4 +458,5 @@ void halbb_supportability_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 void halbb_pause_func_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			  char *output, u32 *_out_len);
 void halbb_store_data(struct bb_info *bb);
+void halbb_sta_rssi_reset_all(struct bb_info *bb);
 #endif

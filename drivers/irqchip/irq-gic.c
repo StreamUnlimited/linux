@@ -39,6 +39,8 @@
 #include <linux/irqchip/chained_irq.h>
 #include <linux/irqchip/arm-gic.h>
 
+#include <misc/realtek-misc.h>
+
 #include <asm/cputype.h>
 #include <asm/irq.h>
 #include <asm/exception.h>
@@ -69,14 +71,6 @@ static void gic_check_cpu_features(void)
  * A-Cut need gic workaround if AP > 1.12G || GIC > 1.12G/2
  */
 
-__attribute__((aligned(64)))
-static atomic_t gic_atomic_data;
-static u32 ap_clk_pre_div;
-static u32 soc_cut_version;
-
-static void __iomem *reg_hsys_hp_clsk;
-static void __iomem *reg_lsys_system_cfg0;
-
 #define HSYS_MASK_CKSL_AP       ((u32)0x00000003 << 2)          /* R/W 0  CA7 clock selection 00: ap pll out (1.2G default) 10: ap pll div2 out (1.2G/2) 01/11: np pll out (600M) */
 #define HSYS_CKSL_AP(x)         ((u32)(((x) & 0x00000003) << 2))
 #define HSYS_GET_CKSL_AP(x)     ((u32)(((x >> 2) & 0x00000003)))
@@ -84,7 +78,9 @@ static void __iomem *reg_lsys_system_cfg0;
 #define HSYS_CKD_AP(x)          ((u32)(((x) & 0x00000003) << 0))
 #define HSYS_GET_CKD_AP(x)      ((u32)(((x >> 0) & 0x00000003)))
 
-#define LSYS_GET_HW_CHIP_ID(x)  ((uint32_t)(((x >> 0) & 0x0000000F)))
+#define LSYS_MASK_CHIP_INFO_EN  ((u32)0x0000000F << 28)          /*!<R/W 0  Only when this field set to 4'hA, rl_ver/rl_no can be read out . */
+#define LSYS_CHIP_INFO_EN(x)    ((u32)((x) & 0x0000000F) << 28)
+#define LSYS_GET_RL_VER(x)      ((u32)(((x >> 16) & 0x0000000F)))
 
 #define AP_CLK_DIV1		        0
 #define AP_CLK_DIV2		        1
@@ -98,83 +94,7 @@ static DEFINE_RAW_SPINLOCK(gic_freq_lock);
 #define gic_freq_unlock_irqrestore(f)	\
 	raw_spin_unlock_irqrestore(&gic_freq_lock, (f))
 
-static uint32_t gic_get_chip_cut_version(void)
-{
-	u32 value32 = readl_relaxed(reg_lsys_system_cfg0);
-
-	return LSYS_GET_HW_CHIP_ID(value32);
-}
-
-static void gic_freq_init(void)
-{
-	u32 reg;
-	atomic_t *data = &gic_atomic_data;
-
-	atomic_set(data, 0);
-	soc_cut_version = gic_get_chip_cut_version();
-	reg = readl(reg_hsys_hp_clsk);
-	ap_clk_pre_div = HSYS_GET_CKD_AP(reg);
-}
-
-/* switch AP frequency to ap_pll/2, this function shall be called from privileged mode */
-static void gic_freq_switch(void)
-{
-	u32 temp;
-	unsigned long flags;
-	atomic_t *data = &gic_atomic_data;
-
-	/* if not A-cut, no need workaround */
-	if (soc_cut_version != 0) {
-		return;
-	}
-
-	gic_freq_lock_irqsave(flags);
-
-	atomic_inc(data);
-	dmb();
-
-	/* if div is 1 or 2, then div 3 to access gic */
-	if (ap_clk_pre_div < AP_CLK_DIV3) {
-		temp = readl(reg_hsys_hp_clsk);
-		writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(AP_CLK_DIV3), reg_hsys_hp_clsk);
-		/* Make Sure APPLL is half */
-		if (ap_clk_pre_div == HSYS_GET_CKD_AP(readl(reg_hsys_hp_clsk))) {
-			writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(AP_CLK_DIV3), reg_hsys_hp_clsk);
-		}
-	}
-
-	gic_freq_unlock_irqrestore(flags);
-}
-
-/*restore AP frequency to ap_pll*/
-static void gic_freq_restore(void)
-{
-	uint32_t temp;
-	unsigned long flags;
-	atomic_t *data = &gic_atomic_data;
-
-	/* if not A-cut, no need workaround */
-	if (soc_cut_version != 0) {
-		return;
-	}
-
-	gic_freq_lock_irqsave(flags);
-
-	atomic_dec(data);
-	dmb();
-
-	if ((atomic_read(data) == 0) && (ap_clk_pre_div < AP_CLK_DIV3)) {
-		temp = readl(reg_hsys_hp_clsk);
-		writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(ap_clk_pre_div), reg_hsys_hp_clsk);
-	}
-
-	gic_freq_unlock_irqrestore(flags);
-}
-#else
-#define gic_freq_init()      do { } while(0)
-#define gic_freq_switch()    do { } while(0)
-#define gic_freq_restore()   do { } while(0)
-#endif
+#endif // RTL8730E_GIC_WORKAROUND
 
 union gic_base {
 	void __iomem *common_base;
@@ -239,6 +159,150 @@ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
 static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
 
 static struct gic_kvm_info gic_v2_kvm_info;
+
+#ifdef RTL8730E_GIC_WORKAROUND
+
+__attribute__((aligned(64)))
+static atomic_t gic_atomic_data;
+static u32 ap_clk_pre_div;
+static u32 soc_cut_version;
+
+static void __iomem *reg_hsys_hp_clsk;
+
+#endif // RTL8730E_GIC_WORKAROUND
+
+//#define REG_LSYS_SCAN_CTRL           0x274UL
+#define LSYS_MASK_CHIP_INFO_EN      ((u32)0x0000000F << 28)
+#define LSYS_CHIP_INFO_EN(x)        ((u32)((x) & 0x0000000F) << 28)
+#define LSYS_GET_RL_VER(x)          ((u32)(((x >> 16) & 0x0000000F)))
+#define LSYS_GET_RL_NO(x)           ((u32)(((x >> 0) & 0x0000FFFF)))
+
+static void __iomem *reg_lsys_scan_ctrl;
+
+int rtk_misc_get_rl_version(void)
+{
+	int result = -1;
+	u32 value;
+	u32 value32;
+
+	if (reg_lsys_scan_ctrl != NULL) {
+		/* Set LSYS_CHIP_INFO_EN register to get ChipInfo */
+		value = readl(reg_lsys_scan_ctrl);
+		value &= ~(LSYS_MASK_CHIP_INFO_EN);
+		value |= LSYS_CHIP_INFO_EN(0xA);
+		writel(value, reg_lsys_scan_ctrl);
+
+		/* Clear LSYS_CHIP_INFO_EN register */
+		value32 = readl(reg_lsys_scan_ctrl);
+		value &= ~(LSYS_MASK_CHIP_INFO_EN);
+		writel(value, reg_lsys_scan_ctrl);
+
+		result = (int)(LSYS_GET_RL_VER(value32));
+	}
+
+	return result;
+}
+
+EXPORT_SYMBOL(rtk_misc_get_rl_version);
+
+int rtk_misc_get_rl_number(void)
+{
+	int result = -1;
+	u32 value;
+	u32 value32;
+
+	if (reg_lsys_scan_ctrl != NULL) {
+		/* Set LSYS_CHIP_INFO_EN register to get ChipInfo */
+		value = readl(reg_lsys_scan_ctrl);
+		value &= ~(LSYS_MASK_CHIP_INFO_EN);
+		value |= LSYS_CHIP_INFO_EN(0xA);
+		writel(value, reg_lsys_scan_ctrl);
+
+		/* Clear LSYS_CHIP_INFO_EN register */
+		value32 = readl(reg_lsys_scan_ctrl);
+		value &= ~(LSYS_MASK_CHIP_INFO_EN);
+		writel(value, reg_lsys_scan_ctrl);
+
+		result = (int)(LSYS_GET_RL_NO(value32));
+	}
+
+	return result;
+}
+
+EXPORT_SYMBOL(rtk_misc_get_rl_number);
+
+#ifdef RTL8730E_GIC_WORKAROUND
+
+static void gic_freq_init(void)
+{
+	u32 reg;
+	atomic_t *data = &gic_atomic_data;
+
+	atomic_set(data, 0);
+	soc_cut_version = rtk_misc_get_rl_version();
+	reg = readl(reg_hsys_hp_clsk);
+	ap_clk_pre_div = HSYS_GET_CKD_AP(reg);
+}
+
+/* switch AP frequency to ap_pll/2, this function shall be called from privileged mode */
+static void gic_freq_switch(void)
+{
+	u32 temp;
+	unsigned long flags;
+	atomic_t *data = &gic_atomic_data;
+
+	/* if not A-cut, no need workaround */
+	if (soc_cut_version != RTK_CUT_VERSION_A) {
+		return;
+	}
+
+	gic_freq_lock_irqsave(flags);
+
+	atomic_inc(data);
+	dmb();
+
+	/* if div is 1 or 2, then div 3 to access gic */
+	if (ap_clk_pre_div < AP_CLK_DIV3) {
+		temp = readl(reg_hsys_hp_clsk);
+		writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(AP_CLK_DIV3), reg_hsys_hp_clsk);
+		/* Make Sure APPLL is half */
+		if (ap_clk_pre_div == HSYS_GET_CKD_AP(readl(reg_hsys_hp_clsk))) {
+			writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(AP_CLK_DIV3), reg_hsys_hp_clsk);
+		}
+	}
+
+	gic_freq_unlock_irqrestore(flags);
+}
+
+/*restore AP frequency to ap_pll*/
+static void gic_freq_restore(void)
+{
+	uint32_t temp;
+	unsigned long flags;
+	atomic_t *data = &gic_atomic_data;
+
+	/* if not A-cut, no need workaround */
+	if (soc_cut_version != RTK_CUT_VERSION_A) {
+		return;
+	}
+
+	gic_freq_lock_irqsave(flags);
+
+	atomic_dec(data);
+	dmb();
+
+	if ((atomic_read(data) == 0) && (ap_clk_pre_div < AP_CLK_DIV3)) {
+		temp = readl(reg_hsys_hp_clsk);
+		writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(ap_clk_pre_div), reg_hsys_hp_clsk);
+	}
+
+	gic_freq_unlock_irqrestore(flags);
+}
+#else
+#define gic_freq_init()      do { } while(0)
+#define gic_freq_switch()    do { } while(0)
+#define gic_freq_restore()   do { } while(0)
+#endif
 
 #ifdef CONFIG_GIC_NON_BANKED
 static void __iomem *gic_get_percpu_base(union gic_base *base)
@@ -1437,9 +1501,9 @@ static void gic_teardown(struct gic_chip_data *gic)
 #ifdef RTL8730E_GIC_WORKAROUND
 	if (reg_hsys_hp_clsk)
 		iounmap(reg_hsys_hp_clsk);
-	if (reg_lsys_system_cfg0)
-		iounmap(reg_lsys_system_cfg0);
 #endif
+	if (reg_lsys_scan_ctrl)
+		iounmap(reg_lsys_scan_ctrl);
 }
 
 #ifdef CONFIG_OF
@@ -1555,13 +1619,13 @@ static int gic_of_setup(struct gic_chip_data *gic, struct device_node *node)
 	if (WARN(!gic->raw_cpu_base, "unable to map gic cpu registers\n"))
 		goto error;
 
+	reg_lsys_scan_ctrl = of_iomap(node, 3);
+	if (WARN(!reg_lsys_scan_ctrl, "unable to map reg_lsys_scan_ctrl register for gic\n"))
+		goto error;
+
 #ifdef RTL8730E_GIC_WORKAROUND
 	reg_hsys_hp_clsk = of_iomap(node, 2);
 	if (WARN(!reg_hsys_hp_clsk, "unable to map reg_hsys_hp_clsk register for gic\n"))
-		goto error;
-
-	reg_lsys_system_cfg0 = of_iomap(node, 3);
-	if (WARN(!reg_lsys_system_cfg0, "unable to map reg_lsys_system_cfg0 register for gic\n"))
 		goto error;
 
 	gic_freq_init();

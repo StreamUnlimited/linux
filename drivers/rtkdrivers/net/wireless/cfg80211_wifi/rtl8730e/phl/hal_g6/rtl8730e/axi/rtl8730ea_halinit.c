@@ -391,34 +391,36 @@ void hal_config_int_8730ea(struct hal_info_t *hal, enum rtw_phl_config_int int_m
 
 	switch (int_mode) {
 #ifdef RTW_PHL_BCN_IOT
-	case RTW_PHL_EN_AP_MODE_INT:
+	case RTW_PHL_EN_P0_AP_MODE_INT:
 		hal_com->int_mask[2] |= BIT_BCNERLY0_INT;
-#ifdef CONFIG_CONCURRENT_MODE
-		hal_com->int_mask[2] |= BIT_BCNERLY8_INT_EN;
-#endif
 		break;
-	case RTW_PHL_DIS_AP_MODE_INT:
+	case RTW_PHL_DIS_P0_AP_MODE_INT:
 		hal_com->int_mask[2] &= ~BIT_BCNERLY0_INT;
-#ifdef CONFIG_CONCURRENT_MODE
-		hal_com->int_mask[2] &= ~BIT_BCNERLY8_INT_EN;
-#endif
 		break;
-	case RTW_PHL_EN_TX_BCN_INT:
+	case RTW_PHL_EN_P0_TX_BCN_INT:
 		hal_com->int_mask[0] |= (BIT_TXBCN1_ERR_INT_EN
 					| BIT_TXBCN1_OK_INT_EN);
-#ifdef CONFIG_CONCURRENT_MODE
-		hal_com->int_mask[2] |= (BIT_TXBCNERR9_INT
-					| BIT_TXBCNOK9_INT);
-#endif
 		break;
-	case RTW_PHL_DIS_TX_BCN_INT:
+	case RTW_PHL_DIS_P0_TX_BCN_INT:
 		hal_com->int_mask[0] &= ~(BIT_TXBCN1_ERR_INT_EN
 					| BIT_TXBCN1_OK_INT_EN);
+		break;
 #ifdef CONFIG_CONCURRENT_MODE
+	case RTW_PHL_EN_P1_AP_MODE_INT:
+		hal_com->int_mask[2] |= BIT_BCNERLY8_INT_EN;
+		break;
+	case RTW_PHL_DIS_P1_AP_MODE_INT:
+		hal_com->int_mask[2] &= ~BIT_BCNERLY8_INT_EN;
+		break;
+	case RTW_PHL_EN_P1_TX_BCN_INT:
+		hal_com->int_mask[2] |= (BIT_TXBCNERR9_INT
+					| BIT_TXBCNOK9_INT);
+		break;
+	case RTW_PHL_DIS_P1_TX_BCN_INT:
 		hal_com->int_mask[2] &= ~(BIT_TXBCNERR9_INT
 					 | BIT_TXBCNOK9_INT);
-#endif
 		break;
+#endif
 #endif
 	default:
 		PHL_WARN("Not support interrupt mode %d.\n", int_mode);
@@ -562,7 +564,7 @@ static u32 hal_rx_handler_8730ea(struct hal_info_t *hal, u32 *handled)
 	u32 ret = 0;
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
 	static const u32 rx_handle_irq0 = (BIT_RXFF_FULL_INT_EN);
-	static const u32 rx_handle_irq1 = (IMR_ROK_8730E | IMR_RDU_8730E);
+	static const u32 rx_handle_irq1 = (IMR_ROK_8730E /*| IMR_RDU_8730E*/);
 	u32	handled0 = (hal_com->int_array[0] & rx_handle_irq0);
 	u32	handled1 = (hal_com->int_array[1] & rx_handle_irq1);
 
@@ -731,7 +733,7 @@ void hal_rx_int_restore_8730ea(struct hal_info_t *hal)
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
 
 	hal_com->int_mask[0] |= (BIT_RXFF_FULL_INT_EN);
-	hal_com->int_mask[1] |= (IMR_ROK_8730E | IMR_RDU_8730E);
+	hal_com->int_mask[1] |= (IMR_ROK_8730E /*| IMR_RDU_8730E*/);
 #ifndef CONFIG_SYNC_INTERRUPT
 	hal_write32(hal_com, REG_HIMR0, hal_com->int_mask[0]);
 	hal_write32(hal_com, REG_AXI_INTERRUPT_MASK, hal_com->int_mask[1]);

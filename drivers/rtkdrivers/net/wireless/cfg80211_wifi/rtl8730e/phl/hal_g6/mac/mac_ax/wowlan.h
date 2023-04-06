@@ -49,7 +49,7 @@
 struct keep_alive {
 	u32 keepalive_en: 1;
 	u32 rsvd0: 7;
-	u32 packet_id: 8;
+	u32 packet_type: 8;
 	u32 period: 8;
 	u32 mac_id: 8;
 };
@@ -120,9 +120,7 @@ struct wow_global {
 	u32 mac_id: 8;
 	u32 pairwise_sec_algo: 8;
 	u32 group_sec_algo: 8;
-	u32 remotectrl_info_content;
-	u32 remotectrl_info_more[sizeof(struct
-					mac_ax_remotectrl_info_parm_) / 4 - 1];
+	u8 rmcl_info_c[sizeof(struct mac_ax_remotectrl_info_parm_)];
 };
 
 /**

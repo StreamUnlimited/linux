@@ -118,3 +118,7 @@
 &timer5{
 	wakeup-source;
 };
+
+&usb {
+	dr_mode = "otg"; // "host", "peripheral", "otg"
+};

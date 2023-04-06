@@ -44,8 +44,6 @@
 #define REG_CKE_GRP1  0x218
 #define CKE_WMAC BIT(5)
 
-#define REG_SCAN_CTRL  0x274
-
 #define REG_SYSTEM_CFG0  0x27c
 #define PTRP_OTPBYP    BIT(16)
 
@@ -109,6 +107,20 @@
 #define WLAFE_ANAPAR_DCK_1 (WLAFE_BASE + 0x30)
 #define WLAFE_ANAPAR_DCK_2 (WLAFE_BASE + 0x34)
 #define WLAFE_ANAPAR_DCK_3 (WLAFE_BASE + 0x38)
+
+/** @defgroup WLAFE_ANAPAR_RFC
+ * @brief
+ * @{
+ **/
+#define WLAFE_BIT_R_RFAFE_VIO1833_SEL        ((u32)0x00000001 << 10)          /*!<R/W 0  IND_VIO1833 output decided by: 1: 1.8V 0: 3.3V */
+#define WLAFE_MASK_R_WLRFC_PWC_ST            ((u32)0x00000003 << 8)          /*!<R/W 01  stable time select for WLRFC power cut 2'b00:40us, 2'b01:50us, 2'b10:100us, 2'b11:200us */
+#define WLAFE_R_WLRFC_PWC_ST(x)              ((u32)(((x) & 0x00000003) << 8))
+#define WLAFE_GET_R_WLRFC_PWC_ST(x)          ((u32)(((x >> 8) & 0x00000003)))
+#define WLAFE_MASK_ANAPOW_RFC                ((u32)0x000000FF << 0)          /*!<R/W 0  wlan power rf control */
+#define WLAFE_ANAPOW_RFC(x)                  ((u32)(((x) & 0x000000FF) << 0))
+#define WLAFE_GET_ANAPOW_RFC(x)              ((u32)(((x >> 0) & 0x000000FF)))
+/** @} */
+
 
 /** @defgroup WLAFE_WLRFC_CTRL
  * @brief
@@ -2833,10 +2845,8 @@ enum mac_ax_qta_mode {
 enum mac_ax_pkt_t {
 	MAC_AX_PKT_DATA,
 	MAC_AX_PKT_MGNT,
-	MAC_AX_PKT_CTRL,
-	MAC_AX_PKT_8023,
 	MAC_AX_PKT_H2C,
-	MAC_AX_PKT_FWDL,
+	MAC_AX_PKT_CTRL,
 	MAC_AX_PKT_C2H,
 	MAC_AX_PKT_PHYSTS,
 	MAC_AX_PKT_CH_INFO,
@@ -5039,6 +5049,19 @@ struct halmac_hw_cfg_info {
 };
 
 
+enum rtw_sch_txen_cfg {
+	RTW_TXEN_VO = 1 << 0,
+	RTW_TXEN_VI = 1 << 1,
+	RTW_TXEN_BE = 1 << 2,
+	RTW_TXEN_BK = 1 << 3,
+	RTW_TXEN_MG = 1 << 4,
+	RTW_TXEN_HI = 1 << 5,
+	RTW_TXEN_BCN = 1 << 6,
+	RTW_TXEN_CPUMG = 1 << 7,
+	RTW_TXEN_DRV_MASK = 0x19FF,
+	RTW_TXEN_ALL = 0xFFFF,
+};
+
 /**
  * @struct mac_ax_sch_tx_en
  * @brief mac_ax_sch_tx_en
@@ -5085,11 +5108,6 @@ struct mac_ax_sch_tx_en {
 	u8 hiq: 1;
 	u8 bcnq: 1;
 	u8 cpumgnt: 1;
-	u8 ul: 1;
-	u8 twt0: 1;
-	u8 twt1: 1;
-	u8 twt2: 1;
-	u8 twt3: 1;
 };
 
 /**
@@ -7773,6 +7791,7 @@ struct mac_ax_pkt_ofld_info {
 	u8 btqosnull_page;
 	u8 cts2self_page;
 	u8 ltecoexqosnull_page;
+	u8 arp_rsp_page;
 	u8 last_op;
 };
 
@@ -7826,6 +7845,7 @@ struct mac_ax_general_pkt_ids {
 	u8 cts2self;
 	u8 probereq;
 	u8 apcsa;
+	u8 arp_rsp;
 };
 
 /**
@@ -9037,14 +9057,11 @@ struct mac_ax_ch_busy_cnt_ref {
  * Please Place Description here.
  */
 struct mac_ax_tx_queue_empty {
-#define WDE_QEMPTY_ACQ_NUM_MAX 16 /* shall be the max num of all chip */
+#define WDE_QEMPTY_ACQ_NUM_MAX 8 /* shall be the max num of all chip */
 	u8 macid_txq_empty[WDE_QEMPTY_ACQ_NUM_MAX];
-	u8 band0_mgnt_empty: 1;
-	u8 band1_mgnt_empty: 1;
-	u8 fw_txq_empty: 1;
-	u8 h2c_empty: 1;
+	u8 mgnt_empty: 1;
 	u8 others_empty: 1;
-	u8 rsvd: 3;
+	u8 rsvd: 6;
 };
 
 /**
@@ -11646,7 +11663,7 @@ struct mac_ax_ie_cam_info {
  * Please Place Description here.
  * @var mac_ax_keep_alive_info::rsvd
  * Please Place Description here.
- * @var mac_ax_keep_alive_info::packet_id
+ * @var mac_ax_keep_alive_info::packet_type
  * Please Place Description here.
  * @var mac_ax_keep_alive_info::period
  * Please Place Description here.
@@ -11654,7 +11671,7 @@ struct mac_ax_ie_cam_info {
 struct mac_ax_keep_alive_info {
 	u8 keepalive_en: 1;
 	u8 rsvd: 7;
-	u8 packet_id;
+	u8 packet_type;
 	u8 period;
 };
 
@@ -11795,7 +11812,6 @@ struct mac_ax_wow_wake_info {
 	u8 rsvd: 5;
 	enum mac_ax_enc_alg pairwise_sec_algo;
 	enum mac_ax_enc_alg group_sec_algo;
-	u32 remotectrl_info_content;
 	u8 pattern_match_en: 1;
 	u8 magic_en: 1;
 	u8 hw_unicast_en: 1;
@@ -16522,6 +16538,8 @@ struct mac_ax_ops {
 	u32(*remove_role)(struct mac_ax_adapter *adapter, u8 macid);
 	u32(*change_role)(struct mac_ax_adapter *adapter,
 			  struct mac_ax_role_info *info);
+	u32(*cfg_macid)(struct mac_ax_adapter *adapter,
+			struct rtw_phl_stainfo_t *sta);
 	u32(*pwr_switch)(struct mac_ax_adapter *adapter, u8 on);
 	u32(*pre_sys_init)(struct mac_ax_adapter *adapter);
 	u32(*sys_init)(struct mac_ax_adapter *adapter);
@@ -16530,8 +16548,8 @@ struct mac_ax_ops {
 	u32(*cfg_sec)(struct mac_ax_adapter *adapter,
 		      struct halmac_security_setting *set);
 	void(*init_pwr_reg)(struct mac_ax_adapter *adapter,
-			     bool is_form_folder, u32 folder_len,
-			     u32 *folder_array);
+			    bool is_form_folder, u32 folder_len,
+			    u32 *folder_array);
 #if MAC_AX_AXI_SUPPORT
 	u32(*enable_fw)(struct mac_ax_adapter *adapter, u8 enable);
 	u32(*send_h2c_hmebox)(struct mac_ax_adapter *adapter, u8 *h2c);
@@ -16877,6 +16895,7 @@ struct mac_ax_ops {
 		      u8 enable);
 	u32(*chk_leave_ips)(struct mac_ax_adapter *adapter, u8 macid);
 	u32(*ps_notify_wake)(struct mac_ax_adapter *adapter);
+	u32(*ps_set_32k)(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack);
 	u32(*cfg_ps_advance_parm)(struct mac_ax_adapter *adapter,
 				  struct mac_ax_ps_adv_parm *parm);
 	u32(*periodic_wake_cfg)(struct mac_ax_adapter *adapter,

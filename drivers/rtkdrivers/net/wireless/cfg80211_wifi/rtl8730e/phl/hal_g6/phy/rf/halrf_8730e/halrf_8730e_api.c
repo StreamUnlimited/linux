@@ -43,18 +43,20 @@ u8 halrf_get_thermal_8730e(struct rf_info *rf, enum rf_path rf_path)
 		}
 
 		RF_DBG(rf, DBG_RF_THER_TRIM, "Ther_A=0x%x, ther_ofst_lsb=0x%x\n", thermal, rf->ther_ofst_lsb);
+
 	}
 
 	return thermal;
 }
 
-u32 halrf_mac_get_pwr_reg_8730e(struct rf_info *rf, enum phl_phy_idx phy,
+u32 halrf_mac_get_pwr_reg_8730e(struct rf_info *rf,
 				u32 addr, u32 mask)
 {
 	struct rtw_hal_com_t *hal = rf->hal_com;
 	u32 result, ori_val, bit_shift, reg_val;
 
-	result = rtw_hal_mac_get_pwr_reg(hal, phy, addr, &ori_val);
+	result = rtw_hal_mac_get_pwr_reg(hal, HW_PHY_0, addr, &ori_val);
+
 	if (result)
 		RF_WARNING("=======>%s Get MAC(0x%x) fail, error code=%d\n",
 			   __func__, addr, result);
@@ -68,14 +70,16 @@ u32 halrf_mac_get_pwr_reg_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	return reg_val;
 }
 
-u32 halrf_mac_set_pwr_reg_8730e(struct rf_info *rf, enum phl_phy_idx phy,
+u32 halrf_mac_set_pwr_reg_8730e(struct rf_info *rf,
 				u32 addr, u32 mask, u32 val)
 {
 	struct rtw_hal_com_t *hal = rf->hal_com;
-	u32 result;
+	u32 result = 0;
 
-	result = rtw_hal_mac_write_msk_pwr_reg(hal, phy, addr, mask, val);
+	result = rtw_hal_mac_write_msk_pwr_reg(hal, HW_PHY_0, addr, mask, val);
+
 	if (result) {
+
 		RF_WARNING("=======>%s Set MAC(0x%x[0x%08x]) fail, error code=%d\n",
 			   __func__, addr, mask, result);
 		return false;
@@ -88,14 +92,16 @@ u32 halrf_mac_set_pwr_reg_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 
 bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val)
 {
+#ifdef	RFDBG_TRACE_EN
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	u32 result;
 	s32 tmp_pwr;
-	u8 phy = 0;
 	u32 all_time_control = 0;
 	u32 gnt_bt_control = 0;
+#endif
 
 	return false;
+#ifdef	RFDBG_TRACE_EN
 	RF_DBG(rf, DBG_RF_POWER, "=======>%s\n", __func__);
 
 	all_time_control = tx_power_val & 0xffff;
@@ -157,7 +163,7 @@ bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val)
 
 	if (pwr->coex_pwr_ctl_enable == false && pwr->dpk_pwr_ctl_enable == false) {
 		/*all-time control Disable*/
-		result = halrf_mac_set_pwr_reg_8730e(rf, phy, 0xd200, 0xfffffc00, 0x0);
+		result = halrf_mac_set_pwr_reg_8730e(rf, 0xd200, 0xfffffc00, 0x0);
 
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd200) fail, error code=%d\n",
@@ -169,7 +175,7 @@ bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val)
 		}
 	} else {
 		/*all-time control*/
-		result = halrf_mac_set_pwr_reg_8730e(rf, phy, 0xd200, 0xfffffc00, ((tmp_pwr & 0x1ff) | BIT(9)));
+		result = halrf_mac_set_pwr_reg_8730e(rf, 0xd200, 0xfffffc00, ((tmp_pwr & 0x1ff) | BIT(9)));
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd200) fail, error code=%d\n",
 				   __func__, result);
@@ -186,8 +192,8 @@ bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val)
 		RF_DBG(rf, DBG_RF_POWER, "=======>%s   gnt_bt_control = 0x%x\n",
 		       __func__, gnt_bt_control);
 
-		result = halrf_mac_set_pwr_reg_8730e(rf, phy, 0xd220, BIT(1), 0x0);
-		result = halrf_mac_set_pwr_reg_8730e(rf, phy, 0xd220, 0xfffff007, 0x0);
+		result = halrf_mac_set_pwr_reg_8730e(rf, 0xd220, BIT(1), 0x0);
+		result = halrf_mac_set_pwr_reg_8730e(rf, 0xd220, 0xfffff007, 0x0);
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd220) fail, error code=%d\n",
 				   __func__, result);
@@ -202,8 +208,8 @@ bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val)
 		RF_DBG(rf, DBG_RF_POWER, "=======>%s   gnt_bt_control = 0x%x\n",
 		       __func__, gnt_bt_control);
 
-		result = halrf_mac_set_pwr_reg_8730e(rf, phy, 0xd220, BIT(1), 0x1);
-		result = halrf_mac_set_pwr_reg_8730e(rf, phy, 0xd220, 0xfffff007, ((gnt_bt_control & 0x1ff) << 3));
+		result = halrf_mac_set_pwr_reg_8730e(rf, 0xd220, BIT(1), 0x1);
+		result = halrf_mac_set_pwr_reg_8730e(rf, 0xd220, 0xfffff007, ((gnt_bt_control & 0x1ff) << 3));
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd220) fail, error code=%d\n",
 				   __func__, result);
@@ -215,8 +221,10 @@ bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val)
 	}
 
 	return true;
+#endif
 }
 
+#if 0
 s8 halrf_get_ther_protected_threshold_8730e(struct rf_info *rf)
 {
 	u8 tmp;
@@ -232,70 +240,84 @@ s8 halrf_get_ther_protected_threshold_8730e(struct rf_info *rf)
 	}
 }
 
-s8 halrf_xtal_tracking_offset_8730e(struct rf_info *rf,
-				    enum phl_phy_idx phy)
+s8 halrf_xtal_tracking_offset_8730e(struct rf_info *rf)
 {
 	struct halrf_xtal_info *xtal_trk = &rf->xtal_track;
-	u8 thermal_a = 0xff, thermal_b = 0xff;
-	u8 tmp_a, tmp_b, tmp;
-	s8 xtal_ofst = 0;
+	u8	thermal_a = 0xff, xtal_efuse = 0xff;
+	u8	tmp_a, tmp;
+	s8	xtal_ofst = 0, xtal_cap;
+	u32	xtal_val;
+	s8	delta_swing_xtal_mp_p_8730e[DELTA_SWINGIDX_SIZE] = {
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 15,
+		20, 25, 25, 25, 25, 30, 30, 30, 30, 30, 30, 30, 30, 30
+	};
+	s8	delta_swing_xtal_mp_n_8730e[DELTA_SWINGIDX_SIZE] = {
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5,
+		-9, -13, -17, -20, -24, -27, -30, -30, -30, -30, -30, -30, -30, -30
+	};
 
-	return 0;
-	RF_DBG(rf, DBG_RF_XTAL_TRACK, "======>%s   phy=%d\n",
-	       __func__, phy);
+	//return 0;
+	//RF_DBG(rf, DBG_RF_XTAL_TRACK, "======>%s\n", __func__);
 
 	tmp_a = halrf_get_thermal(rf, RF_PATH_A);
-	tmp_b = halrf_get_thermal(rf, RF_PATH_B);
 	halrf_efuse_get_info(rf, EFUSE_INFO_RF_THERMAL_A, &thermal_a, 1);
-	halrf_efuse_get_info(rf, EFUSE_INFO_RF_THERMAL_B, &thermal_b, 1);
+	halrf_efuse_get_info(rf, EFUSE_INFO_RF_XTAL, &xtal_efuse, 1);
 
-	if (thermal_a == 0xff || thermal_b == 0xff ||
-	    thermal_a == 0x0 || thermal_b == 0x0) {
-		RF_DBG(rf, DBG_RF_XTAL_TRACK, "======>%s PG ThermalA=%d ThermalB=%d\n",
-		       __func__, thermal_a, thermal_b);
+	if (thermal_a == 0xff || thermal_a == 0x0) {
+		RF_DBG(rf, DBG_RF_XTAL_TRACK, "======>%s PG ThermalA=%d\n",
+		       __func__, thermal_a);
 		return 0;
 	}
 
-	if (tmp_a > tmp_b) {
-		if (tmp_a > thermal_a) {
-			tmp = tmp_a - thermal_a;
-			if (tmp > DELTA_SWINGIDX_SIZE) {
-				tmp = DELTA_SWINGIDX_SIZE - 1;
-			}
-			xtal_ofst = xtal_trk->delta_swing_xtal_table_idx_p[tmp];
-		} else {
-			tmp = thermal_a - tmp_a;
-			if (tmp > DELTA_SWINGIDX_SIZE) {
-				tmp = DELTA_SWINGIDX_SIZE - 1;
-			}
-			xtal_ofst = xtal_trk->delta_swing_xtal_table_idx_n[tmp];
+	if (tmp_a > thermal_a) {
+		tmp = (tmp_a - thermal_a) / 3;
+		if (tmp > DELTA_SWINGIDX_SIZE) {
+			tmp = DELTA_SWINGIDX_SIZE - 1;
 		}
+		xtal_ofst = delta_swing_xtal_mp_p_8730e[tmp];
 	} else {
-		if (tmp_b > thermal_b) {
-			tmp = tmp_b - thermal_b;
-			if (tmp > DELTA_SWINGIDX_SIZE) {
-				tmp = DELTA_SWINGIDX_SIZE - 1;
-			}
-			xtal_ofst = xtal_trk->delta_swing_xtal_table_idx_p[tmp];
-		} else {
-			tmp = thermal_b - tmp_b;
-			if (tmp > DELTA_SWINGIDX_SIZE) {
-				tmp = DELTA_SWINGIDX_SIZE - 1;
-			}
-			xtal_ofst = xtal_trk->delta_swing_xtal_table_idx_n[tmp];
+		tmp = (thermal_a - tmp_a) / 3;
+		if (tmp > DELTA_SWINGIDX_SIZE) {
+			tmp = DELTA_SWINGIDX_SIZE - 1;
 		}
+		xtal_ofst = delta_swing_xtal_mp_n_8730e[tmp];
 	}
 
-	RF_DBG(rf, DBG_RF_XTAL_TRACK, "PG ThermalA=%d   ThermalA=%d\n",
-	       thermal_a, tmp_a);
 
-	RF_DBG(rf, DBG_RF_XTAL_TRACK, "PG ThermalB=%d   ThermalB=%d\n",
-	       thermal_b, tmp_b);
+	xtal_trk-> xtal_offset_last = xtal_trk-> xtal_offset;
 
-	RF_DBG(rf, DBG_RF_XTAL_TRACK, "xtal_ofst[%d]=%d\n",
+	xtal_trk-> xtal_offset = xtal_ofst;
+
+	RF_DBG(rf, DBG_RF_XTAL_TRACK, "PG_ThermalA=%d  cur_ThermalA=%d, tmp = %d\n",
+	       thermal_a, tmp_a, tmp);
+
+	RF_DBG(rf, DBG_RF_XTAL_TRACK, "xtal_offset[%d]=%d\n",
 	       tmp, xtal_ofst);
+
+	if (xtal_trk-> xtal_offset_last == xtal_trk-> xtal_offset) {
+		RF_DBG(rf, DBG_RF_XTAL_TRACK, "======>xtal_offset did not change, return!\n");
+		return xtal_trk;
+	}
+
+	//xtal_cap = (s8)(((XTAL_BASE->XTAL_ANAPAR_XTAL_ON_0) & 0x00FE0000) >> 17) ;
+
+	xtal_cap = (s8)xtal_efuse + xtal_ofst;
+
+	RF_DBG(rf, DBG_RF_XTAL_TRACK, "xtal_cap =0x%x\n", xtal_cap);
+
+	if (xtal_cap < 0) {
+		xtal_cap = 0;
+	} else if (xtal_cap > 127) {
+		xtal_cap = 127;
+	}
+
+	xtal_val = ((u32) xtal_cap << 17) | ((u32) xtal_cap << 10);
+
+	XTAL_BASE->XTAL_ANAPAR_XTAL_ON_0 = (XTAL_BASE->XTAL_ANAPAR_XTAL_ON_0 & 0xFF0003FF) | xtal_val;
+
+	RF_DBG(rf, DBG_RF_XTAL_TRACK, "0x42008804 =0x%x\n", XTAL_BASE->XTAL_ANAPAR_XTAL_ON_0);
 
 	return xtal_ofst;
 }
-
+#endif
 #endif

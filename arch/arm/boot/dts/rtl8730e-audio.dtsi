@@ -22,6 +22,15 @@
 			rtk,sport-clock = <&rcc>;
 		};
 
+		// Cannot be enabled simultaneously with timer9 node
+		captimer: captimer@0x4100A200 {
+			compatible = "realtek,amebad2-captimer";
+			reg = <0x4100A200 0x200>,
+					<0x42008840 0x000040>;
+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_TIM9> ;
+		};
+
 		sport:sport@0x4100D000 {
 			compatible = "realtek,amebad2-sport";
 			reg = <0x4100D000 0x000984>;

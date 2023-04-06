@@ -445,6 +445,14 @@ static u32 role_info_to_hw(struct mac_ax_adapter *adapter,
 		return MACBADDR;
 	}
 
+	if (info->self_role == MAC_AX_SELF_ROLE_CLIENT) {
+		ret = p_ops->cfg_sta_aid(adapter, info->port, info->aid);
+		if (MACSUCCESS != ret) {
+			PLTFM_MSG_ERR("set sta aid faied.\n");
+			return MACBADDR;
+		}
+	}
+
 	return ret;
 }
 
@@ -552,11 +560,11 @@ u32 role_init(struct mac_ax_adapter *adapter,
 
 	pause.macid = info->macid;
 	pause.pause = 0;
-	/*
+
 	ret = set_macid_pause(adapter, &pause);
 	if (ret != MACSUCCESS)
 		return ret;
-	*/
+
 	/* The definition of wmm is different between MAC & drivers
 	 * MAC HW use wmm 0~3 to indicate
 	 * phy0-wmm0, phy0-wmm1, phy1-wmm0, phy1-wmm1 correspondingly.

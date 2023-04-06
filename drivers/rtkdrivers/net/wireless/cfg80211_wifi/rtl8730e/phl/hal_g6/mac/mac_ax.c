@@ -15,6 +15,7 @@
 
 #include "mac_ax.h"
 #include "mac_ax/mac_priv.h"
+#include "misc/realtek-misc.h"
 
 #define CHIP_ID_HW_DEF_8730E	0x6678
 
@@ -199,26 +200,15 @@ static u32 get_chip_info(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 			 enum mac_ax_intf intf, u16 *id, u8 *cv)
 {
 	u16 cur_id;
-	u32 val32;
 
 	if (!cv || !id) {
 		return MACNPTR;
 	}
 
-	/*0x42008274[31:28]=0xA, rl_ver/rl_no can be read out*/
-	val32 = pltfm_cb->sys_reg_r32(drv_adapter, SYSTEM_CTRL_BASE_LP,            \
-				      REG_SCAN_CTRL);
-	val32 |= (0xA << 28);
-	pltfm_cb->sys_reg_w32(drv_adapter, SYSTEM_CTRL_BASE_LP, REG_SCAN_CTRL,     \
-			      val32);
-
 	switch (intf) {
 #if MAC_AX_AXI_SUPPORT
 	case MAC_AX_INTF_AXI:
-		cur_id = pltfm_cb->sys_reg_r16(drv_adapter, SYSTEM_CTRL_BASE_LP,        \
-					       REG_SCAN_CTRL);
-		*cv = pltfm_cb->sys_reg_r8(drv_adapter, SYSTEM_CTRL_BASE_LP,           \
-					   REG_SCAN_CTRL + 2) & 0xF;
+		cur_id = rtk_misc_get_rl_number();
 		break;
 #endif
 	default:
@@ -228,6 +218,7 @@ static u32 get_chip_info(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 	switch (cur_id) {
 	case CHIP_ID_HW_DEF_8730E:
 		*id = MAC_AX_CHIP_ID_8730E;
+		*cv = rtk_misc_get_rl_version();
 		break;
 	default:
 		return MACCHIPID;

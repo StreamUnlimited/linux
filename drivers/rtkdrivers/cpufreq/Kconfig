@@ -2,6 +2,7 @@
 
 config CPUFREQ_RTK_AMEBA
 	tristate "CPU freq driver"
+	select CPU_FREQ
 	help
 	  This adds the CPUFreq driver support for Realtek Ameba SoCs
 	  which are capable of changing the CPU's frequency dynamically.

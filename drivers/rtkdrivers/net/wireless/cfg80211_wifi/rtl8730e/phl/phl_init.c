@@ -264,44 +264,6 @@ static enum rtw_phl_status phl_bcn_init(struct phl_info_t *phl_info)
 	}
 	_os_spinlock_init(phl_to_drvpriv(phl_info), &bcn_info->lock);
 	_os_spinlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
-	bcn_info->port = 0;
-	bcn_info->mbssid =0;
-	bcn_info->band = 0;
-	bcn_info->grp_ie_ofst = 0;
-	bcn_info->macid = 0;
-	bcn_info->ssn_sel = 0;
-	bcn_info->ssn_mode = 0;
-	bcn_info->rate_sel = 0;
-	bcn_info->txpwr = 0;
-	bcn_info->txinfo_ctrl_en = 0;
-	bcn_info->ntx_path_en = 0;
-	bcn_info->path_map_a = 0;
-	bcn_info->path_map_b = 0;
-	bcn_info->path_map_c = 0;
-	bcn_info->path_map_d = 0;
-	bcn_info->antsel_a = 0;
-	bcn_info->antsel_b = 0;
-	bcn_info->antsel_c = 0;
-	bcn_info->antsel_d = 0;
-	bcn_info->sw_tsf = 0;
-	bcn_info->csa_ofst = 0;
-	bcn_info->tx_bcn = false;
-	bcn_info->desc_len = TX_DESC_LEN;
-	bcn_info->desc_vir_addr = _os_shmem_alloc(phl_to_drvpriv(phl_info),
-						  (_dma *)&bcn_info->desc_phy_addr,
-						  0,
-						  bcn_info->desc_len,
-						  0,
-						  DMA_TO_DEVICE,
-						  0);
-	bcn_info->bcn_len = MAX_BCN_SIZE;
-	bcn_info->bcn_vir_addr = _os_shmem_alloc(phl_to_drvpriv(phl_info),
-						  (_dma *)&bcn_info->bcn_phy_addr,
-						  0,
-						  bcn_info->bcn_len,
-						  0,
-						  DMA_TO_DEVICE,
-						  0);
 
 	phl_com->bcn_info = bcn_info;
 	_os_spinunlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
@@ -323,23 +285,6 @@ static enum rtw_phl_status phl_bcn_deinit(struct phl_info_t *phl_info)
 	FUNCIN_WSTS(phl_status);
 
 	_os_spinlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
-	_os_shmem_free(phl_to_drvpriv(phl_info),
-		       bcn_info->bcn_vir_addr,
-		       (_dma *)&bcn_info->bcn_phy_addr,
-		       0,
-		       MAX_BCN_SIZE,
-		       0,
-		       DMA_TO_DEVICE,
-		       0);
-	_os_shmem_free(phl_to_drvpriv(phl_info),
-		       bcn_info->desc_vir_addr,
-		       (_dma *)&bcn_info->desc_phy_addr,
-		       0,
-		       TX_DESC_LEN,
-		       0,
-		       DMA_TO_DEVICE,
-		       0);
-	bcn_info->tx_bcn = false;
 	_os_spinunlock(phl_to_drvpriv(phl_info), &bcn_info->lock, _bh, NULL);
 	_os_spinlock_free(phl_to_drvpriv(phl_info), &bcn_info->lock);
 	_os_mem_free(phl_to_drvpriv(phl_info), bcn_info, sizeof(struct mac_ax_bcn_priv));
@@ -1875,7 +1820,7 @@ enum rtw_phl_status phl_wow_start(struct phl_info_t *phl_info, struct rtw_phl_st
 	struct rtw_phl_evt_ops *evt_ops = &phl_info->phl_com->evt_ops;
 #endif /* CONFIG_SYNC_INTERRUPT */
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s enter with sta state(%d)\n.", __func__, sta->wrole->mstate);
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s enter with sta state(%d).\n", __func__, sta->wrole->mstate);
 
 	phl_wow_decide_op_mode(wow_info, sta);
 
@@ -2009,7 +1954,7 @@ void phl_wow_stop(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta, u8
 		return;
 	}
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s enter with mac power %d\n.",
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s enter with mac power %d.\n",
 		  __func__, wow_info->mac_pwr);
 
 	if (wow_info->mac_pwr != RTW_MAC_PWR_OFF) {
@@ -2055,7 +2000,6 @@ void phl_wow_stop(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta, u8
 
 		phl_wow_deinit_precfg(wow_info);
 
-		rtw_hal_fw_dbg_dump(phl_info->hal);
 #ifdef CONFIG_POWER_SAVE
 		phl_wow_ps_pwr_ntfy(wow_info, false);
 		/* leave power saving */
@@ -2175,7 +2119,7 @@ enum rtw_phl_status rtw_phl_suspend(void *phl, struct rtw_phl_stainfo_t *sta, u8
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_SUCCESS;
 
-	PHL_INFO("%s enter with wow_en(%d)\n.", __func__, wow_en);
+	PHL_INFO("%s enter with wow_en(%d).\n", __func__, wow_en);
 #ifdef CONFIG_WOWLAN
 	pstatus = _phl_cmd_send_msg_phy_on(phl_info);
 	if (RTW_PHL_STATUS_SUCCESS != pstatus) {
@@ -2185,12 +2129,13 @@ enum rtw_phl_status rtw_phl_suspend(void *phl, struct rtw_phl_stainfo_t *sta, u8
 
 	if (wow_en) {
 		pstatus = phl_wow_start(phl_info, sta);
+		rtw_hal_ps_set_32k(phl_info->hal, true, true);
 	} else {
 		phl_cmd_role_suspend(phl_info);
 		rtw_phl_stop(phl);
 	}
 #else
-	PHL_INFO("%s enter with wow_en(%d)\n.", __func__, wow_en);
+	PHL_INFO("%s enter with wow_en(%d).\n", __func__, wow_en);
 
 	phl_cmd_role_suspend(phl_info);
 	rtw_phl_stop(phl);
@@ -2222,11 +2167,12 @@ enum rtw_phl_status rtw_phl_resume(void *phl, struct rtw_phl_stainfo_t *sta, u8 
 	 * "rtw_phl_resume" because core layer will not perform any other tasks when
 	 * calling rtw_phl_resume which is relatively simple enough.
 	 */
-	PHL_INFO("%s enter...\n.", __func__);
+	PHL_INFO("%s enter...\n", __func__);
 	SET_STATUS_FLAG(phl_info->phl_com->dev_state, RTW_DEV_RESUMING);
 
 #ifdef CONFIG_WOWLAN
 	if (wow_info->op_mode != RTW_WOW_OP_NONE) {
+		rtw_hal_ps_set_32k(phl_info->hal, false, true);
 		phl_wow_stop(phl_info, sta, hw_reinit);
 	} else {
 		pstatus = rtw_phl_start(phl);
@@ -2252,7 +2198,7 @@ enum rtw_phl_status rtw_phl_resume(void *phl, struct rtw_phl_stainfo_t *sta, u8 
 
 	CLEAR_STATUS_FLAG(phl_info->phl_com->dev_state, RTW_DEV_RESUMING);
 
-	PHL_INFO("%s exit with hw_reinit %d.\n.", __func__, *hw_reinit);
+	PHL_INFO("%s exit with hw_reinit %d.\n", __func__, *hw_reinit);
 
 	return pstatus;
 }

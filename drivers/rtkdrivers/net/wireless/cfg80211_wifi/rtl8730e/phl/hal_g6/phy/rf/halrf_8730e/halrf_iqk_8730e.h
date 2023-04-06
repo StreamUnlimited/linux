@@ -26,25 +26,20 @@
 #define __HALRF_IQK_8730EH__
 #ifdef RF_8730E_SUPPORT
 
-#define iqk_version_8730e 0x5
+#define iqk_version_8730e 0xc
 #define ss_8730e 1
-#define IQK_THR_ReK 8
+#define IQK_THR_ReK 0x20
 
 void iqk_init_8730e(struct rf_info *rf);
 void iqk_get_ch_info_8730e(struct rf_info *rf, enum phl_phy_idx phy, u8 path);
-bool iqk_mcc_page_sel_8730e(struct rf_info *rf, enum phl_phy_idx phy, u8 path);
 void iqk_macbb_setting_8730e(struct rf_info *rf, enum phl_phy_idx phy_idx, u8 path);
 void iqk_preset_8730e(struct rf_info *rf, u8 path);
 void iqk_start_iqk_8730e(struct rf_info *rf, enum phl_phy_idx phy_idx, u8 path);
 void iqk_restore_8730e(struct rf_info *rf, u8 path);
 void iqk_afebb_restore_8730e(struct rf_info *rf, enum phl_phy_idx phy_idx, u8 path);
-void halrf_iqk_toneleakage_8730e(struct rf_info *rf, u8 path);
 void halrf_iqk_track_8730e(struct rf_info *rf);
 bool halrf_iqk_get_ther_rek_8730e(struct rf_info *rf);
-void halrf_enable_fw_iqk_8730e(struct rf_info *rf, bool is_fw_iqk);
 u32 halrf_get_iqk_ver_8730e(void);
-u8 halrf_iqk_get_rxevm_8730e(struct rf_info *rf);
-u32 halrf_iqk_get_rximr_8730e(struct rf_info *rf, u8 path, u32 idx);
 
 #endif
 #endif /*  __HALRF_IQK_8730EH__ */

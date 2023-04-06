@@ -62,14 +62,22 @@ void halbb_set_crc32_cnt2_rate(struct bb_info *bb, u16 rate_idx)
 	}
 	if (is_vht_rate) {
 		rate_digi = halbb_rate_2_rate_digit(bb, rate_idx);
+#ifdef HALBB_COMPILE_ABOVE_2SS
 		ss = halbb_rate_to_num_ss(bb, rate_idx);
+#else
+		ss = 1;
+#endif
 		halbb_set_reg(bb, reg_addr, vht_mcs_bitmask, rate_digi);
 		halbb_set_reg(bb, reg_addr, vht_ss_bitmask, ss - 1);
 		usr_set->vht2_rate_idx = rate_idx;
 	}
 	if (is_he_rate) {
 		rate_digi = halbb_rate_2_rate_digit(bb, rate_idx);
+#ifdef HALBB_COMPILE_ABOVE_2SS
 		ss = halbb_rate_to_num_ss(bb, rate_idx);
+#else
+		ss = 1;
+#endif
 		halbb_set_reg(bb, reg_addr, he_mcs_bitmask, rate_digi);
 		halbb_set_reg(bb, reg_addr, he_ss_bitmask, ss - 1);
 		usr_set->he2_rate_idx = rate_idx;
@@ -625,7 +633,9 @@ void halbb_cnt_reg_reset(struct bb_info *bb)
 	halbb_set_reg_phy0_1(bb, cr->enable_all_cnt, cr->enable_all_cnt_m, 1);
 
 	/* @reset all bb hw cnt */
+#ifdef CONFIG_MP_INCLUDED
 	halbb_mp_reset_cnt(bb);
+#endif
 }
 
 void halbb_cck_cnt_statistics(struct bb_info *bb)
@@ -2031,7 +2041,9 @@ void halbb_pmac_cnt_reg_reset(struct bb_info *bb, bool cck_en)
 	halbb_set_reg_cmn(bb, cr->enable_all_cnt, cr->enable_all_cnt_m, 1, bb->bb_phy_idx);
 
 	/* @reset all bb hw cnt */
+#ifdef CONFIG_MP_INCLUDED
 	halbb_mp_cnt_reset(bb);
+#endif
 }
 
 void halbb_pmac_statistics(struct bb_info *bb)

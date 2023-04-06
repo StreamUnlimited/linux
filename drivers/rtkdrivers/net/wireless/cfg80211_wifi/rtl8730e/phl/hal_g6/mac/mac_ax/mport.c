@@ -1409,6 +1409,15 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 				      port, cfg_para.mbssid_idx, ret);
 			return ret;
 		}
+
+		/* set high queue to no limit mode */
+		cfg_para.val = 1;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_HIQ_NOLIMIT, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d mbid%d cfg hiq no limit %d\n",
+				      port, cfg_para.mbssid_idx, ret);
+			return ret;
+		}
 	}
 
 	if (port == MAC_AX_PORT_0) {

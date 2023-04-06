@@ -30,7 +30,7 @@ enum halrf_rfk_type {
 	RF_BTC_DACK		= 4,
 	RF_BTC_RXDCK		= 5,
 	RF_BTC_TSSI		= 6,
-	RF_BTC_CHLK		= 7
+	RF_BTC_NOTIFY		= 7
 };
 
 enum halrf_rfk_process {
@@ -77,6 +77,7 @@ enum halrf_event_func {
 /*@--------------------------[Prptotype]-------------------------------------*/
 struct rf_info;
 
+#ifndef IOT_SMALL_RAM
 u32 phlrf_psd_log2base(struct rf_info *rf, u32 val);
 
 void phlrf_rf_lna_setting(struct rf_info *rf, enum phlrf_lna_set type);
@@ -92,24 +93,28 @@ void halrf_reload_bkprf(struct rf_info *rf,
 			u32 bp[][4],
 			u32 reg_num,
 			u8 path_num);
-
-u8 halrf_kpath(struct rf_info *rf, enum phl_phy_idx phy_idx);
-
-void halrf_set_rx_path(struct rf_info *rf, enum phl_phy_idx phy, bool rx_path);
-
-void halrf_tmac_tx_pause(struct rf_info *rf, enum phl_phy_idx band_idx, bool pause);
+void halrf_bt_ultra_low_pwr_adv(struct rf_info *rf);
 
 void halrf_trigger_thermal(struct rf_info *rf);
 
 u8 halrf_only_get_thermal(struct rf_info *rf, enum rf_path path);
+
+void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index);
+
+void halrf_fast_chl_sw_reload(struct rf_info *rf, u8 chl_index, u8 t_index);
+#endif
+
+void halrf_dump_reg(struct rf_info *rf);
+
+u8 halrf_kpath(struct rf_info *rf, enum phl_phy_idx phy_idx);
+
+void halrf_tmac_tx_pause(struct rf_info *rf, enum phl_phy_idx band_idx, bool pause);
 
 void halrf_thermal_period(struct rf_info *rf);
 
 void halrf_btc_rfk_ntfy(struct rf_info *rf, u8 phy_map, enum halrf_rfk_type type,
 			enum halrf_rfk_process process);
 void halrf_fcs_init(struct rf_info *rf);
-void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index);
-void halrf_fast_chl_sw_reload(struct rf_info *rf, u8 chl_index, u8 t_index);
 
 /*FW Offload*/
 void halrf_write_fwofld_start(struct rf_info *rf);
@@ -121,5 +126,8 @@ void  halrf_quick_check_rf(void *rf_void);
 void halrf_mcc_info_init(void *rf_void, enum phl_phy_idx phy);
 void halrf_mcc_get_ch_info(void *rf_void, enum phl_phy_idx phy);
 void  halrf_watchdog_stop(struct rf_info *rf, bool is_stop);
+bool halrf_btc_rf_bton_para(struct rf_info *rf, bool bt_s1);
+bool halrf_btc_rf_switchband_para(struct rf_info *rf);
+
 
 #endif

@@ -79,24 +79,17 @@ u32 efuse_check_autoload(struct efuse_t *efuse)
 	return hal_status;
 }
 
-u32 efuse_hidden_handle(struct efuse_t *efuse)
-{
-	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-
-	hal_status = rtw_hal_mac_read_hidden_rpt(efuse->hal_com);
-
-	return hal_status;
-}
-
 enum rtw_hal_status efuse_set_hw_cap(struct efuse_t *efuse)
 {
 	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
 	struct rtw_hal_com_t *hal_com = efuse->hal_com;
+	struct rtw_phl_com_t *phl_com = efuse->phl_com;
 	u8 pkg_type = 0xFF;
 	u8 rfe_type = 0xFF;
 	u8 xcap = 0xFF;
 	u8 domain = 0xFF;
 	u8 rf_board_opt = 0xFF;
+	int i = 0;
 
 	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_PKG_TYPE, &pkg_type,
 				    sizeof(pkg_type));
@@ -123,21 +116,81 @@ enum rtw_hal_status efuse_set_hw_cap(struct efuse_t *efuse)
 				    sizeof(domain));
 
 	if (status != RTW_HAL_STATUS_SUCCESS) {
-		PHL_WARN("%s: Get domain fail! Status(%x)\n", __FUNCTION__, status);
+		PHL_WARN("%s: Get channel plan fail! Status(%x)\n", __FUNCTION__, status);
 	}
 
 	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_BOARD_OPTION, &rf_board_opt,
 				    sizeof(rf_board_opt));
 
 	if (status != RTW_HAL_STATUS_SUCCESS) {
-		PHL_WARN("%s: Get domain fail! Status(%x)\n", __FUNCTION__, status);
+		PHL_WARN("%s: Get board option fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_THERMAL, &phl_com->efuse_data.thermal_a,
+				    1);
+
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_WARN("%s: Get thermal fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_RX_GAIN_K_A_2G_CCK, &phl_com->efuse_data.rxgain_2g_cck,
+				    1);
+
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_WARN("%s: Get rx gain cck fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_RX_GAIN_K_A_2G_OFMD, &phl_com->efuse_data.rxgain_2g_ofdm,
+				    1);
+
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_WARN("%s: Get rx gain ofdm fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_RX_GAIN_K_A_5GL, &phl_com->efuse_data.rxgain_5gl,
+				    1);
+
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_WARN("%s: Get rx gain 5gl fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_RX_GAIN_K_A_5GM, &phl_com->efuse_data.rxgain_5gm,
+				    1);
+
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_WARN("%s: Get rx gain 5gm fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_RX_GAIN_K_A_5GH, &phl_com->efuse_data.rxgain_5gh,
+				    1);
+
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_WARN("%s: Get rx gain 5gh fail! Status(%x)\n", __FUNCTION__, status);
+	}
+
+	for (i = 0; i < 11; i++) {
+		status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_2G_CCK_C_TSSI_DE_1 + i, &phl_com->efuse_data.tssi_2g[i],
+					    1);
+		if (status != RTW_HAL_STATUS_SUCCESS) {
+			PHL_WARN("%s: Get 2g tssi %d fail! Status(%x)\n", __FUNCTION__, i, status);
+			break;
+		}
+	}
+
+	for (i = 0; i < 14; i++) {
+		status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_5G_BW40M_C_TSSI_DE_1 + i, &phl_com->efuse_data.tssi_5g[i],
+					    1);
+		if (status != RTW_HAL_STATUS_SUCCESS) {
+			PHL_WARN("%s: Get 5g tssi %d fail! Status(%x)\n", __FUNCTION__, i, status);
+			break;
+		}
 	}
 
 	//hal_com->dev_hw_cap.pkg_type = pkg_type;
-	//hal_com->dev_hw_cap.rfe_type = rfe_type;
+	hal_com->dev_hw_cap.rfe_type = rfe_type;
 	hal_com->dev_hw_cap.xcap = xcap;
 	hal_com->dev_hw_cap.domain = domain;
-	//hal_com->dev_hw_cap.rf_board_opt = rf_board_opt;
+	hal_com->dev_hw_cap.rf_board_opt = rf_board_opt;
 
 	return status;
 }
@@ -798,7 +851,6 @@ void rtw_efuse_process(void *efuse, char *ic_name)
 
 	debug_dump_data(efuse_info->shadow_map, efuse_info->log_efuse_size,
 			"Logical EFUSE MAP:");
-	//efuse_hidden_handle(efuse_info);
 
 	/*
 	 * We can set the hw cap after we got the shadow map.

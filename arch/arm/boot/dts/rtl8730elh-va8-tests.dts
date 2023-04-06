@@ -260,3 +260,7 @@
 	pinctrl-0 = <&uart2_pins>;
 	status = "okay";
 };
+
+&usb {
+	dr_mode = "otg"; // "host", "peripheral", "otg"
+};

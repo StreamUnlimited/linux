@@ -68,7 +68,7 @@ MODULE_DEVICE_TABLE(of, rtk_dt_match);
 
 static void rtk_ts_irq_disable(void)
 {
-	RTK_FUNC_ENTER();
+	//RTK_FUNC_ENTER();
 	if (!rtk_ts_data->irq_is_disable) {
 		disable_irq(rtk_ts_data->use_irq);
 		rtk_ts_data->irq_is_disable = 1;
@@ -78,7 +78,7 @@ static void rtk_ts_irq_disable(void)
 
 static void rtk_ts_irq_enable(void)
 {
-	RTK_FUNC_ENTER();
+	//RTK_FUNC_ENTER();
 	if (rtk_ts_data->irq_is_disable) {
 		enable_irq(rtk_ts_data->use_irq);
 		rtk_ts_data->irq_is_disable = 0;
@@ -481,7 +481,7 @@ err_irq_gpio_dir:
 		gpio_free(data->pdata->irq_gpio);
 	}
 
-	RTK_FUNC_EXIT();
+	//RTK_FUNC_EXIT();
 	return ret;
 }
 
@@ -712,7 +712,7 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 {
 	int ret = -1;
 	struct rtk_ts_data *ts_data = NULL;
-	RTK_FUNC_ENTER();
+	//RTK_FUNC_ENTER();
 
 	printk("I2C Address: 0x%02x\n", client->addr);
 
@@ -776,7 +776,7 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err_end;
 	}
 
-	printk("RTK Touch Panel Device Probe %s!", "PASS");
+	//printk("RTK Touch Panel Device Probe %s!", "PASS");
 	//RTK_FUNC_EXIT();
 	return 0;
 
@@ -804,7 +804,7 @@ err_end:
 		kfree(ts_data);
 	}
 
-	RTK_FUNC_EXIT();
+	//RTK_FUNC_EXIT();
 	return ret;
 }
 
@@ -814,7 +814,7 @@ static void rtk_ts_enter_sleep(struct i2c_client *client)
 	int retry = 0;
 	unsigned char buf[2];
 
-	RTK_FUNC_ENTER();
+	//RTK_FUNC_ENTER();
 
 	buf[0] = 0xD1;
 	buf[1] = 0x05;
@@ -833,7 +833,7 @@ static int rtk_ts_remove(struct i2c_client *client)
 {
 	struct rtk_ts_data *ts = i2c_get_clientdata(client);
 
-	RTK_FUNC_ENTER();
+	//RTK_FUNC_ENTER();
 
 	if (!ts) {
 		return -EINVAL;
@@ -882,7 +882,7 @@ static int __maybe_unused rtk_ts_suspend(struct device *dev)
 
 	rtk_ts_enter_sleep(client);
 
-	RTK_FUNC_EXIT();
+	//RTK_FUNC_EXIT();
 
 	return 0;
 }

@@ -24,6 +24,7 @@ void halrf_set_pseudo_cw(struct rf_info *rf, enum rf_path path,
 	halrf_wreg(rf, cw_addr[path], 0x000001FF, txagc_cw & 0x1ff);
 	halrf_wreg(rf, cw_addr[path], BIT(9), en);
 
+#ifdef	RFDBG_TRACE_EN
 	if (en)
 		RF_DBG(rf, DBG_RF_RFK,
 		       "[RFK] Set S%d Pseudo_CW RF:0x%x, BB:%d(x0.125)\n",
@@ -31,6 +32,7 @@ void halrf_set_pseudo_cw(struct rf_info *rf, enum rf_path path,
 	else
 		RF_DBG(rf, DBG_RF_RFK,
 		       "[RFK] Set S%d Pseudo_CW off!!\n", path);
+#endif
 }
 
 void halrf_set_plcp_usr_info(struct rf_info *rf, struct rf_plcp_param_t *plcp,
@@ -103,7 +105,6 @@ void halrf_set_plcp_para_info(struct rf_info *rf, struct rf_plcp_param_t *plcp,
 	plcp->tb_rsvd = 0; /*def*/
 
 	/*halrf_mem_cpy(rf, plcp->usr, rf->usr, 4*sizeof(struct rf_usr_plcp_gen_in));*/
-
 	RF_DBG(rf, DBG_RF_RFK,
 	       "[RFK] Set PLCP para (BW:%d, long_preamble:%d, GI:%d, PPDU:%d)\n",
 	       tx_info->bw, tx_info->long_preamble_en, tx_info->gi, tx_info->ppdu);
@@ -129,7 +130,6 @@ void halrf_set_pmac_tx(struct rf_info *rf, enum phl_phy_idx phy_idx,
 	if (enable) {
 		RF_DBG(rf, DBG_RF_RFK,
 		       "[RFK] Set S%d PMAC Tx (PHY%d)\n", path, phy_idx);
-
 		halrf_set_pmac_plcp_gen(rf, phy_idx, tx);
 		halrf_cfg_tx_path(rf, path);
 		halrf_cfg_rx_path(rf, path);

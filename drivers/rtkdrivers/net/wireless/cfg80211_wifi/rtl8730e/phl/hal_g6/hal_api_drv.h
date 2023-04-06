@@ -81,9 +81,6 @@ rtw_hal_mac_write_log_efuse_map(struct rtw_hal_com_t *hal_com,
 				bool is_limited);
 
 enum rtw_hal_status
-rtw_hal_mac_read_hidden_rpt(struct rtw_hal_com_t *hal_com);
-
-enum rtw_hal_status
 rtw_hal_mac_check_efuse_autoload(struct rtw_hal_com_t *hal_com, u8 *autoload);
 
 enum rtw_hal_status

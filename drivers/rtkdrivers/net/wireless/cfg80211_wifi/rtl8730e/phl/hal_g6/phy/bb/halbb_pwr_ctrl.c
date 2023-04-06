@@ -483,30 +483,6 @@ bool halbb_set_pwr_ul_tb_ofst(struct bb_info *bb, s16 pw_ofst,
 {
 	switch (bb->ic_type) {
 
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		halbb_set_pwr_ul_tb_ofst_8852a_2(bb, pw_ofst, phy_idx);
-		break;
-#endif
-
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		halbb_set_pwr_ul_tb_ofst_8852b(bb, pw_ofst, phy_idx);
-		break;
-#endif
-
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		halbb_set_pwr_ul_tb_ofst_8852c(bb, (s8)pw_ofst, phy_idx);
-		break;
-#endif
-
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		halbb_set_pwr_ul_tb_ofst_8192xb(bb, (s8)pw_ofst, phy_idx);
-		break;
-#endif
-
 #ifdef BB_8720E_SUPPORT
 	case BB_RTL8720E:
 		halbb_set_pwr_ul_tb_ofst_8720e(bb, (s8)pw_ofst, phy_idx);
@@ -530,7 +506,6 @@ void halbb_macid_ctrl_init(struct bb_info *bb)
 {
 	u8 i = 0;
 	u32 reg_ofst = 0;
-	u32 ret_v = 0;
 
 	BB_DBG(bb, DBG_PWR_CTRL, "[%s] phy_idx=%d\n", __func__, bb->bb_phy_idx);
 
@@ -541,7 +516,7 @@ void halbb_macid_ctrl_init(struct bb_info *bb)
 
 	for (i = 0; i < PHL_MAX_STA_NUM; i++) {
 		reg_ofst = MACREG_PWRMACID_CR + (i << 2);
-		ret_v = rtw_hal_mac_set_pwr_reg(bb->hal_com, (u8)bb->bb_phy_idx, reg_ofst, 0);
+		rtw_hal_mac_set_pwr_reg(bb->hal_com, (u8)bb->bb_phy_idx, reg_ofst, 0);
 	}
 }
 
@@ -634,16 +609,6 @@ void halbb_tssi_ctrl_set_dbw_table(struct bb_info *bb)
 	// 52C or 92XB
 	switch (bb->ic_type) {
 
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		halbb_tssi_ctrl_set_dbw_table_8852c(bb);
-		break;
-#endif
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		halbb_tssi_ctrl_set_dbw_table_8192xb(bb);
-		break;
-#endif
 #ifdef BB_8720E_SUPPORT
 	case BB_RTL8720E:
 		halbb_tssi_ctrl_set_dbw_table_8720e(bb);
@@ -672,7 +637,7 @@ void halbb_tssi_ctrl_set_bandedge_cfg(struct bb_info *bb,
 
 		/*r_bandedge_zero_cfg_sbw20*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD91C, 0xff000000, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
-
+#ifdef HALBB_BANDWIDTH_40M
 		/*r_bandedge_zero_cfg_sbw40_0*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD920, 0xff, tssi_i->tssi_dbw_table[bandedge_cfg][1]);
 
@@ -714,12 +679,12 @@ void halbb_tssi_ctrl_set_bandedge_cfg(struct bb_info *bb,
 
 		/*r_bandedge_zero_cfg_sbw160_7*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD91C, 0xff0000, tssi_i->tssi_dbw_table[bandedge_cfg][14]);
-
+#endif
 	} else if ((bandedge_cfg == TSSI_BANDEDGE_LOW) || (bandedge_cfg == TSSI_BANDEDGE_MID) || (bandedge_cfg == TSSI_BANDEDGE_HIGH)) {
 
 		/*r_bandedge_nonzero_cfg_sbw20*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD910, 0xff, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
-
+#ifdef HALBB_BANDWIDTH_40M
 		/*r_bandedge_nonzero_cfg_sbw40_0*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD910, 0xff00, tssi_i->tssi_dbw_table[bandedge_cfg][1]);
 
@@ -761,7 +726,7 @@ void halbb_tssi_ctrl_set_bandedge_cfg(struct bb_info *bb,
 
 		/*r_bandedge_nonzero_cfg_sbw160_7*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD90C, 0xff000000, tssi_i->tssi_dbw_table[bandedge_cfg][14]);
-
+#endif
 	} else {
 		BB_WARNING("[%s]\n", __func__);
 		return;
@@ -785,7 +750,7 @@ void halbb_tssi_ctrl_set_fast_mode_cfg(struct bb_info *bb,
 	if (bandedge_cfg == TSSI_BANDEDGE_FLAT) {
 		/*r_ch_comb_ofst_bandedge_zero_bw20*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD934, 0xff0000, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
-
+#ifdef HALBB_BANDWIDTH_40M
 		/*r_ch_comb_ofst_bandedge_zero_bw40*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD934, 0xff000000, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
 
@@ -794,11 +759,11 @@ void halbb_tssi_ctrl_set_fast_mode_cfg(struct bb_info *bb,
 
 		/*r_ch_comb_ofst_bandedge_zero_bw160*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD934, 0xff00, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
-
+#endif
 	} else if ((bandedge_cfg == TSSI_BANDEDGE_LOW) || (bandedge_cfg == TSSI_BANDEDGE_MID) || (bandedge_cfg == TSSI_BANDEDGE_HIGH)) {
 		/*r_ch_comb_ofst_bandedge_nonzero_bw20*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD930, 0xff0000, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
-
+#ifdef HALBB_BANDWIDTH_40M
 		/*r_ch_comb_ofst_bandedge_nonzero_bw40*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD930, 0xff000000, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
 
@@ -807,6 +772,7 @@ void halbb_tssi_ctrl_set_fast_mode_cfg(struct bb_info *bb,
 
 		/*r_ch_comb_ofst_bandedge_nonzero_bw160*/
 		rtw_hal_mac_write_msk_pwr_reg(hal_com, (u8)band, 0xD930, 0xff00, tssi_i->tssi_dbw_table[bandedge_cfg][0]);
+#endif
 	}
 }
 

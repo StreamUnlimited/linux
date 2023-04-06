@@ -121,6 +121,10 @@ void halbb_radar_detect_disable(struct bb_info *bb)
 	struct bb_dfs_cr_info *cr = &bb_dfs->bb_dfs_cr_i;
 
 	halbb_set_reg_phy0_1(bb, cr->dfs_en, cr->dfs_en_m, 0);
+#if defined(BB_8730E_SUPPORT)
+	halbb_set_reg_phy0_1(bb, 0x4838, 0xF00, 0x8);
+	halbb_set_reg_phy0_1(bb, 0x4A14, 0x80, 0x1);
+#endif
 }
 
 void halbb_radar_detect_enable(struct bb_info *bb)
@@ -129,6 +133,10 @@ void halbb_radar_detect_enable(struct bb_info *bb)
 	struct bb_dfs_cr_info *cr = &bb_dfs->bb_dfs_cr_i;
 
 	halbb_set_reg_phy0_1(bb, cr->dfs_en, cr->dfs_en_m, 1);
+#if defined(BB_8730E_SUPPORT)
+	halbb_set_reg_phy0_1(bb, 0x4838, 0xF00, 0xc);
+	halbb_set_reg_phy0_1(bb, 0x4A14, 0x80, 0x0);
+#endif
 }
 
 void halbb_dfs_enable_cac_flag(struct bb_info *bb)
@@ -189,8 +197,8 @@ void halbb_dfs_rgn_dmn_dflt_cnfg(struct bb_info *bb)
 	/* PW unit: 200ns ; PRI unit: 25us */
 	if (bb_dfs->dfs_rgn_domain == DFS_REGD_FCC) {
 		/*Type {1,2,3,4,6,0,L}*/
-		u8 pw_min_fcc_tab[DFS_RDR_TYP_NUM] = {5, 5, 30, 55, 5, 5, 250, 0};
-		u16 pw_max_fcc_tab[DFS_RDR_TYP_NUM] = {5, 25, 50, 100, 5, 5, 500, 1000};
+		u8 pw_min_fcc_tab[DFS_RDR_TYP_NUM] = {4, 5, 30, 55, 4, 4, 250, 0};
+		u16 pw_max_fcc_tab[DFS_RDR_TYP_NUM] = {8, 25, 50, 100, 8, 8, 500, 1000};
 		u8 pri_min_fcc_tab[DFS_RDR_TYP_NUM] = {20, 6, 8, 8, 13, 57, 40, 0};
 		u8 pri_max_fcc_tab[DFS_RDR_TYP_NUM] = {123, 10, 20, 20, 14, 58, 80, 0};
 		u8 ppb_fcc_tab[DFS_RDR_TYP_NUM] = {18, 23, 16, 12, 15, 18, 15, 255};
@@ -207,8 +215,8 @@ void halbb_dfs_rgn_dmn_dflt_cnfg(struct bb_info *bb)
 	if (bb_dfs->dfs_rgn_domain == DFS_REGD_ETSI) {
 		/*Type {1,2,3,4,5,6,R}*/
 		/*reduce ppb of Type1 from 10 to 9 in order to increase detection rate*/
-		u8 pw_min_etsi_tab[DFS_RDR_TYP_NUM] = {2, 2, 2, 100, 2, 2, 5, 0};
-		u16 pw_max_etsi_tab[DFS_RDR_TYP_NUM] = {25, 75, 75, 150, 10, 10, 5, 1000};
+		u8 pw_min_etsi_tab[DFS_RDR_TYP_NUM] = {2, 2, 2, 100, 2, 2, 4, 0};
+		u16 pw_max_etsi_tab[DFS_RDR_TYP_NUM] = {25, 75, 75, 150, 10, 10, 8, 1000};
 		u8 pri_min_etsi_tab[DFS_RDR_TYP_NUM] = {40, 25, 10, 10, 100, 33, 57, 0};
 		u8 pri_max_etsi_tab[DFS_RDR_TYP_NUM] = {200, 200, 18, 20, 134, 100, 58, 0};
 		u8 ppb_etsi_tab[DFS_RDR_TYP_NUM] = {9, 15, 25, 20, 20, 30, 18, 255};
@@ -231,8 +239,8 @@ void halbb_dfs_rgn_dmn_dflt_cnfg(struct bb_info *bb)
 	}
 	if (bb_dfs->dfs_rgn_domain == DFS_REGD_KCC) {
 		/* reduce ppb of Type 3 from 70 to 20 due to buffer size */
-		u8 pw_min_kcc_tab[DFS_RDR_TYP_NUM] = { 5, 5, 2, 0, 0, 0, 0, 0 };
-		u16 pw_max_kcc_tab[DFS_RDR_TYP_NUM] = { 5, 5, 75, 1000, 1000, 1000, 1000, 1000 };
+		u8 pw_min_kcc_tab[DFS_RDR_TYP_NUM] = { 4, 4, 2, 0, 0, 0, 0, 0 };
+		u16 pw_max_kcc_tab[DFS_RDR_TYP_NUM] = { 8, 8, 75, 1000, 1000, 1000, 1000, 1000 };
 		u8 pri_min_kcc_tab[DFS_RDR_TYP_NUM] = { 57, 22, 121, 0, 0, 0, 0, 0 };
 		u8 pri_max_kcc_tab[DFS_RDR_TYP_NUM] = { 58, 23, 122, 0, 0, 0, 0, 0 };
 		u8 ppb_kcc_tab[DFS_RDR_TYP_NUM] = { 18, 10, 20, 255, 255, 255, 255, 255 };
@@ -263,8 +271,8 @@ void halbb_dfs_rgn_dmn_cnfg_by_ch(struct bb_info *bb, bool w53_band,
 	u8 ppb_mic_w53_tab[DFS_RDR_TYP_NUM] = {10, 15, 22, 22, 30, 25, 24, 20};
 
 	/*Type {1,2,3,4,5,6,L,8}*/
-	u8 pw_min_mic_w56_tab[DFS_RDR_TYP_NUM] = {2, 5, 10, 5, 30, 55, 250, 5};
-	u16 pw_max_mic_w56_tab[DFS_RDR_TYP_NUM] = {3, 5, 10, 25, 50, 100, 500, 5};
+	u8 pw_min_mic_w56_tab[DFS_RDR_TYP_NUM] = {2, 4, 10, 5, 30, 55, 250, 4};
+	u16 pw_max_mic_w56_tab[DFS_RDR_TYP_NUM] = {3, 8, 10, 25, 50, 100, 500, 8};
 	u8 pri_min_mic_w56_tab[DFS_RDR_TYP_NUM] = {55, 57, 160, 6, 8, 8, 40, 13};
 	u8 pri_max_mic_w56_tab[DFS_RDR_TYP_NUM] = {56, 58, 160, 10, 20, 20, 80, 14};
 	u8 ppb_mic_w56_tab[DFS_RDR_TYP_NUM] = {18, 18, 18, 23, 16, 12, 15, 18};
@@ -637,7 +645,8 @@ void halbb_radar_info_processing(struct bb_info *bb,
 		is_sg1 = false;
 	}
 #else
-	cur_seq_num = dfs_rdr_info->rdr_info_seq;
+	cur_seq_num = (dfs_rdr_info->rdr_info_seq_h << 5) |
+		      (dfs_rdr_info->rdr_info_seq_l);
 	pre_seq_num = bb_dfs->lst_seq_num;
 	if (rpt->phy_idx == HW_PHY_0) {
 		pw = (dfs_rdr_info->rdr_info_sg0_pw_m << 7) |
@@ -645,12 +654,6 @@ void halbb_radar_info_processing(struct bb_info *bb,
 		pri = (dfs_rdr_info->rdr_info_sg0_pri_m << 7) |
 		      (dfs_rdr_info->rdr_info_sg0_pri_l);
 		chrp_flag = dfs_rdr_info->rdr_info_sg0_chirp_flag;
-	} else if (rpt->phy_idx == HW_PHY_1) {
-		pw = (dfs_rdr_info->rdr_info_sg1_pw_m << 4) |
-		     (dfs_rdr_info->rdr_info_sg1_pw_l);
-		pri = (dfs_rdr_info->rdr_info_sg1_pri_m << 4) |
-		      (dfs_rdr_info->rdr_info_sg1_pri_l);
-		chrp_flag = dfs_rdr_info->rdr_info_sg1_chirp_flag;
 	}
 #endif
 
@@ -1356,7 +1359,9 @@ void halbb_dfs_dyn_setting(struct bb_info *bb)
 				BB_DBG(bb, DBG_DFS, "[DFS Status] Adaptive State : [%d]\n", bb_dfs->adap_detect_cnt);
 			}
 		} else if ((env_mntr->nhm_idle_ratio < bb_dfs->dfs_idle_prd_th && env_mntr->nhm_idle_ratio > 0) ||
+#ifdef HALBB_STATISTICS_SUPPORT
 			   (fa->cnt_fail_all > bb_dfs->dfs_fa_th) ||
+#endif
 			   (env_mntr->nhm_ratio > bb_dfs->dfs_nhm_th && env_mntr->nhm_ratio != 100)) {
 			bb_dfs->adap_detect_cnt = bb_dfs->adap_detect_cnt_init;
 			bb_dfs->adap_detect_cnt_all += 1;
@@ -1387,7 +1392,9 @@ void halbb_dfs_dyn_setting(struct bb_info *bb)
 				BB_DBG(bb, DBG_DFS, "[DFS Status] Adaptive State : [%d]\n", bb_dfs->adap_detect_cnt);
 			}
 		} else if ((env_mntr->nhm_idle_ratio < bb_dfs->dfs_idle_prd_th && env_mntr->nhm_idle_ratio > 0) ||
+#ifdef HALBB_STATISTICS_SUPPORT
 			   (fa->cnt_fail_all > bb_dfs->dfs_fa_th) ||
+#endif
 			   (env_mntr->nhm_ratio > bb_dfs->dfs_nhm_th && env_mntr->nhm_ratio != 100)) {
 			bb_dfs->adap_detect_cnt = MIN_2(255, bb_dfs->adap_detect_cnt + bb_dfs->adap_detect_cnt_add);
 			bb_dfs->adap_detect_cnt_all = MIN_2(255, bb_dfs->adap_detect_cnt_all + 1);
@@ -1419,9 +1426,11 @@ void halbb_dfs_dyn_setting(struct bb_info *bb)
 
 DETECTING_END:
 	if (bb_dfs->dbg_dyn_prnt_en) {
+#ifdef HALBB_STATISTICS_SUPPORT
 		BB_DBG(bb, DBG_DFS, "[T_TP / I_RTO / FA_CNT / N_RTO] = [%d, %d, %d, %d]\n",
 		       link->total_tp, env_mntr->nhm_idle_ratio,
 		       fa->cnt_fail_all, env_mntr->nhm_ratio);
+#endif
 		BB_DBG(bb, DBG_DFS, "[ACI2SIG_db] = [%d]\n", bb_dfs->ACI2SIG_db);
 	}
 }

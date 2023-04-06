@@ -106,13 +106,17 @@ void halbb_set_edcca_thre(struct bb_info *bb)
 {
 	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
 	struct bb_edcca_cr_info *cr = &bb->bb_edcca_i.bb_edcca_cr_i;
+#if defined(BB_8852C_SUPPORT) || defined(BB_8852B_SUPPORT)
 	u8 band = bb->hal_com->band[0].cur_chandef.band;
 	enum channel_width bw = bb->hal_com->band[0].cur_chandef.bw;
+#endif
 	u32 l2h = bb_edcca->th_h;
 
 	halbb_set_reg_curr_phy(bb, cr->r_edcca_level_p, cr->r_edcca_level_p_m, l2h);
+#if 0
 	halbb_set_reg_curr_phy(bb, cr->r_edcca_level, cr->r_edcca_level_m, l2h);
 	halbb_set_reg_curr_phy(bb, cr->r_ppdu_level, cr->r_ppdu_level_m, l2h);
+#endif
 	halbb_set_reg_curr_phy(bb, cr->r_dwn_level, cr->r_dwn_level_m, (u32)bb_edcca->th_hl_diff);
 #if defined(BB_8852C_SUPPORT) || defined(BB_8852B_SUPPORT)
 	if ((bb->ic_type == BB_RTL8852C) || (bb->ic_sub_type == BB_IC_SUB_TYPE_8852B_8852BP)) {
@@ -199,31 +203,35 @@ void halbb_set_edcca_pause_val(struct bb_info *bb, u32 *val_buf, u8 val_len)
 
 void halbb_edcca_event_nofity(struct bb_info *bb, u8 pause_type)
 {
+#ifdef HALBB_DBG_TRACE_SUPPORT
 	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
-	u8 pause_result = 0;
+#endif
 	u32 val[5] = {0};
 
 	BB_DBG(bb, DBG_EDCCA, "[%s], pause_type=%d, edcca_mode=%d\n",
 	       __func__, pause_type, bb_edcca->edcca_mode);
 
 	val[0] = EDCCA_MAX;
-	pause_result = halbb_pause_func(bb, F_EDCCA, pause_type, HALBB_PAUSE_LV_2, 1, val, bb->bb_phy_idx);
+	halbb_pause_func(bb, F_EDCCA, pause_type, HALBB_PAUSE_LV_2, 1, val, bb->bb_phy_idx);
 }
 
 void halbb_edcca_log(struct bb_info *bb)
 {
-	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
-	struct edcca_hw_rpt *rpt = &bb_edcca->edcca_rpt;
-	struct bb_edcca_cr_info *cr = &bb->bb_edcca_i.bb_edcca_cr_i;
 	enum channel_width bw = 0;
+#ifdef HALBB_DBG_TRACE_SUPPORT
+	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
+	struct bb_edcca_cr_info *cr = &bb->bb_edcca_i.bb_edcca_cr_i;
+	struct edcca_hw_rpt *rpt = &bb_edcca->edcca_rpt;
 	u8 edcca_p_th = 0;
 	u8 edcca_s_th = 0;
 	u8 edcca_diff = 0;
 	bool edcca_en = 0;
+#endif
 
 	bw = bb->hal_com->band[bb->bb_phy_idx].cur_chandef.bw;
 
 	switch (bw) {
+#if 0
 	case CHANNEL_WIDTH_80_80:
 	case CHANNEL_WIDTH_160:
 		BB_DBG(bb, DBG_EDCCA,
@@ -258,6 +266,7 @@ void halbb_edcca_log(struct bb_info *bb)
 		BB_DBG(bb, DBG_EDCCA, "pwdb {FB,p20,s20}={%d,%d,%d}(dBm)\n",
 		       rpt->pwdb_fb, rpt->pwdb_p20, rpt->pwdb_s20);
 		break;
+#endif
 	case CHANNEL_WIDTH_20:
 		BB_DBG(bb, DBG_EDCCA, "pwdb per20{0}={%d}(dBm)\n", rpt->pwdb_0);
 		BB_DBG(bb, DBG_EDCCA, "path=%d, flag {FB,p20}={%d,%d}\n", rpt->path,
@@ -269,14 +278,19 @@ void halbb_edcca_log(struct bb_info *bb)
 		break;
 	}
 
+#ifdef HALBB_DBG_TRACE_SUPPORT
 	edcca_en = (bool)halbb_get_reg_curr_phy(bb, cr->r_snd_en,
 						cr->r_snd_en_m);
+
 	edcca_p_th = (u8)halbb_get_reg_curr_phy(bb, cr->r_edcca_level_p,
 						cr->r_edcca_level_p_m);
+#if 0
 	edcca_s_th = (u8)halbb_get_reg_curr_phy(bb, cr->r_edcca_level,
 						cr->r_edcca_level_m);
+#endif
 	edcca_diff = (u8)halbb_get_reg_curr_phy(bb, cr->r_dwn_level,
 						cr->r_dwn_level_m);
+#endif
 
 	BB_DBG(bb, DBG_EDCCA,
 	       "reg val{en, p20_h_th, sec_h_th, diff}:{%d, %d, %d, %d}\n",
@@ -310,19 +324,25 @@ void halbb_edcca_get_result(struct bb_info *bb)
 #endif
 	halbb_set_reg(bb, rpt_sel_addr, rpt_sel_bmsk, 0);
 	tmp = halbb_get_reg(bb, rpt_a_addr, rpt_a_bmsk);
+#if 0
 	rpt->pwdb_1 = (s8)(((tmp & MASKBYTE2) >> 16) - 256);
+#endif
 	rpt->pwdb_0 = (s8)(((tmp & MASKBYTE3) >> 24) - 256);
 	tmp = halbb_get_reg(bb, rpt_b_addr, rpt_b_bmsk);
 	rpt->path = (u8)((tmp & 0x6) >> 1);
+#if 0
 	rpt->flag_s80 = (bool)((tmp & BIT(3)) >> 3);
 	rpt->flag_s40 = (bool)((tmp & BIT(4)) >> 4);
 	rpt->flag_s20 = (bool)((tmp & BIT(5)) >> 5);
+#endif
 	rpt->flag_p20 = (bool)((tmp & BIT(6)) >> 6);
 	rpt->flag_fb = (bool)((tmp & BIT(7)) >> 7);
+#if 0
 	rpt->pwdb_s20 = (s8)(((tmp & MASKBYTE1) >> 8) - 256);
+#endif
 	rpt->pwdb_p20 = (s8)(((tmp & MASKBYTE2) >> 16) - 256);
 	rpt->pwdb_fb = (s8)(((tmp & MASKBYTE3) >> 24) - 256);
-
+#if 0
 	switch (bw) {
 	case CHANNEL_WIDTH_80_80:
 	case CHANNEL_WIDTH_160:
@@ -375,6 +395,7 @@ void halbb_edcca_get_result(struct bb_info *bb)
 	default:
 		break;
 	}
+#endif
 }
 
 void halbb_edcca(struct bb_info *bb)
@@ -398,7 +419,7 @@ void halbb_edcca(struct bb_info *bb)
 	halbb_edcca_get_result(bb);
 	halbb_edcca_log(bb);
 }
-
+#if 0
 void halbb_fw_edcca(struct bb_info *bb)
 {
 	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
@@ -461,13 +482,13 @@ void halbb_fw_edcca(struct bb_info *bb)
 	}
 #endif
 }
+#endif
 
 void halbb_edcca_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		     char *output, u32 *_out_len)
 {
 	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
 	struct edcca_hw_rpt *rpt = &bb_edcca->edcca_rpt;
-	struct bb_h2c_fw_edcca *fw_edcca_i = &bb->bb_fw_edcca_i;
 	struct rtw_hal_com_t *hal = bb->hal_com;
 	enum channel_width bw = 0;
 	char help[] = "-h";
@@ -573,6 +594,7 @@ void halbb_edcca_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 			halbb_edcca_get_result(bb);
 			switch (bw) {
+#if 0
 			case CHANNEL_WIDTH_80_80:
 			case CHANNEL_WIDTH_160:
 				BB_DBG_CNSL(out_len, used, output + used,
@@ -627,6 +649,7 @@ void halbb_edcca_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 					    rpt->pwdb_fb, rpt->pwdb_p20,
 					    rpt->pwdb_s20);
 				break;
+#endif
 			case CHANNEL_WIDTH_20:
 				BB_DBG_CNSL(out_len, used, output + used,
 					    out_len - used,
@@ -682,7 +705,6 @@ void halbb_edcca_init(struct bb_info *bb)
 {
 	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
 	struct bb_h2c_fw_edcca *fw_edcca_i = &bb->bb_fw_edcca_i;
-	struct bb_edcca_cr_info *cr = &bb->bb_edcca_i.bb_edcca_cr_i;
 	struct rtw_phl_com_t *phl = bb->phl_com;
 
 	if (phl_is_mp_mode(bb->phl_com)) {
@@ -801,6 +823,7 @@ void halbb_cr_cfg_edcca_init(struct bb_info *bb)
 		cr->r_edcca_rpt_sel_m = EDCCA_RPTREG_SEL_P0_C_M;
 		cr->r_edcca_rpt_sel_p1 = EDCCA_RPTREG_SEL_P1_C;
 		cr->r_edcca_rpt_sel_p1_m = EDCCA_RPTREG_SEL_P1_C_M;
+#ifdef HALBB_COMPILE_AP2_SERIES
 		cr->r_ppdu_level = SEG0R_PPDU_LVL_C;
 		cr->r_ppdu_level_m = SEG0R_PPDU_LVL_C_M;
 		cr->collision_r2t_th = COLLISION_R2T_TH_C;
@@ -833,6 +856,7 @@ void halbb_cr_cfg_edcca_init(struct bb_info *bb)
 		cr->collision_t2r_th_cck_m = COLLISION_T2R_TH_CCK_C_M;
 		cr->r_obss_level = SEG0R_OBSS_LVL_C;
 		cr->r_obss_level_m = SEG0R_OBSS_LVL_C_M;
+#endif
 		break;
 #endif
 #ifdef HALBB_COMPILE_AP2_SERIES

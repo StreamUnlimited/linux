@@ -76,7 +76,7 @@ u32 mac_ista_ftm_enable(struct mac_ax_adapter *adapter,
 	}
 
 	if (enable) {
-		ret = check_mac_en(adapter, 0, MAC_AX_CMAC_SEL);
+		ret = check_mac_en(adapter, 0, MAC_AX_MAC_SEL);
 		if (ret != MACSUCCESS) {
 			return ret;
 		}

@@ -135,6 +135,10 @@ enum rtw_phl_status
 rtw_phl_free_stainfo_sw(void *phl, struct rtw_phl_stainfo_t *sta);
 
 enum rtw_phl_status
+rtw_phl_mac_cfg_macid(void *phl,
+		     struct rtw_phl_stainfo_t *sta);
+
+enum rtw_phl_status
 rtw_phl_cmd_alloc_stainfo(void *phl,
 			  struct rtw_phl_stainfo_t **sta,
 			  u8 *sta_addr,
@@ -513,10 +517,12 @@ rtw_phl_set_power_lmt(void *phl, u8 hw_band);
 
 s8 rtw_phl_get_power_limit(void *phl, u8 hw_band,
 			   u16 rate, u8 bandwidth, u8 beamforming, u8 tx_num, u8 channel);
-
+#ifndef IOT_SMALL_RAM
 void
 rtw_phl_enable_ext_pwr_lmt(void *phl, u8 hw_band,
 			   struct rtw_phl_ext_pwr_lmt_info *ext_pwr_lmt_info);
+#endif
+
 void
 rtw_phl_set_ext_pwr_lmt_en(void *phl, bool enable);
 

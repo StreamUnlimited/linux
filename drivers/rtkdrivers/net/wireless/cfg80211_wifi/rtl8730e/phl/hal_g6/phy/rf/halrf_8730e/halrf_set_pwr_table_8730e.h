@@ -18,24 +18,24 @@
 #ifdef RF_8730E_SUPPORT
 
 /*@--------------------------Define Parameters-------------------------------*/
-#define MAX_TX_PATH	2
-#define TPU_SIZE_RUA	3 /*{26, 52, 106}*/
-#define TPU_SIZE_BW20_SC  8 /*8 * 20M = 160M*/
+//#define MAX_TX_PATH	2
+//#define TPU_SIZE_RUA	3 /*{26, 52, 106}*/
+//#define TPU_SIZE_BW20_SC  8 /*8 * 20M = 160M*/
 
 /*@-----------------------End Define Parameters-----------------------*/
 
-bool halrf_set_power_by_rate_to_mac_8730e(struct rf_info *rf,
-		enum phl_phy_idx phy);
+//bool halrf_set_power_by_rate_to_mac_8730e(struct rf_info *rf,
+//						enum phl_phy_idx phy);
 
-bool halrf_set_power_limit_to_mac_8730e(struct rf_info *rf,
-					enum phl_phy_idx phy);
+//bool halrf_set_power_limit_to_mac_8730e(struct rf_info *rf,
+//	enum phl_phy_idx phy);
 
-void halrf_set_ref_power_to_struct_8730e(struct rf_info *rf,
-		enum phl_phy_idx phy);
+void halrf_set_ref_power_to_struct_8730e(struct rf_info *rf);
 
-bool halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
+bool halrf_set_power_8730e(struct rf_info *rf,
 			   enum phl_pwr_table pwr_table);
 
+#ifdef RFDBG_TRACE_EN
 void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 				  char input[][16], u32 *_used, char *output, u32 *_out_len);
 
@@ -44,7 +44,7 @@ void halrf_pwr_limit_info_8730e(struct rf_info *rf,
 
 void halrf_pwr_limit_ru_info_8730e(struct rf_info *rf,
 				   char input[][16], u32 *_used, char *output, u32 *_out_len);
-
+#endif
 void halrf_set_tx_shape_8730e(struct rf_info *rf, u8 tx_shape_idx);
 
 #endif	/*RF_8730E_SUPPORT*/

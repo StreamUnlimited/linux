@@ -52,6 +52,7 @@
 		aipc: aipc@41000580 {
 			compatible = "realtek,aipc";
 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+			wakeup-source;
 			reg = <AIPC_SHARED_MEM_ADDR AIPC_SHARED_MEM_SIZE>, // res 0
 				<AIPC_REG_TX_DATA AIPC_REG_SIZE>, // res 1
 				<AIPC_REG_RX_DATA AIPC_REG_SIZE>, // res 2
@@ -315,9 +316,10 @@
 			};
 		};
 
-		timer9: timer@4100A800 {
+		// Cannot be enabled simultaneously with captimer node
+		timer9: timer@4100A200 {
 			compatible = "realtek,amebad2-timer";
-			reg = <0x4100A800 0x200>;
+			reg = <0x4100A200 0x200>;
 			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM9>;
 			status = "disabled";
@@ -356,9 +358,10 @@
 
 		usb_phy: usb-phy@41000000 {
 			compatible = "realtek,otg-phy";
-			reg = <0x400B0004 0x20>,
+			reg = <0x400B0000 0x20>,
 				<0x41000060 4>,
-				<0x42000100 0x10>; //usb addon,sys base, otpc syscfg base reg
+				<0x42000100 0x10>,
+				<0x4200825C 4>;
 			#phy-cells = <0>;
 			clocks = <&rcc RTK_CKE_USB>;
 			status = "okay";

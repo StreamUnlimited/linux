@@ -247,6 +247,31 @@ u32 mac_two_nav_cfg(struct mac_ax_adapter *adapter,
 
 	return MACSUCCESS;
 }
+
+u32 mac_clr_idx_all(struct mac_ax_adapter *adapter)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 val32 = 0;
+
+	val32 = MAC_REG_R32(REG_BD_RWPTR_CLR);
+	val32 |= BIT_CLR_RXQ_HW_IDX | BIT_CLR_RXQ_HOST_IDX \
+		 | BIT_CLR_MGQ_HW_IDX | BIT_CLR_MGQ_HOST_IDX \
+		 | BIT_CLR_VOQ_HW_IDX | BIT_CLR_VOQ_HOST_IDX \
+		 | BIT_CLR_VIQ_HW_IDX | BIT_CLR_VIQ_HOST_IDX \
+		 | BIT_CLR_BEQ_HW_IDX | BIT_CLR_BEQ_HOST_IDX \
+		 | BIT_CLR_BKQ_HW_IDX | BIT_CLR_BKQ_HOST_IDX \
+		 | BIT_CLR_MQ0_HW_IDX | BIT_CLR_MQ0_HOST_IDX \
+		 | BIT_CLR_MQ1_HW_IDX | BIT_CLR_MQ1_HOST_IDX \
+		 | BIT_CLR_MQ2_HW_IDX | BIT_CLR_MQ2_HOST_IDX \
+		 | BIT_CLR_MQ3_HW_IDX | BIT_CLR_MQ3_HOST_IDX \
+		 | BIT_CLR_MQ4_HW_IDX | BIT_CLR_MQ4_HOST_IDX \
+		 | BIT_CLR_MQ5_HW_IDX | BIT_CLR_MQ5_HOST_IDX \
+		 | BIT_CLR_MQ6_HW_IDX | BIT_CLR_MQ6_HOST_IDX \
+		 | BIT_CLR_MQ7_HW_IDX | BIT_CLR_MQ7_HOST_IDX;
+	MAC_REG_W32(REG_BD_RWPTR_CLR, val32);
+
+	return MACSUCCESS;
+}
 #endif
 
 

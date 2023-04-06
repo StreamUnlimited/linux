@@ -81,6 +81,18 @@ enum clm_opt_input {
 	CLM_CCA_INIT
 };
 
+enum clm_idmatch_input {
+	CLM_IDMATCH_OFF		= 0,
+	CLM_IDMATCH_ON		= 1,
+	CLM_IDMATCH_INIT
+};
+
+enum nhm_idmatch_input {
+	NHM_IDMATCH_OFF		= 0,
+	NHM_IDMATCH_ON		= 1,
+	NHM_IDMATCH_INIT
+};
+
 enum nhm_application {
 	NHM_INIT		= 0,
 	NHM_BACKGROUND		= 1, /*IEEE 11K for background*/
@@ -155,10 +167,12 @@ struct ccx_para_info {
 	enum ccx_edcca_opt_sc_idx	ccx_edcca_opt_sc_idx;
 	enum clm_application		clm_app;
 	enum clm_opt_input		clm_input_opt;
+	enum clm_idmatch_input  clm_input_idmatch;
 	enum nhm_application		nhm_app;
 	u8				nhm_manual_th_ofst;
 	u8				nhm_manual_th0;	/*dbg manual mode*/
 	enum nhm_option_cca_all		nhm_incld_cca; /*Include CCA*/
+	enum nhm_idmatch_input  nhm_input_idmatch; /*nhm macid match*/
 	enum ifs_clm_application	ifs_clm_app;
 	u32				ifs_clm_manual_th_times;
 	u32				ifs_clm_manual_th0;/*us*/

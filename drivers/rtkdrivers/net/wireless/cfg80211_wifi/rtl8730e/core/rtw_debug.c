@@ -6255,7 +6255,7 @@ int proc_get_efuse_map(struct seq_file *m, void *v)
 	HAL_DATA_TYPE *pHalData = GET_PHL_COM(adapter_to_dvobj(padapter));
 	struct pwrctrl_priv *pwrctrlpriv  = adapter_to_pwrctl(padapter);
 	PEFUSE_HAL pEfuseHal = &pHalData->EfuseHal;
-	struct efuse_info *efuse = adapter_to_efuse(padapter);
+	struct efuse_info_t *efuse = adapter_to_efuse(padapter);
 	int i, j;
 	u8 ips_mode = IPS_NUM;
 	u16 mapLen;

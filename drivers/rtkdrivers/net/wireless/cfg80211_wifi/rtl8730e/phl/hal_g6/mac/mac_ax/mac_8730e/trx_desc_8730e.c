@@ -137,7 +137,17 @@ static u32 txdes_proc_data_8730e(struct mac_ax_adapter *adapter,
 	}
 
 	txdesc = (struct tx_desc_t *)buf;
-	qsel = qsel_l[info->tid];
+
+	if (info->tid < TID_MAX_NUM) {
+		/* normal data */
+		qsel = qsel_l[info->tid];
+	}else if (info->tid == RTW_PHL_RING_CAT_HIQ) {
+		/* high queue */
+		qsel = RTW_TXDESC_QSEL_HIGH;
+	} else {
+		PLTFM_MSG_ERR("[ERR] illegal tid %d\n", info->tid);
+		return MACFUNCINPUT;
+	}
 
 	txdesc->txdw0 = cpu_to_le32(SET_WORD(info->pktlen, AX_TXD_TXPKTSIZE) |
 				    SET_WORD(info->offset, AX_TXD_OFFSET) |

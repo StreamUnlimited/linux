@@ -5997,7 +5997,7 @@ static int rtw_wowlan_set_pattern(struct net_device *dev,
 	struct registry_priv  *registry_par = &padapter->registrypriv;
 	struct wow_priv *wowpriv = adapter_to_wowlan(padapter);
 	struct rtw_wowcam_upd_info wowcam_info = {0};
-	u8 input[wrqu->data.length];
+	u8 *input = NULL;
 	int ret = 0;
 
 	if (!(registry_par->wakeup_event & BIT(3))) {
@@ -6019,9 +6019,16 @@ static int rtw_wowlan_set_pattern(struct net_device *dev,
 		RTW_INFO("ERROR: parameter length <= 0\n");
 		goto _rtw_wowlan_set_pattern_exit;
 	} else {
+		input = _rtw_malloc(wrqu->data.length);
+		if (!input) {
+			RTW_INFO("ERROR: allocate input failed!\n");
+			ret = -ENOMEM;
+			goto _rtw_wowlan_set_pattern_exit;
+		}
 		/* set pattern */
 		if (copy_from_user(input, wrqu->data.pointer, wrqu->data.length)) {
 			ret - EFAULT;
+			_rtw_mfree(input, wrqu->data.length);
 			goto _rtw_wowlan_set_pattern_exit;
 		}
 
@@ -6053,6 +6060,7 @@ static int rtw_wowlan_set_pattern(struct net_device *dev,
 			RTW_INFO("ERROR: incorrect parameter!\n");
 			ret = -EINVAL;
 		}
+		_rtw_mfree(input, wrqu->data.length);
 	}
 _rtw_wowlan_set_pattern_exit:
 	return ret;

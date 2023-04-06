@@ -24,8 +24,6 @@
  *****************************************************************************/
 #include "halbb_precomp.h"
 
-#if 1
-
 void halbb_print_hist_2_buf_u8(struct bb_info *bb, u8 *val, u16 len, char *buf,
 			       u16 buf_size)
 {
@@ -166,10 +164,7 @@ u16 halbb_get_plurality_rx_rate_mu(struct bb_info *bb)
 	//BB_DBG(bb, DBG_CMN, "[T]idx_ori= (%d)\n", idx);
 
 	ofst_ss = idx / HE_VHT_NUM_MCS;
-
-	if (ofst_ss >= 0) { /*>=2SS*/
-		idx -= (ofst_ss * HE_VHT_NUM_MCS);
-	}
+	idx -= (ofst_ss * HE_VHT_NUM_MCS);
 
 	//BB_DBG(bb, DBG_CMN, "ofst_ss= (%d), idx=%d\n", ofst_ss, idx);
 
@@ -229,8 +224,10 @@ void halbb_show_rssi_and_rate_distribution_mu(struct bb_info *bb)
 	struct bb_pkt_cnt_mu_info *pkt_cnt = &cmn_rpt->bb_pkt_cnt_mu_i;
 	struct bb_rssi_mu_acc_info *acc = &cmn_rpt->bb_rssi_mu_acc_i;
 	struct bb_rssi_mu_avg_info *avg = &cmn_rpt->bb_rssi_mu_avg_i;
+#ifdef HALBB_DBG_TRACE_SUPPORT
 	u8 rssi_avg_tmp = 0;
 	u8 rssi_tmp[HALBB_MAX_PATH];
+#endif
 	u16 pkt_cnt_ss = 0;
 	u8 i = 0, j = 0;
 	u8 rate_num = bb->num_rf_path, ss_ofst = 0;
@@ -264,6 +261,7 @@ void halbb_show_rssi_and_rate_distribution_mu(struct bb_info *bb)
 				pkt_cnt_ss += pkt_cnt->pkt_cnt_vht[ss_ofst + j];
 			}
 
+#ifdef HALBB_DBG_TRACE_SUPPORT
 			if (pkt_cnt_ss == 0) {
 				rssi_avg_tmp = 0;
 				rssi_tmp[0] = 0;
@@ -273,6 +271,7 @@ void halbb_show_rssi_and_rate_distribution_mu(struct bb_info *bb)
 				rssi_tmp[0] = avg->rssi_t[0] >> 1;
 				rssi_tmp[1] = avg->rssi_t[1] >> 1;
 			}
+#endif
 
 			BB_DBG(bb, DBG_CMN,
 			       "*[MU] VHT %d-S RSSI:{%02d| %02d,%02d} cnt:{%03d| %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
@@ -306,6 +305,7 @@ void halbb_show_rssi_and_rate_distribution_mu(struct bb_info *bb)
 				pkt_cnt_ss += pkt_cnt->pkt_cnt_he[ss_ofst + j];
 			}
 
+#ifdef HALBB_DBG_TRACE_SUPPORT
 			if (pkt_cnt_ss == 0) {
 				rssi_avg_tmp = 0;
 				rssi_tmp[0] = 0;
@@ -315,6 +315,7 @@ void halbb_show_rssi_and_rate_distribution_mu(struct bb_info *bb)
 				rssi_tmp[0] = avg->rssi_t[0] >> 1;
 				rssi_tmp[1] = avg->rssi_t[1] >> 1;
 			}
+#endif
 
 			BB_DBG(bb, DBG_CMN,
 			       "*[MU] HE %d-SS RSSI:{%02d| %02d,%02d} cnt:{%03d| %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
@@ -619,7 +620,6 @@ u16 halbb_get_plurality_rx_rate_su(struct bb_info *bb)
 	} else {
 		return rx_rate_plurality;
 	}
-
 	for (i = 0; i < rate_num_tmp; i++) {
 		if (pkt_cnt_tmp[i] >= max_num_tmp) {
 			max_num_tmp = pkt_cnt_tmp[i];
@@ -627,7 +627,6 @@ u16 halbb_get_plurality_rx_rate_su(struct bb_info *bb)
 			plurality_is_legacy_rate = false;
 		}
 	}
-
 	if (plurality_is_legacy_rate) {
 		return rx_rate_plurality;
 	}
@@ -636,11 +635,7 @@ u16 halbb_get_plurality_rx_rate_su(struct bb_info *bb)
 
 	if (!is_ht_mode) {
 		ofst_ss = idx / HE_VHT_NUM_MCS;
-
-		if (ofst_ss >= 0) { /*>=2SS*/
-			idx -= (ofst_ss * HE_VHT_NUM_MCS);
-		}
-
+		idx -= (ofst_ss * HE_VHT_NUM_MCS);
 		//BB_DBG(bb, DBG_CMN, "ofst_ss= (%d), idx=%d\n", ofst_ss, idx);
 	}
 
@@ -656,8 +651,10 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 	struct bb_pkt_cnt_su_info *pkt_cnt = &cmn_rpt->bb_pkt_cnt_su_i;
 	struct bb_rssi_su_acc_info *acc = &cmn_rpt->bb_rssi_su_acc_i;
 	struct bb_rssi_su_avg_info *avg = &cmn_rpt->bb_rssi_su_avg_i;
+#ifdef HALBB_DBG_TRACE_SUPPORT
 	u8 rssi_avg_tmp = 0;
 	u8 rssi_tmp[HALBB_MAX_PATH];
+#endif
 	u16 pkt_cnt_ss = 0;
 	u8 i = 0, j = 0;
 	u8 rate_num = bb->num_rf_path, ss_ofst = 0;
@@ -726,6 +723,7 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 				pkt_cnt_ss += pkt_cnt->pkt_cnt_ht[ss_ofst + j];
 			}
 
+#ifdef HALBB_DBG_TRACE_SUPPORT
 			if (pkt_cnt_ss == 0) {
 				rssi_avg_tmp = 0;
 				rssi_tmp[0] = 0;
@@ -735,6 +733,7 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 				rssi_tmp[0] = avg->rssi_t[0] >> 1;
 				rssi_tmp[1] = avg->rssi_t[1] >> 1;
 			}
+#endif
 
 			BB_DBG(bb, DBG_CMN,
 			       "*HT%02d:%02d RSSI:{%02d| %02d,%02d} cnt:{%03d| %d, %d, %d, %d, %d, %d, %d, %d}\n",
@@ -763,6 +762,7 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 				pkt_cnt_ss += pkt_cnt->pkt_cnt_vht[ss_ofst + j];
 			}
 
+#ifdef HALBB_DBG_TRACE_SUPPORT
 			if (pkt_cnt_ss == 0) {
 				rssi_avg_tmp = 0;
 				rssi_tmp[0] = 0;
@@ -772,6 +772,7 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 				rssi_tmp[0] = avg->rssi_t[0] >> 1;
 				rssi_tmp[1] = avg->rssi_t[1] >> 1;
 			}
+#endif
 
 			BB_DBG(bb, DBG_CMN,
 			       "*VHT %d-S RSSI:{%02d| %02d,%02d} cnt:{%03d| %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
@@ -805,6 +806,7 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 				pkt_cnt_ss += pkt_cnt->pkt_cnt_he[ss_ofst + j];
 			}
 
+#ifdef HALBB_DBG_TRACE_SUPPORT
 			if (pkt_cnt_ss == 0) {
 				rssi_avg_tmp = 0;
 				rssi_tmp[0] = 0;
@@ -814,6 +816,7 @@ void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb)
 				rssi_tmp[0] = avg->rssi_t[0] >> 1;
 				rssi_tmp[1] = avg->rssi_t[1] >> 1;
 			}
+#endif
 
 			BB_DBG(bb, DBG_CMN,
 			       "*HE %d-SS RSSI:{%02d| %02d,%02d} cnt:{%03d| %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
@@ -1249,7 +1252,20 @@ void halbb_cmn_rpt(struct bb_info *bb, struct physts_rxd *desc, u32 physts_bitma
 	struct bb_physts_rslt_0_info *psts_0 = &physts->bb_physts_rslt_0_i;
 	enum channel_width rx_bw = psts_1->bw_idx;
 	u8 i = 0;
-
+#ifdef HALBB_CMN_RPT_SIMPLE
+	cmn_rpt->is_cck_rate = halbb_is_cck_rate(bb, desc->data_rate);
+	physts->rx_path_en = (cmn_rpt->is_cck_rate) ? psts_0->rx_path_en_cck : psts_1->rx_path_en;
+	if (desc->is_su) {
+		halbb_rate_idx_parsor(bb, desc->data_rate, (enum rtw_gi_ltf)desc->gi_ltf, &cmn_rpt->bb_rate_i);
+		if (desc->user_i[0].is_data || desc->user_i[0].is_bcn) {/*@data frame only*/
+			halbb_rx_pkt_su_store_in_sta_info(bb, desc);
+			halbb_rx_pkt_su_cnt_rpt(bb, desc, rx_bw);
+		}
+		if (desc->user_i[0].is_bcn) {
+			halbb_rx_pkt_cnt_rpt_beacon(bb, desc);
+		}
+	}
+#else
 	if (desc->is_su) {
 		halbb_rate_idx_parsor(bb, desc->data_rate, (enum rtw_gi_ltf)desc->gi_ltf, &cmn_rpt->bb_rate_i);
 	} else if (physts_bitmap & BIT(IE13_DL_MU_DEF)) {
@@ -1289,6 +1305,7 @@ void halbb_cmn_rpt(struct bb_info *bb, struct physts_rxd *desc, u32 physts_bitma
 			halbb_rx_pkt_su_rssi_statistic(bb);
 			halbb_rx_pkt_su_phy_hist(bb);
 
+
 			if (desc->user_i[0].is_bcn) {
 				halbb_rx_pkt_cnt_rpt_beacon(bb, desc);
 			}
@@ -1300,7 +1317,10 @@ void halbb_cmn_rpt(struct bb_info *bb, struct physts_rxd *desc, u32 physts_bitma
 		halbb_rx_pkt_mu_rssi_statistic(bb);
 	}
 	halbb_rx_pop_hist(bb);
+#ifdef HALBB_ENV_MNTR_SUPPORT
 	halbb_idle_time_pwr_physts(bb, desc, cmn_rpt->is_cck_rate);
+#endif
+#endif
 }
 
 void halbb_physts_hist_init(struct bb_info *bb)
@@ -1323,4 +1343,3 @@ void halbb_cmn_rpt_init(struct bb_info *bb)
 	halbb_physts_hist_init(bb);
 	halbb_rx_pkt_cnt_rpt_reset(bb);
 }
-#endif

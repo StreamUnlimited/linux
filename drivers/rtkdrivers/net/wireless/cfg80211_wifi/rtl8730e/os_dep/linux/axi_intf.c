@@ -235,7 +235,7 @@ static struct dvobj_priv *axi_dvobj_init(struct platform_device *pdev)
 
 	/* initialize the ipc channel */
 	axi_data->fw_ipc->port_id = AIPC_PORT_LP;
-	axi_data->fw_ipc->ch_id = 1; /* <  NP -->  LP FW Info channel 1 */
+	axi_data->fw_ipc->ch_id = 1; /* <  AP -->  LP FW Info channel 1 */
 	axi_data->fw_ipc->ch_config = AIPC_CONFIG_NOTHING;
 	axi_data->fw_ipc->ops = &rtw_fw_ipc_ops;
 	axi_data->fw_ipc->priv_data = axi_data;
@@ -323,9 +323,18 @@ static int rtw_axi_suspend(struct platform_device *pdev, pm_message_t state)
 	struct dvobj_priv *dvobj = platform_get_drvdata(pdev);
 	_adapter *padapter = dvobj_get_primary_adapter(dvobj);
 
+	ret = rtw_suspend_common(padapter);
+	if (ret != 0) {
+		RTW_INFO("%s Failed to suspend (%d)\n", __func__, ret);
+		goto exit;
+	}
+
+#ifdef CONFIG_WOWLAN
+	device_set_wakeup_enable(&pdev->dev, true);
+#endif
+
 exit:
 	return ret;
-
 }
 
 static int rtw_resume_process(_adapter *padapter)
@@ -340,6 +349,31 @@ static int rtw_axi_resume(struct platform_device *pdev)
 	struct net_device *pnetdev = padapter->pnetdev;
 	struct pwrctrl_priv *pwrpriv = dvobj_to_pwrctl(dvobj);
 	int	err = 0;
+
+#ifdef CONFIG_WOWLAN
+	device_set_wakeup_enable(&pdev->dev, false);
+#endif
+
+	if (pwrpriv->wowlan_mode || pwrpriv->wowlan_ap_mode) {
+		rtw_resume_lock_suspend();
+		err = rtw_resume_process(padapter);
+		rtw_resume_unlock_suspend();
+	} else {
+#ifdef CONFIG_RESUME_IN_WORKQUEUE
+		rtw_resume_in_workqueue(pwrpriv);
+#else
+		if (rtw_is_earlysuspend_registered(pwrpriv)) {
+			/* jeff: bypass resume here, do in late_resume */
+			rtw_set_do_late_resume(pwrpriv, _TRUE);
+		} else {
+			rtw_resume_lock_suspend();
+			err = rtw_resume_process(padapter);
+			rtw_resume_unlock_suspend();
+		}
+#endif
+	}
+
+exit:
 
 	return err;
 }

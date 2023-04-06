@@ -367,7 +367,9 @@ end:
 		dbg_en.cmac_dbg = 1;
 		dbg_en.mac_dbg_port = 1;
 		dbg_en.plersvd_dbg = 1;
-		mac_ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
+		if (mac_ops->dbg_status_dump) {
+			mac_ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
+		}
 #endif
 	} else {
 		adapter->sm.mac_rdy = MAC_AX_MAC_RDY;

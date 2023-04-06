@@ -24,13 +24,6 @@
  *****************************************************************************/
 #include "halrf_precomp.h"
 
-bool halrf_init_reg_by_hdr(void *rf_void)
-{
-	bool result = true;
-
-	return result;
-}
-
 bool halrf_nctl_init_reg_by_hdr(void *rf_void)
 {
 	struct rf_info *rf = (struct rf_info *)rf_void;
@@ -119,13 +112,13 @@ bool halrf_config_radio_a_reg(void *rf_void, bool is_form_folder,
 #endif
 #ifdef RF_8730E_SUPPORT
 	if (rf->ic_type == RF_RTL8730E) {
-		halrf_config_8730e_radio_a_reg(rf, 0);
+		halrf_config_8730e_new_radio_a_reg(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (rf->ic_type == RF_RTL8720E) {
-		halrf_config_8720e_radio_a_reg(rf, 0);
+		halrf_config_8720e_new_radio_a_reg(rf);
 	}
 #endif
 
@@ -222,13 +215,13 @@ bool halrf_config_store_power_by_rate(void *rf_void,
 #endif
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_power_by_rate(rf, 0);
+		halrf_config_8730e_store_power_by_rate(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_power_by_rate(rf, 0);
+		halrf_config_8720e_store_power_by_rate(rf);
 	}
 #endif
 
@@ -278,17 +271,6 @@ bool halrf_config_store_power_limit(void *rf_void,
 		halrf_config_8852bp_store_power_limit(rf, 0);
 	}
 #endif
-#ifdef RF_8730E_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_power_limit(rf, 0);
-	}
-#endif
-
-#ifdef RF_8720E_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_power_limit(rf, 0);
-	}
-#endif
 
 	return result;
 }
@@ -334,17 +316,6 @@ bool halrf_config_store_power_limit_ru(void *rf_void,
 #ifdef RF_8852BP_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8852BP) {
 		halrf_config_8852bp_store_power_limit_ru(rf, 0);
-	}
-#endif
-#ifdef RF_8730E_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_power_limit_ru(rf, 0);
-	}
-#endif
-
-#ifdef RF_8720E_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_power_limit_ru(rf, 0);
 	}
 #endif
 
@@ -395,13 +366,13 @@ bool halrf_config_store_power_track(void *rf_void,
 #endif
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_pwr_track(rf, 0);
+		halrf_config_8730e_store_pwr_track(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_pwr_track(rf, 0);
+		halrf_config_8720e_store_pwr_track(rf);
 	}
 #endif
 
@@ -438,18 +409,19 @@ bool halrf_config_store_xtal_track(void *rf_void,
 		halrf_config_8852bp_store_xtal_track(rf, 0);
 	}
 #endif
-#ifdef RF_8730E_SUPPORT
+	/*
+	#ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
 		halrf_config_8730e_store_xtal_track(rf, 0);
 	}
-#endif
+	#endif
 
-#ifdef RF_8720E_SUPPORT
+	#ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
 		halrf_config_8720e_store_xtal_track(rf, 0);
 	}
-#endif
-
+	#endif
+	*/
 	return result;
 }
 
@@ -502,13 +474,13 @@ bool halrf_config_radio(void *rf_void, enum phl_phy_idx phy)
 #endif
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_radio_a_reg(rf, phy);
+		halrf_config_8730e_new_radio_a_reg(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_radio_a_reg(rf, phy);
+		halrf_config_8720e_new_radio_a_reg(rf);
 	}
 #endif
 
@@ -558,13 +530,13 @@ bool halrf_config_power_by_rate(void *rf_void, enum phl_phy_idx phy)
 #endif
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_power_by_rate(rf, phy);
+		halrf_config_8730e_store_power_by_rate(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_power_by_rate(rf, phy);
+		halrf_config_8720e_store_power_by_rate(rf);
 	}
 #endif
 
@@ -614,15 +586,16 @@ bool halrf_config_power_limit(void *rf_void, enum phl_phy_idx phy)
 		halrf_config_8852bp_store_power_limit_6g(rf, phy);
 	}
 #endif
+
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_power_limit(rf, phy);
+		halrf_config_8730e_init_power_limit(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_power_limit(rf, phy);
+		halrf_config_8720e_init_power_limit(rf);
 	}
 #endif
 
@@ -672,19 +645,51 @@ bool halrf_config_power_limit_ru(void *rf_void, enum phl_phy_idx phy)
 		halrf_config_8852bp_store_power_limit_ru_6g(rf, phy);
 	}
 #endif
+
+	return result;
+}
+
+s8 halrf_config_power_limit_by_ch(void *rf_void, u8 limit_rate, u8 regulation, u8 chnl)
+{
+	struct rf_info *rf = (struct rf_info *)rf_void;
+	struct rtw_hal_com_t *hal_com = rf->hal_com;
+	s8 val = 0;
+
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_power_limit_ru(rf, phy);
+		val = halrf_config_8730e_power_limit_by_ch(rf, limit_rate, regulation, chnl);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_power_limit_ru(rf, phy);
+		val = halrf_config_8720e_power_limit_by_ch(rf, limit_rate, regulation, chnl);
 	}
 #endif
 
-	return result;
+	return val;
+}
+
+s8 halrf_config_power_limit_ru_by_ch(void *rf_void,
+				     u8 regulation, u8 bandwith, u8 chnl)
+{
+	struct rf_info *rf = (struct rf_info *)rf_void;
+	struct rtw_hal_com_t *hal_com = rf->hal_com;
+	s8 val = 0;
+
+#ifdef RF_8730E_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
+		val = halrf_config_8730e_power_limit_ru_by_ch(rf, regulation, bandwith, chnl);
+	}
+#endif
+
+#ifdef RF_8720E_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
+		val = halrf_config_8720e_power_limit_ru_by_ch(rf, regulation, bandwith, chnl);
+	}
+#endif
+
+	return val;
 }
 
 bool halrf_config_power_track(void *rf_void, enum phl_phy_idx phy)
@@ -730,13 +735,13 @@ bool halrf_config_power_track(void *rf_void, enum phl_phy_idx phy)
 #endif
 #ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
-		halrf_config_8730e_store_pwr_track(rf, phy);
+		halrf_config_8730e_store_pwr_track(rf);
 	}
 #endif
 
 #ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
-		halrf_config_8720e_store_pwr_track(rf, phy);
+		halrf_config_8720e_store_pwr_track(rf);
 	}
 #endif
 
@@ -772,25 +777,25 @@ bool halrf_config_xtal_track(void *rf_void, enum phl_phy_idx phy)
 		halrf_config_8852bp_store_xtal_track(rf, phy);
 	}
 #endif
-#ifdef RF_8730E_SUPPORT
+	/*
+	#ifdef RF_8730E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
 		halrf_config_8730e_store_xtal_track(rf, phy);
 	}
-#endif
+	#endif
 
-#ifdef RF_8720E_SUPPORT
+	#ifdef RF_8720E_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
 		halrf_config_8720e_store_xtal_track(rf, phy);
 	}
-#endif
-
+	#endif
+	*/
 	return result;
 }
 
 void halrf_config_rf_parameter(void *rf_void, enum phl_phy_idx phy)
 {
 	struct rf_info *rf = (struct rf_info *)rf_void;
-	struct rtw_hal_com_t *hal_com = rf->hal_com;
 
 	/*Radio A and B*/
 	halrf_config_radio(rf, phy);
@@ -808,6 +813,9 @@ void halrf_config_rf_parameter(void *rf_void, enum phl_phy_idx phy)
 	halrf_config_power_track(rf, phy);
 
 	/*Xtal Track*/
+#ifndef IOT_SMALL_RAM
 	halrf_config_xtal_track(rf, phy);
+#endif
+
 }
 

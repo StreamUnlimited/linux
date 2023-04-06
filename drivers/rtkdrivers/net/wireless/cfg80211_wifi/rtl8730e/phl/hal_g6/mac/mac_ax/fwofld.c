@@ -212,7 +212,7 @@ u32 mac_read_pkt_ofld(struct mac_ax_adapter *adapter, u8 id)
 	}
 
 	txd_len = adapter->ops->txdesc_len(adapter, NULL);
-	addr = MAC_TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + id) * 128;
+	addr = TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + id) * 128;
 	PLTFM_MEM_W(addr, buf, 128);
 	ofld_pkt->pkt_len = (u16)buf[0] | ((u16)buf[1] << 8);
 	if (ofld_pkt->pkt_len) {
@@ -248,7 +248,7 @@ u32 mac_del_pkt_ofld(struct mac_ax_adapter *adapter, u8 id)
 		return MACNOTSUP;
 	}
 
-	addr = MAC_TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + id) * 128;
+	addr = TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + id) * 128;
 	PLTFM_MEMSET(buf, 0, 128);
 	PLTFM_MEM_W(addr, buf, 128);
 
@@ -275,7 +275,10 @@ u32 mac_add_pkt_ofld(struct mac_ax_adapter *adapter, u8 *pkt, u16 len, u8 *id,
 		page_num = ofld_info->btqosnull_page;
 		break;
 	case PKT_TYPE_QOS_NULL:
-		page_num = ofld_info->qosnull_page;;
+		page_num = ofld_info->qosnull_page;
+		break;
+	case PKT_TYPE_ARP_RSP:
+		page_num = ofld_info->arp_rsp_page;
 		break;
 	default:
 		page_num = 0;
@@ -296,7 +299,7 @@ u32 mac_add_pkt_ofld(struct mac_ax_adapter *adapter, u8 *pkt, u16 len, u8 *id,
 	}
 	__mac_pkt_ofld_fill_txd(adapter, ptxd, len, type);
 
-	addr = MAC_TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + page_num) * 128;
+	addr = TX_PKTBUF_OFFSET + (txff_info->rsvd_bcnq_addr + page_num) * 128;
 
 	PHL_TRACE(COMP_PHL_PKTOFLD, _PHL_INFO_,
 		  "write pkt to address 0x%06x of tx pkt buffer, page %d\n",
@@ -382,6 +385,7 @@ u32 mac_general_pkt_ids(struct mac_ax_adapter *adapter,
 	u8 *buf;
 	u32 ret;
 	struct fwcmd_rsvdpage fwcmd_tbl;
+	struct fwcmd_aoac_rsvdpage rsvdpage;
 	struct fwcmd_general_pkt *write_ptr;
 	struct rtw_hal_com_t *hal_com = adapter->drv_adapter;
 
@@ -394,6 +398,14 @@ u32 mac_general_pkt_ids(struct mac_ax_adapter *adapter,
 	fwcmd_tbl.data5 = ids->cts2self;
 	fwcmd_tbl.data6 = 0; // unknown here.
 	ret = rtw_hal_mac_send_h2c_ameba(hal_com, fwcmd_tbl.cmd_id, sizeof(struct fwcmd_rsvdpage) - 1, &fwcmd_tbl.data0);
+
+	/* if ((ids->arp_rsp != 0) && (arp_rsp != 0xFF)) {
+		rsvdpage.cmd_id = H2C_AOAC_RSVD_PAGE;
+		rsvdpage.loc_arprsp = ids->arp_rsp;
+		ret = rtw_hal_mac_send_h2c_ameba(hal_com, rsvdpage.cmd_id,
+						 sizeof(struct fwcmd_aoac_rsvdpage) - 1,
+						 &rsvdpage.loc_rmcinfo);
+	} */
 
 	return ret;
 }

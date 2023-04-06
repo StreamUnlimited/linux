@@ -13,6 +13,7 @@
  *
  *****************************************************************************/
 #include "../halrf_precomp.h"
+#include "phy/bb/halbb_precomp.h"
 
 #ifdef RF_8730E_SUPPORT
 
@@ -91,17 +92,13 @@ void halrf_psd_init_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	u32 bb_reg[PSD_BACKUP_NUM_8730E] = {
 		0x15864, 0x12008, 0x10c60, 0x10c6c, 0x158ac,
 		0x10c80, 0x120fc, 0x15670, 0x112a0, 0x1030c,
-		0x1032c, 0x112b8, 0x18080, 0x18000, 0x18018,
-		0x18014, 0x1801c, 0x1800c, 0x180cc, 0x18008
+		0x1032c, 0x112b8, 0x18000, 0x18018, 0x18014,
+		0x1801c, 0x1800c, 0x180cc, 0x18008
 	};
-
 
 	u32 rf_reg[PSD_RF_REG_NUM_8730E] = {0x0, 0x5, 0x8f, 0x10000, 0x10005};
 
 	RF_DBG(rf, DBG_RF_PSD, "======> %s\n", __func__);
-
-	//printf("======> %s\n", __func__);
-
 	if (psd_info->psd_progress == 0) {
 
 		_halrf_psd_backup_bb_registers_8730e(rf, phy, bb_reg,
@@ -116,10 +113,8 @@ void halrf_psd_init_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	psd_info->iq_path = iq_path;
 	psd_info->avg = avg;
 	psd_info->fft = fft;
-
 	RF_DBG(rf, DBG_RF_PSD, "[PSD] fft = %d, avg = %d, iq = %d\n",
 	       fft, avg, iq_path);
-
 	halrf_wrf(rf, path, 0x5, 0x00001, 0x0);
 	halrf_wrf(rf, path, 0x0, 0xF0000, 0x3);
 
@@ -147,7 +142,8 @@ void halrf_psd_init_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	halrf_wreg(rf, 0x120fc, 0x00100000, 0x1);  //bit 20
 	halrf_wreg(rf, 0x120fc, 0x10000000, 0x1);  //bit 28
 	/*02*/
-	halrf_wreg(rf, 0x18080, 0xffffffff, 0x00000006);
+	halrf_wreg(rf, 0x18080, BIT(2), 0x1);
+	//halrf_wreg(rf, 0x18080, 0xffffffff, 0x00000004);
 	halrf_wreg(rf, 0x18008, 0xffffffff, 0x00000280);
 	halrf_wreg(rf, 0x18018, 0xffffffff, 0x40010101);
 
@@ -190,6 +186,7 @@ void halrf_psd_init_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 
 	halrf_wreg(rf, 0x1800c, 0x00000C00, 0x3);
 	halrf_wreg(rf, 0x180cc, 0x0000003F, 0x3F);
+	RF_DBG(rf, DBG_RF_RFK, "[RF spur]1: 18080= %x\n", halrf_rreg(rf, 0x18080, MASKDWORD));
 }
 
 void halrf_psd_restore_8730e(struct rf_info *rf, enum phl_phy_idx phy)
@@ -198,15 +195,16 @@ void halrf_psd_restore_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 	u32 bb_reg[PSD_BACKUP_NUM_8730E] = {
 		0x15864, 0x12008, 0x10c60, 0x10c6c, 0x158ac,
 		0x10c80, 0x120fc, 0x15670, 0x112a0, 0x1030c,
-		0x1032c, 0x112b8, 0x18080, 0x18000, 0x18018,
-		0x18014, 0x1801c, 0x1800c, 0x180cc, 0x18008
+		0x1032c, 0x112b8, 0x18000, 0x18018, 0x18014,
+		0x1801c, 0x1800c, 0x180cc, 0x18008
 	};
 	u32 rf_reg[PSD_RF_REG_NUM_8730E] = {0x0, 0x5, 0x8f, 0x10000, 0x10005};
 
 	RF_DBG(rf, DBG_RF_PSD, "======> %s\n", __func__);
-
 	/*10/11.txt*/
-	halrf_wreg(rf, 0x18080, 0xffffffff, 0x00000002);
+	halrf_wreg(rf, 0x18080, BIT(2), 0x0);
+	//halrf_wreg(rf, 0x18080, 0xffffffff, 0x00000000);
+	halrf_delay_ms(rf, 1);
 	halrf_wreg(rf, 0x18008, 0xffffffff, 0x00000000);
 	halrf_wreg(rf, 0x112b8, 0x10000000, 0x0);
 
@@ -226,9 +224,10 @@ void halrf_psd_restore_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 	if (psd_info->psd_progress == 1) {
 		_halrf_psd_reload_bb_registers_8730e(rf, phy, bb_reg,
 						     psd_info->psd_reg_backup, PSD_BACKUP_NUM_8730E);
-
 		_halrf_psd_reload_rf_8730e(rf, rf_reg);
 	}
+
+	halbb_bb_reset_8730e(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, HW_PHY_0);
 
 	psd_info->psd_progress = 0;
 }
@@ -277,7 +276,6 @@ void halrf_psd_query_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 
 	RF_DBG(rf, DBG_RF_PSD, "======> %s point=%d start_point=%d stop_point=%d\n",
 	       __func__, point, start_point, stop_point);
-
 	if (psd_info->psd_result_running == true) {
 		RF_DBG(rf, DBG_RF_PSD, "======> %s PSD Running Return !!!\n", __func__);
 		return;
@@ -319,5 +317,4 @@ void halrf_psd_query_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 
 	psd_info->psd_result_running = false;
 }
-
 #endif	/*RF_8730E_SUPPORT*/

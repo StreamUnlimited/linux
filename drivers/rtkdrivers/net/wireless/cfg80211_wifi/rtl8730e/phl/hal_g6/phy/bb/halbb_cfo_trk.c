@@ -122,60 +122,8 @@ void halbb_dyn_cfo_trk_loop_init(struct bb_info *bb)
 
 #endif
 
-void halbb_digital_cfo_comp(struct bb_info *bb, s32 curr_cfo)
-{
-	switch (bb->ic_type) {
-
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		halbb_digital_cfo_comp_8852a_2(bb, curr_cfo);
-
-		break;
-#endif
-
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		halbb_digital_cfo_comp_8852b(bb, curr_cfo);
-
-		break;
-#endif
-
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		halbb_digital_cfo_comp_8852c(bb, curr_cfo);
-
-		break;
-#endif
-
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		halbb_digital_cfo_comp_8192xb(bb, curr_cfo);
-
-		break;
-#endif
-
-#ifdef BB_8730E_SUPPORT
-	case BB_RTL8730E:
-		halbb_digital_cfo_comp_8730e(bb, curr_cfo);
-
-		break;
-#endif
-
-#ifdef BB_8720E_SUPPORT
-	case BB_RTL8720E:
-		halbb_digital_cfo_comp_8720e(bb, curr_cfo);
-
-		break;
-#endif
-
-	default:
-		break;
-	}
-}
-
 void halbb_digital_cfo_comp_init(struct bb_info *bb)
 {
-	struct bb_cfo_trk_info *cfo_trk = &bb->bb_cfo_trk_i;
 	struct bb_cfo_trk_cr_info *cr = &bb->bb_cfo_trk_i.bb_cfo_trk_cr_i;
 
 	// 0x4494[29] Whether the memory of r_cfo_comp_312p5khz is valid
@@ -211,12 +159,10 @@ void halbb_cfo_recorder(struct bb_info *bb, u8 step_curr, bool is_positive)
 {
 	struct bb_cfo_trk_info *bb_cfo_trk = &bb->bb_cfo_trk_i;
 	struct bb_cfo_rc_info *bb_cfo_rc = &bb_cfo_trk->bb_cfo_rc_i;
-	u8 step_pre = bb_cfo_rc->step_history[0];
 	u8 step_up = 0;
 
 	BB_DBG(bb, DBG_CFO_TRK,  "%s ======>\n", __func__);
 
-	step_pre = bb_cfo_rc->step_history[0];
 	step_up = is_positive ? 1 : 0;
 	bb_cfo_rc->step_bitmap = (bb_cfo_rc->step_bitmap << 1) | step_up;
 
@@ -341,8 +287,10 @@ void halbb_cfo_diver_init(struct bb_info *bb)
 	halbb_mem_set(bb, bb_cfo_div, 0, sizeof(struct bb_cfo_diver_info));
 }
 
+
 void halbb_cfo_acc_io_en(struct bb_info *bb)
 {
+#ifdef HALBB_CFO_TRK_ACC_EN
 	struct bb_cfo_trk_info *cfo_trk = &bb->bb_cfo_trk_i;
 
 	BB_DBG(bb, DBG_CFO_TRK, "[%s]===>\n", __func__);
@@ -353,10 +301,13 @@ void halbb_cfo_acc_io_en(struct bb_info *bb)
 
 	halbb_cfo_dm(bb);
 	halbb_cfg_timers(bb, BB_SET_TIMER, &bb->bb_cfo_trk_i.cfo_timer_i);
+#endif
 }
+
 
 void halbb_cfo_acc_callback(void *context)
 {
+#ifdef HALBB_CFO_TRK_ACC_EN
 	struct bb_info *bb = (struct bb_info *)context;
 	struct bb_cfo_trk_info *cfo_trk = &bb->bb_cfo_trk_i;
 	struct halbb_timer_info *timer = &cfo_trk->cfo_timer_i;
@@ -370,10 +321,13 @@ void halbb_cfo_acc_callback(void *context)
 	} else {
 		rtw_hal_cmd_notify(bb->phl_com, MSG_EVT_NOTIFY_BB, (void *)(&timer->event_idx), bb->bb_phy_idx);
 	}
+#endif
 }
+
 
 void halbb_cfo_acc_timer_init(struct bb_info *bb)
 {
+#ifdef HALBB_CFO_TRK_ACC_EN
 	struct halbb_timer_info *timer = &bb->bb_cfo_trk_i.cfo_timer_i;
 
 	BB_DBG(bb, DBG_INIT, "[%s]\n", __func__);
@@ -382,7 +336,9 @@ void halbb_cfo_acc_timer_init(struct bb_info *bb)
 	timer->timer_state = BB_TIMER_IDLE;
 
 	halbb_init_timer(bb, &timer->timer_list, halbb_cfo_acc_callback, bb, "halbb_cfo_timer");
+#endif
 }
+
 
 void halbb_cfo_trk_init(struct bb_info *bb)
 {
@@ -419,14 +375,14 @@ void halbb_cfo_trk_init(struct bb_info *bb)
 
 	bb_cfo_trk->sw_comp_fine_tune = CFO_SW_COMP_FINE_TUNE << 2;
 
-	bb_cfo_trk->multi_sta_cfo_mode = TP_BASED_AVG_MODE;
-	bb_cfo_trk->man_cfo_tol = false;
+	//bb_cfo_trk->multi_sta_cfo_mode = TP_BASED_AVG_MODE;
+	//bb_cfo_trk->man_cfo_tol = false;
 	BB_DBG(bb, DBG_CFO_TRK, "Default xcap=0x%x\n", bb_cfo_trk->def_x_cap);
 	BB_DBG(bb, DBG_CFO_TRK, "xcap upper_bound=0x%x\n", bb_cfo_trk->x_cap_ub);
 	BB_DBG(bb, DBG_CFO_TRK, "xcap lower_bound=0x%x\n", bb_cfo_trk->x_cap_lb);
 
 	// For manually fine tune digital cfo
-	halbb_set_reg_cmn(bb, 0x4264, 0x00000003, 1, bb->bb_phy_idx);
+	//halbb_set_reg_cmn(bb, 0x4264, 0x00000003, 1, bb->bb_phy_idx);
 	bb_cfo_trk->tb_tx_comp_cfo_th = DIGI_CFO_COMP_LIMIT << 2;
 	halbb_digital_cfo_comp_init(bb);
 
@@ -487,7 +443,6 @@ void halbb_crystal_cap_adjust(struct bb_info *bb, s32 curr_cfo)
 {
 	struct bb_cfo_trk_info *bb_cfo_trk = &bb->bb_cfo_trk_i;
 	struct bb_cfo_rc_info *bb_cfo_rc = &bb_cfo_trk->bb_cfo_rc_i;
-	struct bb_path_info *bb_path = &bb->bb_path_i;
 	u8 x_cap = bb_cfo_trk->crystal_cap;
 	u8 step = 0;
 	s32 cfo_abs = ABS_32(curr_cfo);
@@ -563,7 +518,6 @@ s32 halbb_avg_cfo_calc(struct bb_info *bb)
 	struct rtw_phl_stainfo_t *sta;
 	struct rtw_cfo_info *cfo_t = NULL;
 	s32 cfo_all_avg = 0;
-	u16 macid;
 
 	sta = bb->phl_sta_info[bb_link->one_entry_macid];
 
@@ -571,10 +525,9 @@ s32 halbb_avg_cfo_calc(struct bb_info *bb)
 		return bb_cfo_trk->cfo_avg_pre;
 	}
 
-	macid = sta->macid;
 	cfo_t = &sta->hal_sta->cfo_stat;
 
-	BB_DBG(bb, DBG_CFO_TRK, "one-entry-only macid=%d\n", macid);
+	BB_DBG(bb, DBG_CFO_TRK, "one-entry-only macid=%d\n", sta->macid);
 
 	cfo_all_avg = HALBB_DIV(cfo_t->cfo_tail, (s32)cfo_t->cfo_cnt);
 
@@ -582,7 +535,7 @@ s32 halbb_avg_cfo_calc(struct bb_info *bb)
 	       cfo_t->cfo_tail >> 2, cfo_t->cfo_cnt, cfo_all_avg >> 2);
 	return cfo_all_avg;
 }
-
+#if 0
 s32 halbb_multi_sta_avg_cfo_calc(struct bb_info *bb)
 {
 	struct bb_cfo_trk_info *bb_cfo_trk = &bb->bb_cfo_trk_i;
@@ -776,6 +729,7 @@ s32 halbb_multi_sta_avg_cfo_calc(struct bb_info *bb)
 
 	return target_cfo;
 }
+#endif
 
 void halbb_set_cfo_pause_val(struct bb_info *bb, u32 *val_buf, u8 val_len)
 {
@@ -894,7 +848,7 @@ void halbb_cfo_trk(struct bb_info *bb, s32 curr_cfo)
 
 	halbb_crystal_cap_adjust(bb, curr_cfo); /*Decide xcap need to adjust or not */
 }
-
+#ifdef HALBB_CFO_TRK_ACC_EN
 void halbb_cfo_ul_ofdma_acc_enable(struct bb_info *bb)
 {
 	struct bb_cfo_trk_info *bb_cfo_trk = &bb->bb_cfo_trk_i;
@@ -1015,6 +969,7 @@ bool halbb_cfo_acc_mode_en(struct bb_info *bb)
 	cfo_trk->cfo_tf_cnt_pre = cfo_tf_cnt_cur;
 	return cfo_trk->cfo_trig_by_timer_en;
 }
+#endif
 
 void halbb_cfo_dm(struct bb_info *bb)
 {
@@ -1091,7 +1046,8 @@ void halbb_cfo_dm(struct bb_info *bb)
 			/* To avoid NIC soft-AP going to multi-sta cfo until AP side is verified for a long time*/
 			if (dev->rfe_type >= 50) {
 				/* Multi-sta cfo tracking -> calc. centroid cfo first*/
-				new_cfo = halbb_multi_sta_avg_cfo_calc(bb);
+
+				//new_cfo = halbb_multi_sta_avg_cfo_calc(bb);
 			}
 		}
 	}
@@ -1118,7 +1074,7 @@ void halbb_cfo_dm(struct bb_info *bb)
 			new_cfo += cfo_trk->sw_comp_fine_tune;
 		}
 	}
-	halbb_digital_cfo_comp(bb, new_cfo);
+	halbb_digital_cfo_comp_8730e(bb, new_cfo);
 
 	halbb_cfo_counter_rst(bb);
 }
@@ -1130,12 +1086,13 @@ void halbb_cfo_watchdog(struct bb_info *bb)
 #ifdef HALBB_DBCC_SUPPORT
 	if (!bb->hal_com->dbcc_en)
 #endif
+#ifdef HALBB_CFO_TRK_ACC_EN
 	{
 		if (halbb_cfo_acc_mode_en(bb)) {
 			return;
 		}
 	}
-
+#endif
 	BB_DBG(bb, DBG_CFO_TRK, "[%s]\n", __func__);
 	halbb_cfo_dm(bb);
 	BB_DBG(bb, DBG_CFO_TRK, "\n");
@@ -1221,7 +1178,6 @@ void halbb_parsing_cfo(struct bb_info *bb, u32 physts_bitmap,
 		cfo_t->tp +=  bb_phy_rate_table[fw_rate_idx];
 	}
 }
-
 
 void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		       char *output, u32 *_out_len)

@@ -50,30 +50,30 @@ struct halrf_iqk_info {
 	bool lok_fin_fail[2][NUM]; /*channel/path */
 	bool iqk_tx_fail[2][NUM]; /*channel/path */
 	bool iqk_rx_fail[2][NUM]; /*channel/path */
-	u32 iqk_cnt;
-	u32 iqk_fail_cnt;
+	//u32 iqk_cnt;
+	u8 iqk_fail_cnt;
 	bool segment_iqk;
 	bool is_iqk_enable;
 	bool is_iqk_init;
 	bool is_reload;
-	u32 iqk_channel[2];
+	//u32 iqk_channel[2];
 	u8 iqk_band[NUM];
 	u8 iqk_ch[NUM];
 	u8 iqk_bw[NUM];
-	u8 kcount;
+	//u8 kcount;
 	u8 iqk_times;
-	u8 rxiqk_step;
-	u8 iqk_step;
-	u8 version;
-	u32 lok_idac[2][NUM];
-	u32 lok_vbuf[2][NUM];
-	u32 iqc_gain;
-	u32 rftxgain[NUM];
-	u32 rfrxgain[NUM];
-	u32 nb_txcfir[NUM];
-	u32 nb_rxcfir[NUM];
-	u32 rximr[NUM];
-	u32 syn1to2;
+	//u8 rxiqk_step;
+	//u8 iqk_step;
+	//u8 version;
+	//u32 lok_idac[2][NUM];
+	//u32 lok_vbuf[2][NUM];
+	//u32 iqc_gain;
+	//u32 rftxgain[NUM];
+	//u32 rfrxgain[NUM];
+	//u32 nb_txcfir[NUM];
+	//u32 nb_rxcfir[NUM];
+	//u32 rximr[NUM];
+	u32 temp_rf61;
 	u32 bp_txkresult[2];
 	u32 bp_rxkresult[2];
 	u32 bp_lokresult[2];
@@ -82,12 +82,12 @@ struct halrf_iqk_info {
 	bool is_wb_txiqk[2];
 	bool is_wb_rxiqk[2];
 	bool is_nbiqk;
-	bool iqk_fft_en;
-	bool iqk_xym_en;
-	bool iqk_sram_en;
-	bool iqk_cfir_en;
-	u8 ther_avg[2][8];	/*path*/
-	u8 ther_avg_idx;
+	//bool iqk_fft_en;
+	//bool iqk_xym_en;
+	//bool iqk_sram_en;
+	//bool iqk_cfir_en;
+	//u8 ther_avg[2][8];	/*path*/
+	//u8 ther_avg_idx;
 	u8 thermal[2];
 	bool thermal_rek_en;
 	u8 iqk_mcc_ch[2][NUM];

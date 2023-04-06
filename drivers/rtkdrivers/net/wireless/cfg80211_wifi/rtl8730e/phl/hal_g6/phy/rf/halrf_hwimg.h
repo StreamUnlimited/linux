@@ -30,9 +30,11 @@
 
 struct halrf_radio_info {
 	u32 write_times_a;
+#ifndef IOT_SMALL_RAM
 	u32 write_times_b;
 	u32 radio_a_parameter[RADIO_TO_FW_PAGE_SIZE][RADIO_TO_FW_DATA_SIZE];
 	u32 radio_b_parameter[RADIO_TO_FW_PAGE_SIZE][RADIO_TO_FW_DATA_SIZE];
+#endif
 };
 
 #endif /*  _HALRF_HW_IMG_8852A_H_ */

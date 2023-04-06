@@ -35,18 +35,18 @@ static int file_close(void)
 	return filp_close(file, NULL);
 }
 
-static int file_read(loff_t offset, size_t size, void *data)
+static int file_read(loff_t offset, size_t size, size_t *data)
 {
 	struct file *file = mrdump_desc->file;
 
-	return kernel_read(file, data, size, &offset);
+	return kernel_read(file, (void *)data, size, &offset);
 }
 
-static int file_write(loff_t offset, size_t size, const void *data)
+static int file_write(loff_t offset, size_t size, const size_t *data)
 {
 	struct file *file = mrdump_desc->file;
 
-	return kernel_write(file, data, size, &offset);
+	return kernel_write(file, (void *)data, size, &offset);
 }
 
 static int file_sync(void)

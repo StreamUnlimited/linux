@@ -1318,6 +1318,7 @@ static struct dma_chan *rtk_dma_of_xlate(
 
 static const struct of_device_id rtk_dma_match[] = {
 	{.compatible = "realtek,amebad2-rtk-dmac",},
+	{},
 };
 MODULE_DEVICE_TABLE(of, rtk_dma_match);
 
@@ -1331,7 +1332,7 @@ static int rtk_dma_probe(struct platform_device *pdev)
 
 	of_id = of_match_device(rtk_dma_match, &pdev->dev);
 	if (!of_id || strcmp(of_id->compatible, rtk_dma_match->compatible)) {
-		return -EINVAL;
+		return 0;
 	}
 
 	rsdma = devm_kzalloc(&pdev->dev, sizeof(*rsdma), GFP_KERNEL);
@@ -1420,6 +1421,10 @@ static int rtk_dma_probe(struct platform_device *pdev)
 	ret = devm_request_irq(&pdev->dev, rsdma->irq[5], rtk_dma_interrupt_ch5, 0, dev_name(&pdev->dev), rsdma);
 	ret = devm_request_irq(&pdev->dev, rsdma->irq[6], rtk_dma_interrupt_ch6, 0, dev_name(&pdev->dev), rsdma);
 	ret = devm_request_irq(&pdev->dev, rsdma->irq[7], rtk_dma_interrupt_ch7, 0, dev_name(&pdev->dev), rsdma);
+
+	for (i = 0; i < GDMA_MAX_CHANNEL; i++)
+		irq_set_affinity(rsdma->irq[i],cpumask_of(RTK_DMAC_RUN_CPU));
+
 #endif // !RTK_DMAC_INTERRUPT_COMBINE
 
 	if (ret) {

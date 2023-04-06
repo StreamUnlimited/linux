@@ -284,6 +284,7 @@ static int realtek_comp_remove(struct platform_device *pdev)
 
 static const struct of_device_id realtek_comp_match[] = {
 	{.compatible = "realtek,amebad2-comparator",},
+	{},
 };
 MODULE_DEVICE_TABLE(of, realtek_comp_match);
 

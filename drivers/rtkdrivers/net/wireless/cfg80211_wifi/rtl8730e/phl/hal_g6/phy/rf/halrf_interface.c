@@ -24,11 +24,12 @@
  *****************************************************************************/
 #include "halrf_precomp.h"
 
+/*
 u32 halrf_get_sys_time(struct rf_info *rf)
 {
 	return 0;
 }
-
+*/
 u32 halrf_cal_bit_shift(u32 bit_mask)
 {
 	u32 i;
@@ -68,7 +69,6 @@ void halrf_wreg(struct rf_info *rf, u32 addr, u32 mask, u32 val)
 		RF_DBG(rf, DBG_RF_FW,
 		       "[FW_Ofld] addr=0x%08x   mask=0x%08x   val=0x%08x\n",
 		       addr, mask, val);
-
 		hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
 
 		cmd.src = RTW_MAC_BB_CMD_OFLD;
@@ -120,6 +120,10 @@ u32 halrf_rreg(struct rf_info *rf, u32 addr, u32 mask)
 
 void halrf_wrf(struct rf_info *rf, enum rf_path path, u32 addr, u32 mask, u32 val)
 {
+#if defined (RF_8730E_SUPPORT) || defined (RF_8720E_SUPPORT)
+	u8 cv_drv = 0;
+#endif
+
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 	struct rtw_mac_cmd cmd = {0};
 	struct halrf_fw_offload *fwofld_info = &rf->fwofld;
@@ -130,7 +134,6 @@ void halrf_wrf(struct rf_info *rf, enum rf_path path, u32 addr, u32 mask, u32 va
 		RF_DBG(rf, DBG_RF_FW,
 		       "[FW_Ofld] addr=0x%08x   mask=0x%08x   val=0x%08x   path=%d\n",
 		       addr, mask, val, path);
-
 		hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
 
 		cmd.src = RTW_MAC_RF_CMD_OFLD;
@@ -156,9 +159,22 @@ void halrf_wrf(struct rf_info *rf, enum rf_path path, u32 addr, u32 mask, u32 va
 		}
 	} else
 #endif
-		rtw_hal_write_rf_reg((rf)->hal_com, path, addr, mask, val);
-}
+		halbb_write_rf_reg(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, path, addr, mask, val);
 
+#if defined (RF_8730E_SUPPORT) || defined (RF_8720E_SUPPORT)
+	cv_drv = rf->hal_com->cv;
+	/*workaround to protect lck/x2k/thermal/rck*/
+	if (cv_drv == CAV) {
+		if (addr == 0x18 || addr == 0xbd ||  addr == 0x42 || addr == 0x1b) {
+			halbb_write_rf_reg(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, path, 0xff, MASKRF, 0x0);
+		}
+	}
+#elif defined (RF_8720E_SUPPORT)
+	if (addr == 0x18 || addr == 0xbd ||  addr == 0x42 || addr == 0x1b) {
+		halbb_write_rf_reg(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, path, 0xff, MASKRF, 0x0);
+	}
+#endif
+}
 
 void halrf_delay_10us(struct rf_info *rf, u32 count)
 {
@@ -172,7 +188,9 @@ void halrf_delay_10us(struct rf_info *rf, u32 count)
 void halrf_fill_h2c_cmd(struct rf_info *rf, u16 cmdlen, u8 cmdid,
 			u8 classid, u32 cmdtype, u32 *pval)
 {
+#ifdef	RFDBG_TRACE_EN
 	u32 rt_val = 0;
+#endif
 	struct rtw_g6_h2c_hdr hdr = {0};
 	struct rtw_hal_com_t *hal_com = NULL;
 
@@ -181,12 +199,17 @@ void halrf_fill_h2c_cmd(struct rf_info *rf, u16 cmdlen, u8 cmdid,
 	hdr.type = cmdtype;
 	hdr.content_len = cmdlen;
 	hal_com = rf->hal_com;
-	RF_DBG(rf, DBG_RF_IQK, "[IQK]======>%s   H2C: %x %x %x\n",
-	       __func__, classid, cmdid, cmdlen);
+
+#ifdef	RFDBG_TRACE_EN
 	rt_val =  rtw_hal_mac_send_h2c(hal_com, &hdr, pval);
+	RF_DBG(rf, DBG_RF_IQK, "[IQK]======>%s	 H2C: %x %x %x\n",
+	       __func__, classid, cmdid, cmdlen);
 	if (rt_val != 0) {
 		RF_WARNING("Error H2C CLASS=%d, ID=%d\n", classid, cmdid);
 		RF_DBG(rf, DBG_RF_IQK, "Error H2C CLASS=%d, ID=%d\n", classid, cmdid);
 	}
+#else
+	rtw_hal_mac_send_h2c(hal_com, &hdr, pval);
+#endif
 }
 

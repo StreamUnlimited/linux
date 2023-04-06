@@ -53,84 +53,6 @@ void halbb_cfg_timers(struct bb_info *bb, enum bb_timer_cfg_t cfg,
 	}
 }
 
-u32 halbb_get_sys_time(struct bb_info *bb)
-{
-	return 0;
-}
-
-u32 halbb_phy0_to_phy1_ofst(struct bb_info *bb, u32 addr)
-{
-	u32 ofst = 0;
-
-#ifdef HALBB_DBCC_SUPPORT
-	switch (bb->ic_type) {
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		ofst = halbb_phy0_to_phy1_ofst_8852a_2(bb, addr);
-		break;
-#endif
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		ofst = halbb_phy0_to_phy1_ofst_8852c(bb, addr);
-		break;
-#endif
-
-	default:
-		break;
-	}
-#endif
-	return ofst;
-}
-
-#ifdef BB_FW_OFLD_SUPPORT
-bool halbb_check_fw_ofld(struct bb_info *bb)
-{
-	bool ret = bb->phl_com->dev_cap.fw_cap.offload_cap & BIT0;
-	BB_DBG(bb, DBG_FW_INFO, "FW ofld ret = %d\n", (u8)ret);
-	return ret;
-}
-
-bool halbb_fw_set_reg(struct bb_info *bb, u32 addr, u32 mask, u32 val, u8 lc)
-{
-	/* halbb_set_reg */
-	struct rtw_mac_cmd cmd;
-	u32 ret;
-
-	cmd.src = RTW_MAC_BB_CMD_OFLD;
-	cmd.type = RTW_MAC_WRITE_OFLD;
-	cmd.lc = lc;
-	cmd.offset = (u16)addr;
-	cmd.value = val;
-	cmd.mask = mask;
-	ret = rtw_hal_mac_add_cmd_ofld(bb->hal_com, &cmd);
-	BB_DBG(bb, DBG_FW_INFO, "FW ofld addr:%x, val:%x, msk:%x\n", addr, val, mask);
-	if (ret) {
-		BB_WARNING("IO offload fail: %d\n", ret);
-		return false;
-	} else {
-		return true;
-	}
-
-}
-
-bool halbb_fw_set_reg_cmn(struct bb_info *bb, u32 addr,
-			  u32 mask, u32 val, enum phl_phy_idx phy_idx, u8 lc)
-{
-	bool ret = true;
-	u32 val_mod = val;
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (bb->hal_com->dbcc_en && phy_idx == HW_PHY_1) {
-		addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	}
-#endif
-
-	ret = halbb_fw_set_reg(bb, addr, mask, val_mod, lc);
-	return ret;
-}
-
-#endif
-
 void halbb_set_cr(struct bb_info *bb, u32 addr, u32 val)
 {
 	if (bb->bb_dbg_i.cr_recorder_en) {
@@ -167,15 +89,8 @@ void halbb_set_reg(struct bb_info *bb, u32 addr, u32 mask, u32 val)
 
 void halbb_set_reg_curr_phy(struct bb_info *bb, u32 addr, u32 mask, u32 val)
 {
-	enum phl_phy_idx phy_idx = bb->bb_phy_idx;
 	u32 ori_val, shift;
 	u32 val_mod = val;
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (bb->hal_com->dbcc_en && phy_idx == HW_PHY_1) {
-		addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	}
-#endif
 
 	if (mask != MASKDWORD) {
 		shift = halbb_cal_bit_shift(mask);
@@ -191,12 +106,6 @@ void halbb_set_reg_cmn(struct bb_info *bb, u32 addr, u32 mask, u32 val, enum phl
 {
 	u32 ori_val, shift;
 	u32 val_mod = val;
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (bb->hal_com->dbcc_en && phy_idx == HW_PHY_1) {
-		addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	}
-#endif
 
 	if (mask != MASKDWORD) {
 		shift = halbb_cal_bit_shift(mask);
@@ -221,19 +130,6 @@ void halbb_set_reg_phy0_1(struct bb_info *bb, u32 addr, u32 mask, u32 val)
 	}
 
 	halbb_set_cr(bb, addr, val_mod);
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (!bb->hal_com->dbcc_en) {
-		return;
-	}
-
-	addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	if (mask != MASKDWORD) {
-		ori_val = halbb_get_32(bb, addr);
-		val_mod = ((ori_val) & (~mask)) | (((val << shift)) & mask);
-	}
-	halbb_set_cr(bb, addr, val_mod);
-#endif
 }
 
 u32 halbb_get_reg(struct bb_info *bb, u32 addr, u32 mask)
@@ -247,14 +143,7 @@ u32 halbb_get_reg(struct bb_info *bb, u32 addr, u32 mask)
 
 u32 halbb_get_reg_curr_phy(struct bb_info *bb, u32 addr, u32 mask)
 {
-	enum phl_phy_idx phy_idx = bb->bb_phy_idx;
 	u32 val_0 = 0;
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (bb->hal_com->dbcc_en && phy_idx == HW_PHY_1) {
-		addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	}
-#endif
 
 	val_0 = (halbb_get_cr(bb, addr) & mask) >> halbb_cal_bit_shift(mask);
 
@@ -265,12 +154,6 @@ u32 halbb_get_reg_curr_phy(struct bb_info *bb, u32 addr, u32 mask)
 u32 halbb_get_reg_cmn(struct bb_info *bb, u32 addr, u32 mask, enum phl_phy_idx phy_idx)
 {
 	u32 val_0 = 0;
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (bb->hal_com->dbcc_en && phy_idx == HW_PHY_1) {
-		addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	}
-#endif
 
 	val_0 = (halbb_get_cr(bb, addr) & mask) >> halbb_cal_bit_shift(mask);
 
@@ -283,15 +166,6 @@ u32 halbb_get_reg_phy0_1(struct bb_info *bb, u32 addr, u32 mask, u32 *val_1)
 	u32 shift = halbb_cal_bit_shift(mask);
 
 	val_0 = (halbb_get_cr(bb, addr) & mask) >> shift;
-
-#ifdef HALBB_DBCC_SUPPORT
-	if (!bb->hal_com->dbcc_en) {
-		return val_0;
-	}
-
-	addr += halbb_phy0_to_phy1_ofst(bb, addr);
-	*val_1 = (halbb_get_cr(bb, addr) & mask) >> shift;
-#endif
 
 	return val_0;
 }
@@ -405,8 +279,8 @@ bool halbb_conv_h2c_content(u8 h2c_cmd_id, u32 *pconv1, u32 *pconv2, u32 *pval)
 
 	} else {
 		BB_WARNING("[%s] Error H2C_CMD_ID!!\n", __func__);
+		return false;
 	}
-
 	return true;
 }
 #endif
@@ -415,7 +289,6 @@ bool halbb_fill_h2c_cmd(struct bb_info *bb, u16 cmdlen, u8 cmdid,
 			u8 classid, u32 *pval)
 {
 	u32 rt_val = 0;
-	bool c_val = false;
 	struct rtw_g6_h2c_hdr hdr = {0};
 	struct rtw_hal_com_t *hal_com = NULL;
 
@@ -445,13 +318,13 @@ bool halbb_fill_h2c_cmd(struct bb_info *bb, u16 cmdlen, u8 cmdid,
 			return false;
 		}
 
-		c_val = halbb_conv_h2c_content(elementid, (u32 *)ra_cfg_1, (u32 *)ra_cfg_2, pval);
-		rtw_hal_mac_send_h2c_ameba(hal_com, elementid, length1, (u8 *)ra_cfg_1);
+		halbb_conv_h2c_content(elementid, (u32 *)ra_cfg_1, (u32 *)ra_cfg_2, pval);
 
 		BB_DBG(bb, DBG_RA, "RA trans mask: %x %x %x %x\n", ra_cfg_2->mode_ctrl, ra_cfg_2->upd_bw_nss_mask,
 		       ra_cfg_2->upd_mask, ra_cfg_2->ramask[0]);
 
 		rtw_hal_mac_send_h2c_ameba(hal_com, DM_RA_H2C_MACIDCFG2, length2, (u8 *)ra_cfg_2);
+		rtw_hal_mac_send_h2c_ameba(hal_com, DM_RA_H2C_MACIDCFG, length1, (u8 *)ra_cfg_1);
 
 		if (ra_cfg_1) {
 			hal_mem_free(bb->hal_com, ra_cfg_1, length1);
@@ -468,7 +341,7 @@ bool halbb_fill_h2c_cmd(struct bb_info *bb, u16 cmdlen, u8 cmdid,
 			return false;
 		}
 
-		c_val = halbb_conv_h2c_content(elementid, (u32 *)rssi_i, (u32 *)rssi_i, pval);
+		halbb_conv_h2c_content(elementid, (u32 *)rssi_i, (u32 *)rssi_i, pval);
 		length1 = sizeof(struct fw_h2c_rssi_setting);
 		rt_val =  rtw_hal_mac_send_h2c_ameba(hal_com, elementid, length1, (u8 *)rssi_i);
 
@@ -514,49 +387,6 @@ bool halbb_test_h2c_c2h_flow(struct bb_info *bb)
 	}
 }
 
-u32 halbb_c2h_rua_parsing(struct bb_info *bb, u8 cmdid, u8 len, u8 *c2h)
-{
-	u32 val = 0;
-	return val;
-}
-
-#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT) /* HALBB WARNING */
-u32 halbb_c2h_mu_gptbl_rpt(struct bb_info *bb, u16 len, u8 *c2h)
-{
-	/* Set MU grouping table and return value */
-	u32 val = 0;
-	u8 i = 0;
-	u8 j = 0;
-	u8 k = 0;
-	u8 mask = 0x03;
-	struct hal_mu_score_tbl *mu_sc_tbl = &bb->hal_com->bb_mu_score_tbl;
-
-	/*
-	 Need to do MU protect to prevent error c2h sending
-	 this function will be return to prevent error c2h
-	*/
-	return val;
-	for (i = 0; i < HAL_MAX_MU_STA_NUM; i++)
-		for (j = 0; j < HAL_MAX_MU_SCORE_SIZE; j++) {
-			if (mask == 0x03) {
-				mu_sc_tbl->mu_score[i].score[j] = (c2h[k] & mask);
-				mask = mask << 2;
-			} else if (mask == 0x0c) {
-				mu_sc_tbl->mu_score[i].score[j] = (c2h[k] & mask) >> 2;
-				mask = mask << 2;
-			} else if (mask == 0x30) {
-				mu_sc_tbl->mu_score[i].score[j] = (c2h[k] & mask) >> 4;
-				mask = mask << 2;
-			} else { /*(mask == 0xc0) */
-				mu_sc_tbl->mu_score[i].score[j] = (c2h[k] & mask) >> 6;
-				mask = 0x03;
-				k++;
-			}
-		}
-	return val;
-}
-#endif
-
 #ifdef HALBB_DYN_L2H_SUPPORT
 u32 halbb_c2h_lowrt_rty(struct bb_info *bb, u16 len, u8 *c2h)
 {
@@ -573,40 +403,14 @@ void halbb_fw_ctrl_rtyrpt(struct bb_info *bb, u8 rpt_rtycnt, u8 en_fw_rpt)
 	struct bb_fw_dbg_cmn_info *fwmn_i = &bb->bb_fwdbg_i;
 	u32 *bb_h2c = (u32 *) fwmn_i;
 	u8 cmdlen = sizeof(struct bb_fw_dbg_cmn_info);
-	bool ret_val = false;
 
 	fwmn_i->fw_cmn_info |= (en_fw_rpt & 0x01);
 	fwmn_i->fw_rty_rpt_ctrl = rpt_rtycnt;
 	BB_DBG(bb, DBG_FW_INFO, "FW CTRL RTYRPT: %d %d\n", fwmn_i->fw_cmn_info, fwmn_i->fw_rty_rpt_ctrl);
 	BB_DBG(bb, DBG_FW_INFO, "FW CMN CTRL: %x %x\n", bb_h2c[0], bb_h2c[1]);
-	ret_val = halbb_fill_h2c_cmd(bb, cmdlen, DM_H2C_FWTRACE, HALBB_H2C_DM, bb_h2c);
+	halbb_fill_h2c_cmd(bb, cmdlen, DM_H2C_FWTRACE, HALBB_H2C_DM, bb_h2c);
 }
-
 #endif
-
-/* Remove after 8852A B cut */
-/*
-u32 halbb_c2h_fw_trig_tx_rpt(struct bb_info *bb, u16 len, u8 *c2h)
-{
-	struct bb_c2h_fw_tx_rpt *fw_tx_i = &bb->bb_fwtx_c2h_i;
-	bool tx_stat = c2h[0] & BIT(0);
-	u32 val = (u32)false;
-
-	if (tx_stat) {
-		BB_DBG(bb, DBG_FW_INFO, "[FW][C2H] Tx done\n");
-	} else {
-		BB_DBG(bb, DBG_FW_INFO, "[FW][C2H] Tx fail\n");
-	}
-
-	// PD hit enable
-	halbb_set_reg(bb, 0xa3c, BIT(9), 0);
-	halbb_set_reg(bb, 0xabc, BIT(9), 0);
-
-	fw_tx_i->tx_done = tx_stat;
-
-	val = (u32)true;
-	return val;
-}*/
 
 u32 halbb_c2h_fw_h2c_test(struct bb_info *bb, u16 len, u8 *c2h)
 {
@@ -717,179 +521,19 @@ enum rf_path halbb_config_path(struct bb_info *bb, enum phl_band_idx band_idx,
 	if (rf_num == 1) {
 		path_set = RF_PATH_B;
 	}
-#ifdef HALBB_DBCC_SUPPORT
-	/* While DBCC enable, PHY0 should set path_en = 0,
-	PHY1 should set path_en = 1, and PHY0 Txpath_map_a should set 0, others
-	will be config by HW
-	*/
-
-	if (bb->hal_com->dbcc_en) {
-		if (band_idx == HW_BAND_0) {
-			path_set = RF_PATH_A;
-		} else {
-			path_set = RF_PATH_B;
-		}
-	}
-#endif
 	return path_set;
-}
-
-enum rtw_hal_status
-halbb_config_cmac_tbl(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i,
-		      struct rtw_hal_mac_ax_cctl_info *cctrl,
-		      struct rtw_hal_mac_ax_cctl_info *cctl_info_mask) {
-	enum rtw_hal_status ret = RTW_HAL_STATUS_FAILURE;
-#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT) /* HALBB WARNING don't support pathb/c/d */
-	enum rf_path path_set = RF_PATH_A;
-	u16 cfg;
-	u16 macid = 0;
-	u8 rf_num = 0;
-	bool dbcc_en = false;
-	enum phl_band_idx band_idx = HW_BAND_0;
-
-	if (NULL == phl_sta_i)
-	{
-		return ret;
-	}
-
-	rf_num = bb->hal_com->rfpath_tx_num;
-#ifdef HALBB_DBCC_SUPPORT
-	band_idx = phl_sta_i->rlink->hw_band;
-#endif
-	/* BB related mask */
-	cctl_info_mask->txpwr_mode = 0x7;
-	cctl_info_mask->ntx_path_en = 0xf;
-	cctl_info_mask->path_map_a = 0x3;
-	cctl_info_mask->path_map_b = 0x3;
-	cctl_info_mask->path_map_c = 0x3;
-	cctl_info_mask->path_map_d = 0x3;
-	cctl_info_mask->antsel_a = 0x1;
-	cctl_info_mask->antsel_b = 0x1;
-	cctl_info_mask->antsel_c = 0x1;
-	cctl_info_mask->antsel_d = 0x1;
-	cctl_info_mask->doppler_ctrl = 0x3;
-	cctl_info_mask->txpwr_tolerence = 0xf;
-
-	/* BB related cmac tbl */
-	path_set = halbb_config_path(bb, band_idx, rf_num);
-	cctrl->txpwr_mode = 0; /* txpwr ctrl */
-	cfg = halbb_cfg_cmac_tx_ant(bb, path_set);
-	cctrl->ntx_path_en = cfg & 0x0f;
-	cctrl->path_map_a = ((cfg >> 4) & 0x03);
-	cctrl->path_map_b = ((cfg >> 6) & 0x03);
-	cctrl->path_map_c = ((cfg >> 8) & 0x03);
-	cctrl->path_map_d = ((cfg >> 10) & 0x03);
-	cctrl->antsel_a = 0x0;
-	cctrl->antsel_b = 0x0;
-	cctrl->antsel_c = 0x0;
-	cctrl->antsel_d = 0x0;
-	cctrl->doppler_ctrl = 0;
-	cctrl->txpwr_tolerence = 0;
-	ret = RTW_HAL_STATUS_SUCCESS;
-	BB_DBG(bb, DBG_FW_INFO, "HALBB CMAC tbl config: path = %x\n", cfg);
-#endif
-	return ret;
-}
-
-u8 halbb_set_cmac_txpwr_mode(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	/* power by macid */
-	return 0;
-}
-
-u8 halbb_set_cmac_ntx_en(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 1;
-}
-
-u8 halbb_set_cmac_path_map_a(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 0;
-}
-
-u8 halbb_set_cmac_path_map_b(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 1;
-}
-
-u8 halbb_set_cmac_path_map_c(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 2;
-}
-
-u8 halbb_set_cmac_path_map_d(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 3;
-}
-
-u8 halbb_set_cmac_antsel_a(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	/* antenna selection*/
-	return 0;
-}
-
-u8 halbb_set_cmac_antsel_b(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 0;
-}
-
-u8 halbb_set_cmac_antsel_c(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 0;
-}
-
-u8 halbb_set_cmac_antsel_d(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 0;
-}
-
-u8 halbb_set_cmac_pwr_tol(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	return 0;
-}
-
-u8 halbb_set_cmac_databw_er(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	/* 0: RU242, 1:RU106*/
-	return 0;
 }
 
 bool halbb_set_pwr_by_rate_tbl(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
 {
 	struct halbb_pwr_by_rate_tbl pwr_t = {{0}};
 	u8 i = 0;
-	enum rtw_data_rate ru_pwr_rate[PWR_TBL_NUM] = {RTW_DATA_RATE_HE_NSS1_MCS0,
-						       RTW_DATA_RATE_HE_NSS1_MCS1, RTW_DATA_RATE_HE_NSS1_MCS2,
-						       RTW_DATA_RATE_HE_NSS1_MCS3, RTW_DATA_RATE_HE_NSS1_MCS4,
-						       RTW_DATA_RATE_HE_NSS1_MCS5, RTW_DATA_RATE_HE_NSS1_MCS6,
-						       RTW_DATA_RATE_HE_NSS1_MCS7, RTW_DATA_RATE_HE_NSS1_MCS8,
-						       RTW_DATA_RATE_HE_NSS1_MCS9, RTW_DATA_RATE_HE_NSS1_MCS10,
-						       RTW_DATA_RATE_HE_NSS1_MCS11, RTW_DATA_RATE_HE_NSS2_MCS0,
-						       RTW_DATA_RATE_HE_NSS2_MCS1, RTW_DATA_RATE_HE_NSS2_MCS2,
-						       RTW_DATA_RATE_HE_NSS2_MCS3, RTW_DATA_RATE_HE_NSS2_MCS4,
-						       RTW_DATA_RATE_HE_NSS2_MCS5, RTW_DATA_RATE_HE_NSS2_MCS6,
-						       RTW_DATA_RATE_HE_NSS2_MCS7, RTW_DATA_RATE_HE_NSS2_MCS8,
-						       RTW_DATA_RATE_HE_NSS2_MCS9, RTW_DATA_RATE_HE_NSS2_MCS10,
-						       RTW_DATA_RATE_HE_NSS2_MCS11, RTW_DATA_RATE_HE_NSS1_MCS0,
-						       RTW_DATA_RATE_HE_NSS1_MCS1, RTW_DATA_RATE_HE_NSS1_MCS3,
-						       RTW_DATA_RATE_HE_NSS1_MCS4, RTW_DATA_RATE_HE_NSS2_MCS0,
-						       RTW_DATA_RATE_HE_NSS2_MCS1, RTW_DATA_RATE_HE_NSS2_MCS3,
-						       RTW_DATA_RATE_HE_NSS2_MCS4
-						      };
 	u32 *pval = (u32 *)&pwr_t;
 	u8 cmdlen = sizeof(pwr_t);
-	u8 dcm = 0;
-	enum rtw_data_rate rate;
-	enum channel_width  bw = phl_sta_i->chandef.bw;
-	u8 channel = phl_sta_i->chandef.center_ch;
 	s16 pwr_db = 0;
 
 
 	for (i = 0; i < PWR_TBL_NUM; i++) {
-		rate = ru_pwr_rate[i];
-		if (i >= 24) {
-			dcm = 1;
-		}
 		/*rtw_hal_rf_read_pwr_table(bb->hal_com, 0, rate, bw, channel, 0, dcm, 0, &pwr_db);*/
 		pwr_t.pwr_by_rate[i * 2] = (u8)(pwr_db & 0xff);
 		pwr_t.pwr_by_rate[i * 2 + 1] = (u8)((pwr_db >> 8) & 0xff);

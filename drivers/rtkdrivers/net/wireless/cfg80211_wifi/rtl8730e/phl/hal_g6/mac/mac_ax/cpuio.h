@@ -630,4 +630,7 @@ u32 mac_wde_pkt_drop(struct mac_ax_adapter *adapter,
  */
 
 #endif
+
+u32 mac_wde_pkt_drop(struct mac_ax_adapter *adapter,
+		     struct mac_ax_pkt_drop_info *info);
 #endif

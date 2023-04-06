@@ -969,6 +969,7 @@ phl_free_stainfo_hw(struct phl_info_t *phl_info,
 	{
 		PHL_ERR("rtw_hal_del_sta_entry failed\n");
 	}
+
 _exit:
 	return pstatus;
 }
@@ -1001,6 +1002,7 @@ __phl_free_stainfo(struct phl_info_t *phl, struct rtw_phl_stainfo_t *sta) {
 	{
 		PHL_ERR("__phl_free_stainfo_sw failed\n");
 	}
+
 	return pstatus;
 }
 
@@ -1023,6 +1025,7 @@ _phl_alloc_stainfo_sw(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta
 		PHL_ERR("%s register_tx_ring failure!\n", __func__);
 		goto error_register_tx_ring;
 	}
+
 	pstatus = RTW_PHL_STATUS_SUCCESS;
 	return pstatus;
 
@@ -1196,7 +1199,8 @@ __phl_alloc_stainfo(struct phl_info_t *phl,
 		 alloc_sta->mac_addr[3], alloc_sta->mac_addr[4], alloc_sta->mac_addr[5]);
 
 	*sta = alloc_sta;
-	return RTW_PHL_STATUS_SUCCESS;
+
+	return pstatus;
 
 _err_alloc_sta_hw:
 	__phl_free_stainfo_sw(phl, alloc_sta);
@@ -1323,6 +1327,19 @@ phl_cmd_alloc_stainfo_hdl(struct phl_info_t *phl_info, u8 *param) {
 }
 
 #endif /* CONFIG_CMD_DISP */
+
+enum rtw_phl_status
+rtw_phl_mac_cfg_macid(void *phl,
+		     struct rtw_phl_stainfo_t *sta)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+
+	if (rtw_hal_mac_cfg_macid(phl_info->hal, sta) == RTW_HAL_STATUS_SUCCESS) {
+		return RTW_PHL_STATUS_SUCCESS;
+	}
+
+	return RTW_PHL_STATUS_FAILURE;
+}
 
 enum rtw_phl_status
 rtw_phl_cmd_alloc_stainfo(void *phl,

@@ -89,6 +89,17 @@ bool halbb_sel_headline_8730e(struct bb_info *bb, u32 *array, u32 array_len,
 	}
 	BB_DBG(bb, DBG_INIT, "\t fail\n");
 
+	/*case_idx:2.5 {RFE:Dnot care, CV:Match}*/
+	compare_target = ((DONT_CARE_8730E & 0xff) << 16) | (cut_drv & 0xff);
+	BB_DBG(bb, DBG_INIT, "[1] CHK {RFE:Match, CV:Match}\n");
+	for (i = 0; i < *headline_size; i += 2) {
+		if ((array[i] & 0x0fffffff) == compare_target) {
+			*headline_idx = (u8)(i >> 1);
+			return true;
+		}
+	}
+	BB_DBG(bb, DBG_INIT, "\t fail\n");
+
 	/*case_idx:3 {RFE:Match, CV:Max_in_Table}*/
 	BB_DBG(bb, DBG_INIT, "[3] CHK {RFE:Match, CV:Max_in_Table}\n");
 	for (i = 0; i < *headline_size; i += 2) {

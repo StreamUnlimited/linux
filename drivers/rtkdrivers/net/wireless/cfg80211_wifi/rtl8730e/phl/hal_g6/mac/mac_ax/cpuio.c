@@ -15,7 +15,119 @@
 #include "cpuio.h"
 #include "mac_priv.h"
 
-#define MAX_MACID_NUM		256
+#define MAX_MACID_NUM		128
+
+static void set_macid_drop(struct mac_ax_adapter *adapter, u8 macid);
+static void rel_macid_drop(struct mac_ax_adapter *adapter, u8 macid);
+
+static void set_macid_drop(struct mac_ax_adapter *adapter, u8 macid)
+{
+	u32 val32;
+	u8 macid_sh = macid & (32 - 1);
+	u8 macid_grp = macid >> 5;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	switch (macid_grp) {
+	case 0:
+		val32 = MAC_REG_R32(REG_MACID_DROP0);
+		MAC_REG_W32(REG_MACID_DROP0, val32 | BIT(macid_sh));
+		break;
+	case 1:
+		val32 = MAC_REG_R32(REG_MACID_DROP1);
+		MAC_REG_W32(REG_MACID_DROP1, val32 | BIT(macid_sh));
+		break;
+	case 2:
+		val32 = MAC_REG_R32(REG_MACID_DROP2);
+		MAC_REG_W32(REG_MACID_DROP2, val32 | BIT(macid_sh));
+		break;
+	case 3:
+		val32 = MAC_REG_R32(REG_MACID_DROP3);
+		MAC_REG_W32(REG_MACID_DROP3, val32 | BIT(macid_sh));
+		break;
+	default:
+		break;
+	}
+}
+
+static void rel_macid_drop(struct mac_ax_adapter *adapter, u8 macid)
+{
+	u32 val32;
+	u8 macid_sh = macid & (32 - 1);
+	u8 macid_grp = macid >> 5;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	switch (macid_grp) {
+	case 0:
+		val32 = MAC_REG_R32(REG_MACID_DROP0);
+		MAC_REG_W32(REG_MACID_DROP0, val32 & ~(BIT(macid_sh)));
+		break;
+	case 1:
+		val32 = MAC_REG_R32(REG_MACID_DROP1);
+		MAC_REG_W32(REG_MACID_DROP1, val32 & ~(BIT(macid_sh)));
+		break;
+	case 2:
+		val32 = MAC_REG_R32(REG_MACID_DROP2);
+		MAC_REG_W32(REG_MACID_DROP2, val32 & ~(BIT(macid_sh)));
+		break;
+	case 3:
+		val32 = MAC_REG_R32(REG_MACID_DROP3);
+		MAC_REG_W32(REG_MACID_DROP3, val32 & ~(BIT(macid_sh)));
+		break;
+	default:
+		break;
+	}
+}
+
+static u32 macid_pkt_drop_all(struct mac_ax_adapter *adapter, u8 macid)
+{
+	u32 ret;
+	u32 qid;
+	struct macid_tx_bak bak;
+	struct mac_role_tbl *role;
+
+	role = mac_role_srch(adapter, macid);
+	if (!role) {
+		PLTFM_MSG_ERR("[ERR]:role info is null\n");
+		return MACNOITEM;
+	}
+
+	ret = stop_macid_tx(adapter, role, TB_STOP_SEL_ALL, &bak);
+	if (ret != MACSUCCESS) {
+		return ret;
+	}
+
+	set_macid_drop(adapter, macid);
+
+	ret = resume_macid_tx(adapter, role, &bak);
+	if (ret != MACSUCCESS) {
+		return ret;
+	}
+
+	return ret;
+}
+
+u32 mac_wde_pkt_drop(struct mac_ax_adapter *adapter,
+		     struct mac_ax_pkt_drop_info *info)
+{
+	u32 ret;
+	struct mac_role_tbl *role;
+
+	switch (info->sel) {
+	case MAC_AX_PKT_DROP_SEL_MACID_ALL:
+		ret = macid_pkt_drop_all(adapter, info->macid);
+		if (ret != MACSUCCESS)
+			return ret;
+		break;
+	case MAC_AX_PKT_DROP_SEL_REL_MACID:
+		rel_macid_drop(adapter, info->macid);
+		break;
+	default:
+		return MACNOITEM;
+	}
+
+	return MACSUCCESS;
+}
+
 #if 0
 static u32 band_pkt_drop(struct mac_ax_adapter *adapter,
 			 struct mac_ax_pkt_drop_info *info, u8 once);

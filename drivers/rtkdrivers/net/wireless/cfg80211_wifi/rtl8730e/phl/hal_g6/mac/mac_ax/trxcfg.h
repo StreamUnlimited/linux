@@ -288,4 +288,6 @@ u32 mac_resp_chk_cca(struct mac_ax_adapter *adapter,
  * @}
  */
 
+u32 mac_clr_idx_all(struct mac_ax_adapter *adapter);
+
 #endif

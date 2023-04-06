@@ -32,7 +32,7 @@
 #define SET_MAC_CFG 1
 #define SET_MAC_TRIG 1
 #define SET_MAC_GET_BUF_RPT 1
-u8 g_halbb_la_buf[64 * 1024] = {0};
+PSRAM_DATA_SECTION u8 g_halbb_la_buf[64 * 1024] = {0};
 #if (SET_MAC_GET_BUF_RPT)
 u8 halbb_la_ptrn_chk(struct bb_info *bb)
 {
@@ -742,7 +742,7 @@ halbb_la_drv_buf_allocate(struct bb_info *bb)
 	BB_TRACE("[LA mode BufferAllocate]\n");
 #if defined(BB_8720E_SUPPORT) || defined(BB_8730E_SUPPORT)
 	buf->length = 64 * 1024;
-	buf->octet = (u32 *)g_halbb_la_buf;
+	buf->octet = g_halbb_la_buf;
 #else
 	if (buf->length == 0) {
 		buf->octet = (u32 *)halbb_mem_alloc(bb, buf->buffer_size);

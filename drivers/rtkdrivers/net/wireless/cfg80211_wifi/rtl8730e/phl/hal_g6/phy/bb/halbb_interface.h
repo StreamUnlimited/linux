@@ -72,11 +72,6 @@
 #endif
 
 /*[Efuse]*/
-#ifndef RTW_FLASH_98D
-#define halbb_efuse_get_info(bb, info_type, value, size) rtw_hal_efuse_get_info(bb->hal_com, info_type, (void *)value, size)
-#else
-#define halbb_efuse_get_info(bb, info_type, value, size) rtw_hal_flash_get_info(bb->hal_com, info_type, (void *)value, size)
-#endif
 #define halbb_phy_efuse_get_info(bb, addr, size, value) rtw_hal_mac_read_phy_efuse(bb->hal_com, addr, size, value)
 
 /*[String]*/
@@ -216,8 +211,6 @@ struct bb_info;
 
 void halbb_cfg_timers(struct bb_info *bb, enum bb_timer_cfg_t cfg,
 		      struct halbb_timer_info *timer);
-u32 halbb_get_sys_time(struct bb_info *bb);
-u32 halbb_phy0_to_phy1_ofst(struct bb_info *bb, u32 addr);
 void halbb_set_reg_curr_phy(struct bb_info *bb, u32 addr, u32 mask, u32 val);
 void halbb_set_reg_cmn(struct bb_info *bb, u32 addr, u32 mask, u32 val,
 		       enum phl_phy_idx phy_idx);

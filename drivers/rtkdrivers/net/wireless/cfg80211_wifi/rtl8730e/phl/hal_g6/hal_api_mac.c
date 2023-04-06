@@ -24,6 +24,7 @@
 #endif
 #include "hal_api.h"
 #include "btc/hal_btc.h"
+#include "linux/suspend.h"
 
 #define RTL8852A_FPGA_VERIFICATION 1
 
@@ -1431,7 +1432,6 @@ rtw_hal_mac_port_init(struct hal_info_t *hal_info,
 			ppara.bcn_interval = 100;
 		}
 		ppara.bss_color = phl_sta->asoc_cap.bsscolor;
-		rtw_hal_config_interrupt(hal_info, RTW_PHL_DIS_AP_MODE_INT);
 	} else if (ppara.net_type == MAC_AX_NET_TYPE_AP)
 	{
 #ifdef RTW_PHL_BCN
@@ -1440,16 +1440,13 @@ rtw_hal_mac_port_init(struct hal_info_t *hal_info,
 		ppara.bcn_interval = 100;
 #endif
 		ppara.bss_color = wifi_role->proto_role_cap.bsscolor;
-		rtw_hal_config_interrupt(hal_info, RTW_PHL_EN_AP_MODE_INT);
 	} else if (ppara.net_type == MAC_AX_NET_TYPE_ADHOC)
 	{
 		/* TODO */
 		ppara.bcn_interval = 100;
-		rtw_hal_config_interrupt(hal_info, RTW_PHL_DIS_AP_MODE_INT);
 	} else
 	{
 		/* other net_type, i.e. MAC_AX_NO_LINK */
-		rtw_hal_config_interrupt(hal_info, RTW_PHL_DIS_AP_MODE_INT);
 		ppara.bcn_interval = 100;
 	}
 
@@ -1598,6 +1595,7 @@ static void _hal_stainfo_to_macrinfo(struct hal_info_t *hal_info,
 				     bool is_connect)
 {
 	struct rtw_wifi_role_t *wifi_role = sta->wrole;
+	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
 	void *drv = hal_to_drvpriv(hal_info);
 	bool is_self = false;
 
@@ -1670,6 +1668,21 @@ static void _hal_stainfo_to_macrinfo(struct hal_info_t *hal_info,
 		break;
 	}
 
+	mac->ops->cfg_macid(mac, sta);
+}
+
+enum rtw_hal_status
+rtw_hal_mac_cfg_macid(void *hal,
+		      struct rtw_phl_stainfo_t *sta)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
+
+	if (mac->ops->cfg_macid(mac, sta) == MACSUCCESS) {
+		return RTW_HAL_STATUS_SUCCESS;
+	}
+
+	return RTW_HAL_STATUS_FAILURE;
 }
 
 
@@ -2367,7 +2380,7 @@ rtw_hal_mac_cfg_keep_alive(struct hal_info_t *hal_info, u16 macid, u8 en,
 	{
 		info.keepalive_en = cfg->keep_alive_en;
 		info.period = cfg->keep_alive_period;
-		info.packet_id = cfg->null_pkt_id;
+		info.packet_type = cfg->keep_pkt_type;
 	}
 
 	if (hal_mac_ops->cfg_keepalive(mac, (u8)macid, &info))
@@ -3003,23 +3016,18 @@ static bool _wow_is_txq_empty(struct mac_ax_tx_queue_empty *val)
 		return false;
 	}
 
-	if (!val->band0_mgnt_empty) {
-		return false;
-	}
-
-	if (!val->band1_mgnt_empty) {
+	if (!val->mgnt_empty) {
 		return false;
 	}
 
 	for (i = 0; i < size; i++) {
-		if (val->macid_txq_empty[i] != 0xFF) {
+		if (val->macid_txq_empty[i] != 1) {
 			return false;
 		}
 	}
 
 	PHL_INFO("%s : others_empty %d.\n", __func__, val->others_empty);
-	PHL_INFO("%s : band0_mgnt_empty %d.\n", __func__, val->band0_mgnt_empty);
-	PHL_INFO("%s : band1_mgnt_empty %d.\n", __func__, val->band1_mgnt_empty);
+	PHL_INFO("%s : mgnt_empty %d.\n", __func__, val->mgnt_empty);
 	for (i = 0; i < size; i++) {
 		PHL_INFO("%s : macid_txq_empty[%d] %d.\n", __func__, i, val->macid_txq_empty[i]);
 	}
@@ -3077,7 +3085,7 @@ enum rtw_hal_status rtw_hal_mac_wow_wde_drop(struct hal_info_t *hal, u8 band)
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s with band %d.\n", __func__, band);
 
-	info.sel = MAC_AX_PKT_DROP_SEL_BAND_ONCE;
+	info.sel = MAC_AX_PKT_DROP_SEL_MACID_ALL;
 	info.band = band;
 
 	mac_err = mac->ops->pkt_drop(mac, &info);
@@ -3394,22 +3402,6 @@ rtw_hal_mac_enable_fw(struct hal_info_t *hal_info, u8 enable) {
 	}
 
 	return RTW_HAL_STATUS_SUCCESS;
-}
-#endif
-
-#ifdef RTW_PHL_BCN_IOT
-enum rtw_hal_status
-rtw_hal_mac_ax_fill_bcn_desc(void *mac, struct rtw_t_meta_data *mdata) {
-	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-	struct mac_ax_adapter *mac_info = (struct mac_ax_adapter *)mac;
-	struct rtw_phl_com_t *phl_com = (struct rtw_phl_com_t *)(mac_info->phl_adapter);
-	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)phl_com->bcn_info;
-
-	hal_status = mac_info->ops->build_txdesc(mac_info, mdata,
-						bcn_info->desc_vir_addr,
-						bcn_info->desc_len);
-
-	return hal_status;
 }
 #endif
 
@@ -4174,36 +4166,29 @@ _hal_mac_ax_ppdu_sts_to_hal_info(struct hal_info_t *hal_info,
 				 struct mac_ax_ppdu_rpt *mac_ppdu, void *rx_mdata)
 {
 	struct rtw_phl_com_t *phl_com = hal_info->phl_com;
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl_com->phl_priv;
 	struct rtw_wifi_role_t *wifi_role = NULL;
 	enum role_type type = PHL_RTYPE_NONE;
 	struct rtw_r_meta_data *mdata =
 		(struct rtw_r_meta_data *)rx_mdata;
-	struct rtw_phl_ppdu_sts_info *ppdu_info = NULL;
-	struct rtw_phl_ppdu_sts_ent *ppdu_sts_ent = NULL;
+	struct rtw_phl_stainfo_t *sta = NULL;
 	int i = 0;
 
-	ppdu_info = &(phl_com->ppdu_sts_info);
-	ppdu_sts_ent = &ppdu_info->sts_ent[0][mdata->ppdu_cnt];
-	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
-		if (_os_mem_cmp(phl_com->drv_priv,
-				phl_com->wifi_roles[i].mac_addr,
-				ppdu_sts_ent->dst_mac_addr, MAC_ALEN) == 0) {
-			wifi_role = &(phl_com->wifi_roles[i]);
-			break;
-		}
+	if ((mdata->macid_rxdesc != 0x7F) \
+	    && (rtw_phl_macid_is_used(phl_info, mdata->macid_rxdesc))) {
+		sta = rtw_phl_get_stainfo_by_macid(phl_info, mdata->macid_rxdesc);
+		if (sta && sta->wrole)
+			wifi_role = sta->wrole;
 	}
+
 	if (wifi_role) {
 		type = wifi_role->type;
 	}
 	mac_ppdu->usr_num = 1; /* AX_TODO: need further check */
 	for (i = 0; i < mac_ppdu->usr_num; i++) {
-		if (rtw_phl_macid_is_used(hal_info->phl_com->phl_priv, mdata->macid)) {
-			if (type != PHL_RTYPE_AP) {
-				mac_ppdu->usr[i].vld = 1;
-			} else {
-				mac_ppdu->usr[i].vld = 0;
-			}
-			mac_ppdu->usr[i].macid = mdata->macid;
+		if (mdata->macid_rxdesc != 0x7F) {
+			mac_ppdu->usr[i].vld = 1;
+			mac_ppdu->usr[i].macid = mdata->macid_rxdesc;
 			mac_ppdu->usr[i].has_data = (mdata->frame_type == RTW_FRAME_TYPE_DATA);
 			mac_ppdu->usr[i].has_ctrl = (mdata->frame_type == RTW_FRAME_TYPE_CTRL);
 			mac_ppdu->usr[i].has_mgnt = (mdata->frame_type == RTW_FRAME_TYPE_MGNT);
@@ -4347,8 +4332,6 @@ hal_mac_ax_send_beacon(struct hal_info_t *hal, struct rtw_bcn_entry *bcn_entry) 
 	info.rate_sel = (u16)bcn_cmn->bcn_rate;
 
 	mac->ops->send_bcn_h2c(mac, &info);
-
-	rtw_hal_config_interrupt(hal, RTW_PHL_EN_TX_BCN_INT);
 #endif
 
 	return RTW_HAL_STATUS_SUCCESS;
@@ -4672,14 +4655,17 @@ enum rtw_hal_status rtw_hal_mac_pkt_update_ids(struct hal_info_t *hal,
 	mac_ids.qosnull = entry->pkt_info[PKT_TYPE_QOS_NULL].id;
 	mac_ids.btqosnull = entry->pkt_info[PKT_TYPE_BT_QOS_NULL].id;
 	mac_ids.cts2self = entry->pkt_info[PKT_TYPE_CTS2SELF].id;
+	mac_ids.arp_rsp = entry->pkt_info[PKT_TYPE_ARP_RSP].id;
 
-	PHL_PRINT("probersp %d, pspoll %d, nulldata %d, qosnull %d, btqosnull %d, cts2self %d.\n",
+	PHL_PRINT("probersp %d, pspoll %d, nulldata %d, qosnull %d,"
+		  " btqosnull %d, cts2self %d, arprsp %d.\n",
 		  mac_ids.probersp,
 		  mac_ids.pspoll,
 		  mac_ids.nulldata,
 		  mac_ids.qosnull,
 		  mac_ids.btqosnull,
-		  mac_ids.cts2self);
+		  mac_ids.cts2self,
+		  mac_ids.arp_rsp);
 
 	status = mac->ops->general_pkt_ids(mac, &mac_ids);
 	if (status != MACSUCCESS) {
@@ -5016,63 +5002,6 @@ err_mem_tmp_map:
 	return status;
 }
 
-
-enum rtw_hal_status
-rtw_hal_mac_read_hidden_rpt(struct rtw_hal_com_t *hal_com) {
-
-	struct hal_info_t *hal_info = hal_com->hal_priv;
-	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
-	struct mac_defeature_value rpt;
-	u32 err;
-
-	err = mac->ops->read_hidden_rpt(mac, &rpt);
-	if (err != MACSUCCESS)
-	{
-		PHL_TRACE(COMP_PHL_TRIG, _PHL_INFO_, "err=0x%x\n", err);
-		return RTW_HAL_STATUS_FAILURE;
-	}
-
-	if (rpt.tx_spatial_stream != 7 && rpt.tx_spatial_stream > 0)
-	{
-		hal_com->phy_hw_cap[0].tx_num = rpt.tx_spatial_stream;
-		hal_com->phy_hw_cap[1].tx_num = rpt.tx_spatial_stream;
-		hal_com->rfpath_tx_num = rpt.tx_spatial_stream;
-	}
-	if (rpt.rx_spatial_stream != 7 && rpt.rx_spatial_stream > 0)
-	{
-		hal_com->phy_hw_cap[0].rx_num = rpt.rx_spatial_stream;
-		hal_com->phy_hw_cap[1].rx_num = rpt.rx_spatial_stream;
-		hal_com->rfpath_rx_num = rpt.rx_spatial_stream;
-	}
-	if (rpt.hw_special_type > EFUSE_HW_STYPE_NONE &&
-	    rpt.hw_special_type < EFUSE_HW_STYPE_GENERAL)
-	{
-		hal_com->dev_hw_cap.hw_stype_cap = rpt.hw_special_type;
-	}
-
-	if (rpt.wl_func_support > EFUSE_WL_FUNC_NONE &&
-	    rpt.wl_func_support < EFUSE_WL_FUNC_GENERAL)
-	{
-		hal_com->dev_hw_cap.wl_func_cap = rpt.wl_func_support;
-	}
-
-	hal_com->uuid = rpt.uuid;
-
-	PHL_TRACE(COMP_PHL_MAC, _PHL_INFO_, "hidden tx=%d hidden rx=%d\n",
-		  rpt.tx_spatial_stream, rpt.rx_spatial_stream);
-	PHL_TRACE(COMP_PHL_MAC, _PHL_INFO_, "hidden bw=%d\n", rpt.bandwidth);
-	PHL_TRACE(COMP_PHL_MAC, _PHL_INFO_, "hidden protocol = %d\n",
-		  rpt.protocol_80211);
-	PHL_TRACE(COMP_PHL_MAC, _PHL_INFO_, "hidden nic=%d\n", rpt.NIC_router);
-	PHL_TRACE(COMP_PHL_MAC, _PHL_INFO_, "hidden hw special type=%d\n",
-		  rpt.hw_special_type);
-	PHL_TRACE(COMP_PHL_MAC, _PHL_INFO_, "hidden wl func=%d\n",
-		  rpt.wl_func_support);
-	PHL_INFO("%s\n", __FUNCTION__);
-	return RTW_HAL_STATUS_SUCCESS;
-}
-
-
 enum rtw_hal_status
 rtw_hal_mac_check_efuse_autoload(struct rtw_hal_com_t *hal_com, u8 *autoload) {
 	struct hal_info_t *hal_info = hal_com->hal_priv;
@@ -5360,6 +5289,26 @@ rtw_hal_mac_ps_notify_wake(struct hal_info_t *hal_info) {
 }
 
 enum rtw_hal_status
+rtw_hal_mac_ps_set_32k(struct hal_info_t *hal_info, bool en_32k, bool en_ack) {
+	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
+
+#ifdef CONFIG_PM
+	if (pm_suspend_target_state < PM_SUSPEND_PG) {
+		return RTW_HAL_STATUS_SUCCESS;
+	}
+#endif
+
+	if (mac->ops->ps_set_32k(mac, en_32k, en_ack) == MACSUCCESS)
+	{
+		return RTW_HAL_STATUS_SUCCESS;
+	} else
+	{
+		PHL_WARN("%s: set 32k fail!\n", __FUNCTION__);
+		return RTW_HAL_STATUS_FAILURE;
+	}
+}
+
+enum rtw_hal_status
 rtw_hal_mac_req_pwr_state(struct hal_info_t *hal_info, u8 pwr_state) {
 	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
 
@@ -5547,22 +5496,6 @@ rtw_hal_mac_tx_idle_poll(struct rtw_hal_com_t *hal_com, u8 band_idx) {
 	return RTW_HAL_STATUS_SUCCESS;
 }
 
-enum rtw_sch_txen_cfg {
-	RTW_TXEN_VO = 1 << 0,
-	RTW_TXEN_VI = 1 << 1,
-	RTW_TXEN_BE = 1 << 2,
-	RTW_TXEN_BK = 1 << 3,
-	RTW_TXEN_MG = 1 << 4,
-	RTW_TXEN_HI = 1 << 5,
-	RTW_TXEN_BCN = 1 << 6,
-	RTW_TXEN_CPUMG = 1 << 7,
-	RTW_TXEN_UL = 1 << 13,
-	RTW_TXEN_TWT0 = 1 << 14,
-	RTW_TXEN_TWT1 = 1 << 15,
-	RTW_TXEN_DRV_MASK = 0x19FF,
-	RTW_TXEN_ALL = 0xFFFF,
-};
-
 enum rtw_hal_status
 rtw_hal_mac_set_sch_tx_en(struct rtw_hal_com_t *hal_com, u8 band_idx,
 			  u16 tx_en, u16 tx_en_mask) {
@@ -5584,9 +5517,6 @@ rtw_hal_mac_set_sch_tx_en(struct rtw_hal_com_t *hal_com, u8 band_idx,
 	cfg.tx_en.hiq = ((tx_en & RTW_TXEN_HI) ? 1 : 0);
 	cfg.tx_en.bcnq = ((tx_en & RTW_TXEN_BCN) ? 1 : 0);
 	cfg.tx_en.cpumgnt = ((tx_en & RTW_TXEN_CPUMG) ? 1 : 0);
-	cfg.tx_en.ul = ((tx_en & RTW_TXEN_UL) ? 1 : 0);
-	cfg.tx_en.twt0 = ((tx_en & RTW_TXEN_TWT0) ? 1 : 0);
-	cfg.tx_en.twt1 = ((tx_en & RTW_TXEN_TWT1) ? 1 : 0);
 
 	cfg.tx_en_mask.be = ((tx_en_mask & RTW_TXEN_BE) ? 1 : 0);
 	cfg.tx_en_mask.bk = ((tx_en_mask & RTW_TXEN_BK) ? 1 : 0);
@@ -5596,9 +5526,6 @@ rtw_hal_mac_set_sch_tx_en(struct rtw_hal_com_t *hal_com, u8 band_idx,
 	cfg.tx_en_mask.hiq = ((tx_en_mask & RTW_TXEN_HI) ? 1 : 0);
 	cfg.tx_en_mask.bcnq = ((tx_en_mask & RTW_TXEN_BCN) ? 1 : 0);
 	cfg.tx_en_mask.cpumgnt = ((tx_en & RTW_TXEN_CPUMG) ? 1 : 0);
-	cfg.tx_en_mask.ul = ((tx_en_mask & RTW_TXEN_UL) ? 1 : 0);
-	cfg.tx_en_mask.twt0 = ((tx_en_mask & RTW_TXEN_TWT0) ? 1 : 0);
-	cfg.tx_en_mask.twt1 = ((tx_en_mask & RTW_TXEN_TWT1) ? 1 : 0);
 
 	result = ops->set_hw_value(mac, MAC_AX_HW_SET_SCH_TXEN_CFG, &cfg);
 
@@ -5957,10 +5884,6 @@ rtw_hal_mac_set_rxfltr_by_mode(struct rtw_hal_com_t *hal_com,
 		/* check beacon */
 		ctrl.chk_cbssid_mgnt = 0;
 		mask.chk_cbssid_mgnt = 1;
-
-		ctrl.chk_cbssid_data = 1;
-		mask.chk_cbssid_data = 1;
-
 		break;
 
 	case RX_FLTR_MODE_AP_NORMAL:
@@ -6122,13 +6045,13 @@ enum rtw_hal_status rtw_hal_mac_set_rxfltr_by_subtype(
 
 
 	switch (type) {
-	case 0:
+	case RTW_PHL_PKT_TYPE_MGNT:
 		ftype = MAC_AX_PKT_MGNT;
 		break;
-	case 1:
+	case RTW_PHL_PKT_TYPE_CTRL:
 		ftype = MAC_AX_PKT_CTRL;
 		break;
-	case 2:
+	case RTW_PHL_PKT_TYPE_DATA:
 		ftype = MAC_AX_PKT_DATA;
 		break;
 	default:
@@ -6504,10 +6427,7 @@ rtw_hal_mac_is_tx_mgnt_empty(struct hal_info_t *hal_info, u8 band, u8 *st) {
 		return RTW_HAL_STATUS_FAILURE;
 	}
 
-	if ((band == 0) && (q_st.band0_mgnt_empty == DLE_QUEUE_EMPTY))
-	{
-		*st = 1;
-	} else if ((band == 1) && (q_st.band1_mgnt_empty == DLE_QUEUE_EMPTY))
+	if (q_st.mgnt_empty == DLE_QUEUE_EMPTY)
 	{
 		*st = 1;
 	} else

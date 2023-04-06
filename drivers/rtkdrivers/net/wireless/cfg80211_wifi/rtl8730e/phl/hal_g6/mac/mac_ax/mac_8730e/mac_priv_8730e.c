@@ -47,9 +47,9 @@ static struct mac_ax_priv_ops mac8730e_priv_ops = {
 	cfg_bssid_8730e,/*cfg_bssid*/
 	cfg_transmitter_addr_8730e,/*cfg_transmitter_addr*/
 	cfg_net_type_8730e, /*cfg_net_type*/
+	cfg_sta_aid_8730e, /*cfg_sta_aid*/
 	NULL, /*cmac module init, cmac_init*/
 	NULL,/* cmac_func_en */
-	NULL, /* macid_idle_ck */
 	stop_sch_tx_8730e, /* stop_sch_tx */
 	NULL, /* switch_efuse_bank */
 	NULL, /* enable_efuse_sw_pwr_cut */

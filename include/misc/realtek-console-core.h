@@ -1,5 +1,5 @@
-#ifndef __AMEBA_console_H__
-#define __AMEBA_console_H__
+#ifndef _REALTEK_CONSOLE_CORE_H_
+#define _REALTEK_CONSOLE_CORE_H_
 
 #include <linux/list.h>
 #include <linux/spinlock.h>

@@ -116,7 +116,12 @@ enum halrf_pw_lmt_regulation_type {
 	PW_LMT_REGU_EXT_PWR,
 	PW_LMT_REGU_PREDEF_NUM,
 	PW_LMT_REGU_NULL, /* declare this to PW_LMT_MAX_REGULATION_NUM after limit array remove usage of PW_LMT_REGU_NULL */
+
+#ifndef IOT_SMALL_RAM
+	PW_LMT_MAX_REGULATION_NUM = 32
+#else
 	PW_LMT_MAX_REGULATION_NUM
+#endif
 };
 
 enum halrf_tx_shape_modu_type {
@@ -138,19 +143,22 @@ enum halrf_pw_lmt_band_type {
 
 enum halrf_pw_lmt_bandwidth_type {
 	PW_LMT_BW_20M = 0,
+#ifndef	RF_BW_20M_ONLY
 	PW_LMT_BW_40M = 1,
 	PW_LMT_BW_80M = 2,
 	PW_LMT_BW_160M = 3,
-	PW_LMT_MAX_BANDWIDTH_NUM = 4
+#endif
+	PW_LMT_MAX_BANDWIDTH_NUM
 };
 
 enum halrf_pw_lmt_ratesection_type {
 	PW_LMT_RS_CCK = 0,
 	PW_LMT_RS_OFDM = 1,
-	PW_LMT_RS_HT = 2,
-	PW_LMT_RS_VHT = 3,
-	PW_LMT_RS_HE = 4,
-	PW_LMT_MAX_RS_NUM = 5
+	PW_LMT_RS_HE = 2,	//do not change the index!
+	PW_LMT_RS_HE_B40 = 3,	//for new limit table!!
+	PW_LMT_RS_HT = 4,
+	PW_LMT_RS_VHT = 5,
+	PW_LMT_MAX_RS_NUM = 6
 };
 
 enum halrf_pw_lmt_rfpath_type {
@@ -329,27 +337,22 @@ struct halrf_pwr_info {
 	u8 tx_shap_idx_ru[PW_LMT_MAX_BAND][TX_SHAPE_MAX][PW_LMT_MAX_REGULATION_NUM];
 	s8 tx_pwr_by_rate[PW_LMT_MAX_BAND][HALRF_DATA_RATE_MAX];
 
+#ifndef IOT_SMALL_RAM
 	s8 tx_pwr_limit_2g[PW_LMT_MAX_REGULATION_NUM][PW_LMT_MAX_2G_BANDWITH_NUM]
 	[PW_LMT_MAX_RS_NUM][PW_LMT_MAX_BF_NUM][PW_LMT_MAX_CHANNEL_NUMBER_2G][MAX_HALRF_PATH];
 
 	s8 tx_pwr_limit_ru_2g[PW_LMT_MAX_REGULATION_NUM][PW_LMT_RU_BW_NULL]
 	[PW_LMT_MAX_RS_NUM][PW_LMT_MAX_CHANNEL_NUMBER_2G][MAX_HALRF_PATH];
-
-#ifndef RF_5G_NOT_SUPPORT
 	s8 tx_pwr_limit_5g[PW_LMT_MAX_REGULATION_NUM][PW_LMT_MAX_BANDWIDTH_NUM]
 	[PW_LMT_MAX_RS_NUM][PW_LMT_MAX_BF_NUM][PW_LMT_MAX_CHANNEL_NUMBER_5G][MAX_HALRF_PATH];
 
 	s8 tx_pwr_limit_ru_5g[PW_LMT_MAX_REGULATION_NUM][PW_LMT_RU_BW_NULL]
 	[PW_LMT_MAX_RS_NUM][PW_LMT_MAX_CHANNEL_NUMBER_5G][MAX_HALRF_PATH];
-#endif
-#ifndef RF_6G_NOT_SUPPORT
 	s8 tx_pwr_limit_6g[PW_LMT_MAX_REGULATION_NUM][PW_LMT_MAX_BANDWIDTH_NUM]
 	[PW_LMT_MAX_RS_NUM][PW_LMT_MAX_BF_NUM][PW_LMT_MAX_CHANNEL_NUMBER_6G][MAX_HALRF_PATH];
 
 	s8 tx_pwr_limit_ru_6g[PW_LMT_MAX_REGULATION_NUM][PW_LMT_RU_BW_NULL]
 	[PW_LMT_MAX_RS_NUM][PW_LMT_MAX_CHANNEL_NUMBER_6G][MAX_HALRF_PATH];
-#endif
-#ifndef IOT_SMALL_RAM
 	s8 tx_pwr_by_rate_mac[HW_PHY_MAX][TX_PWR_BY_RATE_NUM_MAC];
 	s8 tx_pwr_limit_mac[HW_PHY_MAX][TX_PWR_LIMIT_NUM_MAC];
 	s8 tx_pwr_limit_ru_mac[HW_PHY_MAX][TX_PWR_LIMIT_RU_NUM_MAC];
@@ -386,6 +389,8 @@ u8 halrf_get_regulation_info(struct rf_info *rf, u8 band);
 
 void halrf_power_by_rate_store_to_array(struct rf_info *rf,
 					u32 band, u32 tx_num, u32 rate_id, u32 data);
+
+#ifndef IOT_SMALL_RAM
 void halrf_power_limit_store_to_array(struct rf_info *rf,
 				      u8 regulation, u8 band, u8 bandwidth, u8 rate,
 				      u8 tx_num, u8 beamforming, u8 chnl, s8 val);
@@ -394,8 +399,6 @@ void halrf_power_limit_ru_store_to_array(struct rf_info *rf,
 		u8 band, u8 bandwidth, u8 tx_num, u8 rate,
 		u8 regulation, u8 chnl, s8 val);
 void halrf_power_limit_ru_set_worldwide(struct rf_info *rf);
-
-#if (!defined(RF_8730E_SUPPORT) && !defined(RF_8720E_SUPPORT))
 const char *halrf_get_pw_lmt_regu_type_str_extra(struct rf_info *rf, u8 band);
 u8 halrf_get_power_limit_extra(struct rf_info *rf);
 #endif
@@ -403,7 +406,7 @@ u8 halrf_get_power_limit_extra(struct rf_info *rf);
 void halrf_modify_pwr_table_bitmask(struct rf_info *rf,
 				    enum phl_phy_idx phy, enum phl_pwr_table pwr_table);
 
-s8 halrf_get_pwr_control(struct rf_info *rf, enum phl_phy_idx phy);
+s8 halrf_get_pwr_control(struct rf_info *rf);
 
 bool halrf_pwr_is_minus(struct rf_info *rf, u32 reg_tmp);
 

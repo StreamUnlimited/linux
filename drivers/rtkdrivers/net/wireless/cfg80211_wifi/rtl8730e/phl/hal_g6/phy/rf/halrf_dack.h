@@ -20,6 +20,7 @@
 
 /*@-----------------------End Define Parameters-----------------------*/
 
+#ifdef	RFDBG_TRACE_EN
 struct halrf_dack_info {
 	bool dack_done;
 	u8 msbk_d[2][2][16];
@@ -33,6 +34,6 @@ struct halrf_dack_info {
 	bool msbk_timeout[2];
 	bool dack_fail;
 };
-
+#endif
 
 #endif

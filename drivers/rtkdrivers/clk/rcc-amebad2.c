@@ -19,6 +19,7 @@
 
 static void __iomem *aon_rcc_base;
 static void __iomem *lsys_rcc_base;
+static void __iomem *hsys_rcc_base;
 static void __iomem *apsys_rcc_base;
 
 static DEFINE_SPINLOCK(amebad2_clk_lock);
@@ -52,6 +53,8 @@ static const char *cksl_hipc_parents[2]			= {"CLK_HAPB", "CKE_LP4M"};
 static const char *cksl_psram_parents[2]		= {"CKE_XTAL_GRP1", "CKD_PSRAM"};
 static const char *cksl_i2s_parents[4] 			= {"I2S_PLL0", "I2S_PLL1", "I2S_PLL2", "I2S_PLL2"};
 static const char *cksl_ap_cpu_parents[2]		= {"AP_SYSPLL", "NP_SYSPLL"};
+static const char *cksl_tim9_parents[2]			= {"CKE_TIM9", "I2S_PLL2"};
+
 
 static const struct clk_div_table ckd_ac_div_table[] = {
 	{ 3, 20 }, { 4, 21 }, { 5, 22 }, { 6, 23 }, { 7, 24 }, { 8, 25 }, { 9, 26 },
@@ -240,7 +243,7 @@ RTK_GATE_CLK(lsys_gate_xtal_lps_grp0,							"CKE_XTAL_LPS_GRP0",	"XTAL_LPS",
 RTK_GATE_CLK(lsys_gate_xtal_lps_grp1,							"CKE_XTAL_LPS_GRP1",	"XTAL_LPS",
 			 AMEBAD2_REG_LSYS_CKE_GRP,	CKE_XTAL_LPS_GRP1,		RTK_NO_GATE_FLAGS,		0,							0,				CLK_IGNORE_UNUSED);
 RTK_GATE_CLK(apsys_gate_ap_cpu,									"CKE_AP_CPU",			"CKD_AP_CPU",
-			 AMEBAD2_REG_C0_MISC_CTRL,	CKE_AP_CPU,				RTK_NO_GATE_FLAGS,		0,							0,				CLK_IGNORE_UNUSED);
+			 AMEBAD2_REG_HP_CKE,	CKE_AP_CPU,				RTK_NO_GATE_FLAGS,		0,							0,				CLK_IGNORE_UNUSED);
 
 
 RTK_MUX_CLK(lsys_mux_lsoc,										"CKSL_LSOC",			cksl_lsoc_parents,
@@ -292,7 +295,9 @@ RTK_MUX_CLK(lsys_mux_hipc,										"CKSL_HIPC",			cksl_hipc_parents,
 RTK_MUX_CLK(lsys_mux_psram,										"CKSL_PSRAM",			cksl_psram_parents,
 			AMEBAD2_REG_LSYS_CKSL_GRP0,	CKSL_PSRAM_SHIFT,		CKSL_PSRAM_MASK,		RTK_NO_MUX_FLAGS,			RTK_NO_FLAGS);
 RTK_MUX_CLK(apsys_mux_ap_cpu,									"CKSL_AP_CPU",			cksl_ap_cpu_parents,
-			AMEBAD2_REG_C0_MISC_CTRL,	CKSL_AP_CPU_SHIFT,		CKSL_AP_CPU_MASK,		RTK_NO_MUX_FLAGS,			RTK_NO_FLAGS);
+			AMEBAD2_REG_HP_CKSL,	CKSL_AP_CPU_SHIFT,		CKSL_AP_CPU_MASK,		RTK_NO_MUX_FLAGS,			RTK_NO_FLAGS);
+RTK_MUX_CLK(hsys_mux_tim9,										"CKSL_TIM9",			cksl_tim9_parents,
+			AMEBAD2_REG_DUMMY_1E0,		CKSL_TIM9_SHIFT,		CKSL_TIM9_MASK,		RTK_NO_MUX_FLAGS,			RTK_NO_FLAGS);
 
 
 RTK_DIV_CLK(lsys_div_np,										"CKD_NP",				"NP_SYSPLL",	// NP_SYSPLL_G0
@@ -302,7 +307,7 @@ RTK_DIV_CLK(lsys_div_plfm,										"CKD_PLFM",				"CKSL_NP",
 RTK_DIV_CLK(lsys_div_psram,										"CKD_PSRAM",			"NP_SYSPLL",	// NP_SYSPLL_G2
 			AMEBAD2_REG_LSYS_CKD_GRP0,	CKD_PSRAM_SHIFT,		CKD_PSRAM_WIDTH,		RTK_NO_DIV_TABLE,			RTK_NO_DIV_FLAGS,			RTK_NO_FLAGS);
 RTK_DIV_CLK(apsys_div_ap_cpu,									"CKD_AP_CPU",			"CKSL_AP_CPU",
-			AMEBAD2_REG_C0_MISC_CTRL,	CKD_AP_CPU_SHIFT,		CKD_AP_CPU_WIDTH,		ckd_ap_cpu_div_table,		RTK_NO_DIV_FLAGS,			RTK_NO_FLAGS);
+			AMEBAD2_REG_HP_CKSL,	CKD_AP_CPU_SHIFT,		CKD_AP_CPU_WIDTH,		ckd_ap_cpu_div_table,		RTK_NO_DIV_FLAGS,			RTK_NO_FLAGS);
 
 RTK_DIV_CLK(lsys_div_hbus,										"CKD_HBUS",				"NP_SYSPLL",	// NP_SYSPLL_G1
 			AMEBAD2_REG_LSYS_CKD_GRP0,	CKD_HBUS_SHIFT,			CKD_HBUS_WIDTH,			RTK_NO_DIV_TABLE,			RTK_NO_DIV_FLAGS,			RTK_NO_FLAGS);
@@ -338,7 +343,7 @@ RTK_FIXED_FACTOR_CLK(lsys_ff_hbus_clk,					"HBUS_CLK",				"CKSL_HBUS",	1,		1,		R
 RTK_FIXED_FACTOR_CLK(lsys_ff_plfm_clk,					"PLFM_CLK",				"CKD_NP",		1,		2,		RTK_NO_FLAGS);
 
 /*AP SYSPLL clock*/
-RTK_APLL_CLK(apsys_apll_clk,			"AP_SYSPLL",			AMEBAD2_REG_C0_MISC_CTRL,			RTK_NO_FLAGS);
+RTK_APLL_CLK(apsys_apll_clk,			"AP_SYSPLL",			AMEBAD2_REG_APLL_BASE,			RTK_NO_FLAGS);
 
 
 static const struct rtk_clk *amebad2_clk_data[] = {
@@ -481,6 +486,7 @@ static const struct rtk_clk *amebad2_clk_data[] = {
 	[RTK_CKSL_AP]				= &apsys_mux_ap_cpu,
 	[RTK_CLK_AP_PLL]			= &apsys_apll_clk,
 	[RTK_CKE_AP]				= &apsys_gate_ap_cpu,
+	[RTK_CKSL_TIM9]				= &hsys_mux_tim9,
 };
 
 #ifdef CONFIG_RESET_CONTROLLER
@@ -524,6 +530,9 @@ static void __iomem *rtk_rcc_get_reg(u32 offset)
 		break;
 	case RTK_SYS_AP:
 		reg = apsys_rcc_base + RTK_REG_GET_OFFSET(offset);
+		break;
+	case RTK_SYS_HP:
+		reg = hsys_rcc_base + RTK_REG_GET_OFFSET(offset);
 		break;
 	default:
 		break;
@@ -629,11 +638,11 @@ static long	rtk_apll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 {
 	long val;
 
-	/* Rate should be multiple of 40M, and between 800M and 1400M*/
+	/* Rate should be multiple of 40M, and between 800M and 1480M*/
 	if (rate < 800000000) {
 		val = 800000000;
-	} else if (rate > 1400000000) {
-		val = 1400000000;
+	} else if (rate > 1480000000) {
+		val = 1480000000;
 	} else {
 		val = rate;
 	}
@@ -907,6 +916,17 @@ static void __init rtk_rcc_init(struct device_node *node)
 
 	apsys_rcc_base = base;
 
+	base = of_iomap(node, 3);
+	if (NULL == base) {
+		iounmap(lsys_rcc_base);
+		iounmap(aon_rcc_base);
+		iounmap(apsys_rcc_base);
+		pr_err("RCC: fail to map hsys rcc resource\n");
+		return;
+	}
+
+	hsys_rcc_base = base;
+
 	for (i = 0; i < amebad2_rcc_data.clock_num; ++i) {
 		if (amebad2_clk_data[i] != NULL) {
 			clk = (struct rtk_clk *)amebad2_clk_data[i];
@@ -973,6 +993,7 @@ fail_add_clk_hw_provider:
 	iounmap(aon_rcc_base);
 	iounmap(lsys_rcc_base);
 	iounmap(apsys_rcc_base);
+	iounmap(hsys_rcc_base);
 
 	pr_info("RCC: init error %d\n", ret);
 }

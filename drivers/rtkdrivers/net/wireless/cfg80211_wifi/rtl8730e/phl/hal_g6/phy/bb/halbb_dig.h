@@ -68,7 +68,7 @@
 #define PD_TH_SB_FLTR_CMP_VAL 7
 #define DIG_CCX_WD_TRIGTIME 1900
 #define IGI_EDCCA_GAP_LIMIT 35
-#ifdef HALBB_DIG_TDMA_SUPPORT
+#if defined(HALBB_DIG_TDMA_SUPPORT) || defined(HALBB_SIMPLE_TDMA_DIG_SUPPORT)
 #define IGI_MAX_AT_STATE_L	0x26
 #define WACHDOG_PERIOD_IN_MS	2000
 #define H_STATE_NUM_MAX		20
@@ -97,7 +97,7 @@ enum dig_noisy_level {
 	DIG_NOISY_LV_MAX	= 4
 };
 
-#ifdef HALBB_DIG_TDMA_SUPPORT
+#if defined(HALBB_DIG_TDMA_SUPPORT) || defined(HALBB_SIMPLE_TDMA_DIG_SUPPORT)
 enum dig_tdma_state {
 	DIG_TDMA_LOW	= 0,
 	DIG_TDMA_HIGH	= 1
@@ -265,7 +265,7 @@ struct bb_dig_record_info {
 
 /* struct for state unit, i.e., L/H */
 struct bb_dig_op_unit {
-#ifdef HALBB_DIG_TDMA_SUPPORT
+#if defined(HALBB_DIG_TDMA_SUPPORT) || defined(HALBB_SIMPLE_TDMA_DIG_SUPPORT)
 	enum dig_tdma_state	state_identifier; /* L/H */
 #endif
 	struct agc_gaincode_set cur_gaincode;
@@ -304,7 +304,7 @@ struct bb_dig_info {
 	s8			le_igi_ofst; /* low end mode IGI offset */
 	struct bb_dig_op_unit	*p_cur_dig_unit;
 	struct bb_dig_op_unit 	dig_state_h_i; /* high state */
-#ifdef HALBB_DIG_TDMA_SUPPORT
+#if defined(HALBB_DIG_TDMA_SUPPORT) || defined(HALBB_SIMPLE_TDMA_DIG_SUPPORT)
 	struct bb_dig_op_unit	dig_state_l_i; /* low state */
 	bool			gaincode_update_en;
 	u16			tdma_passed_time_acc; /* check if 1sec reach */
@@ -312,6 +312,7 @@ struct bb_dig_info {
 	u8			tdma_timestamp_cur;
 	struct halbb_timer_info dig_timer_i;
 #endif
+
 #ifdef HALBB_ENV_MNTR_SUPPORT
 	u8 			fahm_timestamp;
 	struct fahm_para_info 	fahm_para_i;
@@ -337,7 +338,11 @@ void halbb_dig_timercheck_watchdog(struct bb_info *);
 void halbb_tdmadig_io_en(struct bb_info *bb);
 void halbb_dig_timer_init(struct bb_info *bb);
 #endif
-
+#ifdef HALBB_SIMPLE_TDMA_DIG_SUPPORT
+void halbb_s_dig_op_unit_para_reset_l(struct bb_info *bb);
+void halbb_simple_tdma_dig_watchdog(struct bb_info *bb);
+void halbb_simple_tdma_timer_init(struct bb_info *bb);
+#endif
 void halbb_dig_lps(struct bb_info *bb);
 void halbb_dig_cfg_bbcr(struct bb_info *bb, u8 igi_new);
 u8 halbb_dig_igi_by_ofst(struct bb_info *bb, u8 igi_pre, s8 ofst);

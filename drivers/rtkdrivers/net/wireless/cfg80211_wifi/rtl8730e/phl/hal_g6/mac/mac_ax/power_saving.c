@@ -22,13 +22,11 @@
 #define CPWM_SEQ_NUM_MAX                3
 
 //RPWM bit definition
-#define PS_RPWM_TOGGLE			BIT(15)
-#define PS_RPWM_ACK             BIT(14)
-#define PS_RPWM_SEQ_NUM_SH      12
-#define PS_RPWM_SEQ_NUM_MSK     0x3
-#define PS_RPWM_NOTIFY_WAKE     BIT(8)
-#define PS_RPWM_STATE_SH        0
-#define PS_RPWM_STATE_MSK       0x7
+#define PS_RPWM_TOGGLE          BIT(15)
+#define PS_RPWM_ACK             BIT(6)
+#define PS_RPWM_PARTIAL_OFF_EN  BIT(4)
+#define PS_RPWM_32K_EN          BIT(0)
+#define PS_RPWM_32K_EN_SH       (0)
 
 //CPWM bit definition
 #define PS_CPWM_TOGGLE			BIT(15)
@@ -114,34 +112,16 @@ static u32 send_h2c_lps_parm(struct mac_ax_adapter *adapter,
 static void send_rpwm(struct mac_ax_adapter *adapter,
 		      struct ps_rpwm_parm *parm)
 {
-	u16 rpwm_value = 0;
-	u8 toggle = 0;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-#if 0
-	rpwm_value = MAC_REG_R16(REG_RPWM);
-	if (0 == (rpwm_value & BIT_RPWM_TOGGLING)) {
-		toggle = 1;
-	}
-
 	if (parm->notify_wake) {
-		rpwm_value |= PS_RPWM_NOTIFY_WAKE;
+		/* do nothing*/
 	} else {
-		if (rpwm_seq_num == RPWM_SEQ_NUM_MAX) {
-			rpwm_seq_num = 0;
-		} else {
-			rpwm_seq_num += 1;
-		}
-
-		rpwm_value = (SET_WORD(parm->req_pwr_state, PS_RPWM_STATE) |
-			      SET_WORD(rpwm_seq_num, PS_RPWM_SEQ_NUM));
-
 		if (parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_ACTIVE ||
 		    parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_BAND0_RFON ||
 		    parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_BAND1_RFON ||
 		    parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_BAND0_RFOFF ||
 		    parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_BAND1_RFOFF) {
-			rpwm_value |= PS_RPWM_ACK;
 		}
 
 		if (parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_CLK_GATED ||
@@ -150,83 +130,6 @@ static void send_rpwm(struct mac_ax_adapter *adapter,
 			adapter->mac_pwr_info.pwr_in_lps = 1;
 		}
 	}
-
-	if (toggle == 1) {
-		rpwm_value |= PS_RPWM_TOGGLE;
-	} else {
-		rpwm_value &= ~PS_RPWM_TOGGLE;
-	}
-
-	switch (adapter->hw_info->intf) {
-#if MAC_AX_USB_SUPPORT
-	case MAC_AX_INTF_USB:
-#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-			MAC_REG_W16(R_AX_USB_D2F_F2D_INFO + 2, rpwm_value);
-		}
-#endif
-
-#if MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)) {
-			MAC_REG_W16(R_AX_USB_D2F_F2D_INFO_V1 + 2, rpwm_value);
-		}
-#endif
-		break;
-#endif //MAC_AX_USB_SUPPORT
-
-#if MAC_AX_SDIO_SUPPORT
-	case MAC_AX_INTF_SDIO:
-#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-			MAC_REG_W16(R_AX_SDIO_HRPWM1 + 2, rpwm_value);
-		}
-#endif
-
-#if MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)) {
-			MAC_REG_W16(R_AX_SDIO_HRPWM1_V1 + 2, rpwm_value);
-		}
-#endif
-
-		if (parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_CLK_GATED ||
-		    parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_PWR_GATED ||
-		    parm->req_pwr_state == MAC_AX_RPWM_REQ_PWR_STATE_HIOE_PWR_GATED) {
-			adapter->sdio_info.tx_seq = 1;
-		}
-		break;
-#endif //MAC_AX_SDIO_SUPPORT
-
-#if MAC_AX_PCIE_SUPPORT
-	case MAC_AX_INTF_PCIE:
-#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-			MAC_REG_W16(R_AX_PCIE_HRPWM, rpwm_value);
-		}
-#endif
-
-#if MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)) {
-			MAC_REG_W16(R_AX_PCIE_HRPWM_V1, rpwm_value);
-		}
-#endif
-
-		break;
-#endif //MAC_AX_PCIE_SUPPORT
-	default:
-		PLTFM_MSG_ERR("%s: invalid interface = %d!!\n",
-			      __func__, adapter->hw_info->intf);
-
-		break;
-	}
-#endif
-
-	PLTFM_MSG_TRACE("Send RPWM. rpwm_val=0x%x\n", rpwm_value);
 }
 
 static u32 leave_lps(struct mac_ax_adapter *adapter, u8 macid)
@@ -355,117 +258,27 @@ static u32 _chk_cpwm_seq_num(u8 seq_num)
 static u32 chk_cur_pwr_state(struct mac_ax_adapter *adapter,
 			     enum mac_ax_rpwm_req_pwr_state req_pwr_state)
 {
-	u16 cpwm = 0;
-	u32 rpwm_32k;
-	u32 req_32k;
-#if MAC_AX_PCIE_SUPPORT
+	u32 in_lps;
+#if MAC_AX_AXI_SUPPORT
 	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
 	u32 ret = MACSUCCESS;
 #endif
-#if 0
+
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
 	if (req_pwr_state >= MAC_AX_RPWM_REQ_PWR_STATE_CLK_GATED) {
-		req_32k = 1;
+		in_lps = 1;
 	} else {
-		req_32k = 0;
+		in_lps = 0;
 	}
 
-	//(workaround) CPWM register is in OFF area
-	//Use LDM to check if FW receives RPWM
-	rpwm_32k = (MAC_REG_R32(R_AX_LDM) & B_PS_LDM_32K_EN) >> B_PS_LDM_32K_EN_SH;
-	if (req_32k != rpwm_32k) {
-		return MACCPWMPWRSTATERR;
-	}
-
-	//There is no CPWM if 32K state
-	if (req_32k) {
+	if (in_lps) {
 		return MACSUCCESS;
-	}
-
-#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-		cpwm = MAC_REG_R16(R_AX_CPWM);
-	}
-#endif
-
-#if MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)) {
-		switch (adapter->hw_info->intf) {
-#if MAC_AX_USB_SUPPORT
-		case MAC_AX_INTF_USB:
-			cpwm = MAC_REG_R16(R_AX_USB_D2F_F2D_INFO_V1);
-			break;
-#endif // MAC_AX_USB_SUPPORT
-
-#if MAC_AX_SDIO_SUPPORT
-		case MAC_AX_INTF_SDIO:
-			return MACCPWMINTFERR;
-			break;
-#endif // MAC_AX_SDIO_SUPPORT
-
-#if MAC_AX_PCIE_SUPPORT
-		case MAC_AX_INTF_PCIE:
-			cpwm = MAC_REG_R16(R_AX_PCIE_CRPWM);
-			break;
-#endif // MAC_AX_PCIE_SUPPORT
-		default:
-			PLTFM_MSG_ERR("%s: invalid interface = %d!!\n",
-				      __func__, adapter->hw_info->intf);
-			return MACCPWMINTFERR;
-			break;
-		}
-	}
-#endif
-
-	PLTFM_MSG_TRACE("Read CPWM=0x%x\n", cpwm);
-	if (rpwm_seq_num != GET_FIELD(cpwm, PS_CPWM_RSP_SEQ_NUM)) {
-		PLTFM_MSG_TRACE("RPWM seq mismatch!!: expect val:%d, Rx val:%d\n",
-				rpwm_seq_num, GET_FIELD(cpwm, PS_CPWM_RSP_SEQ_NUM));
-#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-			return MACCPWMSEQERR;
-		}
-#endif
-	}
-
-	if (_chk_cpwm_seq_num(GET_FIELD(cpwm, PS_CPWM_SEQ_NUM)) == MACCPWMSEQERR) {
-		PLTFM_MSG_TRACE("CPWM seq mismatch!!: expect val:%d, Rx val:%d\n",
-				cpwm_seq_num, GET_FIELD(cpwm, PS_CPWM_SEQ_NUM));
-#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-			return MACCPWMSEQERR;
-		}
-#endif
-	}
-
-	if (req_pwr_state != GET_FIELD(cpwm, PS_CPWM_STATE)) {
-		return MACCPWMSTATERR;
 	}
 
 	if (adapter->mac_pwr_info.pwr_in_lps) {
 		adapter->mac_pwr_info.pwr_in_lps = 0;
-#if MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)) {
-#if MAC_AX_PCIE_SUPPORT
-			if (adapter->hw_info->intf == MAC_AX_INTF_PCIE) {
-				ret = p_ops->sync_trx_bd_idx(adapter);
-				if (ret != MACSUCCESS) {
-					PLTFM_MSG_ERR("sync trx bd fail: %d\n",
-						      ret);
-					return ret;
-				}
-			}
-#endif
-		}
-#endif
 	}
-#endif
 
 	return MACSUCCESS;
 }
@@ -757,6 +570,66 @@ u32 mac_ps_notify_wake(struct mac_ax_adapter *adapter)
 
 	parm.notify_wake = 1;
 	send_rpwm(adapter, &parm);
+
+	return MACSUCCESS;
+}
+
+u32 mac_ps_set_32k(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u16 rpwm_value = 0;
+	u8 toggle = 0;
+	u16 trycnt = 5000;
+
+	if (adapter->mac_pwr_info.pwr_in_lps == 0) {
+		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): Not in power saving!\n", __func__);
+		return MACPWRSTAT;
+	}
+
+	/* 8730e mp chip: BIT0(clock bit) ,BIT4(PG bit), BIT6(Ack bit), and BIT15(Toggle bit) in REG_RPWM.
+	   BIT0 value - 1: 32k, 0:40MHz.
+	   BIT4 value - partial off.
+	   BIT6 value - 1: report cpwm value after success set, 0:do not report.
+	   BIT15 value - Toggle bit change.
+	*/
+	rpwm_value = MAC_REG_R16(REG_RPWM);
+	rpwm_value &= (BIT_RPWM_TOGGLING | PS_RPWM_ACK \
+		      | PS_RPWM_32K_EN /*| PS_RPWM_PARTIAL_OFF_EN*/);
+
+	/* Toggle bit15 */
+	rpwm_value |= BIT_RPWM_TOGGLING;
+
+	/* set 32k bit */
+	if (en_32k == true) {
+		rpwm_value |= (PS_RPWM_32K_EN /*| PS_RPWM_PARTIAL_OFF_EN*/);
+	} else {
+		rpwm_value &= ~(PS_RPWM_32K_EN /*| PS_RPWM_PARTIAL_OFF_EN*/);
+	}
+
+	/* set ACK bit */
+	if (en_ack == true) {
+		rpwm_value |= PS_RPWM_ACK;
+	} else {
+		rpwm_value &= ~PS_RPWM_ACK;
+	}
+
+	/*clear cpwm intterupt */
+	MAC_REG_W32(REG_HISR0, BIT_HCPWM_INT);
+
+	MAC_REG_W16(REG_RPWM, rpwm_value);
+
+	/*wait ack*/
+	while ((rpwm_value & PS_RPWM_ACK) && (--trycnt >= 1)) {
+		if (MAC_REG_R32(REG_HISR0) & BIT_HCPWM_INT) {
+			break;
+		}
+		PLTFM_DELAY_US(2);
+	}
+
+	if (trycnt <= 1) {
+		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): trycnt: %d\n", __func__, trycnt);
+		return MACPOLLTO;
+	}
 
 	return MACSUCCESS;
 }

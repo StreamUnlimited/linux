@@ -26,13 +26,8 @@
 #define __HALRF_DACK_8730E_H__
 #ifdef RF_8730E_SUPPORT
 
-#define DACK_VER_8730E 0x5
+//#define DACK_VER_8730E 0x5
 
-void halrf_dack_recover_8730e(struct rf_info *rf,
-			      u8 offset,
-			      enum rf_path path,
-			      u32 val,
-			      bool reload);
 void halrf_dac_cal_8730e(struct rf_info *rf, bool force);
 #endif
 #endif /*  __INC_PHYDM_API_H_8852A__ */

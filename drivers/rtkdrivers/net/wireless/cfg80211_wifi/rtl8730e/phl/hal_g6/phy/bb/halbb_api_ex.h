@@ -50,8 +50,8 @@ bool halbb_ctrl_tx_path(struct bb_info *bb, enum rf_path rx_path);
 void halbb_ctrl_trx_path(struct bb_info *bb, enum rf_path tx_path, u8 tx_nss,
 			 enum rf_path rx_path, u8 rx_nss);
 
+void halbb_bb_reset(struct bb_info *bb, enum phl_phy_idx phy_idx);
 void halbb_tssi_bb_reset(struct bb_info *bb);
-
 void halbb_dfs_en(struct bb_info *bb, bool en);
 
 void halbb_adc_en(struct bb_info *bb, bool en);

@@ -24,6 +24,7 @@
  *****************************************************************************/
 #include "halbb_precomp.h"
 
+#ifdef CONFIG_MP_INCLUDED
 u16 halbb_mp_get_tx_ok(struct bb_info *bb, u32 rate_index,
 		       enum phl_phy_idx phy_idx)
 {
@@ -883,7 +884,7 @@ u16 halbb_mp_get_cfo(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	// Polling machanism that determines if read state is successfully set  //
 	if (halbb_get_reg(bb, cr->dbg32_d, BIT(5)) == 1) {
 		halbb_set_reg_cmn(bb, cr->sts_keeper_addr, cr->sts_keeper_addr_m, 2, HW_PHY_0); // 0x738[15:18]
-		cfo = (u8)halbb_get_reg_cmn(bb, cr->sts_keeper_data, 0xfff00000, HW_PHY_0); // Only use [31:20], Total [31:0]
+		cfo = (u16)halbb_get_reg_cmn(bb, cr->sts_keeper_data, 0xfff00000, HW_PHY_0); // Only use [31:20], Total [31:0]
 		bb->bb_cmn_backup_i.last_cfo = cfo;
 	} else {
 		cfo = bb->bb_cmn_backup_i.last_cfo;
@@ -1185,5 +1186,5 @@ void halbb_cr_cfg_mp_init(struct bb_info *bb)
 		break;
 	}
 }
-
+#endif
 

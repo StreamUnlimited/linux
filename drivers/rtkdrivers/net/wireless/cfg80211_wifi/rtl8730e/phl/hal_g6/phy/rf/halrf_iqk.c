@@ -33,7 +33,7 @@ void iqk_restore(struct rf_info *rf, u8 path)
 void iqk_backup_mac_reg(struct rf_info *rf, u32 *backup_mac_reg_val)
 {
 	struct rfk_iqk_info *iqk_info = rf->rfk_iqk_info;
-	u32 i;
+	u8 i;
 	for (i = 0; i < iqk_info->backup_mac_reg_num; i++) {
 		if (i >= RF_BACKUP_MAC_REG_MAX_NUM) {
 			RF_DBG(rf, DBG_RF_IQK,
@@ -52,7 +52,7 @@ void iqk_backup_mac_reg(struct rf_info *rf, u32 *backup_mac_reg_val)
 void iqk_backup_bb_reg(struct rf_info *rf, u32 *backup_bb_reg_val)
 {
 	struct rfk_iqk_info *iqk_info = rf->rfk_iqk_info;
-	u32 i;
+	u8 i;
 	for (i = 0; i < iqk_info->backup_bb_reg_num; i++) {
 		if (i >= RF_BACKUP_BB_REG_MAX_NUM) {
 			RF_DBG(rf, DBG_RF_IQK,
@@ -71,7 +71,7 @@ void iqk_backup_bb_reg(struct rf_info *rf, u32 *backup_bb_reg_val)
 void iqk_backup_rf_reg(struct rf_info *rf, u32 *backup_rf_reg_val, u8 rf_path)
 {
 	struct rfk_iqk_info *iqk_info = rf->rfk_iqk_info;
-	u32 i;
+	u8 i;
 	for (i = 0; i < iqk_info->backup_rf_reg_num; i++) {
 		if (i >= RF_BACKUP_RF_REG_MAX_NUM) {
 			RF_DBG(rf, DBG_RF_IQK,
@@ -91,7 +91,7 @@ void iqk_backup_rf_reg(struct rf_info *rf, u32 *backup_rf_reg_val, u8 rf_path)
 void iqk_restore_mac_reg(struct rf_info *rf, u32 *backup_mac_reg_val)
 {
 	struct rfk_iqk_info *iqk_info = rf->rfk_iqk_info;
-	u32 i;
+	u8 i;
 	for (i = 0; i < iqk_info->backup_mac_reg_num; i++) {
 		if (i >= RF_BACKUP_MAC_REG_MAX_NUM) {
 			RF_DBG(rf, DBG_RF_IQK,
@@ -111,7 +111,7 @@ void iqk_restore_mac_reg(struct rf_info *rf, u32 *backup_mac_reg_val)
 void iqk_restore_bb_reg(struct rf_info *rf, u32 *backup_bb_reg_val)
 {
 	struct rfk_iqk_info *iqk_info = rf->rfk_iqk_info;
-	u32 i;
+	u8 i;
 	for (i = 0; i < iqk_info->backup_bb_reg_num; i++) {
 		if (i >= RF_BACKUP_BB_REG_MAX_NUM) {
 			RF_DBG(rf, DBG_RF_IQK,
@@ -130,7 +130,7 @@ void iqk_restore_bb_reg(struct rf_info *rf, u32 *backup_bb_reg_val)
 void iqk_restore_rf_reg(struct rf_info *rf, u32 *backup_rf_reg_val, u8 rf_path)
 {
 	struct rfk_iqk_info *iqk_info = rf->rfk_iqk_info;
-	u32 i;
+	u8 i;
 	for (i = 0; i < iqk_info->backup_rf_reg_num; i++) {
 		if (i >= RF_BACKUP_RF_REG_MAX_NUM) {
 			RF_DBG(rf, DBG_RF_IQK,
@@ -276,11 +276,9 @@ void halrf_doiqk(struct rf_info *rf, bool force, enum phl_phy_idx phy_idx,
 		 u8 path)
 {
 	struct halrf_iqk_info *iqk_info = &rf->iqk;
-
 	u32 backup_mac_val[RF_BACKUP_MAC_REG_MAX_NUM] = {0x0};
 	u32 backup_bb_val[RF_BACKUP_BB_REG_MAX_NUM] = {0x0};
 	u32 backup_rf_val[RF_PATH_MAX_NUM][RF_BACKUP_RF_REG_MAX_NUM] = {{0x0}};
-	u8 rf_path = 0x0;
 
 #if 0
 	if (!force) {
@@ -484,16 +482,17 @@ bool halrf_fw_iqk(struct rf_info *rf, enum phl_phy_idx phy_idx, bool force)
 
 void halrf_iqk(struct rf_info *rf, enum phl_phy_idx phy_idx, bool force)
 {
+#if 0
+
 	struct halrf_iqk_info *iqk_info = &rf->iqk;
 	bool isfail = true;
 
-#if 0
 	if ((rf->phl_com->id.id & 0x7) == 0x2) { //USB
 		iqk_info->is_fw_iqk = true;
 	} else {
 		iqk_info->is_fw_iqk = false;
 	}
-#endif
+
 
 	if (iqk_info->is_fw_iqk) {
 		isfail = halrf_fw_iqk(rf, phy_idx, force);
@@ -503,15 +502,15 @@ void halrf_iqk(struct rf_info *rf, enum phl_phy_idx phy_idx, bool force)
 			isfail = halrf_fw_iqk(rf, phy_idx, force);
 		}
 	} else {
-		halrf_drv_iqk(rf, phy_idx, force);
-	}
+#endif
+	halrf_drv_iqk(rf, phy_idx, force);
+	//}
 	return;
 }
 
 ////////////// debg command //////////////////////////
 
-u32 halrf_get_iqk_ver(struct rf_info *rf)
-{
+u32 halrf_get_iqk_ver(struct rf_info * rf) {
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 	u32 tmp = 0x0;
 
@@ -558,8 +557,8 @@ u32 halrf_get_iqk_ver(struct rf_info *rf)
 	return tmp;
 
 }
-void halrf_iqk_toneleakage(void *rf_void, u8 path)
-{
+
+void halrf_iqk_toneleakage(void *rf_void, u8 path) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -597,8 +596,7 @@ void halrf_iqk_toneleakage(void *rf_void, u8 path)
 	return;
 }
 
-void halrf_iqk_tx_bypass(void *rf_void, u8 path)
-{
+void halrf_iqk_tx_bypass(void *rf_void, u8 path) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -636,8 +634,7 @@ void halrf_iqk_tx_bypass(void *rf_void, u8 path)
 	return;
 }
 
-void halrf_iqk_rx_bypass(void *rf_void, u8 path)
-{
+void halrf_iqk_rx_bypass(void *rf_void, u8 path) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -673,8 +670,7 @@ void halrf_iqk_rx_bypass(void *rf_void, u8 path)
 	return;
 }
 
-void halrf_iqk_lok_bypass(void *rf_void, u8 path)
-{
+void halrf_iqk_lok_bypass(void *rf_void, u8 path) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -711,8 +707,7 @@ void halrf_iqk_lok_bypass(void *rf_void, u8 path)
 	return;
 }
 
-void halrf_nbiqk_enable(void *rf_void, bool iqk_nbiqk_en)
-{
+void halrf_nbiqk_enable(void *rf_void, bool iqk_nbiqk_en) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -750,8 +745,7 @@ void halrf_nbiqk_enable(void *rf_void, bool iqk_nbiqk_en)
 	return;
 }
 
-void halrf_iqk_xym_enable(void *rf_void, bool iqk_xym_en)
-{
+void halrf_iqk_xym_enable(void *rf_void, bool iqk_xym_en) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -787,8 +781,7 @@ void halrf_iqk_xym_enable(void *rf_void, bool iqk_xym_en)
 	return;
 }
 
-void halrf_iqk_fft_enable(void *rf_void, bool iqk_fft_en)
-{
+void halrf_iqk_fft_enable(void *rf_void, bool iqk_fft_en) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -814,8 +807,7 @@ void halrf_iqk_fft_enable(void *rf_void, bool iqk_fft_en)
 	return;
 }
 
-void halrf_iqk_cfir_enable(void *rf_void, bool iqk_cfir_en)
-{
+void halrf_iqk_cfir_enable(void *rf_void, bool iqk_cfir_en) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -852,8 +844,7 @@ void halrf_iqk_cfir_enable(void *rf_void, bool iqk_cfir_en)
 	return;
 }
 
-void halrf_iqk_sram_enable(void *rf_void, bool iqk_sram_en)
-{
+void halrf_iqk_sram_enable(void *rf_void, bool iqk_sram_en) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -890,8 +881,7 @@ void halrf_iqk_sram_enable(void *rf_void, bool iqk_sram_en)
 	return;
 }
 
-void halrf_iqk_reload(void *rf_void, u8 path)
-{
+void halrf_iqk_reload(void *rf_void, u8 path) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -917,8 +907,7 @@ void halrf_iqk_reload(void *rf_void, u8 path)
 	return;
 }
 
-void halrf_iqk_dbcc(void *rf_void, u8 path)
-{
+void halrf_iqk_dbcc(void *rf_void, u8 path) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -945,8 +934,7 @@ void halrf_iqk_dbcc(void *rf_void, u8 path)
 	return;
 }
 
-u8 halrf_iqk_get_mcc_ch0(void *rf_void)
-{
+u8 halrf_iqk_get_mcc_ch0(void *rf_void) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 	u8 tmp = 0x0;
@@ -975,8 +963,7 @@ u8 halrf_iqk_get_mcc_ch0(void *rf_void)
 
 }
 
-u8 halrf_iqk_get_mcc_ch1(void *rf_void)
-{
+u8 halrf_iqk_get_mcc_ch1(void *rf_void) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 	u8 tmp = 0x0;
@@ -1004,8 +991,7 @@ u8 halrf_iqk_get_mcc_ch1(void *rf_void)
 	return tmp;
 
 }
-void halrf_enable_fw_iqk(void *rf_void, bool is_fw_iqk)
-{
+void halrf_enable_fw_iqk(void *rf_void, bool is_fw_iqk) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
@@ -1025,18 +1011,19 @@ void halrf_enable_fw_iqk(void *rf_void, bool is_fw_iqk)
 		halrf_enable_fw_iqk_8852c(rf, is_fw_iqk);
 		break;
 #endif
-#ifdef RF_8730E_SUPPORT
+	/*
+	#ifdef RF_8730E_SUPPORT
 	case CHIP_WIFI6_8730E:
-		halrf_enable_fw_iqk_8730e(rf, is_fw_iqk);
-		break;
-#endif
+	halrf_enable_fw_iqk_8730e(rf, is_fw_iqk);
+	break;
+	#endif
 
-#ifdef RF_8720E_SUPPORT
+	#ifdef RF_8720E_SUPPORT
 	case CHIP_WIFI6_8720E:
-		halrf_enable_fw_iqk_8720e(rf, is_fw_iqk);
-		break;
-#endif
-
+	halrf_enable_fw_iqk_8720e(rf, is_fw_iqk);
+	break;
+	#endif
+	*/
 	default:
 		break;
 	}
@@ -1044,8 +1031,7 @@ void halrf_enable_fw_iqk(void *rf_void, bool is_fw_iqk)
 	return;
 }
 
-u8 halrf_iqk_get_rxevm(void *rf_void)
-{
+u8 halrf_iqk_get_rxevm(void *rf_void) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 	u8 rxevm = 0x0;
@@ -1083,8 +1069,7 @@ u8 halrf_iqk_get_rxevm(void *rf_void)
 	return rxevm;
 }
 
-u32 halrf_iqk_get_rximr(void *rf_void, u8 path, u32 idx)
-{
+u32 halrf_iqk_get_rximr(void *rf_void, u8 path, u32 idx) {
 	struct rf_info *rf = (struct rf_info *)rf_void;
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 	u32 rximr = 0x0;

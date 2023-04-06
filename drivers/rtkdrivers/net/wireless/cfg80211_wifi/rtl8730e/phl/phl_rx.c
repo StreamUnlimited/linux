@@ -159,7 +159,7 @@ void phl_rx_statistics(struct phl_info_t *phl_info, struct rtw_recv_pkt *rx_pkt)
 	struct rtw_stats *phl_stats = &phl_com->phl_stats;
 	struct rtw_stats *sta_stats = NULL;
 	struct rtw_phl_stainfo_t *sta = NULL;
-	u16 macid = rx_pkt->mdata.macid;
+	u16 macid = rx_pkt->mdata.macid_rxdesc;
 
 	if (!phl_macid_is_valid(phl_info, macid)
 	    || !rtw_phl_macid_is_used(phl_info, macid)) {
@@ -482,6 +482,12 @@ phl_rx_handle_sta_process(struct phl_info_t *phl_info,
 
 	if (!phl_info->phl_com->dev_sw_cap.ap_ps) {
 		return;
+	}
+
+	if (m->macid_rxdesc != 0x7F) {
+		sta = rtw_phl_get_stainfo_by_macid(phl_info, m->macid_rxdesc);
+		if (sta && sta->wrole)
+			role = sta->wrole;
 	}
 
 	/*if (!sta) {
@@ -1434,15 +1440,21 @@ phl_rx_mdate_to_phy_sts(struct phl_info_t *phl_info,
 	struct rtw_r_meta_data *mdata = &(phl_rx->r.mdata);
 	struct rtw_phl_ppdu_phy_info *phy_info = &(phl_rx->r.phy_info);
 	struct rtw_phl_ppdu_sts_info *psts_info = &(phl_info->phl_com->ppdu_sts_info);
+	struct rtw_phl_ppdu_sts_ent *ppdu_sts_ent = NULL;
 	bool ret = false;
 
 	if (false == psts_info->en_psts_per_pkt) {
 		return ret;
 	}
+	ppdu_sts_ent = &psts_info->sts_ent[HW_BAND_0][0];
 
 	phy_info->ch_idx = mdata->central_ch;
 	phy_info->rssi = mdata->pwr_lv >> 2;
 	phy_info->is_valid = true;
+
+	ppdu_sts_ent->phy_info.ch_idx = mdata->central_ch;
+	ppdu_sts_ent->phy_info.rssi = mdata->pwr_lv >> 2;
+	ppdu_sts_ent->phy_info.is_valid = true;
 
 	ret = true;
 
@@ -1608,7 +1620,8 @@ phl_rx_proc_ppdu_sts(struct phl_info_t *phl_info, struct rtw_phl_rx_pkt *phl_rx)
 
 	/* update phl self varibles */
 	for (i = 0 ; i < ppdu_sts_ent->usr_num; i++) {
-		if (ppdu_sts_ent->sta[i].vld) {
+		if (ppdu_sts_ent->sta[i].vld \
+		    && rtw_phl_macid_is_used(phl_info, ppdu_sts_ent->sta[i].macid)) {
 			psta = rtw_phl_get_stainfo_by_macid(phl_info,
 							    ppdu_sts_ent->sta[i].macid);
 			if (psta == NULL) {

@@ -21,8 +21,6 @@
 #include "../mac_priv.h"
 #if MAC_AX_8730E_SUPPORT
 
-//u32 macid_idle_ck_8852a(struct mac_ax_adapter *adapter,
-//			struct mac_role_tbl *role);
 u32 stop_sch_tx_8730e(struct mac_ax_adapter *adapter, enum sch_tx_sel sel,
 		      struct mac_ax_sch_tx_en_cfg *bak);
 #endif /* #if MAC_AX_8730E_SUPPORT */

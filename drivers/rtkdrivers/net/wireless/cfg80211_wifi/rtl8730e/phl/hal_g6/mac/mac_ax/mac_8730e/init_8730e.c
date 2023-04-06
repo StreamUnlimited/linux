@@ -99,9 +99,11 @@ static struct mac_ax_intf_ops mac8730e_axi_ops = {
 	NULL, /*usb_rx_agg_cfg*/
 #if defined(CONFIG_WOWLAN) || defined(CONFIG_AP_WOWLAN)
 	rtl8730e_set_wowlan_ctrl_cmd, /*set_wowlan*/
+#else
+	NULL, /*set_wowlan*/
 #endif
 	NULL, /*ctrl_txdma_ch*/
-	NULL, /*clr_idx_all*/
+	mac_clr_idx_all, /*clr_idx_all*/
 	NULL, /*poll_txdma_ch_idle*/
 	NULL, /*poll_rxdma_ch_idle*/
 	NULL, /*ctrl_txhci*/
@@ -130,6 +132,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_add_role, /* add_role */
 	mac_remove_role, /* remove_role */
 	mac_change_role, /* change_role */
+	cfg_macid_8730e, /* cfg_macid */
 	mac_pwr_switch, /* pwr_switch */
 	mac_pre_sys_init, /*pre_sys_init*/
 	mac_sys_init, /* sys_init */
@@ -234,7 +237,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	NULL, /* config addrcam disable default setting */
 	mac_sr_update, /* set sr parameter */
 	mac_two_nav_cfg,  /* config 2NAV hw setting */
-	NULL, /* pkt_drop */
+	mac_wde_pkt_drop, /* pkt_drop */
 #ifdef RTW_PHL_BCN_IOT
 	mac_send_bcn, /* send beacon h2c */
 #else
@@ -244,7 +247,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	NULL, /* tcpip_chksum_ofd */
 	NULL, /* chk_rx_tcpip_chksum_ofd */
 	NULL, /*chk_allq_empty*/
-	NULL, /*is_txq_empty*/
+	mac_is_txq_empty_8730e, /*is_txq_empty*/
 	NULL, /*is_rxq_empty*/
 	mac_parse_bcn_stats_c2h, /*parse tx bcn statistics*/
 	NULL, /*tx_idle_poll*/
@@ -306,6 +309,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_cfg_ips, /*config IPS*/
 	mac_chk_leave_ips, /*check already leave IPS protocol*/
 	mac_ps_notify_wake, /*send RPWM to wake up HW/FW*/
+	mac_ps_set_32k, /* ps_set_32k */
 	mac_cfg_ps_advance_parm, /*config advance parameter for power saving*/
 	mac_periodic_wake_cfg, /*config ips periodic wake*/
 	/* Wowlan related*/
@@ -545,7 +549,7 @@ static struct mac_ax_adapter mac_8730e_adapter = {
 	NULL, /* role table */
 	{RSVD_PAGE_PROB_RSP, RSVD_PAGE_PS_POLL, RSVD_PAGE_NULL_DATA,
 		RSVD_PAGE_QOS_NULL, RSVD_PAGE_BT_QOS_NULL, RSVD_PAGE_CTS2SELF,
-		RSVD_PAGE_LTECOEX_QOSNULL, 0}, /* pkt_ofld_info */
+		RSVD_PAGE_LTECOEX_QOSNULL, RSVD_PAGE_ARP_RSP, 0}, /* pkt_ofld_info */
 	{0, 0, 0, NULL}, /* pkt_ofld_pkt */
 	{NULL, NULL, NULL, 0, 0, 0, 0, 0}, /* cmd_ofld_info */
 	{{{0}, {0}, {0}, {0}}}, /* mcc_group_info */
@@ -578,6 +582,33 @@ static struct mac_ax_adapter mac_8730e_adapter = {
 	NULL, /* twt_info */
 	NULL, /* dbcc_info */
 };
+
+static u8 _crc5_generate(unsigned char *in, unsigned long byte_num)
+{
+	int a, b;
+	unsigned long i, j;
+	u8 mask, smask = 0x1;
+	int crc_mask = 0x00000010;
+	int poly = 0x05; //CRC5 100101 ==>00101
+	int crc_inter = 0x1f; //initial value
+
+	for (i = 0; i < byte_num; i++) {
+		mask = smask;
+		for (j = 0; j < 8; j++) {
+			a = ((crc_inter & crc_mask) != 0);
+			b = ((in[i] & mask) != 0);
+
+			crc_inter <<= 1;
+			mask <<= 1;
+
+			if (a ^ b) {
+				crc_inter ^= poly;
+			}
+		}
+	}
+
+	return (crc_inter ^ 0x1f) & 0x1f;
+}
 
 struct mac_ax_adapter *get_mac_8730e_adapter(enum mac_ax_intf intf,
 		u8 cv, void *drv_adapter,
@@ -848,6 +879,8 @@ u32 init_edca_cfg_8730e(struct mac_ax_adapter *adapter)
 
 	cfg_mac_clk_8730e(adapter);
 
+	cfg_32k_clk_8730e(adapter);
+
 	/*enable freerun counter*/
 	val8 = MAC_REG_R8(REG_FREERUN_CNT_P2POFF_DIS_TXTIME + 1);
 	val8 = (val8 | BIT(5));
@@ -960,8 +993,14 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	MAC_REG_W8(REG_CHINFO_TRIG_TYPE1 + 2, 0x4);
 
 	val32 = MAC_REG_R32(REG_WMAC_OPTION_FUNCTION_1);
-	val32 |= (BIT_R_WMAC_FIL_FCPROVER_1 | BIT_R_WMAC_FIL_FCTYPE_1);
+	val32 |= (BIT_R_WMAC_FIL_FCPROVER_1 | BIT_R_WMAC_FIL_FCTYPE_1 \
+		 | BIT_R_WMAC_SRCH_TXRPT_MID_1 | BIT_R_WMAC_SRCH_TXRPT_PERPKT_1);
 	MAC_REG_W32(REG_WMAC_OPTION_FUNCTION_1, val32);
+
+	/*https://jira.realtek.com/browse/AMEBALITE-190*/
+	val32 = MAC_REG_R32(REG_RCR);
+	val32 |= BIT_APP_FCS;
+	MAC_REG_W32(REG_RCR, val32);
 
 	ret = init_low_pwr_8730e(adapter);
 	if (ret != MACSUCCESS) {
@@ -1087,7 +1126,10 @@ u32 priority_queue_cfg_8730e(struct mac_ax_adapter *adapter,
 	MAC_REG_W8(REG_BCN_AMPDU_CTCL + 1, (u8)(txff_info->rsvd_bcnq2_addr));
 	MAC_REG_W8(REG_DWBCN1_CTRL + 3, (u8)(txff_info->rsvd_bcnq2_addr));
 
-	MAC_REG_W32(REG_FWHW_TXQ_HWSSN_CTRL, MAC_REG_R32(REG_FWHW_TXQ_HWSSN_CTRL) & ~BIT_EN_WR_FREE_TAIL);
+	val32 = MAC_REG_R32(REG_FWHW_TXQ_HWSSN_CTRL);
+	val32 |= BIT_EN_BCNQ_DL;
+	val32 &= ~BIT_EN_WR_FREE_TAIL;
+	MAC_REG_W32(REG_FWHW_TXQ_HWSSN_CTRL, val32);
 
 	MAC_REG_W16(0x116, (u16)(adapter->hw_cfg_info.rx_fifo_size - C2H_PKT_BUF_8730e - 1));
 
@@ -1309,6 +1351,27 @@ void cfg_mac_clk_8730e(struct mac_ax_adapter *adapter)
 	MAC_REG_W8(REG_WSEC_OPTION, MAC_CLK_SPEED);
 }
 
+void cfg_32k_clk_8730e(struct mac_ax_adapter *adapter)
+{
+	u32 val32;
+	u8 val8;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	/*32kselect sdm32k from mac external(32.768)*/
+	val8 = MAC_REG_R8(REG_WL_CLK_CTRL);
+	val8 &= ~BIT_CKSL_CK32K;
+	val8 |= (BIT_WL_FQSEL_CK32K | BIT_WL_CKMCU_EN | BIT_WL_CKSEC_EN | BIT_WL_CKMAC_EN);
+	MAC_REG_W8(REG_WL_CLK_CTRL, val8);
+
+	/*32k Enable*/
+	val8 = MAC_REG_R8(REG_WL_CLK_CTRL);
+	val8 |= BIT_WL_CK32K_EN;
+	MAC_REG_W8(REG_WL_CLK_CTRL, val8);
+
+	/*CLK for GTimer:Unit: 32us, use 32k clk, 1cycle =32.768us*/
+	MAC_REG_W32(REG_TCUNIT_BASE, 0x01);
+}
+
 u32 init_low_pwr_8730e(struct mac_ax_adapter *adapter)
 {
 	u16 value16;
@@ -1484,6 +1547,89 @@ u32 cfg_net_type_8730e(struct mac_ax_adapter *adapter, u8 port,
 	default:
 		break;
 	}
+
+	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
+
+	return MACSUCCESS;
+}
+
+u32 cfg_sta_aid_8730e(struct mac_ax_adapter *adapter, u8 port, u16 aid)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 val32 = 0;
+
+	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
+	switch (port) {
+	case MAC_AX_PORT_0:
+		val32 = MAC_REG_R32(REG_BCN_PSR_RPT0);
+		val32 = BIT_SET_PS_AID_0(val32, aid);
+		MAC_REG_W32(REG_BCN_PSR_RPT0 , val32);
+
+		/* config mac aid for 11ax */
+		val32 = MAC_REG_R32(REG_AID);
+		val32 = BIT_SET_R_MAC_AID12_0(val32, aid);
+		MAC_REG_W32(REG_AID, val32);
+		break;
+	case MAC_AX_PORT_1:
+		val32 = MAC_REG_R32(REG_BCN_PSR_RPT1);
+		val32 = BIT_SET_PS_AID_1(val32, aid);
+		MAC_REG_W32(REG_BCN_PSR_RPT1 , val32);
+
+		/* config mac aid for 11ax */
+		val32 = MAC_REG_R32(REG_AID);
+		val32 = BIT_SET_R_MAC_AID12_1(val32, aid);
+		MAC_REG_W32(REG_AID, val32);
+		break;
+	default:
+		PLTFM_MSG_ERR("[ERR] invalid port idx %d\n", port);
+		return MACHWNOSUP;
+	}
+	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
+
+	return MACSUCCESS;
+}
+
+u32 cfg_macid_8730e(struct mac_ax_adapter *adapter,
+		    struct rtw_phl_stainfo_t *sta)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 addr = 0;
+	u8 mac_addr[ETH_ALEN] = {0};
+	u8 crc5 = 0;
+	u32 entry = 0;
+	u32 offset = 0, idx = 0;
+	u8 entry_data[CRC5_ENTRY_SIZE_8730E + 1] = {0};
+	u16 entry_val16 = 0;
+
+	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
+
+	memcpy(mac_addr, sta->mac_addr, ETH_ALEN);
+
+	/*write mac addr to control info*/
+	addr = CTRL_INFO_BASE_8730E + CTRL_INFO_ENTRY_SIZE_8730E * sta->macid + 32;
+	PLTFM_MEM_W(addr, mac_addr, ETH_ALEN);
+
+	/*write mac addr to crc5*/
+	crc5 = (u8)_crc5_generate(mac_addr, ETH_ALEN);
+	/* each entry contain 12 macid*/
+	entry = sta->macid / 12;
+	/* offset in each entry(each macid contain 5 bits) */
+	offset = 5 * (sta->macid % 12);
+	idx = offset / 8;
+	offset = offset % 8;
+	/* each entry is 64 bits*/
+	addr = CRC5_BASE_8730E + entry * CRC5_ENTRY_SIZE_8730E;
+	PLTFM_MEM_R(addr, entry_data, CRC5_ENTRY_SIZE_8730E);
+	entry_data[8] = 0;
+
+	entry_val16 = ((u16)entry_data[idx + 1] << 8) | entry_data[idx];
+	entry_val16 &= ~(((u16)0x1F) << offset);
+	entry_val16 |= ((u16)crc5 << offset);
+	entry_data[idx] = (u8)entry_val16;
+	entry_data[idx + 1] = (u8)(entry_val16 >> 8);
+	/* set entry valid bit*/
+	entry_data[7] = entry_data[7] | BIT5;
+	PLTFM_MEM_W(addr, entry_data, CRC5_ENTRY_SIZE_8730E);
 
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 

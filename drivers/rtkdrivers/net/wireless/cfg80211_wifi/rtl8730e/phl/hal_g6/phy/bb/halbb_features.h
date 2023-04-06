@@ -35,6 +35,10 @@
 #define HALBB_TIMER_SUPPORT
 #endif
 
+#ifndef DRV_BB_DGB_SUPPORT_DISABLE
+#define HALBB_DBG_SUPPORT
+#endif
+
 #ifndef DRV_BB_DBG_TRACE_DISABLE
 #define HALBB_DBG_TRACE_SUPPORT
 #endif
@@ -47,7 +51,7 @@
 //#define CLM_SUPPORT
 //#define NHM_SUPPORT
 //#define IFS_CLM_SUPPORT
-#define FAHM_SUPPORT
+//#define FAHM_SUPPORT
 //#define EDCCA_CLM_SUPPORT
 #endif
 #ifndef DRV_BB_STATISTICS_DISABLE
@@ -61,6 +65,7 @@
 #endif
 #ifndef DRV_BB_DFS_DISABLE
 #define HALBB_DFS_SUPPORT
+#define HALBB_ENV_MNTR_SUPPORT
 #endif
 #ifndef DRV_BB_CFO_TRK_DISABLE
 #define HALBB_CFO_TRK_SUPPORT
@@ -69,6 +74,11 @@
 #endif
 #ifndef DRV_BB_DIG_DISABLE
 #define HALBB_DIG_SUPPORT
+#define HALBB_DIG_SIMPLE_MODE
+#define HALBB_SIMPLE_TDMA_DIG_SUPPORT
+#ifndef HALBB_DIG_SIMPLE_MODE
+#define HALBB_ENV_MNTR_SUPPORT
+#define FAHM_SUPPORT
 #ifndef DRV_BB_TDMADIG_DISABLE
 #define HALBB_DIG_TDMA_SUPPORT
 #endif
@@ -78,11 +88,12 @@
 #endif
 #define HALBB_DIG_DAMPING_CHK
 #endif
+#endif
 #ifndef DRV_BB_LA_MODE_DISABLE
 #define HALBB_LA_MODE_SUPPORT
 #endif
 #ifndef DRV_BB_PSD_DISABLE
-#define HALBB_PSD_SUPPORT
+//#define HALBB_PSD_SUPPORT
 #endif
 #ifndef DRV_BB_PWR_CTRL_DISABLE
 #define HALBB_PWR_CTRL_SUPPORT
@@ -96,7 +107,7 @@
 #ifndef DRV_BB_CH_INFO_DISABLE
 #define HALBB_CH_INFO_SUPPORT
 #ifndef DRV_BB_DYN_CSI_RSP_DISABLE
-#define HALBB_DYN_CSI_RSP_SUPPORT
+//#define HALBB_DYN_CSI_RSP_SUPPORT
 #endif
 #endif
 #ifndef DRV_BB_AUTO_DBG_DISABLE
@@ -124,7 +135,7 @@
 #define HALBB_FW_OFLD_SUPPORT
 #endif
 
-#define HALBB_TDMA_CR_SUPPORT
+//#define HALBB_TDMA_CR_SUPPORT
 
 /*[POP resolved hang]*/
 #ifdef DRV_RESOLVED_POP_BY_BB
@@ -140,6 +151,9 @@
 #define HALBB_SHARE_XSTAL_SUPPORT
 #endif
 
+#ifdef DRV_BB_CMN_RPT_DISABLE
+#define HALBB_CMN_RPT_SIMPLE
+#endif
 //#define HALBB_DYN_1R_CCA_SUPPORT
 
 #if (defined(DRV_BB_CNSL_CMN_INFO) || !defined(HALBB_DBG_TRACE_SUPPORT))

@@ -132,11 +132,9 @@ void halrf_rfk_self_init(struct rf_info *rf)
 	struct halrf_iqk_info *iqk_info = &rf->iqk;
 	struct halrf_gapk_info *txgapk_info = &rf->gapk;
 	struct halrf_rx_dck_info *rx_dck = &rf->rx_dck;
-
 	u8 path;
 
 	RF_DBG(rf, DBG_RF_RFK, "===> %s\n", __func__);
-
 	/* [TXGAPK init] */
 	txgapk_info->is_gapk_init = false;
 
@@ -146,9 +144,13 @@ void halrf_rfk_self_init(struct rf_info *rf)
 		rx_dck->is_auto_res = true;
 	}
 #endif
-	/*[IQK init]*/
+	rx_dck->is_rxdck_track_en = true;
 	iqk_info->is_iqk_init = false;
 
+#ifndef IOT_SMALL_RAM
+	halrf_rx_dck_init(rf);
+	/*[IQK init]*/
+#endif
 	/*[DPK init]*/
 	halrf_dpk_init(rf);
 
@@ -283,10 +285,10 @@ void halrf_rfability_init_mp(struct rf_info *rf)
 			HAL_RF_TX_PWR_TRACK |
 			HAL_RF_IQK |
 			HAL_RF_LCK |
-			/*HAL_RF_DPK |*/
+			HAL_RF_DPK |
 			HAL_RF_DACK |
-			/*HAL_RF_TXGAPK |*/
-			/*HAL_RF_DPK_TRACK |*/
+			HAL_RF_TXGAPK |
+			HAL_RF_DPK_TRACK |
 			HAL_RF_RXDCK |
 			/*HAL_RF_RXGAINK |*/
 			HAL_RF_THER_TRIM |
@@ -306,8 +308,8 @@ void halrf_rfability_init_mp(struct rf_info *rf)
 			HAL_RF_LCK |
 			HAL_RF_DPK |
 			HAL_RF_DACK |
-			/*HAL_RF_TXGAPK |*/
-			/*HAL_RF_DPK_TRACK |*/
+			HAL_RF_TXGAPK |
+			HAL_RF_DPK_TRACK |
 			HAL_RF_RXDCK |
 			/*HAL_RF_RXGAINK |*/
 			HAL_RF_THER_TRIM |
@@ -458,18 +460,18 @@ void halrf_rfability_init(struct rf_info *rf)
 #ifdef RF_8730E_SUPPORT
 	case RF_RTL8730E:
 		rf->hw_rf_ability |=
-			/*HAL_RF_TX_PWR_TRACK |*/
+			HAL_RF_TX_PWR_TRACK |
 			HAL_RF_IQK |
 			HAL_RF_LCK |
-			/*HAL_RF_DPK |*/
+			HAL_RF_DPK |
 			HAL_RF_DACK |
-			/*HAL_RF_TXGAPK |*/
-			/*HAL_RF_DPK_TRACK |*/
+			HAL_RF_TXGAPK |
+			HAL_RF_DPK_TRACK |
 			HAL_RF_RXDCK |
 			/*HAL_RF_RXGAINK |*/
 			HAL_RF_THER_TRIM |
 			HAL_RF_PABIAS_TRIM |
-			/*HAL_RF_TSSI_TRIM |*/
+			HAL_RF_TSSI_TRIM |
 			HAL_RF_TSSI_TRK |
 			/*HAL_RF_XTAL_TRACK |*/
 			HAL_RF_RXDCK_TRACK |
@@ -486,8 +488,8 @@ void halrf_rfability_init(struct rf_info *rf)
 			HAL_RF_LCK |
 			HAL_RF_DPK |
 			HAL_RF_DACK |
-			/*HAL_RF_TXGAPK |*/
-			/*HAL_RF_DPK_TRACK |*/
+			HAL_RF_TXGAPK |
+			HAL_RF_DPK_TRACK |
 			HAL_RF_RXDCK |
 			/*HAL_RF_RXGAINK |*/
 			HAL_RF_THER_TRIM |
@@ -543,7 +545,6 @@ void halrf_set_final_rfability(struct rf_info *rf)
 
 	rf->support_ability =
 		rf->phl_com->dev_cap.rfk_cap & rf->hw_rf_ability;
-
 	RF_DBG(rf, DBG_RF_INIT,
 	       "IC = ((0x%x)), mp=%d,  RF_Supportability Init = ((0x%x))\n",
 	       rf->ic_type, rf->phl_com->drv_mode, rf->support_ability);
@@ -551,10 +552,10 @@ void halrf_set_final_rfability(struct rf_info *rf)
 
 void halrf_rfe_init(struct rf_info *rf)
 {
-	u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
 
 	switch (rf->ic_type) {
 #ifdef RF_8852A_SUPPORT
+		u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
 	case RF_RTL8852A:
 		/*2G FEM check*/
 		if (rfe_type == 11 || rfe_type == 12 || rfe_type == 17 ||
@@ -593,24 +594,31 @@ void halrf_rfe_type_gpio_setting(struct rf_info *rf)
 	u32 band = rf->hal_com->band[HW_PHY_0].cur_chandef.band;
 
 	RF_DBG(rf, DBG_RF_INIT, "======>%s\n", __func__);
-
 	halrf_set_gpio(rf, HW_PHY_0, (u8)band);
 }
 
 enum rtw_hal_status halrf_dm_init(void *rf_void)
 {
 	struct rf_info *rf = (struct rf_info *)rf_void;
-	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
+	//enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
 
 	if (!rf) {
 		RF_DBG(rf, DBG_RF_INIT, "[%s] *rf = NULL", __func__);
 		return RTW_HAL_STATUS_FAILURE;
 	}
 
+	rf->is_rfk_init = true;
+	rf->is_chl_rfk = true;
+
+	halrf_btc_rfk_ntfy(rf, (BIT(HW_PHY_0) << 4), RF_BTC_NOTIFY, RFK_START);
+	halrf_tmac_tx_pause(rf, HW_PHY_0, true);
+
 	halrf_cmd_parser_init(rf);
 	halrf_set_final_rfability(rf);
+#ifndef IOT_SMALL_RAM
 	halrf_rfe_init(rf);
 	halrf_rfe_type_gpio_setting(rf);
+#endif
 	halrf_config_nctl_reg(rf);
 	halrf_rfk_self_init(rf);
 
@@ -642,7 +650,13 @@ enum rtw_hal_status halrf_dm_init(void *rf_void)
 
 	halrf_fcs_init(rf);
 
-	return hal_status;
+	halrf_tmac_tx_pause(rf, HW_PHY_0, false);
+	halrf_btc_rfk_ntfy(rf, (BIT(HW_PHY_0) << 4), RF_BTC_NOTIFY, RFK_STOP);
+
+	rf->is_rfk_init = false;
+	rf->is_chl_rfk = false;
+
+	return RTW_HAL_STATUS_SUCCESS;
 }
 
 enum rtw_hal_status halrf_init(struct rtw_phl_com_t *phl_com,
@@ -675,7 +689,7 @@ void halrf_deinit(struct rtw_phl_com_t *phl_com,
 {
 	struct rf_info *halrf = (struct rf_info *)rf;
 
-#if  (!defined(RF_8730E_SUPPORT) && !defined(RF_8720E_SUPPORT))
+#ifndef IOT_SMALL_RAM
 	/*stop FSM of RF or free memory*/
 	PHL_INFO("[PHL] %s - halrf(%p)\n", __func__, halrf);
 #endif

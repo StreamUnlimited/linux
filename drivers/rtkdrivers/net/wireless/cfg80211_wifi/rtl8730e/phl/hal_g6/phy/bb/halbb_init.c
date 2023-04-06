@@ -14,65 +14,6 @@
  *****************************************************************************/
 #include "halbb_precomp.h"
 
-bool halbb_chk_bb_rf_pkg_set_valid(struct bb_info *bb)
-{
-	struct rtw_hal_com_t	*hal_i = bb->hal_com;
-	u8 bb_ver = 0; /*hal_i->bb_para_pkg_ver;*/ /*TBD*/
-	u8 rf_ver = 0; /*hal_i->rf_para_pkg_ver;*/ /*TBD*/
-	bool valid = true;
-
-	switch (bb->ic_type) {
-
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		valid = halbb_chk_pkg_valid_8852a_2(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		valid = halbb_chk_pkg_valid_8852b(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		valid = halbb_chk_pkg_valid_8852c(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-#ifdef BB_8834A_SUPPORT
-	case BB_RTL8834A:
-		valid = halbb_chk_pkg_valid_8834a(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		valid = halbb_chk_pkg_valid_8192xb(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-#ifdef BB_8730E_SUPPORT
-	case BB_RTL8730E:
-		valid = halbb_chk_pkg_valid_8730e(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-#ifdef BB_8720E_SUPPORT
-	case BB_RTL8720E:
-		valid = halbb_chk_pkg_valid_8720e(bb, bb_ver, rf_ver);
-		break;
-#endif
-
-	default:
-		break;
-
-	}
-
-	return valid;
-}
-
 void halbb_ic_hw_setting_init(struct bb_info *bb)
 {
 #ifdef HALBB_TDMA_CR_SUPPORT
@@ -84,49 +25,6 @@ void halbb_ic_hw_setting_init(struct bb_info *bb)
 #endif
 
 	switch (bb->ic_type) {
-
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		halbb_ic_hw_setting_init_8852a_2(bb);
-		halbb_dyn_mu_bypass_vht_sigb_init_8852a_2(bb);
-#ifdef HALBB_DYN_CSI_RSP_SUPPORT
-		halbb_dcr_init(bb);
-#endif
-#ifdef BB_DYN_CFO_TRK_LOP
-		halbb_dyn_cfo_trk_loop_init(bb);
-#endif
-		break;
-#endif
-
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		halbb_ic_hw_setting_init_8852b(bb);
-#ifdef HALBB_DYN_CSI_RSP_SUPPORT
-		halbb_dcr_init(bb);
-#endif
-#ifdef BB_DYN_CFO_TRK_LOP
-		halbb_dyn_cfo_trk_loop_init(bb);
-#endif
-		break;
-#endif
-
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		halbb_ic_hw_setting_init_8852c(bb);
-#ifdef HALBB_DYN_CSI_RSP_SUPPORT
-		halbb_dcr_init(bb);
-#endif
-		break;
-#endif
-
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		halbb_ic_hw_setting_init_8192xb(bb);
-#ifdef HALBB_DYN_CSI_RSP_SUPPORT
-		halbb_dcr_init(bb);
-#endif
-		break;
-#endif
 
 #ifdef BB_8730E_SUPPORT
 	case BB_RTL8730E:
@@ -391,17 +289,15 @@ u64 halbb_supportability_default(struct bb_info *bb)
 #ifdef BB_8730E_SUPPORT
 	case BB_RTL8730E:
 		support_ability |=
-			BB_DIG |
-			BB_CFO_TRK |
-#if 0
 			BB_RA |
-			BB_FA_CNT |
-			BB_DFS |
+			/*BB_FA_CNT |*/
+			/*BB_DFS |*/
 			BB_EDCCA |
-			BB_ENVMNTR |
+			BB_CFO_TRK |
+			/*BB_ENVMNTR |*/
+			BB_DIG |
 			/*BB_UL_TB_CTRL |*/
-			BB_PWR_CTRL |
-#endif
+			/*BB_PWR_CTRL |*/
 			0;
 		break;
 #endif
@@ -409,11 +305,11 @@ u64 halbb_supportability_default(struct bb_info *bb)
 	case BB_RTL8720E:
 		support_ability |=
 			BB_RA |
-			BB_FA_CNT |
+			/*BB_FA_CNT |*/
 			/*BB_DFS |*/
-			/*BB_EDCCA |*/
+			BB_EDCCA |
 			BB_CFO_TRK |
-			BB_ENVMNTR |
+			/*BB_ENVMNTR |*/
 			BB_DIG |
 			/*BB_UL_TB_CTRL |*/
 			/*BB_PWR_CTRL |*/
@@ -523,9 +419,12 @@ enum rtw_hal_status halbb_dm_init_per_phy(struct bb_info *bb_0, enum phl_phy_idx
 
 	halbb_supportability_init(bb);
 	halbb_physts_parsing_init(bb);
+#ifndef HALBB_CMN_RPT_SIMPLE
 	halbb_cmn_rpt_init(bb);
+#endif
+#ifdef HALBB_DBG_SUPPORT
 	halbb_dbg_setting_init(bb);
-
+#endif
 #ifdef HALBB_PWR_CTRL_SUPPORT
 	halbb_macid_ctrl_init(bb);
 #endif
@@ -638,7 +537,7 @@ void halbb_timer_ctrl(struct bb_info *bb, enum bb_timer_cfg_t timer_state)
 #ifdef HALBB_TDMA_CR_SUPPORT
 	halbb_cfg_timers(bb, timer_state, &bb->bb_dbg_i.tdma_cr_timer_i);
 #endif
-#ifdef HALBB_DIG_TDMA_SUPPORT
+#if defined(HALBB_DIG_TDMA_SUPPORT) || defined(HALBB_SIMPLE_TDMA_DIG_SUPPORT)
 	halbb_cfg_timers(bb, timer_state, &bb->bb_dig_i.dig_timer_i);
 #endif
 
@@ -672,6 +571,9 @@ void halbb_timer_init(struct bb_info *bb)
 #ifdef HALBB_DIG_TDMA_SUPPORT
 	halbb_dig_timer_init(bb);
 #endif
+#ifdef HALBB_SIMPLE_TDMA_DIG_SUPPORT
+	halbb_simple_tdma_timer_init(bb);
+#endif
 
 	/*Common Hooker*/
 #ifdef HALBB_LA_MODE_SUPPORT
@@ -683,7 +585,9 @@ void halbb_timer_init(struct bb_info *bb)
 
 void halbb_cr_cfg_init(struct bb_info *bb)
 {
+#ifdef HALBB_DBG_SUPPORT
 	halbb_cr_cfg_dbg_init(bb);
+#endif
 	halbb_cr_cfg_physts_init(bb);
 #ifdef HALBB_STATISTICS_SUPPORT
 	halbb_cr_cfg_stat_init(bb);
@@ -706,7 +610,9 @@ void halbb_cr_cfg_init(struct bb_info *bb)
 #ifdef HALBB_PMAC_TX_SUPPORT
 	halbb_cr_cfg_plcp_init(bb);
 #endif
+#ifdef CONFIG_MP_INCLUDED
 	halbb_cr_cfg_mp_init(bb);
+#endif
 #ifdef HALBB_CH_INFO_SUPPORT
 	halbb_cr_cfg_ch_info_init(bb);
 #endif
@@ -725,7 +631,9 @@ void halbb_cr_cfg_init(struct bb_info *bb)
 #ifdef HALBB_LA_MODE_SUPPORT
 		halbb_cr_cfg_la_init(bb);
 #endif
+#ifdef HALBB_SPUR_SUPPRESS_SUPPORT
 		halbb_cr_cfg_spur_init(bb);
+#endif
 	}
 }
 

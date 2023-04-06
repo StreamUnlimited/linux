@@ -44,6 +44,8 @@
 /*RTK_DMAC_INTERRUPT_COMBINE set 1 means use 1 interrupt callback function. */
 #define RTK_DMAC_INTERRUPT_COMBINE	0
 
+#define RTK_DMAC_RUN_CPU		1
+
 /**************************************************************************/
 
 /************************ RTK_GDMA Hardware Defines ***********************/

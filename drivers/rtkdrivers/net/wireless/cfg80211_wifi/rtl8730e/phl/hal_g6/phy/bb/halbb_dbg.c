@@ -38,13 +38,13 @@ void halbb_dbg_comp_init(struct bb_info *bb)
 
 	bb->dbg_component =
 		/*DBG_RA |		*/
+		/*DBG_PHY_STS |		*/
 		/*DBG_FA_CNT |		*/
 		/*DBG_RSSI_MNTR |	*/
 		/*DBG_DFS |		*/
 		/*DBG_EDCCA |		*/
 		/*DBG_ENV_MNTR |	*/
 		/*DBG_CFO_TRK |		*/
-		/*DBG_PHY_STATUS |	*/
 		/*DBG_COMMON_FLOW |	*/
 		/*DBG_IC_API |		*/
 		/*DBG_DBG_API |		*/
@@ -78,6 +78,158 @@ void halbb_print_devider(struct bb_info *bb, u8 len, bool with_space, u64 comp)
 		BB_TRACE("\n");
 	}
 }
+
+void halbb_get_bb_para_pkg_ver(struct bb_info *bb, u32 *date, u32 *release_ver)
+
+{
+	switch (bb->ic_type) {
+#ifdef BB_8852A_2_SUPPORT
+	case BB_RTL8852A:
+		*date = BB_REG_RELEASE_DATE_8852A_2;
+		*release_ver = BB_REG_RELEASE_VERSION_8852A_2;
+		break;
+#endif
+#ifdef BB_8852B_SUPPORT
+	case BB_RTL8852B:
+		*date = BB_REG_RELEASE_DATE_8852B;
+		*release_ver = BB_REG_RELEASE_VERSION_8852B;
+		break;
+#endif
+#ifdef BB_8852C_SUPPORT
+	case BB_RTL8852C:
+		*date = BB_REG_RELEASE_DATE_8852C;
+		*release_ver = BB_REG_RELEASE_VERSION_8852C;
+		break;
+#endif
+#ifdef BB_8192XB_SUPPORT
+	case BB_RTL8192XB:
+		*date = BB_REG_RELEASE_DATE_8192XB;
+		*release_ver = BB_REG_RELEASE_VERSION_8192XB;
+		break;
+#endif
+#ifdef BB_8720E_SUPPORT
+	case BB_RTL8720E:
+		*date = BB_REG_RELEASE_DATE_8720E;
+		*release_ver = BB_REG_RELEASE_VERSION_8720E;
+		break;
+#endif
+#ifdef BB_8730E_SUPPORT
+	case BB_RTL8730E:
+		*date = BB_REG_RELEASE_DATE_8730E;
+		*release_ver = BB_REG_RELEASE_VERSION_8730E;
+		break;
+#endif
+	default:
+		BB_WARNING("[%s] ic=%d\n", __func__, bb->ic_type);
+		break;
+	}
+
+}
+
+#if HALBB_DBG_DVLP_FLAG /*Dump register - relative*/
+
+void halbb_cr_table_dump(struct bb_info *bb, u32 *cr_table, u32 cr_len)
+{
+	u32 i = 0;
+	u32 cr_tmp, val;
+
+	for (i = 0; i < cr_len; i++) {
+		cr_tmp = cr_table[i];
+		if (cr_tmp == 0) {
+			continue;
+		}
+
+		val = halbb_get_reg(bb, cr_tmp, MASKDWORD);
+		BB_TRACE("[%03d]Reg[0x%04x] = 0x%08x\n", i, cr_tmp, val);
+	}
+}
+
+void halbb_dump_bb_reg(struct bb_info *bb, u32 *_used, char *output,
+		       u32 *_out_len, bool dump_2_buff,
+		       enum bb_frc_phy_dump_reg frc_phy_dump)
+{
+	u32 release_ver, date;
+
+	if (dump_2_buff) {
+		if (*_out_len < 100) {
+			BB_WARNING("[%s] out_len=%d", __func__, *_out_len);
+			return;
+		}
+	}
+
+	BB_TRACE1(bb, "%-15s: %s (%s)\n", "Branch", HLABB_CODE_BASE, HALBB_RELEASE_DATE);
+
+	halbb_get_bb_para_pkg_ver(bb, &date, &release_ver);
+	BB_TRACE1(bb, "%-15s: %02d (%d)\n", "BB CR Ver", release_ver, date);
+
+	switch (bb->ic_type) {
+
+#ifdef BB_8720E_SUPPORT
+	case BB_RTL8720E:
+		halbb_dump_bb_reg_8720e(bb, _used, output, _out_len, dump_2_buff);
+		break;
+#endif
+
+#ifdef BB_8730E_SUPPORT
+	case BB_RTL8730E:
+		halbb_dump_bb_reg_8730e(bb, _used, output, _out_len, dump_2_buff);
+		break;
+#endif
+
+	default:
+		break;
+	}
+}
+
+void halbb_dump_reg_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *output,
+			u32 *_out_len)
+{
+	u32 val[10] = {0};
+	u32 addr = 0;
+	enum bb_frc_phy_dump_reg frc_phy_dump = FRC_DUMP_ALL;
+
+	if (_os_strcmp(input[1], "-h") == 0) {
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "dumpreg all\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "dumpreg frc_phy {val}\n");
+		return;
+	}
+
+	if (_os_strcmp(input[1], "frc_phy") == 0) {
+		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[0]);
+		frc_phy_dump = (enum bb_frc_phy_dump_reg)val[0];
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "frc_phy_dump = phy:%d\n", frc_phy_dump);
+	}
+
+	halbb_dump_bb_reg(bb, _used, output, _out_len, true, frc_phy_dump);
+}
+
+void halbb_dd_dump_dbg(struct bb_info *bb, char input[][16], u32 *_used,
+		       char *output, u32 *_out_len)
+{
+	char help[] = "-h";
+	u32 val[10] = {0};
+	u32 used = *_used;
+	u32 out_len = *_out_len;
+
+	HALBB_SCAN(input[1], DCMD_DECIMAL, &val[0]);
+
+	if (_os_strcmp(input[1], help) == 0) {
+		BB_DBG_CNSL(out_len, *_used, output + *_used, out_len - *_used,
+			    "{dd_dbg}\n");
+		return;
+	}
+	/*[Reg]*/
+	halbb_dump_bb_reg(bb, &used, output, &out_len, true, FRC_DUMP_ALL);
+	/*[Dbg Port]*/
+	halbb_dbgport_dump_all(bb, _used, output, _out_len);
+	/*[Analog Parameters]*/
+	//halbb_get_anapar_table(bb, &used, output, &out_len);
+
+}
+#endif
 
 #ifdef HALBB_TDMA_CR_SUPPORT
 
@@ -161,6 +313,7 @@ void halbb_tdma_cr_sel_init(struct bb_info *bb)
 }
 #endif
 
+#ifdef HALBB_DBG_SUPPORT
 #if 1 /*debug port - relative*/
 void halbb_bb_dbg_port_clock_en(struct bb_info *bb, u8 enable)
 {
@@ -244,30 +397,6 @@ void halbb_dbgport_dump_all(struct bb_info *bb, u32 *_used, char *output,
 {
 	switch (bb->ic_type) {
 
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		halbb_dbgport_dump_all_8852a_2(bb, _used, output, _out_len);
-		break;
-#endif
-
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		halbb_dbgport_dump_all_8852b(bb, _used, output, _out_len);
-		break;
-#endif
-
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		halbb_dbgport_dump_all_8852c(bb, _used, output, _out_len);
-		break;
-#endif
-
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		halbb_dbgport_dump_all_8192xb(bb, _used, output, _out_len);
-		break;
-#endif
-
 #ifdef BB_8720E_SUPPORT
 	case BB_RTL8720E:
 		halbb_dbgport_dump_all_8720e(bb, _used, output, _out_len);
@@ -344,6 +473,7 @@ void halbb_dbgport_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 #if HALBB_DBG_DVLP_FLAG /*Common debug message - relative*/
 void halbb_crc32_cnt2_cmn_log(struct bb_info *bb)
 {
+#ifdef HALBB_STATISTICS_SUPPORT
 	struct bb_stat_info *stat_t = &bb->bb_stat_i;
 	struct bb_crc2_info *crc2 = &stat_t->bb_crc2_i;
 	struct bb_usr_set_info *usr_set = &stat_t->bb_usr_set_i;
@@ -371,10 +501,12 @@ void halbb_crc32_cnt2_cmn_log(struct bb_info *bb)
 	       dbg_buf[0], dbg_buf[1], dbg_buf[2], dbg_buf[3],
 	       crc2->cnt_ofdm2_crc32_error, crc2->cnt_ht2_crc32_error,
 	       crc2->cnt_vht2_crc32_error, crc2->cnt_he2_crc32_error);
+#endif
 }
 
 void halbb_crc32_cnt3_cmn_log(struct bb_info *bb)
 {
+#ifdef HALBB_STATISTICS_SUPPORT
 	struct bb_stat_info *stat_t = &bb->bb_stat_i;
 	struct bb_usr_set_info *usr_set = &stat_t->bb_usr_set_i;
 	struct bb_crc2_info *crc2 = &stat_t->bb_crc2_i;
@@ -460,6 +592,7 @@ void halbb_crc32_cnt3_cmn_log(struct bb_info *bb)
 	default:
 		break;
 	}
+#endif
 }
 
 void halbb_dig_cmn_log(struct bb_info *bb)
@@ -1283,6 +1416,7 @@ void halbb_basic_dbg_05_rx(struct bb_info *bb)
 	       pkt_cnt_cap->pkt_cnt_stbc, pkt_cnt_cap->pkt_cnt_subf,
 	       pkt_cnt_cap->pkt_cnt_mubf);
 	BB_DBG(bb, DBG_CMN, "Dly_sprd=(%d)\n", tmp);
+#ifdef HALBB_STATISTICS_SUPPORT
 	BB_DBG(bb, DBG_CMN,
 	       "[POP] cnt=%d, hist_cck/ofdm[0:3]={%d | %d, %d, %d}/{%d | %d, %d, %d}\n",
 	       bb->bb_stat_i.bb_cca_i.pop_cnt,
@@ -1290,7 +1424,7 @@ void halbb_basic_dbg_05_rx(struct bb_info *bb)
 	       pop_info->pop_hist_cck[2], pop_info->pop_hist_cck[3],
 	       pop_info->pop_hist_ofdm[0], pop_info->pop_hist_ofdm[1],
 	       pop_info->pop_hist_ofdm[2], pop_info->pop_hist_ofdm[3]);
-
+#endif
 	halbb_set_reg(bb, cr->bb_monitor_sel1, cr->bb_monitor_sel1_m, 1);
 	bb_monitor1 = halbb_get_reg(bb, cr->bb_monitor1, cr->bb_monitor1_m);
 	BB_DBG(bb, DBG_CMN, "BB monitor1 = (0x%x)\n", bb_monitor1);
@@ -1388,7 +1522,9 @@ void halbb_basic_dbg_08_rssi_rate_mu(struct bb_info *bb)
 	       bb->dbg_buf, link->rx_rate_plurality);
 
 	/*RX Rate Distribution & RSSI*/
+#ifndef HALBB_CMN_RPT_SIMPLE
 	halbb_show_rssi_and_rate_distribution_mu(bb);
+#endif
 }
 
 void halbb_basic_dbg_06_rssi_rate(struct bb_info *bb)
@@ -1418,7 +1554,9 @@ void halbb_basic_dbg_06_rssi_rate(struct bb_info *bb)
 	       cmn_rpt->bb_pkt_cnt_bcn_i.pkt_cnt_beacon);
 
 	/*RX Rate Distribution & RSSI*/
+#ifndef HALBB_CMN_RPT_SIMPLE
 	halbb_show_rssi_and_rate_distribution_su(bb);
+#endif
 
 	/*RX Utility*/
 	avg_phy_rate = halbb_rx_avg_phy_rate(bb);
@@ -1548,11 +1686,11 @@ void halbb_basic_dbg_message(struct bb_info *bb)
 	       bb->bb_sys_up_time, bb->support_ability);
 	halbb_basic_dbg_01_system(bb);
 	BB_DBG(bb, DBG_CMN, "\n");
-
+#ifdef HALBB_ENV_MNTR_SUPPORT
 	BB_DBG(bb, DBG_CMN, "====[2. ENV Mntr]\n");
 	halbb_env_mntr_log(bb, DBG_CMN);
 	BB_DBG(bb, DBG_CMN, "\n");
-
+#endif
 	BB_DBG(bb, DBG_CMN, "====[3. PMAC]\n");
 	halbb_basic_dbg_03_msg_pmac(bb);
 	BB_DBG(bb, DBG_CMN, "\n");
@@ -1571,7 +1709,9 @@ void halbb_basic_dbg_message(struct bb_info *bb)
 		BB_DBG(bb, DBG_CMN, "\n");
 
 		BB_DBG(bb, DBG_CMN, "====[7. BB Hist]\n");
+#ifndef HALBB_CMN_RPT_SIMPLE
 		halbb_basic_dbg_07_hist_su(bb);
+#endif
 		BB_DBG(bb, DBG_CMN, "\n");
 
 		BB_DBG(bb, DBG_CMN, "====[8. [MU] AVG RSSI/RxRate]\n");
@@ -1588,53 +1728,6 @@ void halbb_basic_dbg_message(struct bb_info *bb)
 
 
 #endif
-
-void halbb_get_bb_para_pkg_ver(struct bb_info *bb, u32 *date, u32 *release_ver)
-
-{
-	switch (bb->ic_type) {
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		*date = BB_REG_RELEASE_DATE_8852A_2;
-		*release_ver = BB_REG_RELEASE_VERSION_8852A_2;
-		break;
-#endif
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		*date = BB_REG_RELEASE_DATE_8852B;
-		*release_ver = BB_REG_RELEASE_VERSION_8852B;
-		break;
-#endif
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		*date = BB_REG_RELEASE_DATE_8852C;
-		*release_ver = BB_REG_RELEASE_VERSION_8852C;
-		break;
-#endif
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		*date = BB_REG_RELEASE_DATE_8192XB;
-		*release_ver = BB_REG_RELEASE_VERSION_8192XB;
-		break;
-#endif
-#ifdef BB_8720E_SUPPORT
-	case BB_RTL8720E:
-		*date = BB_REG_RELEASE_DATE_8720E;
-		*release_ver = BB_REG_RELEASE_VERSION_8720E;
-		break;
-#endif
-#ifdef BB_8730E_SUPPORT
-	case BB_RTL8730E:
-		*date = BB_REG_RELEASE_DATE_8730E;
-		*release_ver = BB_REG_RELEASE_VERSION_8730E;
-		break;
-#endif
-	default:
-		BB_WARNING("[%s] ic=%d\n", __func__, bb->ic_type);
-		break;
-	}
-
-}
 
 void halbb_basic_profile_dbg(struct bb_info *bb, u32 *_used, char *output, u32 *_out_len)
 {
@@ -1851,134 +1944,6 @@ void halbb_basic_profile_dbg(struct bb_info *bb, u32 *_used, char *output, u32 *
 	*_out_len = out_len;
 }
 
-#if HALBB_DBG_DVLP_FLAG /*Dump register - relative*/
-
-void halbb_cr_table_dump(struct bb_info *bb, u32 *cr_table, u32 cr_len)
-{
-	u32 i = 0;
-	u32 cr_tmp, val;
-
-	for (i = 0; i < cr_len; i++) {
-		cr_tmp = cr_table[i];
-		if (cr_tmp == 0) {
-			continue;
-		}
-
-		val = halbb_get_reg(bb, cr_tmp, MASKDWORD);
-		BB_TRACE("[%03d]Reg[0x%04x] = 0x%08x\n", i, cr_tmp, val);
-	}
-}
-
-void halbb_dump_bb_reg(struct bb_info *bb, u32 *_used, char *output,
-		       u32 *_out_len, bool dump_2_buff,
-		       enum bb_frc_phy_dump_reg frc_phy_dump)
-{
-	u32 release_ver, date;
-
-	if (dump_2_buff) {
-		if (*_out_len < 100) {
-			BB_WARNING("[%s] out_len=%d", __func__, *_out_len);
-			return;
-		}
-	}
-
-	BB_TRACE1(bb, "%-15s: %s (%s)\n", "Branch", HLABB_CODE_BASE, HALBB_RELEASE_DATE);
-
-	halbb_get_bb_para_pkg_ver(bb, &date, &release_ver);
-	BB_TRACE1(bb, "%-15s: %02d (%d)\n", "BB CR Ver", release_ver, date);
-
-	switch (bb->ic_type) {
-
-#ifdef BB_8852A_2_SUPPORT
-	case BB_RTL8852A:
-		halbb_dump_bb_reg_8852a_2(bb, _used, output, _out_len, dump_2_buff, frc_phy_dump);
-		break;
-#endif
-
-#ifdef BB_8852B_SUPPORT
-	case BB_RTL8852B:
-		halbb_dump_bb_reg_8852b(bb, _used, output, _out_len, dump_2_buff);
-		break;
-#endif
-
-#ifdef BB_8852C_SUPPORT
-	case BB_RTL8852C:
-		halbb_dump_bb_reg_8852c(bb, _used, output, _out_len, dump_2_buff, frc_phy_dump);
-		break;
-#endif
-
-#ifdef BB_8192XB_SUPPORT
-	case BB_RTL8192XB:
-		halbb_dump_bb_reg_8192xb(bb, _used, output, _out_len, dump_2_buff);
-		break;
-#endif
-
-#ifdef BB_8720E_SUPPORT
-	case BB_RTL8720E:
-		halbb_dump_bb_reg_8720e(bb, _used, output, _out_len, dump_2_buff);
-		break;
-#endif
-
-#ifdef BB_8730E_SUPPORT
-	case BB_RTL8730E:
-		halbb_dump_bb_reg_8730e(bb, _used, output, _out_len, dump_2_buff);
-		break;
-#endif
-
-	default:
-		break;
-	}
-}
-
-void halbb_dump_reg_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *output,
-			u32 *_out_len)
-{
-	u32 val[10] = {0};
-	u32 addr = 0;
-	enum bb_frc_phy_dump_reg frc_phy_dump = FRC_DUMP_ALL;
-
-	if (_os_strcmp(input[1], "-h") == 0) {
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "dumpreg all\n");
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "dumpreg frc_phy {val}\n");
-		return;
-	}
-
-	if (_os_strcmp(input[1], "frc_phy") == 0) {
-		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[0]);
-		frc_phy_dump = (enum bb_frc_phy_dump_reg)val[0];
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "frc_phy_dump = phy:%d\n", frc_phy_dump);
-	}
-
-	halbb_dump_bb_reg(bb, _used, output, _out_len, true, frc_phy_dump);
-}
-
-void halbb_dd_dump_dbg(struct bb_info *bb, char input[][16], u32 *_used,
-		       char *output, u32 *_out_len)
-{
-	char help[] = "-h";
-	u32 val[10] = {0};
-	u32 used = *_used;
-	u32 out_len = *_out_len;
-
-	HALBB_SCAN(input[1], DCMD_DECIMAL, &val[0]);
-
-	if (_os_strcmp(input[1], help) == 0) {
-		BB_DBG_CNSL(out_len, *_used, output + *_used, out_len - *_used,
-			    "{dd_dbg}\n");
-		return;
-	}
-	/*[Reg]*/
-	halbb_dump_bb_reg(bb, &used, output, &out_len, true, FRC_DUMP_ALL);
-	/*[Dbg Port]*/
-	halbb_dbgport_dump_all(bb, _used, output, _out_len);
-	/*[Analog Parameters]*/
-	//halbb_get_anapar_table(bb, &used, output, &out_len);
-
-}
-#endif
 
 void halbb_show_rx_rate(struct bb_info *bb, char input[][16], u32 *_used,
 			char *output, u32 *_out_len)
@@ -2555,4 +2520,4 @@ void halbb_cr_cfg_dbg_init(struct bb_info *bb)
 	}
 
 }
-
+#endif

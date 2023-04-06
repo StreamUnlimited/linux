@@ -1,3 +1,6 @@
+#ifndef _UAPI_REALTEK_OTP_H_
+#define _UAPI_REALTEK_OTP_H_
+
 #define LINUX_IPC_OTP_PHY_READ8		    	0
 #define LINUX_IPC_OTP_PHY_WRITE8		1
 #define LINUX_IPC_OTP_LOGI_READ_MAP		2
@@ -36,3 +39,6 @@ enum realtek_otp_operation {
 	RTK_OTP_READ,
 	RTK_OTP_WRITE,
 };
+
+#endif
+

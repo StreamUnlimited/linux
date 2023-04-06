@@ -476,14 +476,6 @@ void ir_recv_end(struct rtk_ir_dev *ir_rtk)
 		}
 	}
 
-	/* Generate end symbol. */
-	rx_ev.duration = IR_NEC_WAVE_END_SYMBOL1;
-	rx_ev.pulse = 1;
-	ir_raw_event_store(ir_rtk->rcdev, &rx_ev);
-	rx_ev.duration = IR_NEC_WAVE_END_SYMBOL2;
-	rx_ev.pulse = 0;
-	ir_raw_event_store(ir_rtk->rcdev, &rx_ev);
-
 	/* Start NEC Decode. */
 	/* NEC decode has a big edian to little edian change. */
 	/* In test, tx:   0101 0111  0010 0011  0101 0000  1010 1111*/
@@ -519,9 +511,11 @@ int ir_rx_recv(void *input_param)
 			data = reg_data & IR_MASK_RX_CNT;
 
 			if (data > RTK_IR_MAX_CARRIER) {
-				ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = IR_BIT_RX_LEVEL | ir_rtk->ir_manage.pulse_duration;
-				ir_rtk->ir_manage.wbuf_index++;
-				ir_rtk->ir_manage.pulse_duration = 0;
+				if (ir_rtk->ir_manage.pulse_duration) {
+					ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = IR_BIT_RX_LEVEL | ir_rtk->ir_manage.pulse_duration;
+					ir_rtk->ir_manage.wbuf_index++;
+					ir_rtk->ir_manage.pulse_duration = 0;
+				}
 
 				ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = data;
 				ir_rtk->ir_manage.wbuf_index++;
@@ -576,8 +570,6 @@ void ir_tx_start(struct rtk_ir_dev *ir_rtk)
 
 ir_tx_end:
 	ir_rtk->ir_manage.ir_status = RTK_IR_TX_DONE;
-	rtk_ir_enable_cmd(ir_rtk, IR_MODE_TX, DISABLE);
-
 }
 
 static irqreturn_t rtk_ir_isr_event(int irq, void *data)
@@ -614,6 +606,7 @@ static irqreturn_t rtk_ir_isr_event(int irq, void *data)
 
 		if (int_status & IR_BIT_RX_CNT_THR_INT_STATUS) {
 			dev_dbg(ir_rtk->dev, "Rx count threshold interrupt. rx end. ");
+			ir_rx_recv(ir_rtk);
 			ir_recv_end(ir_rtk);
 			rtk_ir_clear_int_pending_bit(ir_rtk, IR_BIT_RX_CNT_THR_INT_CLR);
 		}

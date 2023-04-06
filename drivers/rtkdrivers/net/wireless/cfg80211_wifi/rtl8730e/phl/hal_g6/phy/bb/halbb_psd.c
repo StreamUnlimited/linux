@@ -23,7 +23,6 @@
  *
  *****************************************************************************/
 #include "halbb_precomp.h"
-#include "hal_api.h"
 
 #ifdef HALBB_PSD_SUPPORT
 static const u8 psd_result_cali_tone_8821[7] = {21, 28, 33, 93, 98, 105, 127};
@@ -206,6 +205,7 @@ u8 halbb_psd(struct bb_info *bb, enum igi_lv_sel igi_lv, u16 start_point,
 	struct bb_api_info *api = &bb->bb_api_i;
 	struct bb_psd_cr_info *cr = &psd->bb_psd_cr_i;
 	struct rtw_hal_com_t *hal_com = bb->hal_com;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal_com->hal_priv;
 	u32 i = 0, mod_tone_idx = 0;
 	u32 t = 0;
 	u16 fft_max_half_bw = 0;
@@ -284,7 +284,6 @@ u8 halbb_psd(struct bb_info *bb, enum igi_lv_sel igi_lv, u16 start_point,
 	}
 	BB_DBG(bb, DBG_DBG_API, " PSD_BW = %d\n", psd->psd_bw);
 
-
 	/* Set RF fc*/
 	if (halbb_ctrl_bw_ch(bb, psd_pri_ch, psd_fc_ch, central_ch_seg1, band, bw, HW_PHY_0) == false) {
 		BB_DBG(bb, DBG_DBG_API, "halbb_ctrl_bw_ch PHY0 fail!\n");
@@ -295,20 +294,15 @@ u8 halbb_psd(struct bb_info *bb, enum igi_lv_sel igi_lv, u16 start_point,
 		return HALBB_SET_FAIL;
 	}
 
-	if (rtw_hal_rf_set_ch_bw(hal_com, HW_PHY_0, psd_fc_ch, band, bw) != RTW_HAL_STATUS_SUCCESS) {
-		BB_DBG(bb, DBG_DBG_API, "rtw_hal_rf_set_ch_bw PHY0 fail!\n");
+	halrf_ctrl_bw_ch(hal_info->rf, HW_PHY_0, psd_fc_ch, band, bw);
+	halrf_ctrl_bw_ch(hal_info->rf, HW_PHY_1, psd_fc_ch, band, bw);
+
+	if (halrf_chl_rfk_trigger(hal_info->rf, HW_PHY_0, true) != RTW_HAL_STATUS_SUCCESS) {
+		BB_DBG(bb, DBG_DBG_API, "halrf_chl_rfk_trigger PHY0 fail!\n");
 		return HALBB_SET_FAIL;
 	}
-	if (rtw_hal_rf_set_ch_bw(hal_com, HW_PHY_1, psd_fc_ch, band, bw) != RTW_HAL_STATUS_SUCCESS) {
-		BB_DBG(bb, DBG_DBG_API, "rtw_hal_rf_set_ch_bw PHY01 fail!\n");
-		return HALBB_SET_FAIL;
-	}
-	if (rtw_hal_rf_chl_rfk_trigger(hal_com->hal_priv, HW_PHY_0, true) != RTW_HAL_STATUS_SUCCESS) {
-		BB_DBG(bb, DBG_DBG_API, "rtw_hal_rf_chl_rfk_trigger PHY0 fail!\n");
-		return HALBB_SET_FAIL;
-	}
-	if (rtw_hal_rf_chl_rfk_trigger(hal_com->hal_priv, HW_PHY_1, true) != RTW_HAL_STATUS_SUCCESS) {
-		BB_DBG(bb, DBG_DBG_API, "rtw_hal_rf_chl_rfk_trigger PHY1 fail!\n");
+	if (halrf_chl_rfk_trigger(hal_info->rf, HW_PHY_1, true)) != RTW_HAL_STATUS_SUCCESS) {
+		BB_DBG(bb, DBG_DBG_API, "halrf_chl_rfk_trigger PHY1 fail!\n");
 		return HALBB_SET_FAIL;
 	}
 
@@ -331,7 +325,7 @@ u8 halbb_psd(struct bb_info *bb, enum igi_lv_sel igi_lv, u16 start_point,
 	}
 
 	if (start_point > stop_point) {
-		stop_point = start_point;
+	stop_point = start_point;
 	}
 
 	for (i = start_point; i <= stop_point; i++) {
@@ -393,8 +387,8 @@ u8 halbb_psd(struct bb_info *bb, enum igi_lv_sel igi_lv, u16 start_point,
 
 	halbb_ctrl_bw_ch(bb, pri_ch_bk, fc_ch_bk, central_ch_seg1, band_bk, bw_bk, HW_PHY_0);
 	halbb_ctrl_bw_ch(bb, pri_ch_bk, fc_ch_bk, central_ch_seg1, band_bk, bw_bk, HW_PHY_1);
-	rtw_hal_rf_set_ch_bw(hal_com, HW_PHY_0, fc_ch_bk, band_bk, bw_bk);
-	rtw_hal_rf_set_ch_bw(hal_com, HW_PHY_1, fc_ch_bk, band_bk, bw_bk);
+	halrf_ctrl_bw_ch(hal_info->rf, HW_PHY_0, fc_ch_bk, band_bk, bw_bk);
+	halrf_ctrl_bw_ch(hal_info->rf, HW_PHY_1, fc_ch_bk, band_bk, bw_bk);
 
 	BB_DBG(bb, DBG_DBG_API, "Restore RF0x18=((0x%x))\n",
 	       halbb_read_rf_reg(bb, RF_PATH_A, 0x18, RFREGOFFSETMASK));

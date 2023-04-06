@@ -48,7 +48,7 @@ static struct efuse_info_item len_axi = {
 	0, /* smid */
 };
 
-static struct efuse_info efuse_info_axi = {
+static struct efuse_info_t efuse_info_axi = {
 	&offset_axi, /* offset */
 	&def_val_axi, /* def_val */
 	&len_axi, /* len */
@@ -890,7 +890,7 @@ static u32 query_status_map(struct mac_ax_adapter *adapter,
 }
 #endif
 
-static u32 compare_info_length(struct efuse_info *info,
+static u32 compare_info_length(struct efuse_info_t *info,
 			       enum rtw_efuse_info id, u32 length)
 {
 	u32 idle_len;
@@ -931,7 +931,7 @@ u32 mac_get_efuse_info(struct mac_ax_adapter *adapter, u8 *efuse_map,
 	u32 offset, def_val;
 	u32 ret;
 	enum mac_ax_intf intf = adapter->hw_info->intf;
-	struct efuse_info info;
+	struct efuse_info_t info;
 
 	switch (intf) {
 	case MAC_AX_INTF_AXI:

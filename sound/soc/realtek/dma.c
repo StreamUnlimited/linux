@@ -32,6 +32,7 @@
 #define IS_6_8_CHANNEL(NUM) (((NUM) == 6) || \
 								((NUM) == 8))
 #define TDM_TWO_DMAS_SYNC 1
+#define USING_COUNTER     1
 
 struct dev_data{
 	int dma_debug;
@@ -78,7 +79,9 @@ static const struct snd_pcm_hardware gdma_hardware = {
 		    SNDRV_PCM_INFO_MMAP_VALID |
 		    SNDRV_PCM_INFO_PAUSE |
 		    SNDRV_PCM_INFO_RESUME |
+			#if USING_COUNTER
 			SNDRV_PCM_INFO_HAS_LINK_ATIME |
+			#endif
 		    SNDRV_PCM_INFO_NO_PERIOD_WAKEUP,
 	.buffer_bytes_max = MAX_IDMA_BUFFER,
 	.period_bytes_min = 128,
@@ -223,7 +226,9 @@ static int gdma_open(struct snd_pcm_substream *substream)
 	//substream->ops = rtd->ops, so it's get_time_info is not set,too.
 	//This means add get_time_info in gdma_ops does not work.
 	//Need to set it ourself.the substream->ops is const, need to force change to normal.
+	#if USING_COUNTER
 	((struct snd_pcm_ops*)(substream->ops))->get_time_info = ameba_get_time_info;
+	#endif
 	return 0;
 }
 
@@ -909,7 +914,9 @@ static const struct snd_pcm_ops gdma_ops = {
 	.hw_free	= gdma_hw_free,
 	.prepare	= gdma_prepare,
 	.copy_user  = gdma_copy,
+	#if USING_COUNTER
 	.get_time_info = ameba_get_time_info,
+	#endif
 };
 
 /*

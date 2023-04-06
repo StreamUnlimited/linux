@@ -24,7 +24,7 @@
 			compatible = "arm,cortex-a32";
 			reg = <0x0>;
 			enable-method = "psci";
-			clock-frequency = <800000000>;
+			clock-frequency = <1400000000>;
 			clock-latency = <1000000>;
 			clocks = <&rcc RTK_CKE_AP>,
 					<&rcc RTK_CKD_AP>,
@@ -39,7 +39,8 @@
 						1120000 1160000 
 						1200000 1240000 
 						1280000 1320000 
-						1360000 1400000 >;
+						1360000 1400000
+						1440000 1480000>;
 		};
 
 		cpu@1 {
@@ -47,7 +48,7 @@
 			compatible = "arm,cortex-a32";
 			reg = <0x1>;
 			enable-method = "psci";
-			clock-frequency = <800000000>;
+			clock-frequency = <1400000000>;
 			clock-latency = <1000000>;
 			clocks = <&rcc RTK_CKE_AP>,
 					<&rcc RTK_CKD_AP>,
@@ -62,7 +63,8 @@
 						1120000 1160000 
 						1200000 1240000 
 						1280000 1320000 
-						1360000 1400000 >;
+						1360000 1400000
+						1440000 1480000>;
 		};
 
 	};
@@ -74,7 +76,7 @@
 		reg = <0xA0101000 0x1000>,
 			  <0xA0102000 0x0100>,
 			  <0x41000010 4>,
-			  <0x4200827C 4>;
+			  <0x42008274 4>;
 	};
 
 	psci {

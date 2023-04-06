@@ -176,7 +176,7 @@ struct efuse_info_item {
 };
 
 /**
- * @struct efuse_info
+ * @struct efuse_info_t
  * @brief efuse_info
  *
  * @var efuse_info::offset
@@ -186,7 +186,7 @@ struct efuse_info_item {
  * @var efuse_info::len
  * Efuse information length
  */
-struct efuse_info {
+struct efuse_info_t {
 	struct efuse_info_item *offset;
 	struct efuse_info_item *def_val;
 	struct efuse_info_item *len;

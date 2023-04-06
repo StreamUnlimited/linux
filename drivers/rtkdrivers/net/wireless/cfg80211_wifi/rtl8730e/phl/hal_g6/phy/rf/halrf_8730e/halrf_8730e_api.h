@@ -28,17 +28,15 @@
 
 u8 halrf_get_thermal_8730e(struct rf_info *rf, enum rf_path rf_path);
 
-u32 halrf_mac_get_pwr_reg_8730e(struct rf_info *rf, enum phl_phy_idx phy,
-				u32 addr, u32 mask);
+u32 halrf_mac_get_pwr_reg_8730e(struct rf_info *rf, u32 addr, u32 mask);
 
-u32 halrf_mac_set_pwr_reg_8730e(struct rf_info *rf, enum phl_phy_idx phy,
-				u32 addr, u32 mask, u32 val);
+u32 halrf_mac_set_pwr_reg_8730e(struct rf_info *rf, u32 addr, u32 mask, u32 val);
 
 bool halrf_wl_tx_power_control_8730e(struct rf_info *rf, u32 tx_power_val);
 
-s8 halrf_get_ther_protected_threshold_8730e(struct rf_info *rf);
+//s8 halrf_get_ther_protected_threshold_8730e(struct rf_info *rf);
 
-s8 halrf_xtal_tracking_offset_8730e(struct rf_info *rf, enum phl_phy_idx phy);
+//s8 halrf_xtal_tracking_offset_8730e(struct rf_info *rf);
 
 #endif
 #endif /*  __INC_PHYDM_API_H_8730E__ */

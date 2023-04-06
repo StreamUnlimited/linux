@@ -27,9 +27,10 @@
 #include <linux/reboot.h>
 #include <linux/sysfs.h>
 #include <mach/hardware.h>
+#include <misc/realtek-misc.h>
 
-#define BOOTLOADER_PHYSICAL_ADDR 0x42008D04
-#define BOOTLAODER_IMAGE2_PHY_ADDR 2149711873UL    // 80220001
+#define BOOTLOADER_PHYSICAL_ADDR     0x42008D04UL
+#define BOOTLOADER_IMAGE2_PHY_ADDR   0x80220001UL
 
 /* SYSTEM_CTRL_BASE_LP */
 static void __iomem *plat_lsys_base = NULL;
@@ -42,7 +43,7 @@ static ssize_t boot_slotinfo_show(struct kobject *kobj, struct kobj_attribute *a
 {
 	int slot = 0; // defalut A
 	printk("boot_slotinfo_show enter");
-	if (boot_slot_addr == BOOTLAODER_IMAGE2_PHY_ADDR) { // slota
+	if (boot_slot_addr == BOOTLOADER_IMAGE2_PHY_ADDR) { // slota
 		slot = 0;
 	} else {
 		slot = 1;    //slot B
@@ -54,7 +55,7 @@ static ssize_t boot_slotinfo_show(struct kobject *kobj, struct kobj_attribute *a
 static ssize_t boot_slotinfo_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t n)
 {
 	printk("boot_slotinfo_store enter");
-	boot_slot_addr = (buf[0] == '0') ? BOOTLAODER_IMAGE2_PHY_ADDR : 1;
+	boot_slot_addr = (buf[0] == '0') ? BOOTLOADER_IMAGE2_PHY_ADDR : 1;
 	return n;
 }
 
@@ -130,6 +131,22 @@ static void plat_arch_restart(enum reboot_mode mode, const char *cmd)
 static void __init plat_init_machine(void)
 {
 	struct device_node *np;
+	int rl_version;
+	int rl_numer;
+
+	rl_numer = rtk_misc_get_rl_number();
+	if (rl_numer >= 0) {
+		printk("SoC RL number: 0x%04X\n", rl_numer);
+	} else {
+		pr_err("%s: get rl number failed\n", __func__);
+	}
+
+	rl_version = rtk_misc_get_rl_version();
+	if (rl_version >= 0) {
+		printk("SoC RL version: %d\n", rl_version);
+	} else {
+		pr_err("%s: get rl version failed\n", __func__);
+	}
 
 	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
 	if (np) {

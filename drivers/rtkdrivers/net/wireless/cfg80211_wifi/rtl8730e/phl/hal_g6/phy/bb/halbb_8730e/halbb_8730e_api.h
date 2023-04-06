@@ -59,15 +59,9 @@ bool halbb_ctrl_rx_path_8730e(struct bb_info *bb, enum rf_path rx_path);
 
 bool halbb_ctrl_tx_path_8730e(struct bb_info *bb, enum rf_path tx_path);
 
-void halbb_ctrl_tx_path_tmac_8730e(struct bb_info *bb, enum rf_path tx_path, u8 tx_nss);
+void halbb_ctrl_tx_path_tmac_8730e(struct bb_info *bb, enum rf_path tx_path);
 
 #ifdef HALBB_CONFIG_RUN_IN_DRV
-
-void halbb_gpio_ctrl_dump_8730e(struct bb_info *bb);
-
-void halbb_gpio_rfm_8730e(struct bb_info *bb, enum bb_path path,
-			  enum bb_rfe_src_sel src, bool dis_tx_gnt_wl,
-			  bool active_tx_opt, bool act_bt_en, u8 rfm_output_val);
 
 void halbb_gpio_trsw_table_8730e(struct bb_info *bb, enum bb_path path,
 				 bool path_en, bool trsw_tx,
@@ -188,7 +182,7 @@ bool halbb_rf_write_bb_reg_8730e(struct bb_info *bb, u32 addr, u32 mask, u32 dat
 
 void halbb_pre_agc_en_8730e(struct bb_info *bb, bool enable);
 
-void halbb_set_gain_error_8730e(struct bb_info *bb, u8 central_ch);
+void halbb_set_gain_error_8730e(struct bb_info *bb, u8 central_ch, u8 ant, u8 bt);
 void halbb_set_normal_efuse_8730e(struct bb_info *bb, u8 central_ch, enum band_type band_type, enum rf_path path);
 void halbb_set_hidden_efuse_8730e(struct bb_info *bb, u8 central_ch, enum band_type band_type, enum rf_path path);
 void halbb_get_normal_efuse_init_8730e(struct bb_info *bb);

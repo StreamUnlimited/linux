@@ -1835,7 +1835,7 @@ int rtw_mp_QueryDrv(struct net_device *dev,
 	_adapter *padapter = rtw_netdev_priv(dev);
 	char	input[RTW_IWD_MAX_LEN];
 	int	qAutoLoad = 1;
-	//struct efuse_info *efuse = adapter_to_efuse(padapter);
+	//struct efuse_info_t *efuse = adapter_to_efuse(padapter);
 
 	if (copy_from_user(input, wrqu->data.pointer, wrqu->data.length)) {
 		return -EFAULT;

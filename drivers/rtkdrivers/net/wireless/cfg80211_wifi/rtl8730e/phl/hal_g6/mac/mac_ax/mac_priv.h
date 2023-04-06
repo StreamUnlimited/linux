@@ -89,12 +89,11 @@ struct mac_ax_priv_ops {
 				   union halmac_wlan_addr *addr);
 	u32(*cfg_net_type)(struct mac_ax_adapter *adapter, u8 port,
 				 enum mac_ax_net_type net_type);
+	u32(*cfg_sta_aid)(struct mac_ax_adapter *adapter, u8 port, u16 aid);
 	/*CMAC*/
 	u32(*cmac_init)(struct mac_ax_adapter *adapter,
 			struct mac_ax_trx_info *info, enum mac_ax_band band);
 	u32(*cmac_func_en)(struct mac_ax_adapter *adapter, u8 band, u8 en);
-	u32(*macid_idle_ck)(struct mac_ax_adapter *adapter,
-			    struct mac_role_tbl *role);
 	u32(*stop_sch_tx)(struct mac_ax_adapter *adapter, enum sch_tx_sel sel,
 			  struct mac_ax_sch_tx_en_cfg *bak);
 	/*EFUSE*/

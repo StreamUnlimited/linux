@@ -813,10 +813,6 @@ static enum rtw_hal_status hal_ops_check(struct hal_info_t *hal)
 		status = RTW_HAL_STATUS_FAILURE;
 	}
 #ifdef RTW_PHL_BCN_IOT
-	if (!trx_ops->update_bcn_txbd) {
-		hal_error_msg("trx update_txbd");
-		status = RTW_HAL_STATUS_FAILURE;
-	}
 	if (!trx_ops->tx_bcn_start) {
 		hal_error_msg("trx tx_start");
 		status = RTW_HAL_STATUS_FAILURE;

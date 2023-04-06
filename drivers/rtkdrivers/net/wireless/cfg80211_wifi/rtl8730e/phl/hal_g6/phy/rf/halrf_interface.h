@@ -22,6 +22,9 @@
  * Larry Finger <Larry.Finger@lwfinger.net>
  *
  *****************************************************************************/
+#include "phy/bb/halbb_plcp_tx_ex.h"
+#include "phy/bb/halbb_api_ex.h"
+#include "phy/bb/halbb_pmac_setting_ex.h"
 #ifndef __HALRF_INTERFACE_H__
 #define __HALRF_INTERFACE_H__
 
@@ -41,7 +44,8 @@
 #define halrf_w32(rf, addr, val) hal_write32((rf)->hal_com, (addr | RF_OFST), val)
 #define halrf_w16(rf, addr, val) hal_write16((rf)->hal_com, (addr | RF_OFST), val)
 #define halrf_w8(rf, addr, val) hal_write8((rf)->hal_com, (addr | RF_OFST), val)
-#define halrf_rrf(rf, path, addr, mask) rtw_hal_read_rf_reg((rf)->hal_com, path, addr, mask)
+#define halrf_rrf(rf, path, addr, mask) halbb_read_rf_reg(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, path, addr, mask)
+
 /*#define halrf_wrf(rf, path, addr, mask, val) rtw_hal_write_rf_reg((rf)->hal_com, path, addr, mask, val)*/
 #define halrf_wmac32(rf, addr, val) hal_write32((rf)->hal_com, addr, val)
 #define halrf_rmac32(rf, addr) hal_read32((rf)->hal_com, addr)
@@ -51,15 +55,15 @@
 /*[TX]*/
 #define halrf_tx_pause(rf, band_idx, tx_pause, rson) rtw_hal_tx_pause((rf)->hal_com, band_idx, tx_pause, rson)
 #define halrf_set_pmac_pattern(rf, ppdu_type, case_id, phy_idx) rtw_hal_bb_set_plcp_pattern((rf)->hal_com, ppdu_type, case_id, phy_idx)
-#define halrf_set_pmac_plcp_tx(rf, plcp, usr, phy_idx, sts) rtw_hal_bb_set_plcp_tx((rf)->hal_com, plcp, usr, phy_idx, sts)
+#define halrf_set_pmac_plcp_tx(rf, plcp, usr, phy_idx, sts) *sts = halbb_plcp_gen(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, (struct halbb_plcp_info *)plcp, (struct usr_plcp_gen_in *)usr, phy_idx)
 #define halrf_set_pmac_packet_tx(rf, enable, is_cck, cnt, period, time, phy_idx) rtw_hal_bb_set_pmac_packet_tx((rf)->hal_com, enable, is_cck, cnt, period, time, phy_idx)
-#define halrf_set_pmac_power(rf, dbm, phy_idx) rtw_hal_bb_set_power((rf)->hal_com, dbm, phy_idx)
-#define halrf_cfg_tx_path(rf, path) rtw_hal_bb_cfg_tx_path((rf)->hal_com, path)
-#define halrf_cfg_rx_path(rf, path) rtw_hal_bb_cfg_rx_path((rf)->hal_com, path)
-#define halrf_tx_mode_switch(rf, phy_idx, mode) rtw_hal_bb_tx_mode_switch((rf)->hal_com, phy_idx, mode)
+#define halrf_set_pmac_power(rf, dbm, phy_idx) halbb_set_txpwr_dbm(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, dbm, phy_idx)
+#define halrf_cfg_tx_path(rf, path) halbb_ctrl_tx_path(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, path)
+#define halrf_cfg_rx_path(rf, path) halbb_ctrl_rx_path(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, path)
+#define halrf_tx_mode_switch(rf, phy_idx, mode) 	halbb_set_tmac_tx(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, phy_idx)
 #define halrf_query_regulation_info(rf, info) rtw_hal_query_regulation((rf)->phl_com->phl_priv, info)
-#define halrf_hal_bb_backup_info(rf, phy_idx) rtw_hal_bb_backup_info((rf)->hal_com, phy_idx)
-#define halrf_hal_bb_restore_info(rf, phy_idx) rtw_hal_bb_restore_info((rf)->hal_com, phy_idx)
+#define halrf_hal_bb_backup_info(rf, phy_idx) halbb_backup_info(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, phy_idx)
+#define halrf_hal_bb_restore_info(rf, phy_idx) halbb_restore_info(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, phy_idx)
 
 /*[Delay]*/
 #define halrf_delay_ms(rf, ms) _os_delay_ms(rf->hal_com->drv_priv, ms)
@@ -79,11 +83,6 @@
 #define halrf_release_timer(rf, timer) _os_release_timer(rf->hal_com->drv_priv, timer)
 
 /*efuse*/
-#ifndef RTW_FLASH_98D
-#define halrf_efuse_get_info(rf, info_type, value, size) rtw_hal_efuse_get_info((rf)->hal_com, info_type, (void *)value, size)
-#else
-#define halrf_efuse_get_info(rf, info_type, value, size) rtw_hal_flash_get_info((rf)->hal_com, info_type, (void *)value, size)
-#endif /*RTW_FLASH_98D*/
 #define halrf_phy_efuse_get_info(rf, addr, size, value) rtw_hal_mac_read_phy_efuse((rf)->hal_com, addr, size, value)
 
 /*GPIO*/
@@ -97,11 +96,12 @@
 #define halrf_mac_write_pwr_limit_rua_reg(rf, band) rtw_hal_mac_write_pwr_limit_rua_reg((rf)->hal_com, band)
 #define halrf_mac_write_pwr_limit_reg(rf, band) rtw_hal_mac_write_pwr_limit_reg((rf)->hal_com, band)
 #define halrf_mac_write_pwr_by_rate_reg(rf, band) rtw_hal_mac_write_pwr_by_rate_reg((rf)->hal_com, band)
-#define halrf_bb_set_tx_pow_ref(rf, phy_idx) rtw_hal_bb_set_tx_pow_ref((rf)->hal_com, phy_idx)
+#define halrf_bb_set_tx_pow_ref(rf, phy_idx) halbb_set_tx_pow_ref(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, phy_idx)
 #define halrf_mac_write_pwr_ofst_mode(rf, phy_idx) rtw_hal_mac_write_pwr_ofst_mode((rf)->hal_com, phy_idx)
 #define halrf_mac_write_pwr_ofst_bw(rf, phy_idx) rtw_hal_mac_write_pwr_ofst_bw((rf)->hal_com, phy_idx)
 #define halrf_mac_write_pwr_limit_en(rf, phy_idx) rtw_hal_mac_write_pwr_limit_en((rf)->hal_com, phy_idx)
 #define halrf_bb_set_pow_patten_sharp(rf, channel, is_cck, sharp_id, phy_idx) rtw_hal_bb_set_pow_patten_sharp((rf)->hal_com, channel, is_cck, sharp_id, phy_idx)
+
 
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 /*FW offload*/
@@ -109,7 +109,7 @@
 #endif
 
 /*BB related*/
-#define halrf_bb_ctrl_rx_cca(rf, cca_en, phy_idx) rtw_hal_bb_ctrl_rx_cca((rf)->hal_com, cca_en, phy_idx)
+#define halrf_bb_ctrl_rx_cca(rf, cca_en, phy_idx) halbb_ctrl_rx_cca(((struct hal_info_t *)((rf)->hal_com)->hal_priv)->bb, cca_en, phy_idx)
 
 /*@--------------------------[Enum]------------------------------------------*/
 
@@ -121,7 +121,7 @@ struct bb_info;
 
 u32 halrf_cal_bit_shift(u32 bit_mask);
 
-u32 halrf_get_sys_time(struct rf_info *rf);
+//u32 halrf_get_sys_time(struct rf_info *rf);
 
 void halrf_wreg(struct rf_info *rf, u32 addr, u32 bit_mask, u32 val);
 

@@ -123,12 +123,20 @@ rtw_hal_rf_set_power_table_switch(struct rtw_hal_com_t *hal_com,
 
 int rtw_hal_rf_get_predefined_pw_lmt_regu_type_from_str(const char *str)
 {
+#ifdef CONFIG_LOAD_PHY_PARA_FROM_FILE
 	return halrf_get_predefined_pw_lmt_regu_type_from_str(str);
+#else
+	return 0;
+#endif
 }
 
 const char *const *rtw_hal_rf_get_predefined_pw_lmt_regu_type_str_array(u8 *num)
 {
+#ifdef CONFIG_LOAD_PHY_PARA_FROM_FILE
 	return halrf_get_predefined_pw_lmt_regu_type_str_array(num);
+#else
+	return NULL;
+#endif
 }
 
 const char *rtw_hal_rf_get_pw_lmt_regu_type_str(struct hal_info_t *hal_info, enum band_type band)
@@ -681,8 +689,10 @@ enum rtw_hal_status
 rtw_hal_rf_update_ext_pwr_lmt_table(struct hal_info_t *hal_info) {
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
 
+#ifdef	RFDBG_TRACE_EN
 	halrf_power_limit_set_ext_pwr_limit_table(hal_info->rf, HW_PHY_0);
 	halrf_power_limit_set_ext_pwr_limit_ru_table(hal_info->rf, HW_PHY_0);
+#endif
 
 	return hal_status;
 }

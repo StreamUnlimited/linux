@@ -26,6 +26,51 @@ static u32 tx_duty_h2c(struct mac_ax_adapter *adapter,
 		       u16 pause_intvl, u16 tx_intvl);
 
 #if 1
+static void u8_2_sch(struct mac_ax_adapter *adapter,
+		      struct mac_ax_sch_tx_en *tx_en, u8 val8)
+{
+	tx_en->be = val8 & RTW_TXEN_BE ? 1 : 0;
+	tx_en->bk = val8 & RTW_TXEN_BK ? 1 : 0;
+	tx_en->vi = val8 & RTW_TXEN_VI ? 1 : 0;
+	tx_en->vo = val8 & RTW_TXEN_VO ? 1 : 0;
+	tx_en->mgnt = val8 & RTW_TXEN_MG ? 1 : 0;
+	tx_en->hiq = val8 & RTW_TXEN_HI ? 1 : 0;
+	tx_en->bcnq = val8 & RTW_TXEN_BCN ? 1 : 0;
+	tx_en->cpumgnt = val8 & RTW_TXEN_CPUMG ? 1 : 0;
+}
+
+static u32 stop_macid_ctn(struct mac_ax_adapter *adapter,
+			  struct mac_role_tbl *role,
+			  struct mac_ax_sch_tx_en_cfg *bak)
+{
+	struct mac_ax_sch_tx_en_cfg cfg;
+	u32 ret;
+
+	ret = check_mac_en(adapter, MAC_AX_MAC_SEL);
+	if (ret != MACSUCCESS)
+		return ret;
+
+	ret = get_hw_sch_tx_en(adapter, bak);
+	if (ret != MACSUCCESS)
+		return ret;
+
+	cfg.band = role->info.band;
+	u8_2_sch(adapter, &cfg.tx_en_mask, 0);
+
+	u8_2_sch(adapter, &cfg.tx_en, 0);
+	u8_2_sch(adapter, &cfg.tx_en_mask, 0xFF);
+	cfg.tx_en_mask.mgnt = 0;
+	cfg.tx_en_mask.hiq = 0;
+	cfg.tx_en_mask.bcnq = 0;
+
+	ret = set_hw_sch_tx_en(adapter, &cfg);
+	if (ret != MACSUCCESS)
+		return ret;
+
+	return MACSUCCESS;
+}
+
+
 u32 set_hw_ampdu_cfg(struct mac_ax_adapter *adapter,
 		     struct mac_ax_ampdu_cfg *cfg)
 {
@@ -229,7 +274,7 @@ u32 set_hw_muedca_ctrl(struct mac_ax_adapter *adapter,
 	u16 val16;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-	ret = check_mac_en(adapter, MAC_AX_CMAC_SEL);
+	ret = check_mac_en(adapter, MAC_AX_MAC_SEL);
 	if (ret != MACSUCCESS) {
 		return ret;
 	}
@@ -408,7 +453,7 @@ u32 get_muedca_param_addr(struct mac_ax_adapter *adapter,
 
 	ac = param->ac;
 
-	ret = check_mac_en(adapter, MAC_AX_CMAC_SEL);
+	ret = check_mac_en(adapter, MAC_AX_MAC_SEL);
 	if (ret != MACSUCCESS) {
 		return ret;
 	}
@@ -535,3 +580,47 @@ u32 tx_duty_h2c(struct mac_ax_adapter *adapter,
 	return 0;
 }
 
+u32 stop_macid_tx(struct mac_ax_adapter *adapter, struct mac_role_tbl *role,
+		  enum tb_stop_sel stop_sel, struct macid_tx_bak *bak)
+{
+	u8 band;
+	u32 ret;
+	struct mac_ax_macid_pause_cfg pause;
+
+	band = role->info.band;
+
+	pause.macid = role->macid;
+	pause.pause = 1;
+	ret = set_macid_pause(adapter, &pause);
+	if (ret != MACSUCCESS)
+		return ret;
+
+	bak->sch_bak.band = band;
+	ret = stop_macid_ctn(adapter, role, &bak->sch_bak);
+	if (ret != MACSUCCESS)
+		return ret;
+
+	return MACSUCCESS;
+}
+
+u32 resume_macid_tx(struct mac_ax_adapter *adapter, struct mac_role_tbl *role,
+		    struct macid_tx_bak *bak)
+{
+	u32 ret;
+	struct mac_ax_macid_pause_cfg pause_cfg;
+
+	if (role->info.band == MAC_AX_BAND_0) {
+		u8_2_sch(adapter, &bak->sch_bak.tx_en_mask, 0xFF);
+		ret = set_hw_sch_tx_en(adapter, &bak->sch_bak);
+		if (ret != MACSUCCESS)
+			return ret;
+	}
+
+	pause_cfg.macid = role->macid;
+	pause_cfg.pause = 0;
+	ret = set_macid_pause(adapter, &pause_cfg);
+	if (ret != MACSUCCESS)
+		return ret;
+
+	return MACSUCCESS;
+}

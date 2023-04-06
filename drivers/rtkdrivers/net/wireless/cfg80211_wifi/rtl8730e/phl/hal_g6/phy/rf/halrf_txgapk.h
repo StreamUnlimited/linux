@@ -16,7 +16,7 @@
 #define _HALRF_TXGAPK_H_
 #include "halrf_headers.h"
 
-#define NUM		4
+#define NUM 1
 
 enum txgapk_id {
 	TXGAPK_TRACK	= 0x00,

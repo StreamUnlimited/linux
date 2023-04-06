@@ -521,11 +521,11 @@ enum rtw_hal_status rtw_hal_wow_func_start(struct rtw_phl_com_t *phl_com, void *
 		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
 			break;
 		}
-		/* poll fw status */
-		hstatus = _hal_check_wow_fw_ready(hal_info, 1);
-		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
-			break;
-		}
+		///* poll fw status */
+		//hstatus = _hal_check_wow_fw_ready(hal_info, 1);
+		//if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+		//	break;
+		//}
 	} while (0);
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s status(%u).\n", __func__, hstatus);
@@ -544,10 +544,10 @@ enum rtw_hal_status rtw_hal_wow_func_stop(struct rtw_phl_com_t *phl_com, void *h
 		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] rtw_hal_mac_cfg_wow_wake failed \n");
 	}
 
-	hstatus = _hal_check_wow_fw_ready(hal_info, 0);
-	if (RTW_HAL_STATUS_SUCCESS != hstatus) {
-		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] _hal_poll_wow_fw_status failed \n");
-	}
+	//hstatus = _hal_check_wow_fw_ready(hal_info, 0);
+	//if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+	//	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] _hal_poll_wow_fw_status failed \n");
+	//}
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s status(%u).\n", __func__, hstatus);
 

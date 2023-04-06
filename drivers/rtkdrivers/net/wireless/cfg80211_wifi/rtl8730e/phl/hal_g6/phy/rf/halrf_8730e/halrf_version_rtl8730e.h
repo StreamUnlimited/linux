@@ -23,4 +23,4 @@
  *
  *****************************************************************************/
 /*RTL8730E RF Parameters*/
-#define	RF_RELEASE_VERSION_8730E	0xE
+#define	RF_RELEASE_VERSION_8730E	0x1b

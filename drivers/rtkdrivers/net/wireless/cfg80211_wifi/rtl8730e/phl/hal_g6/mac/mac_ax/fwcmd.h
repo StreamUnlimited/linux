@@ -445,7 +445,7 @@ typedef enum _bt_op_code {
 #define H2C_RSVDPAGE_LOC_LEN		5
 #define H2C_MEDIA_STATUS_RPT_LEN		3
 
-#define H2C_KEEP_ALIVE_CTRL_LEN	6
+#define H2C_KEEP_ALIVE_CTRL_LEN	2
 #define H2C_DISCON_DECISION_LEN		3
 #define H2C_PNO_LEN		        4
 #define H2C_TCP_KEEP_ALIVE_CTRL_LEN 6
@@ -847,7 +847,7 @@ u32 mac_fw_log_cfg(struct mac_ax_adapter *adapter, struct mac_ax_fw_log *log_cfg
 u32 mac_host_getpkt_h2c(struct mac_ax_adapter *adapter, u8 macid, u8 pkttype);
 #if defined(CONFIG_WOWLAN) || defined(CONFIG_AP_WOWLAN)
 /* WOW command function */
-u8 rtl8730e_set_wowlan_ctrl_cmd(struct mac_ax_adapter *adapter, enum mac_ax_wow_ctrl w_c);
+u32 rtl8730e_set_wowlan_ctrl_cmd(struct mac_ax_adapter *adapter, enum mac_ax_wow_ctrl w_c);
 void rtw_hal_set_fw_wow_related_cmd(struct mac_ax_adapter *padapter, u8 enable);
 #ifdef CONFIG_P2P_WOWLAN
 /* H2C 0x8A */

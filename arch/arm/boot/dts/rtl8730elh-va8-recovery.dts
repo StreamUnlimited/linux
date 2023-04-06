@@ -233,9 +233,10 @@
 
 		usb_phy: usb-phy@41000000 {
 			compatible = "realtek,otg-phy";
-			reg = <0x400B0004 0x20>,
+			reg = <0x400B0000 0x20>,
 				<0x41000060 4>,
-				<0x42000100 0x10>; //usb addon,sys base, otpc syscfg base reg
+				<0x42000100 0x10>,
+				<0x4200825C 4>;
 			#phy-cells = <0>;
 			clocks = <&rcc RTK_CKE_USB>;
 			status = "okay";

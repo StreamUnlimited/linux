@@ -95,13 +95,6 @@ void rtw_hal_bb_reset(struct hal_info_t *hal_info)
 	halbb_watchdog_reset(hal_info->bb);
 }
 
-void rtw_hal_bb_fw_edcca(struct hal_info_t *hal_info)
-{
-	PHL_INFO("[Cert], %s() ==> !! \n", __func__);
-
-	halbb_fw_edcca(hal_info->bb);
-}
-
 void rtw_hal_bb_dm_init(struct hal_info_t *hal_info)
 {
 	halbb_dm_init(hal_info->bb, HW_PHY_0);
@@ -675,9 +668,11 @@ enum rtw_hal_status  rtw_hal_bb_get_rx_ok(struct hal_info_t *hal_info, u8 cur_ph
 {
 	enum rtw_hal_status ret = RTW_HAL_STATUS_SUCCESS;
 
+#ifdef CONFIG_MP_INCLUDED
 	PHL_INFO("[MP HAL BB API]%s\n", __FUNCTION__);
 
 	*rx_ok = halbb_mp_get_rx_crc_ok(hal_info->bb, cur_phy_idx);
+#endif
 
 	return ret;
 }
@@ -686,9 +681,11 @@ enum rtw_hal_status  rtw_hal_bb_get_rx_crc(struct hal_info_t *hal_info, u8 cur_p
 {
 	enum rtw_hal_status ret = RTW_HAL_STATUS_SUCCESS;
 
+#ifdef CONFIG_MP_INCLUDED
 	PHL_INFO("[MP HAL BB API]%s\n", __FUNCTION__);
 
 	*rx_crc_err = halbb_mp_get_rx_crc_err(hal_info->bb, cur_phy_idx);
+#endif
 
 	return ret;
 }
@@ -697,8 +694,10 @@ enum rtw_hal_status  rtw_hal_bb_set_reset_cnt(void *hal)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 
+#ifdef CONFIG_MP_INCLUDED
 	PHL_INFO("[HAL] call halbb_mp_seset_cnt !!!\n");
 	halbb_mp_reset_cnt(hal_info->bb);
+#endif
 	return RTW_HAL_STATUS_SUCCESS;
 }
 
@@ -862,13 +861,29 @@ rtw_hal_bb_parse_phy_sts(void *hal, void *ppdu_sts,
 	enum rtw_hal_status hstutus = RTW_HAL_STATUS_SUCCESS;
 
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct rtw_phl_com_t *phl_com = hal_info->phl_com;
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl_com->phl_priv;
 	struct hal_ppdu_sts *hal_ppdu = (struct hal_ppdu_sts *)ppdu_sts;
 	struct rtw_r_meta_data *mdata = &(phl_rx->r.mdata);
 	struct rtw_phl_ppdu_phy_info *phy_info = &(phl_rx->r.phy_info);
 	struct physts_rxd rxdesc = {0};
 	struct physts_result bb_rpt = {0};
+	struct rtw_wifi_role_t *wifi_role = NULL;
+	struct rtw_phl_stainfo_t *sta = NULL;
+	enum role_type type = PHL_RTYPE_NONE;
 	u8 i = 0;
 	bool valid = false;
+
+	if ((mdata->macid_rxdesc != 0x7F) \
+	    && (rtw_phl_macid_is_used(phl_info, mdata->macid_rxdesc))) {
+		sta = rtw_phl_get_stainfo_by_macid(phl_info, mdata->macid_rxdesc);
+		if (sta && sta->wrole)
+			wifi_role = sta->wrole;
+	}
+
+	if (wifi_role) {
+		type = wifi_role->type;
+	}
 
 	rxdesc.data_rate = mdata->rx_rate;
 	rxdesc.gi_ltf = mdata->rx_gi_ltf;
@@ -883,8 +898,13 @@ rtw_hal_bb_parse_phy_sts(void *hal, void *ppdu_sts,
 		rxdesc.user_i[i].macid = (u8)hal_ppdu->usr[i].macid;
 		rxdesc.user_i[i].is_data = hal_ppdu->usr[i].has_data;
 		rxdesc.user_i[i].is_ctrl = hal_ppdu->usr[i].has_ctrl;
-		rxdesc.user_i[i].is_mgnt = hal_ppdu->usr[i].has_ctrl;
+		rxdesc.user_i[i].is_mgnt = hal_ppdu->usr[i].has_mgnt;
 		rxdesc.user_i[i].is_bcn = hal_ppdu->usr[i].has_bcn;
+		if (type == PHL_RTYPE_STATION) {
+			rxdesc.is_to_self = (mdata->a1_match \
+					     || rxdesc.user_i[i].is_bcn \
+					     || (rxdesc.user_i[i].is_ctrl && mdata->bc));
+		}
 	}
 
 	valid = halbb_physts_parsing(hal_info->bb, hal_ppdu->phy_st_ptr,
@@ -896,6 +916,7 @@ rtw_hal_bb_parse_phy_sts(void *hal, void *ppdu_sts,
 			  "halbb_physts_parsing Fail!\n");
 		hstutus = RTW_HAL_STATUS_FAILURE;
 	}
+
 
 	if ((bb_rpt.rssi_avg != 0) || (bb_rpt.physts_rpt_valid == 1))
 	{
@@ -960,9 +981,11 @@ enum rtw_hal_status rtw_hal_bb_get_rssi(struct hal_info_t *hal_info, enum rf_pat
 {
 	enum rtw_hal_status ret = RTW_HAL_STATUS_SUCCESS;
 
+#ifdef CONFIG_MP_INCLUDED
 	PHL_INFO("[MP HAL API]%s\n", __FUNCTION__);
 
 	*rssi = halbb_mp_get_rssi(hal_info->bb, rx_path);
+#endif
 
 	return ret;
 }
@@ -990,9 +1013,11 @@ enum rtw_hal_status rtw_hal_bb_get_rxevm(struct hal_info_t *hal_info, u8 user, u
 {
 	enum rtw_hal_status ret = RTW_HAL_STATUS_SUCCESS;
 
+#ifdef CONFIG_MP_INCLUDED
 	PHL_INFO("[MP HAL API]%s\n", __FUNCTION__);
 
 	*rx_evm = halbb_mp_get_rxevm(hal_info->bb,  user, strm, rxevm_table);
+#endif
 
 	return ret;
 }
@@ -1005,6 +1030,7 @@ enum rtw_hal_status rtw_hal_bb_trigger_rxevm(struct hal_info_t *hal_info, u8 cur
 	struct rxevm_physts evm;
 	enum rtw_hal_status ret = RTW_HAL_STATUS_SUCCESS;
 
+#ifdef CONFIG_MP_INCLUDED
 	PHL_INFO("[MP HAL API]%s\n", __FUNCTION__);
 
 	evm = halbb_mp_get_rxevm_physts(hal_info->bb, cur_phy_idx);
@@ -1047,6 +1073,7 @@ enum rtw_hal_status rtw_hal_bb_trigger_rxevm(struct hal_info_t *hal_info, u8 cur
 	*phy1_user3_rxevm = (*phy1_user3_rxevm << 8) | evm.rxevm_seg[1].rxevm_user[3].rxevm_ss_2;
 	*phy1_user3_rxevm = (*phy1_user3_rxevm << 8) | evm.rxevm_seg[1].rxevm_user[3].rxevm_ss_1;
 	*phy1_user3_rxevm = (*phy1_user3_rxevm << 8) | evm.rxevm_seg[1].rxevm_user[3].rxevm_ss_0;
+#endif
 
 	return ret;
 }
@@ -1720,10 +1747,6 @@ enum rtw_hal_status rtw_hal_bb_simple_watchdog(struct hal_info_t *hal_info, u8 i
 }
 
 void rtw_hal_bb_reset(struct hal_info_t *hal_info)
-{
-}
-
-void rtw_hal_bb_fw_edcca(struct hal_info_t *hal_info)
 {
 }
 

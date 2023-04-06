@@ -26,180 +26,6 @@
 
 #ifdef HALBB_DIG_SUPPORT
 u32 g_pre_post_pd_mode = 0;
-#ifdef BB_8852A_2_SUPPORT
-u8 halbb_lna_idx_by_rssi(struct bb_info *bb, u8 rssi)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-	u8 lna_idx = LNA_IDX_MAX;
-
-	if (rssi < bb_dig_u->dig_op_para.igi_rssi_th[0]) {
-		lna_idx = 6;
-	} else if (rssi < bb_dig_u->dig_op_para.igi_rssi_th[1]) {
-		lna_idx = 5;
-	} else if (rssi < bb_dig_u->dig_op_para.igi_rssi_th[2]) {
-		lna_idx = 4;
-	} else if (rssi < bb_dig_u->dig_op_para.igi_rssi_th[3]) {
-		lna_idx = 3;
-	} else if (rssi < bb_dig_u->dig_op_para.igi_rssi_th[4]) {
-		lna_idx = 2;
-	} else {
-		lna_idx = 1;
-	}
-
-	return lna_idx;
-}
-
-u8 halbb_tia_idx_by_rssi(struct bb_info *bb, u8 rssi)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-	u8 tia_idx = TIA_IDX_MAX;
-
-	if (rssi < bb_dig_u->dig_op_para.igi_rssi_th[0]) {
-		tia_idx = 1;
-	} else {
-		tia_idx = 0;
-	}
-
-	return tia_idx;
-}
-
-u8 halbb_rxb_idx_by_rssi(struct bb_info *bb,
-			 struct agc_gaincode_set *set, u8 rssi)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	u8 rxb_idx = RXB_IDX_MAX;
-	s8 lna_gain = bb_dig->lna_gain[set->lna_idx];
-	s8 tia_gain = bb_dig->tia_gain[set->tia_idx];
-	s32 rxb_idx_tmp = RXB_IDX_MAX;
-	s32 wb_rssi = rssi + lna_gain + tia_gain;
-
-	rxb_idx_tmp = (bb_dig->ib_pkpwr - bb_dig->ib_pbk + 110) - wb_rssi + 10;
-
-	if (rxb_idx_tmp > RXB_IDX_MAX) {
-		rxb_idx = RXB_IDX_MAX;
-	} else if (rxb_idx_tmp < RXB_IDX_MIN) {
-		rxb_idx = RXB_IDX_MIN;
-	} else {
-		rxb_idx = (u8)rxb_idx_tmp;
-	}
-
-	BB_DIG_DBG(bb, DIG_DBG_LV2, "wb_rssi=%03d, rxb_idx_tmp=%03d\n",
-		   wb_rssi, rxb_idx_tmp);
-
-	return rxb_idx;
-}
-
-
-void halbb_dig_set_igi_cr_8852a(struct bb_info *bb, const struct agc_gaincode_set set)
-{
-	if (bb->ic_type != BB_RTL8852A) {
-		return;
-	}
-
-	if (bb->hal_com->dbcc_en) {
-		if (bb->bb_phy_idx == HW_PHY_0)
-			halbb_set_igi_8852a_2(bb, set.lna_idx, set.tia_idx,
-					      set.rxb_idx, RF_PATH_A);
-		else
-			halbb_set_igi_8852a_2(bb, set.lna_idx, set.tia_idx,
-					      set.rxb_idx, RF_PATH_B);
-	} else {
-		halbb_set_igi_8852a_2(bb, set.lna_idx, set.tia_idx,
-				      set.rxb_idx, RF_PATH_A);
-		halbb_set_igi_8852a_2(bb, set.lna_idx, set.tia_idx,
-				      set.rxb_idx, RF_PATH_B);
-	}
-
-	BB_DIG_DBG(bb, DIG_DBG_LV1, "Set (lna,tia,rxb)=((%d,%d,%02d))\n",
-		   set.lna_idx, set.tia_idx, set.rxb_idx);
-}
-
-void halbb_dig_agc_update_8852a(struct bb_info *bb, struct bb_dig_op_para_unit *para)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	u8 igi_rssi_th_ifem[IGI_RSSI_TH_NUM] = {68, 84, 90, 98, 104};
-	u8 igi_rssi_th_efem[IGI_RSSI_TH_NUM] = {68, 84, 90, 98, 104};
-	u8 *igi_rssi_th;
-
-
-	if (bb->ic_type != BB_RTL8852A) {
-		return;
-	}
-
-	/* gain para update */
-	bb_dig->lna_gain = bb_dig->lna_gain_g;
-	bb_dig->tia_gain = bb_dig->tia_gain_g;
-
-	/* igi rssi th update */
-	switch (bb->phl_com->dev_cap.rfe_type) {
-	case 51:
-	case 52:
-	case 53:
-	case 54:
-		igi_rssi_th = igi_rssi_th_efem;
-		break;
-	default:
-		igi_rssi_th = igi_rssi_th_ifem;
-	}
-
-	halbb_mem_cpy(bb, &para->igi_rssi_th, igi_rssi_th, sizeof(u8) * IGI_RSSI_TH_NUM);
-
-	BB_DIG_DBG(bb, DIG_DBG_LV1, "Sigi_rssi_th[4:0] = %d,%d,%d,%d,%d\n",
-		   para->igi_rssi_th[4], para->igi_rssi_th[3],
-		   para->igi_rssi_th[2], para->igi_rssi_th[1],
-		   para->igi_rssi_th[0]);
-}
-
-#if 0
-void halbb_dig_write_igi_8852a(struct bb_info *bb)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-
-	halbb_dig_set_igi_cr_8852a(bb, bb_dig_u->cur_gaincode);
-}
-#endif
-
-void halbb_gaincode_by_rssi_8852a(struct bb_info *bb,
-				  struct agc_gaincode_set *set, u8 rssi)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-
-	if (bb->ic_type != BB_RTL8852A) {
-		return;
-	}
-
-	set->lna_idx = halbb_lna_idx_by_rssi(bb, rssi);
-	set->tia_idx = halbb_tia_idx_by_rssi(bb, rssi);
-	set->rxb_idx = halbb_rxb_idx_by_rssi(bb, set, rssi);
-
-	BB_DIG_DBG(bb, DIG_DBG_LV1, "final_rssi=%03d, (lna,tia,rab)=(%d,%d,%02d)\n",
-		   rssi, set->lna_idx, set->tia_idx, set->rxb_idx);
-}
-
-bool halbb_dig_gaincode_update_en_8852a(struct bb_info *bb)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-	struct rtw_hw_band *hw_band = &bb->hal_com->band[bb->bb_phy_idx];
-
-	if ((bb->ic_type != BB_RTL8852A) || (bb->hal_com->cv >= CCV)) {
-		return false;
-	}
-
-	if (hw_band->cur_chandef.band != BAND_ON_24G) {
-		return false;
-	}
-
-	halbb_gaincode_by_rssi_8852a(bb, &bb_dig_u->cur_gaincode, bb_dig_u->igi_fa_rssi);
-
-	return true;
-}
-
-#endif
-
 #ifdef HALBB_DIG_DAMPING_CHK
 void halbb_dig_recorder_reset(struct bb_info *bb)
 {
@@ -217,7 +43,6 @@ void halbb_dig_recorder(struct bb_info *bb, u8 igi_curr, u32 fa_metrics)
 	struct bb_dig_record_info *dig_rc = &dig->bb_dig_record_i;
 	u8 igi_pre = dig_rc->igi_history[0];
 	u8 igi_up = 0;
-	int idx = 0;
 
 	BB_DBG(bb, DBG_DIG,  "%s ======>\n", __func__);
 
@@ -225,7 +50,7 @@ void halbb_dig_recorder(struct bb_info *bb, u8 igi_curr, u32 fa_metrics)
 	igi_up = (igi_curr > igi_pre) ? 1 : 0;
 	dig_rc->igi_bitmap = (dig_rc->igi_bitmap << 1) | igi_up;
 
-	for (idx = 5; idx > 0; idx--) { // code size total: 3952->3916
+	for (int idx = 5; idx > 0; idx--) { // code size total: 3952->3916
 		dig_rc->igi_history[idx] = dig_rc->igi_history[idx - 1];
 		dig_rc->fa_history[idx] = dig_rc->fa_history[idx - 1];
 	}
@@ -410,8 +235,8 @@ u8 halbb_get_tia_idx(struct bb_info *bb, enum rf_path path)
 	if (path != RF_PATH_A) {
 		return tia_idx;
 	}
-		tia_idx = (u8)halbb_get_reg(bb, cr->path0_tia_init_idx,
-					    cr->path0_tia_init_idx_m);
+	tia_idx = (u8)halbb_get_reg(bb, cr->path0_tia_init_idx,
+				    cr->path0_tia_init_idx_m);
 	return tia_idx;
 }
 
@@ -430,7 +255,6 @@ u8 halbb_get_rxb_idx(struct bb_info *bb, enum rf_path path)
 u8 halbb_igi_by_edcca(struct bb_info *bb, u8 igi)
 {
 #ifdef HALBB_EDCCA_SUPPORT
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	const u8 margin = IGI_EDCCA_GAP_LIMIT - 18; /* -128(dBm)+110(RSSI) */
 	u8 bound = bb->bb_edcca_i.th_h;
 
@@ -489,7 +313,7 @@ s8 halbb_dig_ofst_by_fa(struct bb_info *bb, u16 fa)
 	for (idx = 0; idx < FA_TH_NUM; idx++) {
 		if (fa <  para->fa_th[idx]) {
 			break;
-	}
+		}
 	}
 	ofst = -2 + 2 * idx;
 	BB_DIG_DBG(bb, DIG_DBG_LV1, "fa_th: [+6 (%d) +4 (%d) +2 (%d) 0 (%d) -2 ]\n",
@@ -640,9 +464,9 @@ u8 halbb_dig_igi_bound_decision(struct bb_info *bb)
 
 bool halbb_dig_fahm_trig(struct bb_info *bb, u16 mntr_time)
 {
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	bool is_trig_success = false;
-#ifdef HALBB_ENV_MNTR_SUPPORT
+#if defined(HALBB_ENV_MNTR_SUPPORT) && defined(FAHM_SUPPORT)
+	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	struct fahm_trig_report rpt = {0};
 
 	/* trigger fahm_rpt */
@@ -664,9 +488,9 @@ bool halbb_dig_fahm_trig(struct bb_info *bb, u16 mntr_time)
 
 bool halbb_dig_fahm_latch(struct bb_info *bb)
 {
+#if defined(HALBB_ENV_MNTR_SUPPORT) && defined(FAHM_SUPPORT)
 	struct bb_dig_info *dig = &bb->bb_dig_i;
 	struct bb_dig_op_unit *dig_u = dig->p_cur_dig_unit;
-#ifdef HALBB_ENV_MNTR_SUPPORT
 	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
 	struct fahm_report rpt = {0};
 	bool fahm_rpt_result = false;
@@ -715,7 +539,6 @@ void halbb_sdagc_follow_pagc_config(struct bb_info *bb, bool set_en)
 	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	const struct bb_dig_cr_info *cr = &bb_dig->bb_dig_cr_i;
 	u32 val = (set_en) ? 1 : 0;
-	u8 i = 0;
 
 	if (bb_dig->p_cur_dig_unit->sdagc_follow_pagc_en == set_en) {
 		return;
@@ -740,7 +563,6 @@ void halbb_dyn_pd_th_cck(struct bb_info *bb, u8 rssi, bool set_en)
 {
 	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-	const struct bb_dig_cr_info *cr = &bb_dig->bb_dig_cr_i;
 	u8 pd_dyn_max = bb_dig->igi_rssi + 5; /* PD_low upper bound */
 	u8 margin = bb_dig_u->pd_low_th_ofst; /* backoff of CCA ability */
 	u8 phy = bb->bb_phy_idx == HW_PHY_1 ? 1 : 0;
@@ -758,9 +580,10 @@ void halbb_dyn_pd_th_cck(struct bb_info *bb, u8 rssi, bool set_en)
 		if (!halbb_set_pd_lower_bound_cck(bb, RSSI_MAX - rssi, cbw,
 						  bb->bb_phy_idx)) {
 			BB_DIG_DBG(bb, DIG_DBG_LV0, "CCK PD th set warning.\n");
-		} else
+		} else {
 			BB_DIG_DBG(bb, DIG_DBG_LV1, "dyn_max=%d, backoff=%d, pd_th=%d(-%ddBm)\n",
 				   pd_dyn_max, margin, rssi, RSSI_MAX - rssi);
+		}
 	}
 }
 
@@ -768,7 +591,6 @@ void halbb_dyn_pd_th_ofdm(struct bb_info *bb, u8 rssi, bool set_en)
 {
 	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-	const struct bb_dig_cr_info *cr = &bb_dig->bb_dig_cr_i;
 	u8 pd_dyn_max = bb_dig->igi_rssi + 5; /* PD_low upper bound */
 	u8 margin = bb_dig_u->pd_low_th_ofst; /* backoff of CCA ability */
 	u8 phy = bb->bb_phy_idx == HW_PHY_1 ? 1 : 0;
@@ -786,9 +608,10 @@ void halbb_dyn_pd_th_ofdm(struct bb_info *bb, u8 rssi, bool set_en)
 		if (!halbb_set_pd_lower_bound(bb, RSSI_MAX - rssi, cbw,
 					      bb->bb_phy_idx)) {
 			BB_DIG_DBG(bb, DIG_DBG_LV0, "PD th set warning.\n");
-		} else
+		} else {
 			BB_DIG_DBG(bb, DIG_DBG_LV1, "pd_dyn_max=%d, backoff=%d, pd_th_eq_rssi=%d(-%ddBm)\n",
 				   pd_dyn_max, margin, rssi, RSSI_MAX - rssi);
+		}
 	}
 }
 
@@ -937,7 +760,6 @@ static const u16 fa_th_linked[FA_TH_NUM] = {4, 8, 12, 16};
 void halbb_dig_para_update(struct bb_info *bb)
 {
 	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_link_info *bb_link = &bb->bb_link_i;
 	struct bb_dig_op_para_unit *para_dst;
 
 	BB_DIG_DBG(bb, DIG_DBG_LV1, "%s ======>\n", __func__);
@@ -986,14 +808,13 @@ void halbb_dig_op_unit_para_reset_h(struct bb_info *bb)
 {
 	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
 	struct bb_dig_op_unit *unit_cur = &bb_dig->dig_state_h_i;
-	u8 i = 0;
 
 	unit_cur->cur_gaincode = bb_dig->max_gaincode;
 	unit_cur->force_gaincode = bb_dig->max_gaincode;
 	unit_cur->abs_igi_max = IGI_MAX_PERFORMANCE_MODE;
 	unit_cur->abs_igi_min = 0xc;
 	unit_cur->pd_low_th_ofst = 6;
-#ifdef HALBB_DIG_TDMA_SUPPORT
+#if defined(HALBB_DIG_TDMA_SUPPORT) || defined(HALBB_SIMPLE_TDMA_DIG_SUPPORT)
 	unit_cur->state_identifier = DIG_TDMA_HIGH;
 #endif
 }
@@ -1016,8 +837,8 @@ void halbb_dig_op_unit_para_reset_l(struct bb_info *bb)
 
 void halbb_dig_fahm_para_init(struct bb_info *bb)
 {
-	struct bb_dig_info *dig = &bb->bb_dig_i;
 #ifdef HALBB_ENV_MNTR_SUPPORT
+	struct bb_dig_info *dig = &bb->bb_dig_i;
 	struct fahm_para_info *para = &dig->fahm_para_i;
 
 	para->fahm_rac_lv = RAC_LV_2;
@@ -1026,8 +847,8 @@ void halbb_dig_fahm_para_init(struct bb_info *bb)
 	para->fahm_app = FAHM_DIG;
 	para->fahm_numer_opt = FAHM_INCLU_FA;
 	para->fahm_denom_opt = FAHM_INCLU_CRC_ERR;
-#endif
 	dig->fahm_is_triggered = false;
+#endif
 }
 
 void halbb_dig_para_reset(struct bb_info *bb)
@@ -1041,6 +862,12 @@ void halbb_dig_para_reset(struct bb_info *bb)
 #ifdef HALBB_DIG_TDMA_SUPPORT
 	halbb_dig_op_unit_para_reset_l(bb); /* dig_op_unit para reset */
 	bb_dig->gaincode_update_en = false;
+	bb_dig->tdma_passed_time_acc = 0;
+	bb_dig->tdma_timestamp_cur = 0;
+	bb_dig->tdma_timestamp_pre = bb_dig->tdma_timestamp_cur;
+#endif
+#ifdef HALBB_SIMPLE_TDMA_DIG_SUPPORT
+	halbb_s_dig_op_unit_para_reset_l(bb); /* dig_op_unit para reset */
 	bb_dig->tdma_passed_time_acc = 0;
 	bb_dig->tdma_timestamp_cur = 0;
 	bb_dig->tdma_timestamp_pre = bb_dig->tdma_timestamp_cur;
@@ -1077,7 +904,23 @@ void halbb_dig_init(struct bb_info *bb)
 	}
 
 	BB_DIG_DBG(bb, DIG_DBG_LV0, "[%s]=========>\n", __func__);
+#ifdef HALBB_DIG_SIMPLE_MODE
+	bb_dig->igi_pause_cnt = 0;
+	bb_dig->le_igi_ofst = 0;
+	bb_dig->dbg_lv = DIG_DBG_LV2;
+	bb_dig->igi_rssi = IGI_NOLINK - 10; /*init IGI state*/
+	bb_dig->p_cur_dig_unit = &bb_dig->dig_state_h_i;
+	bb_dig->dig_state_h_i.dig_op_para.dyn_pd_th_en = true;
+	igi_new = bb_dig->igi_rssi;
+	bb_dig->dig_state_h_i.pd_low_th_ofst = 6;
+#ifdef HALBB_SIMPLE_TDMA_DIG_SUPPORT
+	bb_dig->dig_timer_i.cb_time = 50;
+	bb_dig->dig_state_h_i.state_num_lmt = 3;
+	bb_dig->dig_state_l_i.state_num_lmt = 1;
+	bb_dig->dig_state_l_i.pd_low_th_ofst = 6;
+#endif
 
+#else
 	/* DIG sub-DM configurations */
 	halbb_dig_mode_update(bb, DIG_ORIGIN, bb->bb_phy_idx);
 	bb_dig->igi_pause_cnt = 0;
@@ -1100,6 +943,7 @@ void halbb_dig_init(struct bb_info *bb)
 	halbb_dig_damping_chk_init(bb);
 #endif
 	igi_new = halbb_dig_igi_by_ofst(bb, bb_dig->igi_rssi, 0);
+#endif
 	halbb_dig_cfg_bbcr(bb, igi_new);
 }
 
@@ -1175,7 +1019,9 @@ void halbb_set_lna_tia_rxb_by_igi(struct bb_info *bb, u8 igi_new, enum phl_phy_i
 void halbb_dig_cfg_bbcr(struct bb_info *bb, u8 igi_new)
 {
 	struct bb_dig_info *dig = &bb->bb_dig_i;
+#ifdef BB_8852A_2_SUPPORT
 	struct bb_dig_op_unit *bb_dig_u = dig->p_cur_dig_unit;
+#endif
 	struct bb_dig_op_unit *dig_u = &dig->dig_state_h_i;
 	struct bb_dig_op_para_unit *para = &dig_u->dig_op_para;
 	u32 post_pd_mode = 0;
@@ -1224,7 +1070,6 @@ void halbb_dig_cfg_bbcr(struct bb_info *bb, u8 igi_new)
 void halbb_dig_lps(struct bb_info *bb)
 {
 	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
 	struct bb_link_info *bb_link = &bb->bb_link_i;
 	s16 final_rssi = 0;
 
@@ -1263,7 +1108,17 @@ void halbb_dig(struct bb_info *bb)
 	/* Update igi_rssi */
 	dig->igi_rssi = (bb_link->is_linked) ? (bb->bb_ch_i.rssi_min >> 1) : IGI_NOLINK;
 	BB_DIG_DBG(bb, DIG_DBG_LV0, "link=%d, rssi=%d\n", bb_link->is_linked, dig->igi_rssi);
-
+#ifdef HALBB_DIG_SIMPLE_MODE
+#ifdef HALBB_SIMPLE_TDMA_DIG_SUPPORT
+	BB_DIG_DBG(bb, DIG_DBG_LV0, "ap_on=%d\n", bb->phl_com->ap_on);
+	if (bb->phl_com->ap_on && bb_link->is_linked) {
+		halbb_simple_tdma_dig_watchdog(bb);
+		return;
+	}
+#endif
+	halbb_dig_lps(bb);
+	return;
+#else
 	if (dig->need_update) {
 		halbb_dig_para_update(bb);
 #ifdef HALBB_DIG_DAMPING_CHK
@@ -1316,6 +1171,7 @@ DIG_END:
 	if (!halbb_dig_fahm_trig(bb, DIG_CCX_WD_TRIGTIME)) {
 		BB_DIG_DBG(bb, DIG_DBG_LV0, "FAHM Trig Fail\n");
 	}
+#endif
 }
 
 #ifdef HALBB_DIG_TDMA_SUPPORT
@@ -2126,6 +1982,110 @@ void halbb_cr_cfg_dig_init(struct bb_info *bb)
 	}
 }
 #endif
+
+#ifdef HALBB_SIMPLE_TDMA_DIG_SUPPORT
+void halbb_s_dig_op_unit_para_reset_l(struct bb_info *bb)
+{
+	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
+	struct bb_dig_op_unit *unit_cur = &bb_dig->dig_state_l_i;
+	unit_cur->state_identifier = DIG_TDMA_LOW;
+}
+
+void halbb_simple_tdma_dig_watchdog(struct bb_info *bb)
+{
+	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
+
+	if (bb_dig->tdma_timestamp_cur == bb_dig->tdma_timestamp_pre) {
+		BB_DIG_DBG(bb, DIG_DBG_LV0, "DIG TDMA timer check FAIL. Restart.\n");
+		halbb_dig_reset(bb);
+		halbb_cfg_timers(bb, BB_SET_TIMER, &bb->bb_dig_i.dig_timer_i);
+	}
+	bb_dig->tdma_timestamp_pre = bb_dig->tdma_timestamp_cur;
+}
+
+void halbb_simple_tdma_dig(struct bb_info *bb)
+{
+	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
+	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
+	s16 final_rssi = 0;
+
+	BB_DIG_DBG(bb, DIG_DBG_LV0, "%s ======>\n", __func__);
+	bb_dig->tdma_timestamp_cur++;
+	bb_dig->tdma_passed_time_acc += (u16)bb_dig->dig_timer_i.cb_time;
+
+	if (bb_dig->tdma_passed_time_acc >= WACHDOG_PERIOD_IN_MS) {
+		BB_DIG_DBG(bb, DIG_DBG_LV0, "Two seconds reached.\n");
+		bb_dig->p_cur_dig_unit = bb_dig_u;
+		bb_dig->tdma_passed_time_acc = 0;
+	}
+
+	final_rssi = MIN_2(bb_dig->igi_rssi + bb_dig->le_igi_ofst, RSSI_MAX);
+	if (++bb_dig_u->passed_state_cnt >= bb_dig_u->state_num_lmt) {
+		bb_dig_u->passed_state_cnt = 0;
+		switch (bb_dig_u->state_identifier) {
+		case DIG_TDMA_LOW:
+			bb_dig->p_cur_dig_unit = &bb_dig->dig_state_h_i;
+			final_rssi = SUBTRACT_TO_0(IGI_NOLINK, 20);
+			BB_DIG_DBG(bb, DIG_DBG_LV0, "[TDMA]L->H IGI=%d.\n", final_rssi);
+			break;
+		case DIG_TDMA_HIGH:
+			bb_dig->p_cur_dig_unit = &bb_dig->dig_state_l_i;
+			final_rssi = SUBTRACT_TO_0(final_rssi, 10);
+			BB_DIG_DBG(bb, DIG_DBG_LV0, "[TDMA]H->L IGI=%d.\n", final_rssi);
+			break;
+		default:
+			break;
+		}
+		halbb_dig_cfg_bbcr(bb, (u8)final_rssi);
+	}
+}
+
+void halbb_simle_tdmadig_en(struct bb_info *bb)
+{
+	struct bb_link_info *bb_link = &bb->bb_link_i;
+
+	if (halbb_dig_abort(bb)) {
+		return;
+	}
+
+	if (!bb_link->is_linked) {
+		BB_DIG_DBG(bb, DIG_DBG_LV0, "is_linked=%d, one_entry_only=%d\n",
+			   bb_link->is_linked, bb_link->is_one_entry_only);
+		return;
+	}
+
+	halbb_simple_tdma_dig(bb);
+	halbb_cfg_timers(bb, BB_SET_TIMER, &bb->bb_dig_i.dig_timer_i);
+}
+
+
+void halbb_simple_tdmadig_callback(void *context)
+{
+	struct bb_info *bb = (struct bb_info *)context;
+	struct halbb_timer_info *timer = &bb->bb_dig_i.dig_timer_i;
+
+	BB_DIG_DBG(bb, DIG_DBG_LV0, "[%s]===>\n", __func__);
+
+	timer->timer_state = BB_TIMER_IDLE;
+
+	halbb_simle_tdmadig_en(bb);
+}
+
+void halbb_simple_tdma_timer_init(struct bb_info *bb)
+{
+	struct halbb_timer_info *timer = &bb->bb_dig_i.dig_timer_i;
+
+	BB_DBG(bb, DBG_INIT, "[%s]\n", __func__);
+
+	timer->event_idx = BB_EVENT_TIMER_DIG;
+	timer->timer_state = BB_TIMER_IDLE;
+
+	halbb_init_timer(bb, &timer->timer_list, halbb_simple_tdmadig_callback, bb, "halbb_simple_dig_timer");
+}
+
+
+#endif
+
 #ifdef HALBB_DIG_MCC_SUPPORT
 void Halbb_init_mccdm(struct bb_info *bb)
 {

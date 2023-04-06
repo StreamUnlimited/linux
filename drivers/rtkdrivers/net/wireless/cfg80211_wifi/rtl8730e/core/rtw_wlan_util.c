@@ -1842,6 +1842,79 @@ int rtw_update_bcn_keys_of_network(struct wlan_network *network)
 				CIPHER_STR(c, BIP_CMAC_256)
 #define AKM_STR(akm, type)	akm & WLAN_AKM_TYPE_##type ? "["#type"]" : ""
 
+/* Only print different beacon IEs that beacon-change-condition cares. */
+void rtw_dump_bcn_keys_diff(void *sel, struct beacon_keys *recv_beacon, struct beacon_keys *cur_beacon)
+{
+	u8 ssid[IW_ESSID_MAX_SIZE + 1];
+
+	if (_rtw_memcmp(recv_beacon->ssid, cur_beacon->ssid,
+		recv_beacon->ssid_len > cur_beacon->ssid_len ? recv_beacon->ssid_len : cur_beacon->ssid_len)) {
+		_rtw_memcpy(ssid, cur_beacon->ssid, cur_beacon->ssid_len);
+		ssid[cur_beacon->ssid_len] = '\0';
+		RTW_PRINT_SEL(sel, "current ssid = %s (len = %u)\n", ssid, cur_beacon->ssid_len);
+		_rtw_memcpy(ssid, recv_beacon->ssid, recv_beacon->ssid_len);
+		ssid[recv_beacon->ssid_len] = '\0';
+		RTW_PRINT_SEL(sel, "received ssid = %s (len = %u)\n", ssid, recv_beacon->ssid_len);
+	}
+
+	if ((recv_beacon->ch != cur_beacon->ch) || (recv_beacon->bw != cur_beacon->bw) || (recv_beacon->offset != cur_beacon->offset)) {
+		RTW_PRINT_SEL(sel, "current ch = %u,%u,%u\n", cur_beacon->ch, cur_beacon->bw, cur_beacon->offset);
+		RTW_PRINT_SEL(sel, "received ch = %u,%u,%u\n", recv_beacon->ch, recv_beacon->bw, recv_beacon->offset);
+	}
+
+	if (recv_beacon->encryp_protocol != cur_beacon->encryp_protocol) {
+		RTW_PRINT_SEL(sel, "current sec = %d\n", cur_beacon->encryp_protocol);
+		RTW_PRINT_SEL(sel, "received sec = %d\n", recv_beacon->encryp_protocol);
+	}
+
+	if (recv_beacon->group_cipher != cur_beacon->group_cipher) {
+		RTW_PRINT_SEL(sel, "current GTK = 0x%x " CIPHER_FMT "\n", cur_beacon->group_cipher, CIPHER_ARG(cur_beacon->group_cipher));
+		RTW_PRINT_SEL(sel, "received GTK = 0x%x " CIPHER_FMT "\n", recv_beacon->group_cipher, CIPHER_ARG(recv_beacon->group_cipher));
+	}
+
+	if (recv_beacon->pairwise_cipher != cur_beacon->pairwise_cipher) {
+		RTW_PRINT_SEL(sel, "current PTK = 0x%x " CIPHER_FMT "\n", cur_beacon->pairwise_cipher, CIPHER_ARG(cur_beacon->pairwise_cipher));
+		RTW_PRINT_SEL(sel, "received PTK = 0x%x " CIPHER_FMT "\n", recv_beacon->pairwise_cipher, CIPHER_ARG(recv_beacon->pairwise_cipher));
+	}
+
+	if (recv_beacon->akm != cur_beacon->akm) {
+		RTW_PRINT_SEL(sel, "current AKM = 0x%08x %s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+				, cur_beacon->akm
+				, AKM_STR(cur_beacon->akm, 8021X)
+				, AKM_STR(cur_beacon->akm, PSK)
+				, AKM_STR(cur_beacon->akm, FT_8021X)
+				, AKM_STR(cur_beacon->akm, FT_PSK)
+				, AKM_STR(cur_beacon->akm, 8021X_SHA256)
+				, AKM_STR(cur_beacon->akm, PSK_SHA256)
+				, AKM_STR(cur_beacon->akm, TDLS)
+				, AKM_STR(cur_beacon->akm, SAE)
+				, AKM_STR(cur_beacon->akm, FT_OVER_SAE)
+				, AKM_STR(cur_beacon->akm, 8021X_SUITE_B)
+				, AKM_STR(cur_beacon->akm, 8021X_SUITE_B_192)
+				, AKM_STR(cur_beacon->akm, FILS_SHA256)
+				, AKM_STR(cur_beacon->akm, FILS_SHA384)
+				, AKM_STR(cur_beacon->akm, FT_FILS_SHA256)
+				, AKM_STR(cur_beacon->akm, FT_FILS_SHA384));
+		RTW_PRINT_SEL(sel, "received AKM = 0x%08x %s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+				, recv_beacon->akm
+				, AKM_STR(recv_beacon->akm, 8021X)
+				, AKM_STR(recv_beacon->akm, PSK)
+				, AKM_STR(recv_beacon->akm, FT_8021X)
+				, AKM_STR(recv_beacon->akm, FT_PSK)
+				, AKM_STR(recv_beacon->akm, 8021X_SHA256)
+				, AKM_STR(recv_beacon->akm, PSK_SHA256)
+				, AKM_STR(recv_beacon->akm, TDLS)
+				, AKM_STR(recv_beacon->akm, SAE)
+				, AKM_STR(recv_beacon->akm, FT_OVER_SAE)
+				, AKM_STR(recv_beacon->akm, 8021X_SUITE_B)
+				, AKM_STR(recv_beacon->akm, 8021X_SUITE_B_192)
+				, AKM_STR(recv_beacon->akm, FILS_SHA256)
+				, AKM_STR(recv_beacon->akm, FILS_SHA384)
+				, AKM_STR(recv_beacon->akm, FT_FILS_SHA256)
+				, AKM_STR(recv_beacon->akm, FT_FILS_SHA384));
+		}
+}
+
 void rtw_dump_bcn_keys(void *sel, struct beacon_keys *recv_beacon)
 {
 	u8 ssid[IW_ESSID_MAX_SIZE + 1];
@@ -2087,11 +2160,7 @@ int rtw_check_bcn_info(_adapter *adapter, u8 *pframe, u32 packet_len)
 #endif /* CONFIG_DFS */
 
 	if (_rtw_memcmp(&recv_beacon, cur_beacon, sizeof(recv_beacon)) == _FALSE) {
-		RTW_INFO(FUNC_ADPT_FMT" new beacon occur!!\n", FUNC_ADPT_ARG(adapter));
-		RTW_INFO(FUNC_ADPT_FMT" cur beacon key:\n", FUNC_ADPT_ARG(adapter));
-		rtw_dump_bcn_keys(RTW_DBGDUMP, cur_beacon);
-		RTW_INFO(FUNC_ADPT_FMT" new beacon key:\n", FUNC_ADPT_ARG(adapter));
-		rtw_dump_bcn_keys(RTW_DBGDUMP, &recv_beacon);
+		rtw_dump_bcn_keys_diff(RTW_DBGDUMP, &recv_beacon, cur_beacon);
 
 		if (recv_beacon.ch != cur_beacon->ch) {
 			pmlmeinfo->illegal_beacon_code |= BEACON_CHANNEL_CHANGED;
@@ -2113,6 +2182,7 @@ int rtw_check_bcn_info(_adapter *adapter, u8 *pframe, u32 packet_len)
 			goto exit;
 		}
 
+		RTW_INFO(FUNC_ADPT_FMT" Beacon changed, use new beacon!!\n", FUNC_ADPT_ARG(adapter));
 		_rtw_memcpy(cur_beacon, &recv_beacon, sizeof(recv_beacon));
 	}
 

@@ -26,29 +26,6 @@
 
 #ifdef BB_8730E_SUPPORT
 
-bool halbb_chk_pkg_valid_8730e(struct bb_info *bb, u8 bb_ver, u8 rf_ver)
-{
-	bool valid = true;
-
-#if 0
-	if (bb_ver >= X && rf_ver >= Y) {
-		valid = true;
-	} else if (bb_ver < X && rf_ver < Y) {
-		valid = true;
-	} else {
-		valid = false;
-	}
-
-	if (!valid) {
-		/*halbb_set_reg(bb, 0x1c3c, (BIT(0) | BIT(1)), 0x0);*/
-		BB_WARNING("[%s] Pkg_ver{bb, rf}={%d, %d} disable all BB block\n",
-			   __func__, bb_ver, rf_ver);
-	}
-#endif
-	return valid;
-}
-
-
 void halbb_stop_pmac_tx_8730e(struct bb_info *bb,
 			      struct halbb_pmac_info *tx_info,
 			      enum phl_phy_idx phy_idx)
@@ -75,6 +52,7 @@ void halbb_stop_pmac_tx_8730e(struct bb_info *bb,
 			halbb_set_reg_cmn(bb, 0x9c4, BIT(4), 0, phy_idx);
 		}
 	}
+	halbb_set_reg_cmn(bb, 0xd44, BIT(31), 1, phy_idx);
 }
 
 
@@ -83,6 +61,7 @@ void halbb_start_pmac_tx_8730e(struct bb_info *bb,
 			       enum halbb_pmac_mode mode, u32 pkt_cnt, u16 period,
 			       enum phl_phy_idx phy_idx)
 {
+	halbb_set_reg_cmn(bb, 0xd44, BIT(31), 0, phy_idx);
 	if (mode == CONT_TX) {
 		if (tx_info->is_cck) {
 			halbb_set_reg(bb, 0x2318, BIT(8), 1);
@@ -218,7 +197,7 @@ bool halbb_set_pd_lower_bound_8730e(struct bb_info *bb, u8 bound,
 	BW80: 89~27
 	*/
 	u8 bw_attenuation = 0;
-	u8 subband_filter_atteniation = 7;
+	u8 subband_filter_atteniation = 0;
 	u8 bound_idx = 0;
 	bool rpt = true;
 
@@ -268,7 +247,7 @@ bool halbb_set_pd_lower_bound_cck_8730e(struct bb_info *bb, u8 bound,
 					enum phl_phy_idx phy_idx)
 {
 	u8 bw_attenuation = 0;
-	u8 subband_filter_atteniation = 5;
+	u8 subband_filter_atteniation = 0;
 	s8 bound_tmp = 0;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "<====== %s ======>\n", __func__);

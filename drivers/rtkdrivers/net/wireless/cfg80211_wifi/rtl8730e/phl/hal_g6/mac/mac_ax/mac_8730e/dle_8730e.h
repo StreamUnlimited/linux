@@ -204,5 +204,8 @@ u32 chk_dle_rdy_8852a(struct mac_ax_adapter *adapter, enum DLE_CTRL_TYPE type);
  * @}
  * @}
  */
+
+u32 mac_is_txq_empty_8730e(struct mac_ax_adapter *adapter,
+			   struct mac_ax_tx_queue_empty *val);
 #endif
 #endif

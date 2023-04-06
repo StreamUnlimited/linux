@@ -910,6 +910,75 @@ u32 mac_write_bbrst_reg(struct mac_ax_adapter *adapter, u8 val)
 
 	return MACSUCCESS;
 }
+
+u32 set_macid_pause(struct mac_ax_adapter *adapter,
+		    struct mac_ax_macid_pause_cfg *cfg)
+{
+	u32 val32;
+	u8 macid_sh = cfg->macid & (32 - 1);
+	u8 macid_grp = cfg->macid >> 5;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 ret;
+	struct mac_ax_macid_pause_grp grp = {{0}};
+
+	ret = check_mac_en(adapter, MAC_AX_MAC_SEL);
+	if (ret)
+		return ret;
+
+	if (cfg->pause) {
+		switch (macid_grp) {
+		case 0:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP);
+			MAC_REG_W32(REG_MACID_SLEEP,
+				    val32 | BIT(macid_sh));
+			break;
+		case 1:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP1);
+			MAC_REG_W32(REG_MACID_SLEEP1,
+				    val32 | BIT(macid_sh));
+			break;
+		case 2:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP2);
+			MAC_REG_W32(REG_MACID_SLEEP2,
+				    val32 | BIT(macid_sh));
+			break;
+		case 3:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP3);
+			MAC_REG_W32(REG_MACID_SLEEP3,
+				    val32 | BIT(macid_sh));
+			break;
+		default:
+			break;
+		}
+	} else {
+		switch (macid_grp) {
+		case 0:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP);
+			MAC_REG_W32(REG_MACID_SLEEP,
+				    val32 & ~(BIT(macid_sh)));
+			break;
+		case 1:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP1);
+			MAC_REG_W32(REG_MACID_SLEEP1,
+				    val32 & ~(BIT(macid_sh)));
+			break;
+		case 2:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP2);
+			MAC_REG_W32(REG_MACID_SLEEP2,
+				    val32 & ~(BIT(macid_sh)));
+			break;
+		case 3:
+			val32 = MAC_REG_R32(REG_MACID_SLEEP3);
+			MAC_REG_W32(REG_MACID_SLEEP3,
+				    val32 & ~(BIT(macid_sh)));
+			break;
+		default:
+			break;
+		}
+	}
+	return MACSUCCESS;
+}
+
 #endif
 
 /*

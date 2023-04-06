@@ -26,26 +26,9 @@
 #include "../halbb_precomp.h"
 #ifdef BB_8730E_SUPPORT
 
-void halbb_cfg_rf_reg_8730e(struct bb_info *bb, u32 addr, u32 data,
-			    enum rf_path rf_path, u32 reg_addr)
-{
-}
-
-void halbb_cfg_rf_radio_a_8730e(struct bb_info *bb, u32 addr, u32 data)
-{
-}
-
-void halbb_cfg_rf_radio_b_8730e(struct bb_info *bb, u32 addr, u32 data)
-{
-}
-
 void halbb_cfg_bb_phy_8730e(struct bb_info *bb, u32 addr, u32 data,
 			    enum phl_phy_idx phy_idx)
 {
-#ifdef HALBB_DBCC_SUPPORT
-	u32 ofst = 0;
-#endif
-
 	if (addr == 0xfe) {
 		halbb_delay_ms(bb, 50);
 		BB_DBG(bb, DBG_INIT, "Delay 50 ms\n");
@@ -65,22 +48,7 @@ void halbb_cfg_bb_phy_8730e(struct bb_info *bb, u32 addr, u32 data,
 		halbb_delay_us(bb, 1);
 		BB_DBG(bb, DBG_INIT, "Delay 1 us\n");
 	} else {
-#ifdef HALBB_DBCC_SUPPORT
-		if ((bb->hal_com->dbcc_en || bb->bb_dbg_i.cr_dbg_mode_en) &&
-		    phy_idx == HW_PHY_1) {
-			ofst = halbb_phy0_to_phy1_ofst(bb, addr);
-			if (ofst == 0) {
-				return;
-			}
-			addr += ofst;
-		} else {
-			phy_idx = HW_PHY_0;
-		}
-		BB_DBG(bb, DBG_INIT, "[REG][%d]0x%04X = 0x%08X\n", phy_idx, addr, data);
-#else
 		BB_DBG(bb, DBG_INIT, "[REG]0x%04X = 0x%08X\n", addr, data);
-#endif
-
 		halbb_set_reg(bb, addr, MASKDWORD, data);
 	}
 }

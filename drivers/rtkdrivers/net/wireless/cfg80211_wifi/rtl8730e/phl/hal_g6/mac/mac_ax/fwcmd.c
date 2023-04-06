@@ -184,7 +184,7 @@ u32 mac_process_c2h(struct mac_ax_adapter *adapter, u8 *buf, u32 len, u8 *c2h_re
 }
 
 /* km */
-u8 rtl8730e_set_wowlan_ctrl_cmd(struct mac_ax_adapter *adapter, enum mac_ax_wow_ctrl w_c)
+u32 rtl8730e_set_wowlan_ctrl_cmd(struct mac_ax_adapter *adapter, enum mac_ax_wow_ctrl w_c)
 {
 	struct rtw_hal_com_t *hal_com = adapter->drv_adapter;
 

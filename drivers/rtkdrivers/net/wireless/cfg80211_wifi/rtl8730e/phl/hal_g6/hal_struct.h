@@ -128,11 +128,7 @@ struct hal_trx_ops {
 		       u8 ch_idx, u16 wd_num);
 #ifdef RTW_PHL_BCN_IOT
 	enum rtw_hal_status
-	(*update_bcn_txbd)(struct hal_info_t *hal,
-			   struct tx_base_desc *txbd_ring,
-			   void *bcn_info);
-	enum rtw_hal_status
-	(*tx_bcn_start)(struct hal_info_t *hal);
+	(*tx_bcn_start)(struct hal_info_t *hal, u8 port);
 #endif
 	enum rtw_hal_status
 	(*tx_start)(struct hal_info_t *hal,

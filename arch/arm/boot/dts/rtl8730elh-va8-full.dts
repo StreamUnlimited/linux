@@ -72,7 +72,7 @@
 	#size-cells = <0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c2_pins>;
-	status = "disabled";
+	status = "okay";
 
 	rtk_ts@1a {
 		compatible = "realtek,rtk_ts";
@@ -138,4 +138,8 @@
 
 &timer5{
 	wakeup-source;
+};
+
+&usb {
+	dr_mode = "otg"; // "host", "peripheral", "otg"
 };

@@ -15,6 +15,6 @@
 };
 
 &rcc {
-	assigned-clocks = <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_SPORT0>, <&rcc RTK_CKSL_SPORT1>, <&rcc RTK_CKSL_SPORT2>, <&rcc RTK_CKSL_SPORT3>;
-	assigned-clock-parents = <&rcc RTK_CKE_XTAL_GRP1>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>;
+	assigned-clocks = <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_SPORT0>, <&rcc RTK_CKSL_SPORT1>, <&rcc RTK_CKSL_SPORT2>, <&rcc RTK_CKSL_SPORT3>, <&rcc RTK_CKSL_TIM9>;
+	assigned-clock-parents = <&rcc RTK_CKE_XTAL_GRP1>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&rcc RTK_CKSL_AC>, <&clk_i2s_pll2>;
 };

@@ -659,6 +659,7 @@ int rtw_get_bcn_keys_from_bss(WLAN_BSSID_EX *bss, struct beacon_keys *bcn_keys);
 int rtw_update_bcn_keys_of_network(struct wlan_network *network);
 
 int validate_beacon_len(u8 *pframe, uint len);
+void rtw_dump_bcn_keys_diff(void *sel, struct beacon_keys *recv_beacon, struct beacon_keys *cur_beacon);
 void rtw_dump_bcn_keys(void *sel, struct beacon_keys *recv_beacon);
 bool rtw_bcn_key_compare(struct beacon_keys *cur, struct beacon_keys *recv);
 int rtw_check_bcn_info(_adapter *adapter, u8 *pframe, u32 packet_len);

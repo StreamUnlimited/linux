@@ -16,13 +16,14 @@
 
 #ifdef RF_8730E_SUPPORT
 
+/*
 s8 _halrf_avg_power_8730e(struct rf_info *rf, enum phl_phy_idx phy, s8 *value, s8 n)
 {
 	u8 i;
 	s16 total = 0;
 
-	RF_DBG(rf, DBG_RF_POWER, "=======>%s\n", __func__);
 
+	RF_DBG(rf, DBG_RF_POWER, "=======>%s\n", __func__);
 	for (i = 0; i < n; i++) {
 		total = total + value[i];
 		RF_DBG(rf, DBG_RF_POWER, "value[%d]=%d total=%d n=%d\n", i, value[i], total, n);
@@ -39,9 +40,8 @@ void _halrf_bub_sort_8730e(struct rf_info *rf, enum phl_phy_idx phy, s8 *data, u
 	s8 temp;
 	u32 k;
 
-	for (k = 0; k < n; k++) {
+	for (k = 0; k < n; k++)
 		RF_DBG(rf, DBG_RF_POWER, "===> %s  Before data[%d]=%d\n", __func__, k, data[k]);
-	}
 
 	for (i = n - 1; i >= 0; i--) {
 		sp = 1;
@@ -53,66 +53,67 @@ void _halrf_bub_sort_8730e(struct rf_info *rf, enum phl_phy_idx phy, s8 *data, u
 				sp = 0;
 			}
 		}
-		if (sp == 1) {
+		if (sp == 1)
 			break;
 		}
-	}
 
-	for (k = 0; k < n; k++) {
+	for (k = 0; k < n; k++)
 		RF_DBG(rf, DBG_RF_POWER, "<=== %s  After data[%d]=%d\n", __func__, k, data[k]);
 	}
-}
+*/
 
-bool halrf_set_power_by_rate_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+bool halrf_set_power_by_rate_to_struct_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[HW_PHY_0].rtw_tpu_i;
 	struct rtw_tpu_pwr_by_rate_info *rate = &tpu->rtw_tpu_pwr_by_rate_i;
+#ifdef RFDBG_TRACE_EN
 	u32 i, j;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s\n", __func__);
+#endif
+	rate->pwr_by_rate_lgcy[0] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK1, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[1] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK2, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[2] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK5_5, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[3] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
 
-	rate->pwr_by_rate_lgcy[0] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK1, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[1] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK2, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[2] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK5_5, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[3] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[4] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM6, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[5] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM9, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[6] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM12, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[7] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM18, 0, 0) / 2;
 
-	rate->pwr_by_rate_lgcy[4] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM6, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[5] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM9, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[6] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM12, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[7] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM18, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[8] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM24, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[9] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM36, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[10] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM48, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[11] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
 
-	rate->pwr_by_rate_lgcy[8] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM24, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[9] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM36, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[10] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM48, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[11] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][0] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS0, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][1] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS1, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][2] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS2, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][3] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS3, 0, 0) / 2;
 
-	rate->pwr_by_rate[PW_LMT_PH_1T][0] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS0, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][1] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS1, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][2] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS2, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][3] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS3, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][4] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][5] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS5, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][6] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS6, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][7] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
 
-	rate->pwr_by_rate[PW_LMT_PH_1T][4] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][5] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS5, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][6] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS6, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][7] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][8] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS8, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][9] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS9, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][10] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS10, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][11] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS11, 0, 0) / 2;
 
-	rate->pwr_by_rate[PW_LMT_PH_1T][8] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS8, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][9] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS9, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][10] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS10, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][11] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS11, 0, 0) / 2;
-
-	rate->pwr_by_rate[PW_LMT_PH_1T][12] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS0, 1, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][13] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS1, 1, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][14] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS3, 1, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][15] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][12] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS0, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][13] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS1, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][14] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS3, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][15] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
 
 	/*CCK, Legacy, HT, VHT, HE*/
-	tpu->pwr_ofst_mode[0] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS11, 0, 1) / 2;
-	tpu->pwr_ofst_mode[1] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_VHT_NSS1_MCS9, 0, 1) / 2;
-	tpu->pwr_ofst_mode[2] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_MCS7, 0, 1) / 2;
-	tpu->pwr_ofst_mode[3] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 1) / 2;
-	tpu->pwr_ofst_mode[4] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 1) / 2;
+	tpu->pwr_ofst_mode[0] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS11, 0, 1) / 2;
+	tpu->pwr_ofst_mode[1] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_VHT_NSS1_MCS9, 0, 1) / 2;
+	tpu->pwr_ofst_mode[2] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_MCS7, 0, 1) / 2;
+	tpu->pwr_ofst_mode[3] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 1) / 2;
+	tpu->pwr_ofst_mode[4] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 1) / 2;
 
+#ifdef RFDBG_TRACE_EN
 	for (i = 0; i < 12; i = i + 4)
 		RF_DBG(rf, DBG_RF_POWER, "power_by_rate ==> %d   %d   %d   %d\n",
 		       rate->pwr_by_rate_lgcy[i + 3],
@@ -134,59 +135,61 @@ bool halrf_set_power_by_rate_to_struct_8730e(struct rf_info *rf, enum phl_phy_id
 	       tpu->pwr_ofst_mode[2],
 	       tpu->pwr_ofst_mode[1],
 	       tpu->pwr_ofst_mode[0]);
+#endif
 	return true;
 }
 
-bool halrf_set_power_by_rate_all_the_smae_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+bool halrf_set_power_by_rate_all_the_smae_to_struct_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[HW_PHY_0].rtw_tpu_i;
 	struct rtw_tpu_pwr_by_rate_info *rate = &tpu->rtw_tpu_pwr_by_rate_i;
+#ifdef RFDBG_TRACE_EN
 	u32 i, j;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s\n", __func__);
+#endif
+	rate->pwr_by_rate_lgcy[0] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[1] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[2] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[3] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
 
-	rate->pwr_by_rate_lgcy[0] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[1] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[2] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[3] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[4] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[5] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[6] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[7] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
 
-	rate->pwr_by_rate_lgcy[4] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[5] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[6] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[7] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[8] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[9] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[10] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate_lgcy[11] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
 
-	rate->pwr_by_rate_lgcy[8] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[9] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[10] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
-	rate->pwr_by_rate_lgcy[11] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][0] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][1] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][2] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][3] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
 
-	rate->pwr_by_rate[PW_LMT_PH_1T][0] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][1] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][2] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][3] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][4] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][5] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][6] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][7] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
 
-	rate->pwr_by_rate[PW_LMT_PH_1T][4] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][5] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][6] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][7] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][8] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][9] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][10] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][11] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
 
-	rate->pwr_by_rate[PW_LMT_PH_1T][8] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][9] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][10] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][11] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, 0, 0) / 2;
-
-	rate->pwr_by_rate[PW_LMT_PH_1T][12] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][13] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][14] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
-	rate->pwr_by_rate[PW_LMT_PH_1T][15] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][12] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][13] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][14] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
+	rate->pwr_by_rate[PW_LMT_PH_1T][15] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS4, 1, 0) / 2;
 
 	/*CCK, Legacy, HT, VHT, HE*/
-	tpu->pwr_ofst_mode[0] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS11, 0, 1) / 2;
-	tpu->pwr_ofst_mode[1] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_VHT_NSS1_MCS9, 0, 1) / 2;
-	tpu->pwr_ofst_mode[2] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_MCS7, 0, 1) / 2;
-	tpu->pwr_ofst_mode[3] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 1) / 2;
-	tpu->pwr_ofst_mode[4] = halrf_get_power_by_rate(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 1) / 2;
-
+	tpu->pwr_ofst_mode[0] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS11, 0, 1) / 2;
+	tpu->pwr_ofst_mode[1] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_VHT_NSS1_MCS9, 0, 1) / 2;
+	tpu->pwr_ofst_mode[2] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_MCS7, 0, 1) / 2;
+	tpu->pwr_ofst_mode[3] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_OFDM54, 0, 1) / 2;
+	tpu->pwr_ofst_mode[4] = halrf_get_power_by_rate(rf, RF_PATH_A, RTW_DATA_RATE_CCK11, 0, 1) / 2;
+#ifdef RFDBG_TRACE_EN
 	for (i = 0; i < 12; i = i + 4)
 		RF_DBG(rf, DBG_RF_POWER, "power_by_rate ==> %d   %d   %d   %d\n",
 		       rate->pwr_by_rate_lgcy[i + 3],
@@ -208,15 +211,16 @@ bool halrf_set_power_by_rate_all_the_smae_to_struct_8730e(struct rf_info *rf, en
 	       tpu->pwr_ofst_mode[2],
 	       tpu->pwr_ofst_mode[3],
 	       tpu->pwr_ofst_mode[4]);
+#endif
 	return true;
 }
 
 
-void halrf_get_power_limit_to_struct_20m_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+void halrf_get_power_limit_to_struct_20m_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_pwr_imt_info *lmt = &rf->hal_com->band[phy].rtw_tpu_i.rtw_tpu_pwr_imt_i;
+	struct rtw_tpu_pwr_imt_info *lmt = &rf->hal_com->band[0].rtw_tpu_i.rtw_tpu_pwr_imt_i;
 	struct rtw_hal_com_t *hal = rf->hal_com;
-	u8 ch = rf->hal_com->band[phy].cur_chandef.center_ch;
+	u8 ch = rf->hal_com->band[0].cur_chandef.center_ch;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s channel=%d\n", __func__, ch);
 
@@ -224,23 +228,20 @@ void halrf_get_power_limit_to_struct_20m_8730e(struct rf_info *rf, enum phl_phy_
 
 	/*1Tx CCK 20m  NOBF*/
 	lmt->pwr_lmt_cck_20m[PW_LMT_PH_1T][PW_LMT_NONBF] =
-		halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, PW_LMT_BW_20M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
-
-	/*1Tx CCK 40m  NOBF*/
-	lmt->pwr_lmt_cck_40m[PW_LMT_PH_1T][PW_LMT_NONBF] =
-		halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_CCK11, PW_LMT_BW_40M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
+		halrf_get_power_limit(rf, HW_PHY_0, RF_PATH_A, RTW_DATA_RATE_CCK11, PW_LMT_BW_20M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
 
 	/*1Tx OFDM  NOBF*/
 	lmt->pwr_lmt_lgcy_20m[PW_LMT_PH_1T][PW_LMT_NONBF] =
-		halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_OFDM54, PW_LMT_BW_20M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
+		halrf_get_power_limit(rf, HW_PHY_0, RF_PATH_A, RTW_DATA_RATE_OFDM54, PW_LMT_BW_20M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
 
 	/*1Tx 20m NOBF*/
 	lmt->pwr_lmt_20m[PW_LMT_PH_1T][0][PW_LMT_NONBF] =
-		halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_BW_20M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
+		halrf_get_power_limit(rf, HW_PHY_0, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_BW_20M, PW_LMT_NONBF, PW_LMT_PH_1T, ch) / 2;
 
 
 }
 
+#if 0
 void halrf_get_power_limit_to_struct_40m_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 {
 	struct rtw_tpu_pwr_imt_info *lmt = &rf->hal_com->band[phy].rtw_tpu_i.rtw_tpu_pwr_imt_i;
@@ -248,7 +249,7 @@ void halrf_get_power_limit_to_struct_40m_8730e(struct rf_info *rf, enum phl_phy_
 	u8 ch = rf->hal_com->band[phy].cur_chandef.center_ch;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s channel=%d\n", __func__, ch);
-#if 0
+
 	hal_mem_set(hal, lmt, 0, sizeof(*lmt));
 
 	/*1Tx CCK 20m NONBF*/
@@ -342,8 +343,6 @@ void halrf_get_power_limit_to_struct_40m_8730e(struct rf_info *rf, enum phl_phy_
 	/*2Tx 40m BF*/
 	lmt->pwr_lmt_40m[PW_LMT_PH_2T][0][PW_LMT_BF] =
 		halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_BW_40M, PW_LMT_BF, PW_LMT_PH_2T, ch) / 2;
-#endif
-
 }
 
 void halrf_get_power_limit_to_struct_80m_8730e(struct rf_info *rf, enum phl_phy_idx phy)
@@ -354,7 +353,7 @@ void halrf_get_power_limit_to_struct_80m_8730e(struct rf_info *rf, enum phl_phy_
 	s8 tmp, tmp1, tmp2;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s channel=%d\n", __func__, ch);
-#if 0
+
 	hal_mem_set(hal, lmt, 0, sizeof(*lmt));
 
 	/*1Tx OFDM NONBF*/
@@ -512,28 +511,20 @@ void halrf_get_power_limit_to_struct_80m_8730e(struct rf_info *rf, enum phl_phy_
 	}
 
 	lmt->pwr_lmt_40m_0p5[PW_LMT_PH_2T][PW_LMT_BF] = tmp;
-#endif
 }
+#endif
 
-bool halrf_set_power_limit_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+bool halrf_set_power_limit_to_struct_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_pwr_imt_info *lmt = &rf->hal_com->band[phy].rtw_tpu_i.rtw_tpu_pwr_imt_i;
-	u8 bw = rf->hal_com->band[phy].cur_chandef.bw;
+#ifdef RFDBG_TRACE_EN
 	u32 i;
-	s8 tmp;
+	//s8 tmp;
+	struct rtw_tpu_pwr_imt_info *lmt = &rf->hal_com->band[0].rtw_tpu_i.rtw_tpu_pwr_imt_i;
+#endif
 
-	RF_DBG(rf, DBG_RF_POWER, "======>%s   bandwidth=%d\n",
-	       __func__, bw);
+	halrf_get_power_limit_to_struct_20m_8730e(rf);
 
-	if (bw == CHANNEL_WIDTH_20) {
-		halrf_get_power_limit_to_struct_20m_8730e(rf, phy);
-	} else if (bw == CHANNEL_WIDTH_40) {
-		halrf_get_power_limit_to_struct_40m_8730e(rf, phy);
-	} else {
-		halrf_get_power_limit_to_struct_80m_8730e(rf, phy);
-	}
-
-	tmp = lmt->pwr_lmt_cck_40m[0][0];
+#ifdef RFDBG_TRACE_EN
 
 	for (i = 0; i < HAL_MAX_PATH; i++) {
 		RF_DBG(rf, DBG_RF_POWER, "power_limit ==> %d   %d   %d   %d\n",
@@ -577,15 +568,15 @@ bool halrf_set_power_limit_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx 
 		       lmt->pwr_lmt_40m_2p5[i][1], lmt->pwr_lmt_40m_2p5[i][0],
 		       lmt->pwr_lmt_40m_0p5[i][1], lmt->pwr_lmt_40m_0p5[i][0]);
 	}
-
+#endif
 	return true;
 }
 
-void halrf_get_power_limit_ru_to_struct_20m_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+void halrf_get_power_limit_ru_to_struct_20m_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[HW_PHY_0].rtw_tpu_i;
 	struct rtw_hal_com_t *hal = rf->hal_com;
-	u8 ch = rf->hal_com->band[phy].cur_chandef.center_ch;
+	u8 ch = rf->hal_com->band[0].cur_chandef.center_ch;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s channel=%d\n", __func__, ch);
 
@@ -593,24 +584,26 @@ void halrf_get_power_limit_ru_to_struct_20m_8730e(struct rf_info *rf, enum phl_p
 
 	/*1Tx RU26*/
 	tpu->pwr_lmt_ru[PW_LMT_PH_1T][PW_LMT_RU_BW_RU26][0] =
-		halrf_get_power_limit_ru(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU26, PW_LMT_PH_1T, ch) / 2;
+		halrf_get_power_limit_ru(rf, HW_PHY_0, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU26, PW_LMT_PH_1T, ch) / 2;
 
 	/*1Tx RU52*/
 	tpu->pwr_lmt_ru[PW_LMT_PH_1T][PW_LMT_RU_BW_RU52][0] =
-		halrf_get_power_limit_ru(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU52, PW_LMT_PH_1T, ch) / 2;
+		halrf_get_power_limit_ru(rf, HW_PHY_0, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU52, PW_LMT_PH_1T, ch) / 2;
 
 	/*1Tx RU106*/
 	tpu->pwr_lmt_ru[PW_LMT_PH_1T][PW_LMT_RU_BW_RU106][0] =
-		halrf_get_power_limit_ru(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU106, PW_LMT_PH_1T, ch) / 2;
+		halrf_get_power_limit_ru(rf, HW_PHY_0, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU106, PW_LMT_PH_1T, ch) / 2;
 
 }
+
+#if 0
 
 void halrf_get_power_limit_ru_to_struct_40m_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 {
 	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
 	struct rtw_hal_com_t *hal = rf->hal_com;
 	u8 ch = rf->hal_com->band[phy].cur_chandef.center_ch;
-#if 0
+
 	RF_DBG(rf, DBG_RF_POWER, "======>%s channel=%d\n", __func__, ch);
 
 	hal_mem_set(hal, tpu->pwr_lmt_ru, 0, sizeof(tpu->pwr_lmt_ru));
@@ -656,7 +649,7 @@ void halrf_get_power_limit_ru_to_struct_40m_8730e(struct rf_info *rf, enum phl_p
 
 	tpu->pwr_lmt_ru[PW_LMT_PH_2T][PW_LMT_RU_BW_RU106][1] =
 		halrf_get_power_limit_ru(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU106, PW_LMT_PH_2T, ch + 2) / 2;
-#endif
+
 }
 
 void halrf_get_power_limit_ru_to_struct_80m_8730e(struct rf_info *rf, enum phl_phy_idx phy)
@@ -666,7 +659,6 @@ void halrf_get_power_limit_ru_to_struct_80m_8730e(struct rf_info *rf, enum phl_p
 	u8 ch = rf->hal_com->band[phy].cur_chandef.center_ch;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s channel=%d\n", __func__, ch);
-#if 0
 
 	hal_mem_set(hal, tpu->pwr_lmt_ru, 0, sizeof(tpu->pwr_lmt_ru));
 
@@ -747,29 +739,20 @@ void halrf_get_power_limit_ru_to_struct_80m_8730e(struct rf_info *rf, enum phl_p
 
 	tpu->pwr_lmt_ru[PW_LMT_PH_2T][PW_LMT_RU_BW_RU106][3] =
 		halrf_get_power_limit_ru(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_RU_BW_RU106, PW_LMT_PH_2T, ch + 6) / 2;
+}
 #endif
 
-}
-
-bool halrf_set_power_limit_ru_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+bool halrf_set_power_limit_ru_to_struct_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
-	u8 bw = rf->hal_com->band[phy].cur_chandef.bw;
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[HW_PHY_0].rtw_tpu_i;
+#ifdef RFDBG_TRACE_EN
 	u8 i, j, k;
+#endif
 
-	RF_DBG(rf, DBG_RF_POWER, "======>%s   bandwidth=%d\n",
-	       __func__, bw);
-
-	if (bw == CHANNEL_WIDTH_20) {
-		halrf_get_power_limit_ru_to_struct_20m_8730e(rf, phy);
-	} else if (bw == CHANNEL_WIDTH_40) {
-		halrf_get_power_limit_ru_to_struct_40m_8730e(rf, phy);
-	} else if (bw == CHANNEL_WIDTH_80) {
-		halrf_get_power_limit_ru_to_struct_80m_8730e(rf, phy);
-	}
+	halrf_get_power_limit_ru_to_struct_20m_8730e(rf);
 
 	tpu->pwr_lmt_ru_mem_size = tpu->pwr_lmt_ru_mem_size;
-
+#ifdef RFDBG_TRACE_EN
 	for (k = 0; k < MAX_HALRF_PATH; k++) {
 		for (j = 0; j < PW_LMT_RU_BW_NULL; j++) {
 			for (i = 0; i < 8; i = i + 4) {
@@ -783,15 +766,15 @@ bool halrf_set_power_limit_ru_to_struct_8730e(struct rf_info *rf, enum phl_phy_i
 			}
 		}
 	}
+#endif
 	return true;
 }
 
-void _halrf_set_tx_shape_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+void _halrf_set_tx_shape_8730e(struct rf_info *rf)
 {
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
-	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
-
-	u8 ch = rf->hal_com->band[phy].cur_chandef.center_ch;
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[HW_PHY_0].rtw_tpu_i;
+	u8 ch = rf->hal_com->band[HW_PHY_0].cur_chandef.center_ch;
 	u8 reg;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d\n", __func__, ch);
@@ -813,37 +796,32 @@ void _halrf_set_tx_shape_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 
 	if (ch >= 1 && ch <= 14) {
 		reg = halrf_get_regulation_info(rf, BAND_ON_24G);
-
 		RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
 		RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][CCK][%d]=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
 		       tpu->tx_ptrn_shap_idx, PW_LMT_BAND_2_4G, reg,
 		       pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg],
 		       PW_LMT_BAND_2_4G, reg,
 		       pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg]);
-
 		tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg];
 		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK] =
 			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg];
 
 		halrf_bb_set_pow_patten_sharp(rf, ch, true,
-					      pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg], phy);	/*cck*/
-
+					      pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg], HW_PHY_0);	/*cck*/
 		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set CCK Tx Shape!!!\n",
 		       tpu->tx_ptrn_shap_idx, ch);
-
 		tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg];
 
 		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM] =
 			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg];
 
 		halrf_bb_set_pow_patten_sharp(rf, ch, false,
-					      pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
+					      pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg], HW_PHY_0);	/*ofdm*/
 
 		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set OFDM Tx Shape!!!\n",
 		       tpu->tx_ptrn_shap_idx, ch);
 	} else if (ch >= 36 && ch <= 177) {
 		reg = halrf_get_regulation_info(rf, BAND_ON_5G);
-
 		RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
 		RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
 		       tpu->tx_ptrn_shap_idx, PW_LMT_BAND_5G, reg,
@@ -855,8 +833,7 @@ void _halrf_set_tx_shape_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 			pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg];
 
 		halrf_bb_set_pow_patten_sharp(rf, ch, false,
-					      pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
-
+					      pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg], HW_PHY_0);	/*ofdm*/
 		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set Tx Shape!!!\n",
 		       tpu->tx_ptrn_shap_idx, ch);
 	} else {
@@ -867,7 +844,7 @@ void _halrf_set_tx_shape_8730e(struct rf_info *rf, enum phl_phy_idx phy)
 	}
 }
 
-bool _halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
+bool _halrf_set_power_8730e(struct rf_info *rf,
 			    enum phl_pwr_table pwr_table)
 {
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
@@ -885,66 +862,65 @@ bool _halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	       __func__, pwr->pwr_table_switch_efuse);
 
 	if (pwr_table & PWR_BY_RATE) {
-		if (pwr->pwr_by_rate_switch == PW_BY_RATE_ALL_SAME) {
-			halrf_set_power_by_rate_all_the_smae_to_struct_8730e(rf, phy);
-		} else {
-			halrf_set_power_by_rate_to_struct_8730e(rf, phy);
-		}
 
 		if (pwr->pwr_limit_switch == PWLMT_BY_EFUSE) {
-			if (pwr->pwr_table_switch_efuse == 0) {
-				halrf_set_power_by_rate_to_struct_8730e(rf, phy);
-			} else if (pwr->pwr_table_switch_efuse == 2) {
-				halrf_set_power_by_rate_all_the_smae_to_struct_8730e(rf, phy);
+			if (pwr->pwr_table_switch_efuse == 2) {
+				halrf_set_power_by_rate_all_the_smae_to_struct_8730e(rf);
 			} else {
-				halrf_set_power_by_rate_to_struct_8730e(rf, phy);
+				halrf_set_power_by_rate_to_struct_8730e(rf);
+			}
+		} else {
+			if (pwr->pwr_by_rate_switch == PW_BY_RATE_ALL_SAME) {
+				halrf_set_power_by_rate_all_the_smae_to_struct_8730e(rf);
+			} else {
+				halrf_set_power_by_rate_to_struct_8730e(rf);
 			}
 		}
 
-		halrf_mac_write_pwr_by_rate_reg(rf, phy);
-		halrf_mac_write_pwr_ofst_mode(rf, phy);
+		halrf_mac_write_pwr_by_rate_reg(rf, 0);
+		halrf_mac_write_pwr_ofst_mode(rf, 0);
 
 		if (rf->dbg_component & DBG_RF_POWER) {
 			halrf_delay_ms(rf, 100);
 
 			for (i = 0; i < TX_PWR_BY_RATE_NUM_MAC; i = i + 4) {
-				halrf_mac_get_pwr_reg_8730e(rf, phy, (0xd2c0 + i), 0xffffffff);
+				halrf_mac_get_pwr_reg_8730e(rf, (0xd2c0 + i), 0xffffffff);
 			}
 		}
 	}
 
 	if (pwr_table & PWR_LIMIT) {
-		_halrf_set_tx_shape_8730e(rf, phy);
-		if (!halrf_set_power_limit_to_struct_8730e(rf, phy)) {
+		_halrf_set_tx_shape_8730e(rf);
+		if (!halrf_set_power_limit_to_struct_8730e(rf)) {
 			RF_DBG(rf, DBG_RF_POWER, "halrf_set_power_limit_to_struct_8730e return fail\n");
 			return false;
 		}
 
-		halrf_mac_write_pwr_limit_reg(rf, phy);
+		halrf_mac_write_pwr_limit_reg(rf, 0);
 
 		if (rf->dbg_component & DBG_RF_POWER) {
 			halrf_delay_ms(rf, 100);
 
 			for (i = 0; i < TX_PWR_LIMIT_NUM_MAC; i = i + 4) {
-				halrf_mac_get_pwr_reg_8730e(rf, phy, (0xd2ec + i), 0xffffffff);
+				halrf_mac_get_pwr_reg_8730e(rf, (0xd2ec + i), 0xffffffff);
 			}
 		}
 	}
 
 	if (pwr_table & PWR_LIMIT_RU) {
-		_halrf_set_tx_shape_8730e(rf, phy);
-		if (!halrf_set_power_limit_ru_to_struct_8730e(rf, phy)) {
+		_halrf_set_tx_shape_8730e(rf);
+		if (!halrf_set_power_limit_ru_to_struct_8730e(rf)) {
 			RF_DBG(rf, DBG_RF_POWER, "halrf_set_power_limit_ru_to_struct_8730e return fail\n");
 			return false;
 		}
 
-		halrf_mac_write_pwr_limit_rua_reg(rf, phy);
+		halrf_mac_write_pwr_limit_rua_reg(rf, HW_PHY_0);
 
 		if (rf->dbg_component & DBG_RF_POWER) {
 			halrf_delay_ms(rf, 100);
 
 			for (i = 0; i < 48; i = i + 4) {
-				halrf_mac_get_pwr_reg_8730e(rf, phy, (0xd33c + i), 0xffffffff);
+				halrf_mac_get_pwr_reg_8730e(rf, (0xd33c + i), 0xffffffff);
 			}
 		}
 	}
@@ -952,10 +928,10 @@ bool _halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	return true;
 }
 
-void halrf_set_ref_power_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx phy)
+void halrf_set_ref_power_to_struct_8730e(struct rf_info *rf)
 {
-	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
-	u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[0].rtw_tpu_i;
+	//u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s\n", __func__);
 
@@ -971,11 +947,11 @@ void halrf_set_ref_power_to_struct_8730e(struct rf_info *rf, enum phl_phy_idx ph
 	tpu->ref_pow_ofdm = 0;		/*0dBm*/
 	tpu->ref_pow_cck = 0;		/*0dBm*/
 
-	halrf_bb_set_tx_pow_ref(rf, phy);
+	halrf_bb_set_tx_pow_ref(rf, 0);
 }
 
 
-bool halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
+bool halrf_set_power_8730e(struct rf_info *rf,
 			   enum phl_pwr_table pwr_table)
 {
 #if 0
@@ -985,7 +961,7 @@ bool halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	}
 #endif
 
-	if (!_halrf_set_power_8730e(rf, phy, pwr_table)) {
+	if (!_halrf_set_power_8730e(rf, pwr_table)) {
 		RF_DBG(rf, DBG_RF_POWER, "_halrf_set_power_8730e return fail\n");
 		return false;
 	}
@@ -993,6 +969,7 @@ bool halrf_set_power_8730e(struct rf_info *rf, enum phl_phy_idx phy,
 	return true;
 }
 
+#ifdef RFDBG_TRACE_EN
 void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 				  char input[][16], u32 *_used, char *output, u32 *_out_len)
 {
@@ -1026,8 +1003,8 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    ((pwr->pwr_table_switch_efuse == 0) ? "Disable Limit" : (pwr->pwr_table_switch_efuse == 2) ? "The Same" : "Enable Limit")
 		    : "From Driver");
 
-	cck_ref = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd200, 0x0007fc00);
-	ofdm_ref = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd200, 0x0ff80000);
+	cck_ref = halrf_mac_get_pwr_reg_8730e(rf, 0xd200, 0x0007fc00);
+	ofdm_ref = halrf_mac_get_pwr_reg_8730e(rf, 0xd200, 0x0ff80000);
 	(cck_ref & BIT(8)) ? (s_cck_ref = cck_ref | 0xfffffe00) : (s_cck_ref = cck_ref);
 	(ofdm_ref & BIT(8)) ? (s_ofdm_ref = ofdm_ref | 0xfffffe00) : (s_ofdm_ref = ofdm_ref);
 	int_tmp[0] = s_cck_ref / 4;
@@ -1045,7 +1022,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1SS\n");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2c0, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2c0, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "CCK 11M / 5.5M / 2M / 1M",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1054,7 +1031,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2c4, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2c4, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "OFDM 18M / 12M / 9M / 6M",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1063,7 +1040,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2c8, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2c8, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "OFDM 54M / 48M / 36M / 24M",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1075,7 +1052,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s\n",
 		    "HT / VHT / HE");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2cc, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2cc, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "MCS3 / MCS2 / MCS1 / MCS0",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1084,7 +1061,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2d0, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2d0, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "MCS7 / MCS6 / MCS5 / MCS4",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1093,7 +1070,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2d4, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2d4, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "MCS11 / MCS10 / MCS9 / MCS8",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1102,7 +1079,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2d8, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2d8, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "DCM MCS4 / MCS3 / MCS1 / MCS0",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1116,7 +1093,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s\n",
 		    "HT / VHT / HE");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2dc, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2dc, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "MCS3 / MCS2 / MCS1 / MCS0",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1125,7 +1102,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2e0, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2e0, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "MCS7 / MCS6 / MCS5 / MCS4",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1134,7 +1111,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2e4, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2e4, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "MCS11 / MCS10 / MCS9 / MCS8",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1143,7 +1120,7 @@ void halrf_pwr_by_rate_info_8730e(struct rf_info *rf,
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10
 		   );
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2e8, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2e8, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-36s = %d.%d / %d.%d / %d.%d / %d.%d\n",
 		    "DCM MCS4 / MCS3 / MCS1 / MCS0",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1187,8 +1164,8 @@ void halrf_pwr_limit_info_8730e(struct rf_info *rf,
 		    halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_24G),
 		    halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_5G));
 
-	cck_ref = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd200, 0x0007fc00);
-	ofdm_ref = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd200, 0x0ff80000);
+	cck_ref = halrf_mac_get_pwr_reg_8730e(rf, 0xd200, 0x0007fc00);
+	ofdm_ref = halrf_mac_get_pwr_reg_8730e(rf, 0xd200, 0x0ff80000);
 	(cck_ref & BIT(8)) ? (s_cck_ref = cck_ref | 0xfffffe00) : (s_cck_ref = cck_ref);
 	(ofdm_ref & BIT(8)) ? (s_ofdm_ref = ofdm_ref | 0xfffffe00) : (s_ofdm_ref = ofdm_ref);
 	int_tmp[0] = s_cck_ref / 4;
@@ -1206,7 +1183,7 @@ void halrf_pwr_limit_info_8730e(struct rf_info *rf,
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s\n",
 		    "Power Limit (Reg)",
-		    halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd208, BIT(21)) ? "Enable Limit" : "Disable Limit");
+		    halrf_mac_get_pwr_reg_8730e(rf, 0xd208, BIT(21)) ? "Enable Limit" : "Disable Limit");
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s / %s\n",
 		    "Driver Swith / Efuse Switch",
@@ -1224,33 +1201,33 @@ void halrf_pwr_limit_info_8730e(struct rf_info *rf,
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1SS\n");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2ec, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2ec, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "CCK 20M NOBF", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "CCK 40M NOBF", ((reg_tmp & 0x7f0000) >> 16) / 2,
 		    ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd2f0, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd2f0, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "OFDM NOBF", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "HT 20M NOBF", ((reg_tmp & 0x7f0000) >> 16) / 2,
 		    ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd300, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd300, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "HT 40M NOBF", ((reg_tmp & 0x7f0000) >> 16) / 2,
 		    ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd308, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd308, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "HT 80M NOBF", ((reg_tmp & 0x7f0000) >> 16) / 2,
 		    ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "2SS\n");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd314, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd314, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "CCK 20M NOBF",
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
@@ -1258,7 +1235,7 @@ void halrf_pwr_limit_info_8730e(struct rf_info *rf,
 		    "CCK 40M NOBF",
 		    ((reg_tmp & 0x7f0000) >> 16) / 2, ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd318, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd318, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "OFDM NOBF",
 		    (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
@@ -1267,13 +1244,13 @@ void halrf_pwr_limit_info_8730e(struct rf_info *rf,
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
 		    ((reg_tmp & 0x7f0000) >> 16) / 2, ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd328, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd328, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d / %d.%d\n",
 		    "HT 40M BF / NOBF",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
 		    ((reg_tmp & 0x7f0000) >> 16) / 2, ((reg_tmp & 0x7f0000) >> 16) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd330, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd330, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d / %d.%d\n",
 		    "HT 80M BF / NOBF",
 		    ((reg_tmp & 0x7f000000) >> 24) / 2, ((reg_tmp & 0x7f000000) >> 24) * 10 / 2 % 10,
@@ -1314,8 +1291,8 @@ void halrf_pwr_limit_ru_info_8730e(struct rf_info *rf,
 		    halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_24G),
 		    halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_5G));
 
-	cck_ref = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd200, 0x0007fc00);
-	ofdm_ref = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd200, 0x0ff80000);
+	cck_ref = halrf_mac_get_pwr_reg_8730e(rf, 0xd200, 0x0007fc00);
+	ofdm_ref = halrf_mac_get_pwr_reg_8730e(rf, 0xd200, 0x0ff80000);
 	(cck_ref & BIT(8)) ? (s_cck_ref = cck_ref | 0xfffffe00) : (s_cck_ref = cck_ref);
 	(ofdm_ref & BIT(8)) ? (s_ofdm_ref = ofdm_ref | 0xfffffe00) : (s_ofdm_ref = ofdm_ref);
 	int_tmp[0] = s_cck_ref / 4;
@@ -1333,7 +1310,7 @@ void halrf_pwr_limit_ru_info_8730e(struct rf_info *rf,
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s\n",
 		    "Power Limit (Reg)",
-		    halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd208, BIT(20)) ? "Enable Limit" : "Disable Limit");
+		    halrf_mac_get_pwr_reg_8730e(rf, 0xd208, BIT(20)) ? "Enable Limit" : "Disable Limit");
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s / %s\n",
 		    "Driver Swith / Efuse Switch",
@@ -1351,29 +1328,29 @@ void halrf_pwr_limit_ru_info_8730e(struct rf_info *rf,
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1SS\n");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd33c, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd33c, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "RU26", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd344, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd344, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "RU52", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd34c, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd34c, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "RU106", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "2SS\n");
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd354, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd354, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "RU26", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd35c, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd35c, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "RU52", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
-	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0, 0xd364, 0xffffffff);
+	reg_tmp = halrf_mac_get_pwr_reg_8730e(rf, 0xd364, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		    "RU106", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
@@ -1381,7 +1358,7 @@ void halrf_pwr_limit_ru_info_8730e(struct rf_info *rf,
 	*_out_len = out_len;
 
 }
-
+#endif
 void halrf_set_tx_shape_8730e(struct rf_info *rf, u8 tx_shape_idx)
 {
 	struct rtw_tpu_info *tpu = &rf->hal_com->band[0].rtw_tpu_i;
@@ -1390,12 +1367,11 @@ void halrf_set_tx_shape_8730e(struct rf_info *rf, u8 tx_shape_idx)
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s   ch=%d   tx_shape_idx=%d\n",
 	       __func__, ch, tx_shape_idx);
-
 	tpu->tx_ptrn_shap_idx = tx_shape_idx;
 
 	if (tx_shape_idx == 255) {
 		pwr->set_tx_ptrn_shap_en = false;
-		_halrf_set_tx_shape_8730e(rf, 0);
+		_halrf_set_tx_shape_8730e(rf);
 		return;
 	} else {
 		pwr->set_tx_ptrn_shap_en = true;

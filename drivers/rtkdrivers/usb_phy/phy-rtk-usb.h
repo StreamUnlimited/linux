@@ -13,14 +13,26 @@
 
 #include "core.h"
 
+/* LSYS BG registers */
+#define REG_LSYS_AIP_CTRL1                              0UL // 0x025C
+#define LSYS_BIT_BG_PWR                                 ((u32)0x00000001 << 8)          /* 1: power on ddrphy bandgap 0: shutdown bg */
+#define LSYS_BIT_BG_ON_USB2                             ((u32)0x00000001 << 5)          /* 1: Bandgap USB2 current enable */
+#define LSYS_MASK_BG_ALL                                ((u32)0x00000003 << 0)          /* 0x3  Bandgap enable mode */
+#define LSYS_BG_ALL(x)                                  ((u32)(((x) & 0x00000003) << 0))
+#define LSYS_GET_BG_ALL(x)                              ((u32)(((x >> 0) & 0x00000003)))
+
 /* USB OTG addon registers */
-#define USB_OTG_ADDON_REG_CTRL							0UL // 0x30004UL
-#define USB_OTG_ADDON_REG_VND_STS_OUT					0x18//0x3001CUL
+#define USB_OTG_ADDON_REG_CTRL							0x004 // 0x30004UL
+#define USB_OTG_ADDON_REG_VND_STS_OUT					0x01C // 0x3001CUL
 
 #define USB_OTG_ADDON_REG_CTRL_BIT_UPLL_CKRDY			BIT(5)  /* 1: USB PHY clock ready */
-#define USB_OTG_ADDON_REG_CTRL_BIT_USBOTG_EN			BIT(8)  /* 1: Enable USB OTG */
-#define USB_OTG_ADDON_REG_CTRL_BIT_USBPHY_EN			BIT(9)  /* 1: Enable USB APHY & DPHY */
-#define USB_OTG_ADDON_REG_CTRL_BIT_PORETB_TOP			BIT(14) /* 1: Enable USB APHY */
+#define USB_OTG_ADDON_REG_CTRL_BIT_USB_OTG_RST			BIT(8)  /* 1: Enable USB OTG */
+#define USB_OTG_ADDON_REG_CTRL_BIT_USB_DPHY_FEN			BIT(9)  /* 1: Enable USB DPHY */
+#define USB_OTG_ADDON_REG_CTRL_BIT_USB_APHY_EN			BIT(14) /* 1: Enable USB APHY */
+#define USB_OTG_ADDON_REG_CTRL_BIT_LS_HST_UTMI_EN		BIT(22) /* 1: Enable the support of low-speed host mode when using utmi 16bit */
+#define USB_OTG_ADDON_REG_CTRL_BIT_HS_IP_GAP_OPT_POS	20U		/* MAC high-speed host inter-packet delay */
+#define USB_OTG_ADDON_REG_CTRL_BIT_HS_IP_GAP_OPT_MASK	(0x3U << USB_OTG_ADDON_REG_CTRL_BIT_HS_IP_GAP_OPT_POS)
+#define USB_OTG_ADDON_REG_CTRL_BIT_HS_IP_GAP_OPT		USB_OTG_ADDON_REG_CTRL_BIT_HS_IP_GAP_OPT_MASK
 
 /* USB control registers */
 #define REG_HSYS_USB_CTRL								0UL // 0x0060
@@ -54,12 +66,20 @@
 #define USB_OTG_PHY_REG_E0								0xE0U
 #define USB_OTG_PHY_REG_E1								0xE1U
 #define USB_OTG_PHY_REG_E2								0xE2U
+#define USB_OTG_PHY_REG_E3								0xE3U
 #define USB_OTG_PHY_REG_E4								0xE4U
+#define USB_OTG_PHY_REG_E5								0xE5U
 #define USB_OTG_PHY_REG_E6								0xE6U
 #define USB_OTG_PHY_REG_E7								0xE7U
+#define USB_OTG_PHY_REG_F0								0xF0U
 #define USB_OTG_PHY_REG_F1								0xF1U
+#define USB_OTG_PHY_REG_F2								0xF2U
+#define USB_OTG_PHY_REG_F3								0xF3U
 #define USB_OTG_PHY_REG_F4								0xF4U
+#define USB_OTG_PHY_REG_F5								0xF5U
 #define USB_OTG_PHY_REG_F6								0xF6U
+#define USB_OTG_PHY_REG_F7								0xF7U
+
 
 /* USB_OTG_PHY_REG_E0 PAGE0 bits */
 #define USB_OTG_PHY_REG_E0_PAGE0_BIT_Z0_AUTO_K_POS		6U

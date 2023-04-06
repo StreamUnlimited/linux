@@ -216,14 +216,17 @@ struct halrf_fw_offload {
 #endif
 
 struct halrf_rx_dck_info {
-	bool is_afe;
-	bool is_rxdck_track_en;
+	bool is_afe; //
+	bool is_rxdck_track_en; //
+	u8 ther_rxdck[KPATH];
+//#ifdef	RFDBG_TRACE_EN
 	struct rfk_location loc[KPATH]; /*max RF path*/
 	u32 rxdck_time;
 	bool is_auto_res;
-	u8 ther_rxdck[KPATH];
+//#endif
 };
 
+#ifndef IOT_SMALL_RAM
 struct halrf_mcc_info {
 	u8 ch[2];
 	u8 band[2];
@@ -231,7 +234,7 @@ struct halrf_mcc_info {
 
 	bool is_init;
 };
-
+#endif
 struct rf_info {
 	struct rtw_phl_com_t	*phl_com;
 	struct rtw_hal_com_t	*hal_com;
@@ -257,6 +260,7 @@ struct rf_info {
 	bool 			rfk_is_processing;
 	bool			is_bt_iqk_timeout;
 	bool			is_chl_rfk;
+	bool			is_rfk_init;
 	/*[initial]*/
 	u8 		pre_rxbb_bw[KPATH];
 	/*[TSSI Info]*/
@@ -270,12 +274,15 @@ struct rf_info {
 	/*LCK*/
 	u8		lck_ther_s0;
 	u8		lck_ther_s1;
+	u8		pa_ib_def;
+	u8		pa_ib_ther;
 	/*[Do Coex]*/
 	bool		is_coex;
 	/*[watchdog]*/
 	bool		is_watchdog_stop;
 	/*[thermal rek indictor]*/
 	bool rfk_do_thr_rek;
+#ifdef RFDBG_TRACE_EN
 	/*reg check*/
 	u32	rfk_reg[KIP_REG];
 	u32	rfc_reg[2][10];
@@ -287,6 +294,7 @@ struct rf_info {
 	u8	pre_ther_idx;
 	/* [Check NCTL Done status Read Times] */
 	u32 nctl_ck_times[2];  /* 0xbff8 0x80fc*/
+#endif
 	u32	fw_ofld_enable;
 
 	/*@=== [HALRF Structure] ============================================*/
@@ -296,7 +304,9 @@ struct rf_info {
 	struct halrf_iqk_info		iqk;
 	struct halrf_dpk_info	dpk;
 	struct halrf_rx_dck_info rx_dck;
+#ifdef	RFDBG_TRACE_EN
 	struct halrf_dack_info	dack;
+#endif
 	struct halrf_gapk_info	gapk;
 	struct halrf_pwr_info	pwr_info;
 	struct halrf_radio_info	radio_info;
@@ -311,7 +321,9 @@ struct rf_info {
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 	struct halrf_fw_offload fwofld;
 #endif
+#ifndef IOT_SMALL_RAM
 	struct halrf_mcc_info mcc_info;
+#endif
 };
 
 /*@--------------------------[Prptotype]-------------------------------------*/

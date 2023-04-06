@@ -16,6 +16,7 @@
 
 #include "halrf_precomp.h"
 
+#ifndef IOT_SMALL_RAM
 u32 phlrf_psd_log2base(struct rf_info *rf, u32 val)
 {
 	u32 j;
@@ -121,68 +122,18 @@ void halrf_reload_bkprf(struct rf_info *rf,
 	}
 }
 
-u8 halrf_kpath(struct rf_info *rf, enum phl_phy_idx phy_idx)
-{
-	struct rtw_hal_com_t *hal_i = rf->hal_com;
-
-	u8 path = 0;
-
-	switch (hal_i->chip_id) {
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		path = halrf_kpath_8852a(rf, phy_idx);
-		break;
-#endif
-	default:
-		break;
-	}
-	return path;
-}
-
-void halrf_set_rx_path(struct rf_info *rf, enum phl_phy_idx phy, bool rx_path)
+void halrf_bt_ultra_low_pwr_adv(struct rf_info *rf)
 {
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
 	switch (hal_i->chip_id) {
-#ifdef RF_8730E_SUPPORT
-	case CHIP_WIFI6_8730E:
-		halrf_set_rx_path_8730e(rf, phy, rx_path); //rf->hal_com->band[phy].cur_chandef.band;
+#ifdef RF_8720E_SUPPORT
+	case CHIP_WIFI6_8720E:
+		halrf_bt_ultra_low_pwr_adv_8720e(rf);
 		break;
 #endif
 	default:
 		break;
-	}
-}
-
-void halrf_wait_rx_mode(struct rf_info *rf, u8 kpath)
-{
-	u8 path, rf_mode = 0;
-	u16 count = 0;
-
-	for (path = 0; path < 4; path++) {
-		if (kpath & BIT(path)) {
-			rf_mode = (u8)halrf_rrf(rf, path, 0x00, MASKRFMODE);
-
-			while (rf_mode == 2 && count < 2500) {
-				rf_mode = (u8)halrf_rrf(rf, path, 0x00, MASKRFMODE);
-				halrf_delay_us(rf, 2);
-				count++;
-			}
-			RF_DBG(rf, DBG_RF_RFK,
-			       "[RFK] Wait S%d to Rx mode!! (count = %d)\n", path, count);
-		}
-	}
-}
-
-void halrf_tmac_tx_pause(struct rf_info *rf, enum phl_phy_idx band_idx, bool is_pause)
-{
-	halrf_tx_pause(rf, band_idx, is_pause, PAUSE_RSON_RFK);
-
-	RF_DBG(rf, DBG_RF_RFK, "[RFK] Band%d Tx Pause %s!!\n",
-	       band_idx, is_pause ? "on" : "off");
-
-	if (is_pause) {
-		halrf_wait_rx_mode(rf, halrf_kpath(rf, band_idx));
 	}
 }
 
@@ -219,6 +170,148 @@ u8 halrf_only_get_thermal(struct rf_info *rf, enum rf_path path)
 	return 0;
 }
 
+void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index)
+{
+	u32 t[2];
+
+	t[0] = chl_index;
+	t[1] = t_index;
+
+	halrf_fill_h2c_cmd(rf, 8, FWCMD_H2C_BACKUP_RFK, 0xa, H2CB_TYPE_DATA, t);
+	RF_DBG(rf, DBG_RF_RFK, "FWCMD_H2C_BACKUP_RFK chl=%d t=%d\n", chl_index, t_index);
+}
+
+void halrf_fast_chl_sw_reload(struct rf_info *rf, u8 chl_index, u8 t_index)
+{
+	u32 t[2];
+
+	t[0] = chl_index;
+	t[1] = t_index;
+
+	halrf_fill_h2c_cmd(rf, 8, FWCMD_H2C_RELOAD_RFK, 0xa, H2CB_TYPE_DATA, t);
+	RF_DBG(rf, DBG_RF_RFK, "FWCMD_H2C_RELOAD_RFK chl=%d t=%d\n", chl_index, t_index);
+}
+#endif
+
+void halrf_dump_reg(struct rf_info *rf)
+{
+#ifdef RFDBG_TRACE_EN
+
+	u32 val[10] = {0};
+	u32 addr = 0;
+	/*
+		RF_DBG(rf, DBG_RF_RFK,
+			      "===================[ MAC Reg start ]===================\n");
+
+		for (addr = 0xd200; addr < 0xd3ff; addr += 0x10)
+			RF_DBG(rf, DBG_RF_RFK,
+				    " 0x%x : 0x%08x  0x%08x  0x%08x  0x%08x\n", addr,
+				    halrf_rmac32(rf, addr),
+				    halrf_rmac32(rf, addr + 0x4),
+				    halrf_rmac32(rf, addr + 0x8),
+				    halrf_rmac32(rf, addr + 0xc));
+
+
+		RF_DBG(rf, DBG_RF_RFK,
+			      "===================[ BB Reg start ]===================\n");
+		for (addr = 0x4000; addr < 0x6000; addr += 0x10)
+			RF_DBG(rf, DBG_RF_RFK,
+				    " 0x%x : 0x%08x  0x%08x  0x%08x  0x%08x\n", addr,
+				    halrf_rreg(rf, addr, MASKDWORD),
+				    halrf_rreg(rf, addr + 0x4, MASKDWORD),
+				    halrf_rreg(rf, addr + 0x8, MASKDWORD),
+				    halrf_rreg(rf, addr + 0xc, MASKDWORD));
+	*/
+
+	RF_DBG(rf, DBG_RF_RFK,
+	       "===================[ RFK Reg start ]===================\n");
+
+	for (addr = 0x8000; addr < 0x8200; addr += 0x10)
+		RF_DBG(rf, DBG_RF_IQK,
+		       " 0x%x : 0x%08x  0x%08x  0x%08x  0x%08x\n", addr,
+		       halrf_rreg(rf, addr, MASKDWORD),
+		       halrf_rreg(rf, addr + 0x4, MASKDWORD),
+		       halrf_rreg(rf, addr + 0x8, MASKDWORD),
+		       halrf_rreg(rf, addr + 0xc, MASKDWORD));
+
+	/*
+		RF_DBG(rf, DBG_RF_RFK,
+			      "===================[ RF Reg start ]===================\n");
+		for (addr = 0x0; addr < 0x100; addr += 0x4)
+			RF_DBG(rf, DBG_RF_RFK,
+				    " 0x%02x : 0x%08x  0x%08x  0x%08x  0x%08x\n", addr,
+				    halrf_rrf(rf, 0, addr, MASKDWORD),
+				    halrf_rrf(rf, 0, addr + 0x1, MASKDWORD),
+				    halrf_rrf(rf, 0, addr + 0x2, MASKDWORD),
+				    halrf_rrf(rf, 0, addr + 0x3, MASKDWORD));
+		for (addr = 0x10000; addr < 0x10100; addr += 0x4)
+		    RF_DBG(rf, DBG_RF_RFK,
+				" 0x%x : 0x%08x  0x%08x  0x%08x  0x%08x\n", addr,
+				halrf_rrf(rf, 0, addr, MASKDWORD),
+				halrf_rrf(rf, 0, addr + 0x1, MASKDWORD),
+				halrf_rrf(rf, 0, addr + 0x2, MASKDWORD),
+				halrf_rrf(rf, 0, addr + 0x3, MASKDWORD));
+	*/
+
+#endif
+}
+
+u8 halrf_kpath(struct rf_info *rf, enum phl_phy_idx phy_idx)
+{
+	/*
+	struct rtw_hal_com_t *hal_i = rf->hal_com;
+
+	u8 path = 0;
+
+	switch (hal_i->chip_id) {
+	#ifdef RF_8852A_SUPPORT
+	case CHIP_WIFI6_8852A:
+		path = halrf_kpath_8852a(rf, phy_idx);
+		break;
+	#endif
+	default:
+		break;
+	}
+	return path;
+	*/
+	return 0;
+
+}
+
+void halrf_wait_rx_mode(struct rf_info *rf, u8 kpath)
+{
+	u8 path, rf_mode = 0;
+	u16 count = 0;
+
+	for (path = 0; path < 4; path++) {
+		if (kpath & BIT(path)) {
+			rf_mode = (u8)halrf_rrf(rf, path, 0x00, MASKRFMODE);
+
+			while (rf_mode == 2 && count < 2500) {
+				rf_mode = (u8)halrf_rrf(rf, path, 0x00, MASKRFMODE);
+				halrf_delay_us(rf, 2);
+				count++;
+			}
+
+			RF_DBG(rf, DBG_RF_RFK,
+			       "[RFK] Wait S%d to Rx mode!! (count = %d)\n", path, count);
+
+		}
+	}
+}
+
+void halrf_tmac_tx_pause(struct rf_info *rf, enum phl_phy_idx band_idx, bool is_pause)
+{
+	halrf_tx_pause(rf, band_idx, is_pause, PAUSE_RSON_RFK);
+
+	RF_DBG(rf, DBG_RF_RFK, "[RFK] Band%d Tx Pause %s!!\n",
+	       band_idx, is_pause ? "on" : "off");
+
+	if (is_pause) {
+		halrf_wait_rx_mode(rf, halrf_kpath(rf, band_idx));
+	}
+}
+
 void halrf_btc_rfk_ntfy(struct rf_info *rf, u8 phy_map, enum halrf_rfk_type type,
 			enum halrf_rfk_process process)
 {
@@ -229,7 +322,6 @@ void halrf_btc_rfk_ntfy(struct rf_info *rf, u8 phy_map, enum halrf_rfk_type type
 	band = rf->hal_com->band[(phy_map & 0x30) >> 5].cur_chandef.band;
 
 	phy_map = (band << 6) | phy_map;
-
 	RF_DBG(rf, DBG_RF_RFK, "[RFK] RFK notify (%s / PHY%d / K_type = %d / path_idx = %d / process = %s)\n",
 	       band == 0 ? "2G" : (band == 1 ? "5G" : "6G"), (phy_map & 0x30) >> 5, type,
 	       phy_map & 0xf, process == 0 ? "RFK_STOP" : (process == 1 ? "RFK_START" :
@@ -261,28 +353,6 @@ void halrf_fcs_init(struct rf_info *rf)
 #endif
 }
 
-void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index)
-{
-	u32 t[2];
-
-	t[0] = chl_index;
-	t[1] = t_index;
-
-	halrf_fill_h2c_cmd(rf, 8, FWCMD_H2C_BACKUP_RFK, 0xa, H2CB_TYPE_DATA, t);
-	RF_DBG(rf, DBG_RF_RFK, "FWCMD_H2C_BACKUP_RFK chl=%d t=%d\n", chl_index, t_index);
-}
-
-void halrf_fast_chl_sw_reload(struct rf_info *rf, u8 chl_index, u8 t_index)
-{
-	u32 t[2];
-
-	t[0] = chl_index;
-	t[1] = t_index;
-
-	halrf_fill_h2c_cmd(rf, 8, FWCMD_H2C_RELOAD_RFK, 0xa, H2CB_TYPE_DATA, t);
-	RF_DBG(rf, DBG_RF_RFK, "FWCMD_H2C_RELOAD_RFK chl=%d t=%d\n", chl_index, t_index);
-}
-
 void  halrf_quick_check_rf(void *rf_void)
 {
 	struct rf_info *rf = (struct rf_info *)rf_void;
@@ -307,7 +377,9 @@ void  halrf_watchdog_stop(struct rf_info *rf, bool is_stop)
 	} else {
 		rf->is_watchdog_stop = false;
 	}
-	RF_DBG(rf, DBG_RF_RXDCK, "is_watchdog_stop=%d\n", rf->is_watchdog_stop);
+
+	/*RF_DBG(rf, DBG_RF_RXDCK, "is_watchdog_stop=%d\n", rf->is_watchdog_stop);*/
+
 }
 
 void halrf_wifi_event_notify(void *rf_void,
@@ -342,6 +414,7 @@ void halrf_write_fwofld_start(struct rf_info *rf)
 
 	RF_DBG(rf, DBG_RF_FW, "======> %s   fw_ofld=%d   rf->fw_ofld_enable=%d\n",
 	       __func__, fw_ofld, rf->fw_ofld_enable);
+
 #endif
 }
 
@@ -373,10 +446,12 @@ void halrf_write_fwofld_end(struct rf_info *rf)
 
 	if (fw_ofld) {
 		rtn = halrf_mac_add_cmd_ofld(rf, &cmd);
+
 		if (rtn) {
 			RF_WARNING("======>%s return fail error code = %d !!!\n",
 				   __func__, rtn);
 		}
+
 	}
 
 	rf->fw_ofld_enable = false;
@@ -457,6 +532,7 @@ u32 halrf_test_event_trigger(void *rf_void,
 	return 0;
 }
 
+#ifndef IOT_SMALL_RAM
 void halrf_mcc_info_init(void *rf_void, enum phl_phy_idx phy)
 {
 	struct rf_info *rf = (struct rf_info *)rf_void;
@@ -464,6 +540,7 @@ void halrf_mcc_info_init(void *rf_void, enum phl_phy_idx phy)
 	u8 idx;
 
 	if (!mcc_info->is_init) {
+
 		RF_DBG(rf, DBG_RF_RFK, "[MCC info]======> %s \n", __func__);
 
 		mcc_info->is_init = true;
@@ -509,5 +586,34 @@ void halrf_mcc_get_ch_info(void *rf_void, enum phl_phy_idx phy)
 		mcc_info->band[idx] = rf->hal_com->band[phy].cur_chandef.band;
 	}
 #endif
+}
+#endif
+
+bool halrf_btc_rf_bton_para(struct rf_info *rf, bool bt_s1)
+{
+	struct rtw_hal_com_t *hal_com = rf->hal_com;
+	bool result = true;
+
+#ifdef RF_8730E_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
+		halrf_btc_rf_para_8730e(rf, bt_s1);
+	}
+#endif
+
+	return result;
+}
+
+bool halrf_btc_rf_switchband_para(struct rf_info *rf)
+{
+	struct rtw_hal_com_t *hal_com = rf->hal_com;
+	bool result = true;
+
+#ifdef RF_8730E_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
+		halrf_s1_bt_on_rf_band_8730e(rf);
+	}
+#endif
+
+	return result;
 }
 

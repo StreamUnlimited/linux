@@ -922,7 +922,7 @@ void phl_record_wow_stat(struct phl_wow_info *wow_info)
 	}
 }
 
-#ifdef CONFIG_PCI_HCI
+#ifdef CONFIG_AXI_HCI
 enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
 {
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
@@ -962,8 +962,8 @@ enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
 enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
 {
 	/* stop tx/rx hci */
-	rtw_hal_cfg_txhci(phl_info->hal, false);
-	rtw_hal_cfg_rxhci(phl_info->hal, false);
+	//rtw_hal_cfg_txhci(phl_info->hal, false);
+	//rtw_hal_cfg_rxhci(phl_info->hal, false);
 
 	rtw_hal_poll_txdma_idle(phl_info->hal);
 
@@ -1113,7 +1113,7 @@ enum rtw_phl_status phl_wow_init_postcfg(struct phl_wow_info *wow_info)
 			PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] sw rx pause succeed.\n");
 			break;
 		}
-		_os_delay_us(phl_info->phl_com->drv_priv, 1);
+		_os_delay_us(phl_info->phl_com->drv_priv, 10);
 		wait_cnt++;
 	}
 
@@ -1231,15 +1231,15 @@ enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
 #ifdef DBG_RST_BDRAM_TIME
 	rst_bdram_start = _os_get_cur_time_ms();
 #endif
-	rtw_hal_rst_bdram(phl_info->hal);
+	//rtw_hal_rst_bdram(phl_info->hal);
 
 #ifdef DBG_RST_BDRAM_TIME
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : Reset bdram takes %u (ms).\n"
 		  , __func__, phl_get_passing_time_ms(rst_bdram_start));
 #endif
 
-	rtw_hal_cfg_txhci(phl_info->hal, true);
-	rtw_hal_cfg_rxhci(phl_info->hal, true);
+	//rtw_hal_cfg_txhci(phl_info->hal, true);
+	//rtw_hal_cfg_rxhci(phl_info->hal, true);
 
 	/* start tx dma */
 	rtw_hal_wow_cfg_txdma(phl_info->hal, true);
@@ -1482,6 +1482,8 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 
 			_phl_cfg_pkt_ofld_null_info(wow_info, sta, &null_info);
 
+			/* pkt_type: 0: nulldata. 1: ARP response */
+			wow_info->keep_alive_info.keep_pkt_type = 0;
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 							PKT_TYPE_NULL_DATA,
 							&wow_info->keep_alive_info.null_pkt_id,
@@ -1746,7 +1748,7 @@ void phl_wow_decide_op_mode(struct phl_wow_info *wow_info, struct rtw_phl_stainf
 		wow_info->op_mode = RTW_WOW_OP_PWR_DOWN;
 	}
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s op mode set to %d, pwr lvl %s.\n.",
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s op mode set to %d, pwr lvl %s.\n",
 		  __func__, wow_info->op_mode, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
 }
 
@@ -1784,7 +1786,7 @@ enum rtw_phl_status phl_wow_ps_proto_cfg(struct phl_wow_info *wow_info, bool ent
 		PHL_ERR("%s : undefined wowlan op mode.\n", __func__);
 	}
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n.",
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n",
 		  __func__, wow_info->op_mode, enter_ps, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
 
 	return pstatus;
@@ -1815,7 +1817,7 @@ void phl_wow_ps_pwr_ntfy(struct phl_wow_info *wow_info, bool enter_ps)
 		PHL_ERR("%s : undefined wowlan op mode.\n", __func__);
 	}
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n.",
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n",
 		  __func__, wow_info->op_mode, enter_ps, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
 }
 
@@ -1846,7 +1848,7 @@ enum rtw_phl_status phl_wow_ps_pwr_cfg(struct phl_wow_info *wow_info, bool enter
 		PHL_ERR("%s : undefined wowlan op mode.\n", __func__);
 	}
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n.",
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.",
 		  __func__, wow_info->op_mode, enter_ps, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
 
 	return (hstatus == RTW_HAL_STATUS_SUCCESS ?

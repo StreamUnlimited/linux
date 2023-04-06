@@ -862,9 +862,6 @@ phl_trx_free_handler(void *phl)
 {
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct rtw_phl_handler *tx_handler = &phl_info->phl_tx_handler;
-#ifdef RTW_PHL_BCN_IOT
-	struct rtw_phl_handler *bcn_handler = &phl_info->phl_bcn_handler;
-#endif
 	struct rtw_phl_handler *rx_handler = &phl_info->phl_rx_handler;
 	struct rtw_phl_handler *event_handler = &phl_info->phl_event_handler;
 
@@ -873,9 +870,6 @@ phl_trx_free_handler(void *phl)
 	phl_deregister_handler(phl_info->phl_com, event_handler);
 	phl_deregister_handler(phl_info->phl_com, rx_handler);
 	phl_deregister_handler(phl_info->phl_com, tx_handler);
-#ifdef RTW_PHL_BCN_IOT
-	phl_deregister_handler(phl_info->phl_com, bcn_handler);
-#endif
 
 	FUNCOUT();
 }
@@ -2004,9 +1998,6 @@ enum rtw_phl_status rtw_phl_bcn_int_hdl(void *phl)
 {
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
-#ifdef RTW_PHL_BCN_IOT
-	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)phl_com->bcn_info;
-#endif
 	struct hal_info_t *hal = (struct hal_info_t *)phl_info->hal;
 	struct hal_trx_ops *trx_ops = hal->trx_ops;
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
@@ -2017,13 +2008,24 @@ enum rtw_phl_status rtw_phl_bcn_int_hdl(void *phl)
 	hal->txdone_ch_map[2] = (hal_com->int_array[2] & hal->tx_dma_ch_map[2]);
 
 	status = trx_ops->check_bcn_status(hal);
-	if ((status & PHL_TX_BCN_EARLY) && (bcn_info->tx_bcn == true)) {
-		phl_schedule_handler(phl_info->phl_com, &phl_info->phl_bcn_handler);
+	if (status & PHL_P0_TX_BCN_EARLY) {
+		rtw_hal_config_interrupt(hal, RTW_PHL_EN_P0_TX_BCN_INT);
+		rtw_hal_trigger_bcn(hal, 0);
 	}
 
-	if (status & (PHL_TX_BCN_OK)) {
-		rtw_hal_config_interrupt(hal, RTW_PHL_DIS_TX_BCN_INT);
-		bcn_info->tx_bcn = false;
+	if (status & PHL_P1_TX_BCN_EARLY) {
+		rtw_hal_config_interrupt(hal, RTW_PHL_EN_P1_TX_BCN_INT);
+		rtw_hal_trigger_bcn(hal, 1);
+	}
+
+	if (status & PHL_P0_TX_BCN_OK) {
+		rtw_hal_config_interrupt(hal, RTW_PHL_DIS_P0_TX_BCN_INT);
+		rtw_hal_config_interrupt(hal, RTW_PHL_DIS_P0_AP_MODE_INT);
+	}
+
+	if (status & PHL_P1_TX_BCN_OK) {
+		rtw_hal_config_interrupt(hal, RTW_PHL_DIS_P1_TX_BCN_INT);
+		rtw_hal_config_interrupt(hal, RTW_PHL_DIS_P1_AP_MODE_INT);
 	}
 #endif
 

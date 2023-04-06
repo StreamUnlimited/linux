@@ -34,34 +34,6 @@
 #define	AX_TXDESC_QSEL_BCN 0x10
 
 struct mac_ax_bcn_priv {
-	u8 port;
-	u8 mbssid;
-	u8 band;
-	u8 grp_ie_ofst;
-	u8 macid;
-	u8 ssn_sel;
-	u8 ssn_mode;
-	u16 rate_sel;
-	u8 txpwr;
-	u8 txinfo_ctrl_en;
-	u8 ntx_path_en;
-	u8 path_map_a;
-	u8 path_map_b;
-	u8 path_map_c;
-	u8 path_map_d;
-	u8 antsel_a;
-	u8 antsel_b;
-	u8 antsel_c;
-	u8 antsel_d;
-	u8 sw_tsf;
-	u16 csa_ofst;
-	u8 *bcn_vir_addr;
-	u32 bcn_phy_addr;
-	u32 bcn_len;
-	u8 *desc_vir_addr;
-	u32 desc_phy_addr;
-	u32 desc_len;
-	u8 tx_bcn;
 	_os_lock lock;
 };
 

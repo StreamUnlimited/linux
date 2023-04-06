@@ -54,8 +54,8 @@ u32 rx_fltr_init(struct mac_ax_adapter *adapter)
 	if (ret != MACSUCCESS) {
 		return ret;
 	}
-	ret = mac_ax_ops->set_rx_fltr_typ_opt(adapter,
-					      MAC_AX_PKT_CTRL,
+	ret = mac_ax_ops->set_rx_fltr_typstyp_opt(adapter,
+					      MAC_AX_PKT_CTRL, 10,
 					      trxcfg_rx_fltr_ctrl_frame);
 	if (ret != MACSUCCESS) {
 		return ret;
@@ -258,7 +258,7 @@ u32 mac_set_typsbtyp_fltr_opt(struct mac_ax_adapter *adapter,
 	case MAC_AX_PKT_CTRL:
 		val16 = MAC_REG_R16(REG_RXFLTMAP0 + 2);
 		val16 |= fwd_target ? BIT(subtype) : 0;
-		MAC_REG_W32(REG_RXFLTMAP0 + 2, val16);
+		MAC_REG_W16(REG_RXFLTMAP0 + 2, val16);
 		break;
 	case MAC_AX_PKT_DATA:
 		val16 = MAC_REG_R32(REG_RXFLTMAP);
@@ -283,7 +283,7 @@ u32 mac_set_typsbtyp_fltr_detail(struct mac_ax_adapter *adapter,
 	u16 reg, val16;
 	u8 idx;
 
-	val32 = check_mac_en(adapter, MAC_AX_CMAC_SEL);
+	val32 = check_mac_en(adapter, MAC_AX_MAC_SEL);
 	if (val32 != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]%s MAC not enable\n", __func__);
 		return val32;

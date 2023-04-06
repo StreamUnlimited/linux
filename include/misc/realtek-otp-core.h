@@ -1,5 +1,5 @@
-#ifndef __AMEBA_OTP_H__
-#define __AMEBA_OTP_H__
+#ifndef _REALTEK_OTP_CORE_H_
+#define _REALTEK_OTP_CORE_H_
 
 #include <linux/list.h>
 #include <linux/spinlock.h>

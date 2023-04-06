@@ -866,6 +866,9 @@ u32 ss_get_quotasetting(struct mac_ax_adapter *adapter,
  * @{
  */
 
+u32 set_macid_pause(struct mac_ax_adapter *adapter,
+		    struct mac_ax_macid_pause_cfg *cfg);
+
 
 //u32 mac_get_bt_dis(struct mac_ax_adapter *adapter);
 

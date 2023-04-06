@@ -751,6 +751,20 @@ bool halbb_nhm_set(struct bb_info *bb, struct ccx_para_info *para)
 		env->nhm_include_cca = para->nhm_incld_cca;
 	}
 
+	/*Set nhm macid match*/
+	if (para->nhm_input_idmatch != env->nhm_input_idmatch) {
+		halbb_set_reg_curr_phy(bb, cr->nhm_idmatch_en,
+				       cr->nhm_idmatch_en_m,
+				       para->nhm_input_idmatch);
+
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "Update NHM idmatch ((%d)) -> ((%d))\n",
+		       env->nhm_input_idmatch, para->nhm_input_idmatch);
+
+		env->nhm_input_idmatch = para->nhm_input_idmatch;
+	}
+
+
 	/*Set NHM threshold*/
 	if (halbb_nhm_th_update_chk(bb, para, &nhm_th[0])) {
 		env->nhm_app = para->nhm_app;
@@ -763,6 +777,23 @@ bool halbb_nhm_set(struct bb_info *bb, struct ccx_para_info *para)
 	return HALBB_SET_SUCCESS;
 }
 
+void halbb_nhm_set_rssi_th(struct bb_info *bb, bool nhm_rssi_en, u8 nhm_rssi_th)
+{
+	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
+	struct bb_env_mntr_cr_info *cr = &env->bb_env_mntr_cr_i;
+	halbb_set_reg_curr_phy(bb, cr->nhm_rssi_th_en, cr->nhm_rssi_th_en_m, nhm_rssi_en);
+	halbb_set_reg_curr_phy(bb, cr->nhm_rssi_th, cr->nhm_rssi_th_m, nhm_rssi_th);
+}
+
+void halbb_nhm_set_idmatch(struct bb_info *bb, bool nhm_nav_en, bool idmatch)
+{
+	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
+	struct bb_env_mntr_cr_info *cr = &env->bb_env_mntr_cr_i;
+	halbb_set_reg_curr_phy(bb, cr->nhm_nav_en, cr->nhm_nav_en_m, nhm_nav_en);
+	halbb_set_reg_curr_phy(bb, cr->nhm_idmatch_en, cr->nhm_idmatch_en_m, idmatch);
+}
+
+
 void halbb_nhm_init(struct bb_info *bb)
 {
 	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
@@ -772,6 +803,7 @@ void halbb_nhm_init(struct bb_info *bb)
 
 	env->nhm_app = NHM_INIT;
 	env->nhm_include_cca = NHM_CCA_INIT;
+	env->nhm_input_idmatch = NHM_IDMATCH_INIT;
 	env->nhm_mntr_time = 0;
 	env->nhm_pwr = 0;
 
@@ -802,11 +834,17 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Basic-Trigger(11k/1900ms): {1}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "Adv-Trigger(11k): {2} {0~2097ms} {Include CCA}\n");
+			    "Adv-Trigger(11k): {2} {0~2097ms} {Include CCA} {nhm Macid match} \n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "Adv-Trigger(RSSI): {3} {0~2097ms} {Include CCA}\n");
+			    "Adv-Trigger(RSSI): {3} {0~2097ms} {Include CCA} {nhm Macid match}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "Adv-Trigger(Manual): {4} {0~2097ms} {Include CCA} {th[0]} {th_ofst:1~12}\n");
+			    "Adv-Trigger(Manual): {4} {0~2097ms} {Include CCA} {nhm Macid match} {th[0]} {th_ofst:1~12}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			    "NHM set nhm rssith: {5} {nhm_rssi_en(0,1)}, {rssi:u(8,1) (dbm+110)}\n");
+		/*BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			    "NHM set mac id match: {6} {nhm_nav_en(mac_virtual_cca)}, {macid match en(0,1)}\n");*/
+
+
 	} else if (var[0] == 100) { /*Get NHM results*/
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "ccx_rpt_stamp=%d, ccx_period=%d\n",
@@ -855,6 +893,11 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 		halbb_ccx_racing_release(bb);
 		env->ccx_manual_ctrl = false;
+	} else if (var[0] == 5) { /*Set nhm rssi */
+		halbb_nhm_set_rssi_th(bb, (bool)var[1], (u8)var[2]);
+		BB_DBG_CNSL(out_len, used, output + used,
+			    out_len - used, "nhm_rssi_th_en: %d, nhm_rssi_th: %d\n ",
+			    (bool)var[1], (u8)var[2] >> 1);
 	} else { /*NMH trigger*/
 		env->ccx_manual_ctrl = true;
 
@@ -868,20 +911,24 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			para.nhm_app = NHM_DBG_11K;
 			para.mntr_time = 1900;
 			para.nhm_incld_cca = NHM_EXCLUDE_CCA;
+			para.nhm_input_idmatch = NHM_IDMATCH_ON;
 		} else if (var[0] == 2) {
 			para.nhm_app = NHM_DBG_11K;
 			para.mntr_time = (u16)var[1];
 			para.nhm_incld_cca = (enum nhm_option_cca_all)var[2];
+			para.nhm_input_idmatch = (enum nhm_idmatch_input)var[3];
 		} else if (var[0] == 3) {
 			para.nhm_app = NHM_DBG_RSSI;
 			para.mntr_time = (u16)var[1];
 			para.nhm_incld_cca = (enum nhm_option_cca_all)var[2];
+			para.nhm_input_idmatch = (enum nhm_idmatch_input)var[3];
 		} else {
 			para.nhm_app = NHM_DBG_MANUAL;
 			para.mntr_time = (u16)var[1];
 			para.nhm_incld_cca = (enum nhm_option_cca_all)var[2];
-			para.nhm_manual_th0 = (u8)var[3];
-			para.nhm_manual_th_ofst = (u8)var[4];
+			para.nhm_input_idmatch = (enum nhm_idmatch_input)var[3];
+			para.nhm_manual_th0 = (u8)var[4];
+			para.nhm_manual_th_ofst = (u8)var[5];
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used,
 				    "manual_th_ofst=%d, manaul_th0=%d\n",
@@ -994,7 +1041,18 @@ bool halbb_clm_set(struct bb_info *bb, struct ccx_para_info *para)
 		env->clm_input_opt = para->clm_input_opt;
 	}
 
+	/*Set macid match option*/
 	env->clm_app = para->clm_app;
+	if (para->clm_input_idmatch != env->clm_input_idmatch) {
+		halbb_set_reg_curr_phy(bb, cr->clm_idmatch_en, cr->clm_idmatch_en_m,
+				       para->clm_input_idmatch);
+
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "Update CLM input idmatch ((%d)) -> ((%d))\n",
+		       env->clm_input_idmatch, para->clm_input_idmatch);
+
+		env->clm_input_idmatch = para->clm_input_idmatch;
+	}
 
 	return HALBB_SET_SUCCESS;
 }
@@ -1007,6 +1065,7 @@ void halbb_clm_init(struct bb_info *bb)
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s]===>\n", __func__);
 	env->clm_input_opt = CLM_CCA_INIT;
 	env->clm_app = CLM_INIT;
+	env->clm_input_idmatch = CLM_IDMATCH_INIT;
 	env->clm_mntr_time = 0;
 
 	halbb_set_reg_curr_phy(bb, cr->clm_en, cr->clm_en_m, true);
@@ -1019,6 +1078,23 @@ void halbb_clm_set_dbg_sel(struct bb_info *bb, u8 dbg_sel)
 
 	/*r_clm_from_dbg_sel[5](0xa04[25]) is dummy*/
 	halbb_set_reg_curr_phy(bb, cr->clm_dbg_sel, cr->clm_dbg_sel_m, dbg_sel);
+}
+
+
+void halbb_clm_set_rssi_th(struct bb_info *bb, bool clm_rssi_en, u8 clm_rssi_th)
+{
+	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
+	struct bb_env_mntr_cr_info *cr = &env->bb_env_mntr_cr_i;
+	halbb_set_reg_curr_phy(bb, cr->clm_rssi_th_en, cr->clm_rssi_th_en_m, clm_rssi_en);
+	halbb_set_reg_curr_phy(bb, cr->clm_rssi_th, cr->clm_rssi_th_m, clm_rssi_th);
+}
+
+void halbb_clm_set_idmatch(struct bb_info *bb, bool clm_nav_en, bool idmatch)
+{
+	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
+	struct bb_env_mntr_cr_info *cr = &env->bb_env_mntr_cr_i;
+	halbb_set_reg_curr_phy(bb, cr->clm_nav_en, cr->clm_nav_en, clm_nav_en);
+	halbb_set_reg_curr_phy(bb, cr->clm_idmatch_en, cr->clm_idmatch_en_m, idmatch);
 }
 
 
@@ -1045,9 +1121,13 @@ void halbb_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "CLM Basic-Trigger(1900ms): {1}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "CLM Adv-Trigger: {2} {0~2097ms} {input:0(p20)/1(s20)/2(s40)/3(s80)/4(dbg)/5(txon_cca)/6(s20_s40_s80)/7(s20_s40_s80_p20)}\n");
+			    "CLM Adv-Trigger: {2} {0~2097ms} {input:0(p20)/1(s20)/2(s40)/3(s80)/4(dbg)/5(txon_cca)/6(s20_s40_s80)/7(s20_s40_s80_p20)} {clm macidmatch:0(off)/1(on)}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "CLM set dbg_sel: {3} {bit:0~31}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			    "CLM set clm rssith: {4} {clm_rssi_en(0,1)}, {rssi:u(8,1) (dbm+110)}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			    "CLM set mac id match: {5} {clm_nav_en(mac_virtual_cca)}, {macid match en(0,1)}\n");
 	} else if (var[0] == 100) { /*Get CLM results */
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "ccx_rpt_stamp=%d, ccx_period=%d\n",
@@ -1067,24 +1147,36 @@ void halbb_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		env->ccx_manual_ctrl = false;
 	} else if (var[0] == 3) { /* Set dbg_bit_sel */
 		halbb_clm_set_dbg_sel(bb, (u8)var[1]);
+	} else if (var[0] == 4) { /*Set clm rssi */
+		halbb_clm_set_rssi_th(bb, (bool)var[1], (u8)var[2]);
+		BB_DBG_CNSL(out_len, used, output + used,
+			    out_len - used, "clm_rssi_th_en: %d, clm_rssi_th: %d\n",
+			    (bool)var[1], (u8)var[2]);
+	} else if (var[0] == 5) {
+		halbb_clm_set_idmatch(bb, (bool)var[1], (bool)var[2]);
+		BB_DBG_CNSL(out_len, used, output + used,
+			    out_len - used, "clm_nav_en: %d, clm_idmatch_en: %d\n",
+			    (bool)var[1], (bool)var[2]);
 	} else { /* Set & trigger CLM */
 		env->ccx_manual_ctrl = true;
 
 		if (var[0] == 1) {
 			para.mntr_time = 1900;
 			para.clm_input_opt = CLM_CCA_P20;
+			para.clm_input_idmatch = CLM_IDMATCH_ON; //id match
 		} else if (var[0] == 2) {
 			para.mntr_time = (u16)var[1];
 			para.clm_input_opt = (enum clm_opt_input)var[2];
+			para.clm_input_idmatch = (enum clm_idmatch_input)var[3];
 		}
 
 		para.clm_app = CLM_DBG;
 		para.rac_lv = RAC_LV_4;
 
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "app=%d, lv=%d, time=%d ms, input_opt=%d\n",
+			    "app=%d, lv=%d, time=%d ms, input_opt=%d, idmatch=%d\n",
 			    para.clm_app, para.rac_lv, para.mntr_time,
-			    para.clm_input_opt);
+			    para.clm_input_opt, para.clm_input_idmatch);
 
 		if (halbb_clm_set(bb, &para) == HALBB_SET_SUCCESS) {
 			halbb_ccx_trigger(bb);
@@ -1781,6 +1873,7 @@ bool halbb_fahm_get_result(struct bb_info *bb)
 	struct bb_env_mntr_cr_info *cr = &env->bb_env_mntr_cr_i;
 	u8 i = 0;
 	u32 result_sum_tmp = 0;
+	u32 rslt;
 
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s]===>\n", __func__);
 
@@ -1788,7 +1881,7 @@ bool halbb_fahm_get_result(struct bb_info *bb)
 		BB_DBG(bb, DBG_ENV_MNTR, "Get FAHM report Fail\n");
 		return false;
 	}
-
+#if 0
 	env->fahm_result[0] = (u16)halbb_get_reg_curr_phy(bb, cr->fahm_cnt0,
 			      cr->fahm_cnt0_m);
 	env->fahm_result[1] = (u16)halbb_get_reg_curr_phy(bb, cr->fahm_cnt1,
@@ -1817,6 +1910,15 @@ bool halbb_fahm_get_result(struct bb_info *bb)
 	for (i = 0; i < FAHM_RPT_NUM; i++) {
 		result_sum_tmp += (u32)env->fahm_result[i];
 	}
+#else
+	for (i = 0; i < FAHM_RPT_NUM; i += 2) {
+		rslt = halbb_get_reg_curr_phy(bb, cr->fahm_cnt0 + 4 * i, 0xffffffff);
+		env->fahm_result[i] = (u16)(rslt & cr->fahm_cnt0);
+		env->fahm_result[i + 1] = (u16)((rslt & cr->fahm_cnt1) >> 16);
+		result_sum_tmp += (env->fahm_result[i] + env->fahm_result[i + 1]);
+	}
+#endif
+
 
 	env->fahm_result_sum = (u16)result_sum_tmp;
 	BB_DBG(bb, DBG_ENV_MNTR, "fahm_result_sum=%d\n", env->fahm_result_sum);
@@ -2492,7 +2594,6 @@ void halbb_edcca_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 		if (halbb_edcca_clm_set(bb, &para) == HALBB_SET_SUCCESS) {
 			halbb_ccx_trigger(bb);
-
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used, "ccx_rpt_stamp=%d\n",
 				    env->ccx_rpt_stamp);
@@ -2543,7 +2644,6 @@ halbb_env_mntr_bg_app_chk(struct bb_info *bb)
 void halbb_env_mntr_cmn_log(struct bb_info *bb)
 {
 	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
-	u8 i = 0;
 
 	if (!(bb->cmn_dbg_msg_component & BB_BASIC_DBG_02_ENVMNTR)) {
 		BB_DBG(bb, DBG_CMN, "Disabled\n");
@@ -2823,11 +2923,6 @@ void halbb_env_mntr_get_bg_result(struct bb_info *bb_0,
 	struct bb_info *bb = bb_0;
 	struct bb_env_mntr_info *env = NULL;
 
-#ifdef HALBB_DBCC_SUPPORT
-	HALBB_GET_PHY_PTR(bb_0, bb, phy_idx);
-	BB_DBG(bb, DBG_ENV_MNTR, "[%s] phy_idx=%d\n", __func__, bb->bb_phy_idx);
-#endif
-
 	env = &bb->bb_env_mntr_i;
 
 	halbb_mem_cpy(bb, bg_rpt, &env->env_mntr_rpt_bg,
@@ -2840,11 +2935,6 @@ void halbb_env_mntr_get_bg_setting(struct bb_info *bb_0,
 {
 	struct bb_info *bb = bb_0;
 	struct bb_env_mntr_info *env = NULL;
-
-#ifdef HALBB_DBCC_SUPPORT
-	HALBB_GET_PHY_PTR(bb_0, bb, phy_idx);
-	BB_DBG(bb, DBG_ENV_MNTR, "[%s] phy_idx=%d\n", __func__, bb->bb_phy_idx);
-#endif
 
 	env = &bb->bb_env_mntr_i;
 
@@ -2859,10 +2949,6 @@ u8 halbb_env_mntr_trigger(struct bb_info *bb_0, struct ccx_para_info *para,
 	struct bb_env_mntr_info *env = NULL;
 	u8 trigger_result = CCX_FAIL;
 
-#ifdef HALBB_DBCC_SUPPORT
-	HALBB_GET_PHY_PTR(bb_0, bb, phy_idx);
-	BB_DBG(bb, DBG_ENV_MNTR, "[%s] phy_idx=%d\n", __func__, bb->bb_phy_idx);
-#endif
 	env = &bb->bb_env_mntr_i;
 
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s] ======>\n", __func__);
@@ -2908,12 +2994,7 @@ u8 halbb_env_mntr_result(struct bb_info *bb_0, struct env_mntr_rpt *rpt,
 {
 	struct bb_info *bb = bb_0;
 	struct bb_env_mntr_info *env = NULL;
-	u8 i = 0;
 
-#ifdef HALBB_DBCC_SUPPORT
-	HALBB_GET_PHY_PTR(bb_0, bb, phy_idx);
-	BB_DBG(bb, DBG_ENV_MNTR, "[%s] phy_idx=%d\n", __func__, bb->bb_phy_idx);
-#endif
 	env = &bb->bb_env_mntr_i;
 
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s] ======>\n", __func__);
@@ -3103,6 +3184,7 @@ void halbb_env_mntr(struct bb_info *bb)
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s]===>\n", __func__);
 
 	env->ccx_watchdog_result = CCX_FAIL;
+	env->ccx_chk_result = CCX_FAIL;
 	env->fahm_watchdog_result = false;
 
 	if (!(bb->support_ability & BB_ENVMNTR)) {
@@ -3133,14 +3215,17 @@ void halbb_env_mntr(struct bb_info *bb)
 
 		chk_result = halbb_env_mntr_trigger(bb, &para, &trig_rpt,
 						    bb->bb_phy_idx);
+#ifdef HALBB_DBG_TRACE_SUPPORT
 		BB_DBG(bb, DBG_ENV_MNTR,
 		       "get_result=0x%x, chk_result:0x%x\n",
 		       env->ccx_watchdog_result, chk_result);
+#endif
 	}
 
 	if (env->fahm_manual_ctrl) {
 		BB_DBG(bb, DBG_ENV_MNTR, "FAHM in manual ctrl\n");
 	} else if (halbb_env_mntr_watchdog_chk(bb, true)) {
+#ifdef FAHM_SUPPORT
 		/*get result*/
 		env->fahm_watchdog_result = halbb_fahm_result(bb, &fahm_rpt);
 
@@ -3158,6 +3243,7 @@ void halbb_env_mntr(struct bb_info *bb)
 		BB_DBG(bb, DBG_ENV_MNTR,
 		       "fahm_get_result=%d, fahm_chk_result:%d\n",
 		       env->fahm_watchdog_result, fahm_chk_result);
+#endif
 	}
 
 	BB_DBG(bb, DBG_ENV_MNTR, "CCX Summary:\n");
@@ -3210,9 +3296,7 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	bool is_show_fahm_rpt = false;
 
 	for (i = 0; i < 2; i++) {
-		if (input[i + 1]) {
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
-		}
 	}
 
 	if ((_os_strcmp(input[1], help) == 0)) {
@@ -3228,8 +3312,9 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			    "Show noise {noise}\n");
 	} else if (var[0] == 100) { /* Get results */
 		set_result = halbb_env_mntr_result(bb, &rpt, bb->bb_phy_idx);
+#ifdef FAHM_SUPPORT
 		fahm_set_result = halbb_fahm_result(bb, &fahm_rpt);
-
+#endif
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "CCX get Result=0x%x, ccx_rpt_stamp=%d\n",
 			    set_result, rpt.ccx_rpt_stamp);
@@ -3255,9 +3340,10 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	} else if (var[0] == 101) { /* Get bg results */
 		halbb_env_mntr_get_bg_setting(bb, &para, bb->bb_phy_idx);
 		halbb_env_mntr_get_bg_result(bb, &rpt, bb->bb_phy_idx);
+#ifdef FAHM_SUPPORT
 		halbb_fahm_get_bg_setting(bb, &fahm_para);
 		halbb_fahm_get_bg_result(bb, &fahm_rpt);
-
+#endif
 		/*bg_para*/
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "rac_lv = %d, mntr_time = %d, edcca_opt_sc_idx = %d\n",
@@ -3320,17 +3406,18 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 		set_result = halbb_env_mntr_trigger(bb, &para, &trig_rpt,
 						    bb->bb_phy_idx);
-
+#ifdef FAHM_SUPPORT
 		fahm_set_result = halbb_fahm_trigger(bb, &fahm_para,
 						     &fahm_trig_rpt);
-
+#endif
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Set Result=0x%x, ccx_rpt_stamp=%d\n",
 			    set_result, trig_rpt.ccx_rpt_stamp);
-
+#ifdef FAHM_SUPPORT
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "fahm set Result=%d, fahm_rpt_stamp=%d\n",
 			    fahm_set_result, fahm_trig_rpt.fahm_rpt_stamp);
+#endif
 	}
 
 	if (is_show_rpt) {
@@ -3542,6 +3629,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->clm_opt_m = CLM_CCA_OPT_A_M;
 		cr->clm_period = CLM_PERIOD_A;
 		cr->clm_period_m = CLM_PERIOD_A_M;
+		/*cr->clm_idmatch_en = */
+		/*cr->clm_idmatch_en_m = */
 		cr->clm_dbg_sel = CLM_FROM_DBG_SEL_A;
 		cr->clm_dbg_sel_m = CLM_FROM_DBG_SEL_A_M;
 		cr->clm_cnt = RO_CLM_RESULT_A;
@@ -3568,6 +3657,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->nhm_unit_idx_m = NHM_COUNTER_UNIT_A_M;
 		cr->nhm_inclu_cca = NHM_IGNORE_CCA_A;
 		cr->nhm_inclu_cca_m = NHM_IGNORE_CCA_A_M;
+		/*cr->nhm_idmatch_en =NHM_IDMATCH_EN_C;*/
+		/*cr->nhm_idmatch_en_m =NHM_IDMATCH_EN_C_M;*/
 		cr->nhm_th0 = NHM_TH0_A;
 		cr->nhm_th0_m = NHM_TH0_A_M;
 		cr->nhm_th1 = NHM_TH1_A;
@@ -3777,6 +3868,7 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->ccx_edcca_opt_m = CCX_EDCCA_OPT_C_M;
 		cr->ccx_source_sel = CCX_SOURCE_SEL_C;
 		cr->ccx_source_sel_m = CCX_SOURCE_SEL_C_M;
+#ifdef CLM_SUPPORT
 		cr->clm_unit_idx = CLM_COUNTER_UNIT_C;
 		cr->clm_unit_idx_m = CLM_COUNTER_UNIT_C_M;
 		cr->clm_en = CLM_EN_C;
@@ -3785,12 +3877,23 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->clm_opt_m = CLM_CCA_OPT_C_M;
 		cr->clm_period = CLM_PERIOD_C;
 		cr->clm_period_m = CLM_PERIOD_C_M;
+		cr->clm_idmatch_en = CLM_IDMATCH_EN_C;
+		cr->clm_idmatch_en_m = CLM_IDMATCH_EN_C_M;
 		cr->clm_dbg_sel = CLM_FROM_DBG_SEL_C;
 		cr->clm_dbg_sel_m = CLM_FROM_DBG_SEL_C_M;
+		cr->clm_nav_en = CLM_NAV_EN_C;
+		cr->clm_nav_en_m = CLM_NAV_EN_C_M;
+		cr->clm_rssi_th_en = CLM_RSSI_TH_EN_C;  /* */
+		cr->clm_rssi_th_en_m = CLM_RSSI_TH_EN_C_M;
+		cr->clm_rssi_th = CLM_RSSI_TH_C;
+		cr->clm_rssi_th_m = CLM_RSSI_TH_C_M;
+
 		cr->clm_cnt = RO_CLM_RESULT_C;
 		cr->clm_cnt_m = RO_CLM_RESULT_C_M;
 		cr->clm_rdy = RO_CLM_RDY_C;
 		cr->clm_rdy_m = RO_CLM_RDY_C_M;
+#endif
+#ifdef EDCCA_CLM_SUPPORT
 		cr->edcca_clm_period = CLM_EDCCA_PERIOD_C;
 		cr->edcca_clm_period_m = CLM_EDCCA_PERIOD_C_M;
 		cr->edcca_clm_unit_idx = CLM_EDCCA_COUNTER_UNIT_C;
@@ -3801,6 +3904,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->edcca_clm_cnt_m = RO_CLM_EDCCA_RESULT_C_M;
 		cr->edcca_clm_rdy = RO_CLM_EDCCA_RDY_C;
 		cr->edcca_clm_rdy_m = RO_CLM_EDCCA_RDY_C_M;
+#endif
+#ifdef NHM_SUPPORT
 		cr->nhm_en = NHM_EN_C;
 		cr->nhm_en_m = NHM_EN_C_M;
 		cr->nhm_method_sel = NHM_PWDB_METHOD_SEL_C;
@@ -3811,6 +3916,14 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->nhm_unit_idx_m = NHM_COUNTER_UNIT_C_M;
 		cr->nhm_inclu_cca = NHM_IGNORE_CCA_C;
 		cr->nhm_inclu_cca_m = NHM_IGNORE_CCA_C_M;
+		cr->nhm_idmatch_en = NHM_IDMATCH_EN_C;
+		cr->nhm_idmatch_en_m = NHM_IDMATCH_EN_C_M;
+		cr->nhm_nav_en = NHM_NAV_EN_C;
+		cr->nhm_nav_en_m = NHM_NAV_EN_C_M;
+		cr->nhm_rssi_th_en = NHM_RSSI_TH_EN_C;
+		cr->nhm_rssi_th_en_m = NHM_RSSI_TH_EN_C_M;
+		cr->nhm_rssi_th = NHM_RSSI_TH_C;
+		cr->nhm_rssi_th_m = NHM_RSSI_TH_C_M;
 		cr->nhm_th0 = NHM_TH0_C;
 		cr->nhm_th0_m = NHM_TH0_C_M;
 		cr->nhm_th1 = NHM_TH1_C;
@@ -3865,6 +3978,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->nhm_idle_cnt_m = NHM_IDLE_CNT_C_M;
 		cr->nhm_rdy = NHM_RDY_C;
 		cr->nhm_rdy_m = NHM_RDY_C_M;
+#endif
+#ifdef FAHM_SUPPORT
 		cr->fahm_en = FAHM_EN_C;
 		cr->fahm_en_m = FAHM_EN_C_M;
 		cr->fahm_ofdm_en = FAHM_EN_OFDM_C;
@@ -3933,6 +4048,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->fahm_denom_cnt_m = RO_FAHM_DEN_C_M;
 		cr->fahm_rdy = RO_FAHM_RDY_C;
 		cr->fahm_rdy_m = RO_FAHM_RDY_C_M;
+#endif
+#ifdef IFS_CLM_SUPPORT
 		cr->ifs_clm_en = IFS_COLLECT_EN_C;
 		cr->ifs_clm_en_m = IFS_COLLECT_EN_C_M;
 		cr->ifs_clm_clr = IFS_COUNTER_CLR_C;
@@ -4005,6 +4122,7 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->ifs_total_cnt_m = IFS_TOTAL_C_M;
 		cr->ifs_clm_rdy = IFSCNT_DONE_C;
 		cr->ifs_clm_rdy_m = IFSCNT_DONE_C_M;
+#endif
 		break;
 #endif
 
@@ -4028,6 +4146,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->clm_opt_m = CLM_CCA_OPT_A2_M;
 		cr->clm_period = CLM_PERIOD_A2;
 		cr->clm_period_m = CLM_PERIOD_A2_M;
+		/*cr->clm_idmatch_en = */
+		/*cr->clm_idmatch_en_m = */
 		cr->clm_dbg_sel = CLM_FROM_DBG_SEL_A2;
 		cr->clm_dbg_sel_m = CLM_FROM_DBG_SEL_A2_M;
 		cr->clm_cnt = RO_CLM_RESULT_A2;
@@ -4054,6 +4174,8 @@ void halbb_cr_cfg_env_mntr_init(struct bb_info *bb)
 		cr->nhm_unit_idx_m = NHM_COUNTER_UNIT_A2_M;
 		cr->nhm_inclu_cca = NHM_IGNORE_CCA_A2;
 		cr->nhm_inclu_cca_m = NHM_IGNORE_CCA_A2_M;
+		/*cr->nhm_idmatch_en =NHM_IDMATCH_EN_C;*/
+		/*cr->nhm_idmatch_en_m =NHM_IDMATCH_EN_C_M;*/
 		cr->nhm_th0 = NHM_TH0_A2;
 		cr->nhm_th0_m = NHM_TH0_A2_M;
 		cr->nhm_th1 = NHM_TH1_A2;

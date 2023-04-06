@@ -77,26 +77,6 @@ static void realtek_thermal_cmd(struct realtek_thermal_data *thermal, bool state
 	writel(reg_value, thermal->base + RTK_TM_CTRL);
 }
 
-/**
-  * @brief  Enable or Disable the thermal latch.
-  * @param  thermal: thermal driver data.
-  * @param  state: state of the thermal latch.
-  *   			This parameter can be: true or false.
-  * @retval None
-  */
-static void realtek_thermal_set_latch(struct realtek_thermal_data *thermal, bool state)
-{
-	u32 reg_value;
-
-	reg_value = readl(thermal->base + RTK_TM_CTRL);
-	if (state) {
-		reg_value |= TM_BIT_EN_LATCH;
-	} else {
-		reg_value &= ~TM_BIT_EN_LATCH;
-	}
-	writel(reg_value, thermal->base + RTK_TM_CTRL);
-}
-
 /* Callback to get temperature from HW */
 static int realtek_thermal_get_temp(void *data, int *temp)
 {
@@ -117,6 +97,27 @@ static int realtek_thermal_get_temp(void *data, int *temp)
 	}
 
 	return 0;
+}
+
+#ifdef CONFIG_SOC_CPU_ARMA7
+/**
+  * @brief  Enable or Disable the thermal latch.
+  * @param  thermal: thermal driver data.
+  * @param  state: state of the thermal latch.
+  *   			This parameter can be: true or false.
+  * @retval None
+  */
+static void realtek_thermal_set_latch(struct realtek_thermal_data *thermal, bool state)
+{
+	u32 reg_value;
+
+	reg_value = readl(thermal->base + RTK_TM_CTRL);
+	if (state) {
+		reg_value |= TM_BIT_EN_LATCH;
+	} else {
+		reg_value &= ~TM_BIT_EN_LATCH;
+	}
+	writel(reg_value, thermal->base + RTK_TM_CTRL);
 }
 
 static void realtek_thermal_init(struct realtek_thermal_data *thermal)
@@ -162,6 +163,52 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 	// enable interrupt
 	writel((TM_BIT_IMR_TM_HIGH_WT | TM_BIT_IMR_TM_LOW_WT), thermal->base + RTK_TM_INTR_CTRL);
 }
+#endif
+
+#ifdef CONFIG_SOC_CPU_ARMA32
+static void realtek_thermal_init(struct realtek_thermal_data *thermal)
+{
+	u32 reg_value;
+
+	writel(0, thermal->base + RTK_TM_INTR_CTRL);
+	realtek_thermal_cmd(thermal, false);
+	//set thermal control register
+	reg_value = readl(thermal->base + RTK_TM_CTRL);
+	reg_value &= ~TM_MASK_OSR;
+	reg_value |= TM_OSR(realtek_thermal_cfg.down_rate);
+	if (realtek_thermal_cfg.clk_div == TM_ADC_CLK_DIV_128) {
+		reg_value |= TM_BIT_ADCCKSEL;
+	} else {
+		reg_value &= ~TM_BIT_ADCCKSEL;
+	}
+	
+	// max and min clear
+	reg_value = readl(thermal->base + RTK_TM_MAX_CTRL);
+	reg_value |= TM_BIT_MAX_CLR;
+	reg_value &= ~TM_BIT_MAX_CLR;
+	writel(reg_value, thermal->base + RTK_TM_MAX_CTRL);
+	reg_value = readl(thermal->base + RTK_TM_MIN_CTRL);
+	reg_value |= TM_BIT_MIN_CLR;
+	reg_value &= ~TM_BIT_MIN_CLR;
+	writel(reg_value, thermal->base + RTK_TM_MIN_CTRL);
+
+	// set timer period
+	writel(TM_TIME_PERIOD(realtek_thermal_cfg.period), thermal->base + RTK_TM_TIMER);
+
+	realtek_thermal_cmd(thermal, true);
+	
+	// clear all interrupt
+	writel((TM_BIT_ISR_TM_LOW_WT | TM_BIT_ISR_TM_HIGH_WT), thermal->base + RTK_TM_INTR_STS);
+	// set thermal threshold
+	reg_value = (TM_HIGH_PT_THR(thermal->temp_critical) |
+				 TM_BIT_HIGHCMP_WT_EN |
+				 TM_HIGH_WT_THR(thermal->temp_passive) |
+				 TM_BIT_LOWCMP_WT_EN |
+				 TM_LOW_WT_THR(realtek_thermal_cfg.low_tmp_th));
+	writel(reg_value, thermal->base + RTK_TM_TH_CTRL);
+	writel((TM_BIT_IMR_TM_HIGH_WT | TM_BIT_IMR_TM_LOW_WT), thermal->base + RTK_TM_INTR_CTRL);
+}
+#endif
 
 static const struct thermal_zone_of_device_ops realtek_tz_ops = {
 	.get_temp	= realtek_thermal_get_temp,

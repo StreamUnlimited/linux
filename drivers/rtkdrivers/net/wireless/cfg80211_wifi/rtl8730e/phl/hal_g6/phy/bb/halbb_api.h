@@ -60,8 +60,11 @@ struct bb_info;
 u8 halbb_ch_2_band(struct bb_info *bb, u8 fc_ch);
 u16 halbb_get_csi_buf_idx(struct bb_info *bb, u8 buf_idx, u8 txsc_idx);
 
-void halbb_reset_bb_phy(struct bb_info *bb, enum phl_phy_idx phy_idx);
+void halbb_reset_bb(struct bb_info *bb);
+void halbb_gpio_setting(struct bb_info *bb, u8 gpio_idx, enum bb_path path,
+			bool inv, enum bb_rfe_src_sel src);
 void halbb_gpio_setting_init(struct bb_info *bb);
+void halbb_gpio_setting_rfetype(struct bb_info *bb, u8 rfe_idx, enum bb_rfe_src_sel src_sel);
 void halbb_pre_agc_en(struct bb_info *bb, bool enable);
 void halbb_set_gain_error(struct bb_info *bb, u8 central_ch, enum band_type band, enum rf_path path);
 u8 halbb_stop_ic_trx(struct bb_info *bb, u8 set_type);
@@ -74,4 +77,5 @@ void halbb_ic_hw_setting_dbcc(struct bb_info *bb);
 void halbb_ic_hw_setting(struct bb_info *bb);
 void halbb_ic_hw_setting_dbg(struct bb_info *bb, char input[][16],
 			     u32 *_used, char *output, u32 *_out_len);
+void halbb_btc_bb_switchchannel_para(struct bb_info *bb, u8 central_ch, u8 bt_on);
 #endif

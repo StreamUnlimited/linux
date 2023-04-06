@@ -72,6 +72,7 @@
 #define RF_8730E_SUPPORT
 #define RF_6G_NOT_SUPPORT
 #define RF_MULTIPATH_NOT_SUPPORT
+#define RF_BW_20M_ONLY
 #endif
 
 #ifdef CONFIG_RTL8720E
@@ -79,6 +80,7 @@
 #define RF_5G_NOT_SUPPORT
 #define RF_6G_NOT_SUPPORT
 #define RF_MULTIPATH_NOT_SUPPORT
+#define RF_BW_20M_ONLY
 #endif
 
 #if defined (RF_8730E_SUPPORT) || defined (RF_8720E_SUPPORT)
@@ -279,5 +281,7 @@
 #include "halrf_8720e/halrf_tssi_8720e.h"
 #include "halrf_8720e/halrf_psd_8720e.h"
 #endif
+
+#include "hal_struct.h"
 
 #endif

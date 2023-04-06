@@ -18,14 +18,15 @@
 #define RX_GAIN_K_PATH_MAX 2
 #define RX_GAIN_K_OFFSET_MAX 5
 #define RX_GAIN_K_HIDE_OFFSET_MAX 4
-
+#define RF_HIDDEN_SIZE 0x20
+/*
 enum BITMASK {
 	LOW_MASK = 0,
 	HIGH_MASK = 1
 };
-
+*/
 struct halrf_kfree_info {
-	u8 efuse_content[100];
+	u8 efuse_content[RF_HIDDEN_SIZE];
 #if 0
 	bool efuse_chenk;
 	bool hide_efuse_chenk;

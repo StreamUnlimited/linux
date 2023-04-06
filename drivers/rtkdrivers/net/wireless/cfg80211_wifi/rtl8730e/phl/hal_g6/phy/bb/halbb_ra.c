@@ -22,16 +22,19 @@ const u16 bb_phy_rate_table[] = {
 	6, 9, 12, 18, 24, 36, 48, 54,
 	/*HT/VHT-1ss LGI*/
 	6, 13, 19, 26, 39, 52, 58, 65, 78, 87, 98, 108,
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	/*HT/VHT-2ss LGI*/
 	13, 26, 39, 52, 78, 104, 117, 130, 156, 173, 195, 217,
 	/*HT/VHT-3ss LGI*/
 	19, 39, 58, 78, 117, 156, 175, 195, 234, 260, 293, 325,
 	/*HT/VHT-4ss LGI*/
 	26, 52, 78, 104, 156, 208, 234, 260, 312, 347, 390, 433,
+#endif
 }; /*HE[3.2] = VHT[LGI] * 1.125*/
 
 bool halbb_is_he_rate(struct bb_info *bb, u16 rate)
 {
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	return ((((rate & 0x1ff) >= BB_HE_1SS_MCS0) &&
 		 ((rate & 0x1ff) <= BB_HE_1SS_MCS(11))) ||
 		(((rate & 0x1ff) >= BB_HE_2SS_MCS0) &&
@@ -40,10 +43,15 @@ bool halbb_is_he_rate(struct bb_info *bb, u16 rate)
 		 ((rate & 0x1ff) <= BB_HE_3SS_MCS(11))) ||
 		(((rate & 0x1ff) >= BB_HE_4SS_MCS0) &&
 		 ((rate & 0x1ff) <= BB_HE_4SS_MCS(11)))) ? true : false;
+#else
+	return (((rate & 0x1ff) >= BB_HE_1SS_MCS0) &&
+		((rate & 0x1ff) <= BB_HE_1SS_MCS(11))) ? true : false;
+#endif
 }
 
 bool halbb_is_vht_rate(struct bb_info *bb, u16 rate)
 {
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	return ((((rate & 0x1ff) >= BB_VHT_1SS_MCS0) &&
 		 ((rate & 0x1ff) <= BB_VHT_1SS_MCS(9))) ||
 		(((rate & 0x1ff) >= BB_VHT_2SS_MCS0) &&
@@ -52,6 +60,10 @@ bool halbb_is_vht_rate(struct bb_info *bb, u16 rate)
 		 ((rate & 0x1ff) <= BB_VHT_3SS_MCS(9))) ||
 		(((rate & 0x1ff) >= BB_VHT_4SS_MCS0) &&
 		 ((rate & 0x1ff) <= BB_VHT_4SS_MCS(9)))) ? true : false;
+#else
+	return (((rate & 0x1ff) >= BB_VHT_1SS_MCS0) &&
+		((rate & 0x1ff) <= BB_VHT_1SS_MCS(9)))  ? true : false;
+#endif
 }
 
 bool halbb_is_ht_rate(struct bb_info *bb, u16 rate)
@@ -191,7 +203,7 @@ u8 halbb_rate_2_rate_digit(struct bb_info *bb, u16 rate)
 {
 	u8 legacy_table[12] = {1, 2, 5, 11, 6, 9, 12, 18, 24, 36, 48, 54};
 	u8 rate_digit = 0;
-
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	if (rate >= BB_HE_8SS_MCS0) {
 		rate_digit = (rate - BB_HE_8SS_MCS0);
 	} else if (rate >= BB_HE_7SS_MCS0) {
@@ -206,9 +218,13 @@ u8 halbb_rate_2_rate_digit(struct bb_info *bb, u16 rate)
 		rate_digit = (rate - BB_HE_3SS_MCS0);
 	} else if (rate >= BB_HE_2SS_MCS0) {
 		rate_digit = (rate - BB_HE_2SS_MCS0);
-	} else if (rate >= BB_HE_1SS_MCS0) {
+	} else
+#endif
+	if (rate >= BB_HE_1SS_MCS0) {
 		rate_digit = (rate - BB_HE_1SS_MCS0);
-	} else if (rate >= BB_VHT_8SS_MCS0) {
+	} else
+#ifdef HALBB_COMPILE_ABOVE_2SS
+	if (rate >= BB_VHT_8SS_MCS0) {
 		rate_digit = (rate - BB_VHT_8SS_MCS0);
 	} else if (rate >= BB_VHT_7SS_MCS0) {
 		rate_digit = (rate - BB_VHT_7SS_MCS0);
@@ -222,7 +238,9 @@ u8 halbb_rate_2_rate_digit(struct bb_info *bb, u16 rate)
 		rate_digit = (rate - BB_VHT_3SS_MCS0);
 	} else if (rate >= BB_VHT_2SS_MCS0) {
 		rate_digit = (rate - BB_VHT_2SS_MCS0);
-	} else if (rate >= BB_VHT_1SS_MCS0) {
+	} else
+#endif
+	if (rate >= BB_VHT_1SS_MCS0) {
 		rate_digit = (rate - BB_VHT_1SS_MCS0);
 	} else if (rate >= BB_HT_MCS0) {
 		rate_digit = (rate - BB_HT_MCS0);
@@ -251,6 +269,7 @@ u8 halbb_rate_2_rate_digit(struct bb_info *bb, u16 rate)
 	return rx_num;
 }*/
 
+#ifdef HALBB_COMPILE_ABOVE_2SS
 u8 halbb_rate_type_2_num_ss(struct bb_info *bb, enum halbb_rate_type type)
 {
 	u8 num_ss = 1;
@@ -287,7 +306,9 @@ u8 halbb_rate_to_num_ss(struct bb_info *bb, u16 rate)
 		num_ss = ((rate - BB_HT_MCS0) >> 3) + 1;
 	} else if (rate <= BB_VHT_1SS_MCS(9)) {
 		num_ss = 1;
-	} else if (rate <= BB_VHT_2SS_MCS(9)) {
+	}
+#ifdef HALBB_COMPILE_ABOVE_2SS
+	else if (rate <= BB_VHT_2SS_MCS(9)) {
 		num_ss = 2;
 	} else if (rate <= BB_VHT_3SS_MCS(9)) {
 		num_ss = 3;
@@ -301,9 +322,13 @@ u8 halbb_rate_to_num_ss(struct bb_info *bb, u16 rate)
 		num_ss = 7;
 	} else if (rate <= BB_VHT_8SS_MCS(9)) {
 		num_ss = 8;
-	} else if (rate <= BB_HE_1SS_MCS(11)) {
+	}
+#endif
+	else if (rate <= BB_HE_1SS_MCS(11)) {
 		num_ss = 1;
-	} else if (rate <= BB_HE_2SS_MCS(11)) {
+	}
+#ifdef HALBB_COMPILE_ABOVE_2SS
+	else if (rate <= BB_HE_2SS_MCS(11)) {
 		num_ss = 2;
 	} else if (rate <= BB_HE_3SS_MCS(11)) {
 		num_ss = 3;
@@ -318,10 +343,10 @@ u8 halbb_rate_to_num_ss(struct bb_info *bb, u16 rate)
 	} else if (rate <= BB_HE_8SS_MCS(11)) {
 		num_ss = 8;
 	}
-
+#endif
 	return num_ss;
 }
-
+#endif
 void halbb_print_rate_2_buff(struct bb_info *bb, u16 rate_idx, enum rtw_gi_ltf gi_ltf, char *buf, u16 buf_size)
 {
 	struct bb_rate_info rate;
@@ -341,15 +366,16 @@ void halbb_print_rate_2_buff(struct bb_info *bb, u16 rate_idx, enum rtw_gi_ltf g
 		mode = "";
 	}
 
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	if (rate.ss == 4) {
 		ss = "4";
 	} else if (rate.ss == 3) {
 		ss = "3";
 	} else if (rate.ss == 2) {
 		ss = "2";
-	} else {
+	} else
+#endif
 		ss = "1";
-	}
 
 	if (rate.mode == BB_HE_MODE) {
 		if (rate.gi_ltf == RTW_GILTF_LGI_4XHE32) {
@@ -441,14 +467,16 @@ u8 halbb_rate_order_compute(struct bb_info *bb, u16 rate_idx)
 	u16 rate_order = rate_idx & 0x7f;
 
 	rate_idx &= 0x7f;
-
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	if (rate_idx >= BB_VHT_MCS(4, 0)) {
 		rate_order -= BB_VHT_MCS(4, 0);
 	} else if (rate_idx >= BB_VHT_MCS(3, 0)) {
 		rate_order -= BB_VHT_MCS(3, 0);
 	} else if (rate_idx >= BB_VHT_MCS(2, 0)) {
 		rate_order -= BB_VHT_MCS(2, 0);
-	} else if (rate_idx >= BB_VHT_MCS(1, 0)) {
+	} else
+#endif
+	if (rate_idx >= BB_VHT_MCS(1, 0)) {
 		rate_order -= BB_VHT_MCS(1, 0);
 	} else if (rate_idx >= BB_HT_MCS(24)) {
 		rate_order -= BB_HT_MCS(24);
@@ -482,7 +510,7 @@ u8 halbb_init_ra_by_rssi(struct bb_info *bb, u8 rssi_assoc)
 	} else if (rssi_assoc > 1) {
 		init_ra_lv = 3;
 	} else {
-		init_ra_lv = 0;
+		init_ra_lv = 3;
 	}
 	return init_ra_lv;
 }
@@ -552,25 +580,25 @@ u8 halbb_rssi_lv_dec(struct bb_info *bb, u8 rssi, u8 ratr_state)
 
 u64 halbb_ramask_by_rssi(struct bb_info *bb, u8 rssi_lv, u64 ramask)
 {
-	u64 ra_mask_bitmap = ramask;
+	u32 ra_mask_bitmap = ramask & 0xffffffff;
 
 	if (rssi_lv == 0) {
-		ra_mask_bitmap &= 0xffffffffffffffff;
+		ra_mask_bitmap &= 0xffffffff;
 	} else if (rssi_lv == 1) {
-		ra_mask_bitmap &= 0xfffffffffffffff0;
+		ra_mask_bitmap &= 0xfffffff0;
 	} else if (rssi_lv == 2) {
-		ra_mask_bitmap &= 0xffffffffffffefe0;
+		ra_mask_bitmap &= 0xffffefe0;
 	} else if (rssi_lv == 3) {
-		ra_mask_bitmap &= 0xffffffffffffcfc0;
+		ra_mask_bitmap &= 0xffffcfc0;
 	} else if (rssi_lv == 4) {
-		ra_mask_bitmap &= 0xffffffffffff8f80;
+		ra_mask_bitmap &= 0xffff8f80;
 	} else if (rssi_lv >= 5) {
-		ra_mask_bitmap &= 0xffffffffffff0f00;
+		ra_mask_bitmap &= 0xffff0f00;
 	}
 
 	/*Avoid empty HT/VHT/HE ramask when HT/VHT/HE mode is enabled*/
 	if ((ra_mask_bitmap >> 12) == 0x0) {
-		ra_mask_bitmap |= (ramask & 0xfffffffffffff000);
+		ra_mask_bitmap |= (ramask & 0xffff000);
 		BB_DBG(bb, DBG_RA,
 		       "Empty HT/VHT/HE ramask! Bypass HT/VHT/HE ramask_by_rssi\n");
 	}
@@ -646,6 +674,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 		case RA_1SS_MODE:
 			mod_mask &= RAMASK_1SS_HT;
 			break;
+#ifdef HALBB_COMPILE_ABOVE_2SS
 		case RA_2SS_MODE:
 			mod_mask &= RAMASK_2SS_HT;
 			break;
@@ -655,6 +684,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 		case RA_4SS_MODE:
 			mod_mask &= RAMASK_4SS_HT;
 			break;
+#endif
 		default:
 			mod_mask &= RAMASK_1SS_HT;
 			break;
@@ -664,6 +694,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 		case RA_1SS_MODE:
 			mod_mask &= RAMASK_1SS_VHT;
 			break;
+#ifdef HALBB_COMPILE_ABOVE_2SS
 		case RA_2SS_MODE:
 			mod_mask &= RAMASK_2SS_VHT;
 			break;
@@ -673,6 +704,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 		case RA_4SS_MODE:
 			mod_mask &= RAMASK_4SS_VHT;
 			break;
+#endif
 		default:
 			mod_mask &= RAMASK_1SS_VHT;
 			break;
@@ -682,6 +714,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 		case RA_1SS_MODE:
 			mod_mask &= RAMASK_1SS_HE;
 			break;
+#ifdef HALBB_COMPILE_ABOVE_2SS
 		case RA_2SS_MODE:
 			mod_mask &= RAMASK_2SS_HE;
 			break;
@@ -691,6 +724,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 		case RA_4SS_MODE:
 			mod_mask &= RAMASK_4SS_HE;
 			break;
+#endif
 		default:
 			mod_mask &= RAMASK_1SS_HE;
 			break;
@@ -707,7 +741,7 @@ u64 halbb_ramask_mod(struct bb_info *bb, u8 macid, u64 ramask, u8 rssi, u8 mode,
 
 	if (wifi_mode != RA_CCK) {
 		mod_mask_rssi = halbb_ramask_by_rssi(bb, new_rssi_lv, mod_mask);
-		//BB_DBG(bb, DBG_RA, "RA mask modify by rssi : 0x%016llx\n", mod_mask_rssi);
+		BB_DBG(bb, DBG_RA, "RA mask modify by rssi : 0x%016llx\n", mod_mask_rssi);
 	} else {
 		mod_mask_rssi = mod_mask;
 	}
@@ -777,15 +811,21 @@ u64 halbb_gen_vht_mask(struct bb_info *bb,
 	}
 	asoc_cap_i = &phl_sta_i->asoc_cap;
 	vht_cap[0] = asoc_cap_i->vht_rx_mcs[0];
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	vht_cap[1] = asoc_cap_i->vht_rx_mcs[1];
 	BB_DBG(bb, DBG_RA, "%s : vhtcap:%x %x\n", __func__, vht_cap[0], vht_cap[1]);
 	for (i = 0; i < MAX_NSS_VHT; i++) {
+#else
+	for (i = 0; i < 1; i++) {
+#endif
 		if (i == 0) {
 			tmp_cap = vht_cap[0];
-		} else if (i == 4) {
+		}
+#ifdef HALBB_COMPILE_ABOVE_2SS
+		else if (i == 4) {
 			tmp_cap = vht_cap[1];
 		}
-
+#endif
 		cap_ss = tmp_cap & 0x03;
 		tmp_cap = tmp_cap >> 2;
 		if (cap_ss == 0) {
@@ -816,11 +856,18 @@ u64 halbb_gen_ht_mask(struct bb_info *bb,
 		return 0;
 	}
 	asoc_cap_i = &phl_sta_i->asoc_cap;
-	for (i = 0; i < MAX_NSS_HT; i++) { /* can use pointer after merge code*/
+#ifdef HALBB_COMPILE_ABOVE_2SS
+	for (i = 0; i < MAX_NSS_HT; i++)/* can use pointer after merge code*/
+#else
+	for (i = 0; i < 1; i++)
+#endif
 		ht_cap[i] = asoc_cap_i->ht_rx_mcs[i];
-	}
 	BB_DBG(bb, DBG_RA, "%s : htcap: %x %x\n", __func__, ht_cap[0], ht_cap[1]);
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	for (i = 0; i < MAX_NSS_HT; i++) {
+#else
+	for (i = 0; i < 1; i++) {
+#endif
 		cap_ss = (u64)ht_cap[i];
 		tmp_mask_nss = tmp_mask_nss | (cap_ss << (i * 12));
 		BB_DBG(bb, DBG_RA, "gen_htmask:cap%llx, ss%x, htmask: 0x%llx\n", cap_ss, i, tmp_mask_nss);
@@ -845,6 +892,7 @@ u64 halbb_gen_he_mask(struct bb_info *bb,
 		return 0;
 	}
 	asoc_cap_i = &phl_sta_i->asoc_cap;
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	if (bw == CHANNEL_WIDTH_80_80) {
 		he_cap[0] = asoc_cap_i->he_rx_mcs[4];
 		he_cap[1] = asoc_cap_i->he_rx_mcs[5];
@@ -855,13 +903,23 @@ u64 halbb_gen_he_mask(struct bb_info *bb,
 		he_cap[0] = asoc_cap_i->he_rx_mcs[0];
 		he_cap[1] = asoc_cap_i->he_rx_mcs[1];
 	}
+#else
+	he_cap[0] = asoc_cap_i->he_rx_mcs[0];
+#endif
 	BB_DBG(bb, DBG_RA, "%s: hecap:%x %x\n", __func__, he_cap[0], he_cap[1]);
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	for (i = 0; i < MAX_NSS_HE; i++) {
+#else
+	for (i = 0; i < 1; i++) {
+#endif
 		if (i == 0) {
 			tmp_cap = he_cap[0];
-		} else if (i == 4) {
+		}
+#ifdef HALBB_COMPILE_ABOVE_2SS
+		else if (i == 4) {
 			tmp_cap = he_cap[1];
 		}
+#endif
 		cap_ss = tmp_cap & 0x03;
 		tmp_cap = tmp_cap >> 2;
 		if (cap_ss == 0) {
@@ -963,6 +1021,7 @@ bool halbb_hw_bw_mode_chk(struct bb_info *bb, u8 bw, u8 hw_mode)
 u8 halbb_hw_bw_mapping(struct bb_info *bb, u8 bw, u8 hw_mode)
 {
 	u8 hw_bw_map = CHANNEL_WIDTH_20;
+#ifdef HALBB_BANDWIDTH_40M
 	bool ret_val;
 
 	if (bw <= CHANNEL_WIDTH_80) {
@@ -973,6 +1032,7 @@ u8 halbb_hw_bw_mapping(struct bb_info *bb, u8 bw, u8 hw_mode)
 		hw_bw_map = CHANNEL_WIDTH_20;
 	}
 	ret_val = halbb_hw_bw_mode_chk(bb, bw, hw_mode);
+#endif
 	return hw_bw_map;
 }
 
@@ -1057,40 +1117,13 @@ u8 halbb_nss_mapping(struct bb_info *bb,  u8 nss)
 	if (nss != 0) {
 		mapping_nss = nss - 1;
 	}
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	/* Driver tx_nss mapping */
 	if (mapping_nss > (bb->hal_com->rfpath_tx_num - 1)) {
 		mapping_nss = bb->hal_com->rfpath_tx_num - 1;
 	}
+#endif
 	return mapping_nss;
-}
-
-bool halbb_stbc_mapping(struct bb_info *bb,  struct rtw_phl_stainfo_t *phl_sta_i, u8 hw_mode)
-{
-	struct protocol_cap_t *asoc_cap_i;
-	bool stbc_en = false;
-
-	/* Driver wifi mode mapping */
-	if (!phl_sta_i) {
-		return false;
-	}
-	asoc_cap_i = &phl_sta_i->asoc_cap;
-	if (hw_mode & HE_SUPPORT) {
-		if (asoc_cap_i->stbc_he_rx != 0) {
-			stbc_en = true;
-		}
-		BB_DBG(bb, DBG_RA, "HE STBC %d\n", stbc_en);
-	} else if (hw_mode & VHT_SUPPORT_TX) {
-		if (asoc_cap_i->stbc_vht_rx != 0) {
-			stbc_en = true;
-		}
-		BB_DBG(bb, DBG_RA, "VHT STBC %d\n", stbc_en);
-	} else if (hw_mode & HT_SUPPORT) {
-		if (asoc_cap_i->stbc_ht_rx != 0) {
-			stbc_en = true;
-		}
-		BB_DBG(bb, DBG_RA, "HT STBC %d\n", stbc_en);
-	}
-	return stbc_en;
 }
 
 bool halbb_sgi_chk(struct bb_info *bb,  struct rtw_phl_stainfo_t *phl_sta_i, u8 hw_bw)
@@ -1106,7 +1139,9 @@ bool halbb_sgi_chk(struct bb_info *bb,  struct rtw_phl_stainfo_t *phl_sta_i, u8 
 	if (hw_bw == CHANNEL_WIDTH_20) {
 		sgi_en = asoc_cap_i->sgi_20;
 		BB_DBG(bb, DBG_RA, "Enable 20M SGI\n");
-	} else if (hw_bw == CHANNEL_WIDTH_40) {
+	}
+#ifdef HALBB_COMPILE_ABOVE_2SS
+	else if (hw_bw == CHANNEL_WIDTH_40) {
 		sgi_en = asoc_cap_i->sgi_40;
 		BB_DBG(bb, DBG_RA, "Enable 40M SGI\n");
 	} else if (hw_bw == CHANNEL_WIDTH_80) {
@@ -1116,6 +1151,7 @@ bool halbb_sgi_chk(struct bb_info *bb,  struct rtw_phl_stainfo_t *phl_sta_i, u8 
 		sgi_en = asoc_cap_i->sgi_160;
 		BB_DBG(bb, DBG_RA, "Enable 160M SGI\n");
 	}
+#endif
 	return sgi_en;
 }
 
@@ -1127,10 +1163,12 @@ void halbb_ramask_trans(struct bb_info *bb, u8 macid, u64 mask)
 	ra_cfg->ramask[1] = (u8)((mask & 0x000000000000ff00) >> 8);
 	ra_cfg->ramask[2] = (u8)((mask & 0x0000000000ff0000) >> 16);
 	ra_cfg->ramask[3] = (u8)((mask & 0x00000000ff000000) >> 24);
+#ifdef HALBB_COMPILE_ABOVE_2SS
 	ra_cfg->ramask[4] = (u8)((mask & 0x000000ff00000000) >> 32);
 	ra_cfg->ramask[5] = (u8)((mask & 0x0000ff0000000000) >> 40);
 	ra_cfg->ramask[6] = (u8)((mask & 0x00ff000000000000) >> 48);
 	ra_cfg->ramask[7] = (u8)((mask & 0xff00000000000000) >> 56);
+#endif
 }
 
 u8 halbb_get_opt_giltf(struct bb_info *bb, u8 assoc_giltf)
@@ -1150,8 +1188,6 @@ u8 halbb_get_opt_giltf(struct bb_info *bb, u8 assoc_giltf)
 
 u8 halbb_giltf_trans(struct bb_info *bb, u8 assoc_giltf, u8 cal_giltf)
 {
-	u8 i = 0;
-
 	BB_DBG(bb, DBG_RA, "Ass GILTF=%x,Cal GILTF=%x\n", assoc_giltf, cal_giltf);
 	if (cal_giltf == RTW_GILTF_LGI_4XHE32 && (assoc_giltf & BIT(0))) {
 		return cal_giltf;
@@ -1188,10 +1224,12 @@ bool rtw_halbb_dft_mask(struct bb_info *bb,
 	u8 hw_md;
 	u64 init_mask = 0;
 	u64 get_mask = 0;
-	u32 mask0, mask1;
+#ifdef HALBB_DBG_TRACE_SUPPORT
+	u32 mask0 = 0;
+#endif
+
 	enum channel_width bw;
 	struct rtw_hal_stainfo_t *hal_sta_i;
-	struct protocol_cap_t *asoc_cap_i;
 
 	if (!phl_sta_i || !bb) {
 		BB_WARNING("[%s][1]\n", __func__);
@@ -1202,7 +1240,7 @@ bool rtw_halbb_dft_mask(struct bb_info *bb,
 		BB_WARNING("[%s][2]\n", __func__);
 		return false;
 	}
-	asoc_cap_i = &phl_sta_i->asoc_cap;
+
 	mode = phl_sta_i->wmode;
 	bw = phl_sta_i->chandef.bw;
 	hw_md = halbb_hw_mode_mapping(bb, mode);
@@ -1236,73 +1274,19 @@ bool rtw_halbb_dft_mask(struct bb_info *bb,
 		get_mask = 0;
 	}
 	init_mask |= (get_mask << 12);
+#ifdef HALBB_DBG_TRACE_SUPPORT
 	mask0 = (u32)(init_mask & 0xffffffff);
-	mask1 = (u32)((init_mask >> 32) & 0xffffffff);
+#endif
 	if (init_mask != 0) {
 		hal_sta_i->ra_info.cur_ra_mask = init_mask;
-		BB_DBG(bb, DBG_RA, "Default mask = %x %x\n", mask0, mask1);
+#ifdef HALBB_DBG_TRACE_SUPPORT
+		BB_DBG(bb, DBG_RA, "Default mask = %x\n", mask0);
+#endif
 		return true;
 	} else {
 		BB_WARNING("[%s]Error default mask, it should not zero\n", __func__);
 		return false;
 	}
-}
-
-u8 rtw_halbb_arfr_trans(struct bb_info *bb,
-			struct rtw_phl_stainfo_t *phl_sta_i)
-{
-	struct rtw_hal_stainfo_t *hal_sta_i;
-	u8 mode;
-	u8 arfr_ret = 0x0;
-
-	if (!phl_sta_i) {
-		return false;
-	}
-	hal_sta_i = phl_sta_i->hal_sta;
-	if (!hal_sta_i) {
-		return false;
-	}
-	mode = phl_sta_i->wmode;
-	if (mode & WLAN_MD_11B) { /*11B*/
-		arfr_ret |= CCK_SUPPORT;
-	}
-	if ((mode & WLAN_MD_11A) || (mode & WLAN_MD_11G)) { /*11G, 11A*/
-		arfr_ret |= OFDM_SUPPORT;
-	}
-	if (mode & WLAN_MD_11N) { /* 11_N*/
-		arfr_ret |= HT_SUPPORT;
-	}
-	if (mode & WLAN_MD_11AC) { /*11AC*/
-		arfr_ret |= VHT_SUPPORT_TX;
-	}
-	return arfr_ret;
-	/*if (mode|WLAN_MD_11AX ) // 11AX usually can use arfr
-		hw_mode_map |= HE_SUPPORT;*/
-}
-
-bool halbb_ra_cfg_chk(struct bb_info *bb, u8 *mode, u8 *tx_nss, bool *tx_stbc)
-{
-	bool rpt = true;
-
-	if (bb->hal_com->dbcc_en && bb->num_rf_path == 2) {
-		if (*tx_stbc) {
-			BB_WARNING("[%s] stbc_en=%d", __func__, *tx_stbc);
-			*tx_stbc = false;
-			rpt = false;
-		}
-
-		if (*tx_nss == 1) { /*2SS*/
-			BB_WARNING("[%s] mapping_nss=%d", __func__, *tx_nss);
-			*tx_nss = 0;
-			rpt = false;
-		}
-
-		if (*mode == 0) {
-			BB_WARNING("[%s] mode=%d", __func__, *mode);
-			rpt = false;
-		}
-	}
-	return rpt;
 }
 
 bool rtw_halbb_raregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
@@ -1312,10 +1296,8 @@ bool rtw_halbb_raregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_st
 	struct bb_h2c_ra_cfg_info *ra_cfg;
 	struct rtw_hal_stainfo_t *hal_sta_i;
 	bool tx_ldpc;
-	bool tx_stbc;
 	bool ret_val = false;
 	u8 tx_nss;
-	u8 rssi;
 	struct protocol_cap_t *asoc_cap_i;
 	u8 rssi_assoc ;
 	u8 mode;
@@ -1344,16 +1326,14 @@ bool rtw_halbb_raregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_st
 	/*@ use assoc rssi to init ra, only use in ra register, it is an integer using U(8,0)*/
 	rssi_assoc = (u8)(hal_sta_i->rssi_stat.assoc_rssi);
 	BB_DBG(bb, DBG_RA, "Assoc rssi = %d\n", rssi_assoc);
-	rssi = (u8)(hal_sta_i->rssi_stat.rssi) >> 1;
 	mode = phl_sta_i->wmode;
 	init_lv = halbb_init_ra_by_rssi(bb, rssi_assoc);
 	/*@Becareful RA use our "Tx" capability which means the capability of their "Rx"*/
 	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx);
-	if (asoc_cap_i->dcm_max_const_rx) {
-		ra_cfg->dcm_cap = 1;
-	} else {
-		ra_cfg->dcm_cap = 0;
-	}
+	//if (asoc_cap_i->dcm_max_const_rx)
+	//	ra_cfg->dcm_cap = 1;
+	//else
+	//	ra_cfg->dcm_cap = 0;
 	mode = halbb_hw_mode_mapping(bb, mode);
 
 	/* ONLY need to get the optional gi-ltf combination for H2C FW*/
@@ -1386,43 +1366,39 @@ bool rtw_halbb_raregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_st
 
 	ra_cfg->is_dis_ra = hal_sta_i->ra_info.dis_ra;
 	mod_mask = hal_sta_i->ra_info.cur_ra_mask;
-	ra_cfg->er_cap = asoc_cap_i->er_su;
-	ra_cfg->partial_bw_su_er = asoc_cap_i->partial_bw_su_er;
-	tx_stbc = halbb_stbc_mapping(bb, phl_sta_i, mode);
+	//ra_cfg->er_cap = asoc_cap_i->er_su;
+	//ra_cfg->partial_bw_su_er = asoc_cap_i->partial_bw_su_er;
 	ra_cfg->upd_all = true;
-	ra_cfg->upd_bw_nss_mask = false;
+	//ra_cfg->upd_bw_nss_mask= false;
 	ra_cfg->upd_mask = false;
 
-	if (!halbb_ra_cfg_chk(bb, &mode, &tx_nss, &tx_stbc)) {
-		BB_WARNING("[%s] mode=%d, tx_nss=%d, tx_stbc=%d\n", __func__, mode, tx_nss, tx_stbc);
-		//return false;
-	}
 	if (mode == 0) {
 		return false;
 	}
 	tx_ldpc = halbb_ldpc_chk(bb, phl_sta_i, mode);
 	ra_cfg->mode_ctrl = mode;
-	ra_cfg->bw_cap = halbb_hw_bw_mapping(bb, phl_sta_i->chandef.bw, mode);
 	en_sgi = halbb_sgi_chk(bb, phl_sta_i, ra_cfg->bw_cap);
 	ra_cfg->macid = macid;
 	ra_cfg->init_rate_lv = init_lv;
 	ra_cfg->en_sgi = halbb_ac_n_sgi_chk(bb, mode, en_sgi);
 	ra_cfg->ldpc_cap = tx_ldpc;
-	ra_cfg->stbc_cap = tx_stbc;
+	//ra_cfg->stbc_cap = tx_stbc;
 	ra_cfg->ss_num = tx_nss;
-	ra_cfg->is_6g = (bb->hal_com->band[bb->bb_phy_idx].cur_chandef.band == BAND_ON_6G) ? 1 : 0;
+	//ra_cfg->is_6g = (bb->hal_com->band[bb->bb_phy_idx].cur_chandef.band == BAND_ON_6G) ? 1 : 0;
 	/*@ modify ra mask by assoc rssi*/
 	mod_mask = halbb_ramask_mod(bb, macid, mod_mask, rssi_assoc, mode, tx_nss);
 	halbb_ramask_trans(bb, macid, mod_mask);
+#ifdef HALBB_CSI_RATE
 	ret_val = halbb_set_csi_rate(bb, phl_sta_i);
 	if (!ret_val) {
 		return ret_val;
 	}
+#endif
 	BB_DBG(bb, DBG_RA, "RA Register=>In: Dis_ra=%x, MD=%x, BW=%x, macid=%x\n",
 	       hal_sta_i->ra_info.dis_ra, mode, phl_sta_i->chandef.bw, macid);
-	BB_DBG(bb, DBG_RA, "RA Register=>In: DCM =%x, ER=%x, Par_ER=%x, in_rt=%x, upd_a=%x, sgi=%x, ldpc=%x, stbc=%x\n",
+	BB_DBG(bb, DBG_RA, "RA Register=>In: DCM =%x, ER=%x, Par_ER=%x, in_rt=%x, upd_a=%x, sgi=%x, ldpc=%x\n",
 	       ra_cfg->dcm_cap, ra_cfg->er_cap, ra_cfg->partial_bw_su_er, init_lv, ra_cfg->upd_all,
-	       en_sgi, tx_ldpc, tx_stbc);
+	       en_sgi, tx_ldpc);
 	BB_DBG(bb, DBG_RA, "RA Register=>In: SS=%x, GILTF_cap=%x, upd_bnm=%x, upd_m=%x, mask=%llx\n",
 	       tx_nss, giltf_cap, ra_cfg->upd_bw_nss_mask, ra_cfg->upd_mask, mod_mask);
 	BB_DBG(bb, DBG_RA, "RA Register=>Out racfg: dis%x bw%x md%x mid%x\n", ra_cfg->is_dis_ra,
@@ -1457,6 +1433,10 @@ bool rtw_halbb_raupdate(struct bb_info *bb,
 	u32 *bb_h2c;
 	u8 cmdlen = sizeof(struct bb_h2c_ra_cfg_info);
 	u64 mod_mask;
+
+#ifndef HALBB_COMPILE_ABOVE_2SS
+	return false;
+#endif
 
 	BB_DBG(bb, DBG_RA, "====>%s\n", __func__);
 	if (!phl_sta_i || !bb) {
@@ -1515,7 +1495,7 @@ bool rtw_halbb_raupdate(struct bb_info *bb,
 	BB_DBG(bb, DBG_RA, "fix_giltf_en(phl)=%d, fix_giltf_en(Final)=%d, fix_giltf=%d\n",
 	       hal_sta_i->ra_info.fix_giltf_en, ra_cfg->fix_giltf_en, ra_cfg->fix_giltf);
 
-	ra_cfg->bw_cap = halbb_hw_bw_mapping(bb, phl_sta_i->chandef.bw, mode);
+	ra_cfg->bw_cap = CHANNEL_WIDTH_20;
 	ra_cfg->init_rate_lv = 0;
 	ra_cfg->ss_num = tx_nss;
 	mod_mask = halbb_ramask_mod(bb, macid, mod_mask, rssi, mode, tx_nss);
@@ -1534,7 +1514,6 @@ bool halbb_ra_update_mask_watchdog(struct bb_info *bb, struct rtw_phl_stainfo_t 
 	struct protocol_cap_t *asoc_cap_i;
 	u8 tx_nss;
 	u8 rssi;
-	u8 init_lv = 0;
 	u8 mode = 0;
 	u8 giltf_cap = 0;
 	bool ret_val = false;
@@ -1556,7 +1535,7 @@ bool halbb_ra_update_mask_watchdog(struct bb_info *bb, struct rtw_phl_stainfo_t 
 	ra_cfg->is_dis_ra = hal_sta_i->ra_info.dis_ra;
 	mod_mask = hal_sta_i->ra_info.cur_ra_mask;
 	ra_cfg->upd_all = false;
-	ra_cfg->upd_bw_nss_mask = false;
+	//ra_cfg->upd_bw_nss_mask= false;
 	ra_cfg->upd_mask = true;
 	/* while ra mask is updated, gi_ltf can also be update */
 	mode = ra_cfg->mode_ctrl;
@@ -1726,35 +1705,8 @@ bool rtw_halbb_query_txsts(struct bb_info *bb, u16 macid0, u16 macid1)
 	return ret_val;
 }
 
-void halbb_drv_cmac_rpt_parsing(struct bb_info *bb, u8 *rpt)
-{
-	struct bb_fw_cmac_rpt_info *c_rpt;
-	u16 rpt_len, i;
-	u8 *rpt_tmp = rpt;
-
-	if (!rpt) {
-		return;
-	}
-	c_rpt = (struct bb_fw_cmac_rpt_info *)rpt;
-	rpt_len = sizeof(struct bb_fw_cmac_rpt_info);
-	if (rpt_len % 4) {
-		return;
-	}
-	BB_DBG(bb, DBG_RA,
-	       "[%d] try_rate=%d, fix_rate=0x%x, final{rate, giltf}={0x%x,0x%x}, data_bw = 0x%x\n",
-	       c_rpt->macid, c_rpt->try_rate, c_rpt->fix_rate,
-	       c_rpt->final_rate, c_rpt->final_gi_ltf, c_rpt->data_bw);
-	for (i = 0; i < rpt_len; i++) {
-		BB_DBG(bb, DBG_RA, "[%d] 0x%x\n", i, *(u32 *)rpt);
-		rpt_tmp += 4;
-	}
-}
-
 u32 halbb_get_txsts_rpt(struct bb_info *bb, u16 len, u8 *c2h)
 {
-#ifdef HALBB_DBCC_SUPPORT
-	struct bb_info *bb_1 = NULL;
-#endif
 	u16 macid_rpt;
 	u16 macid_rpt_1;
 	u8 i = 0;
@@ -1793,19 +1745,11 @@ u32 halbb_get_txsts_rpt(struct bb_info *bb, u16 len, u8 *c2h)
 		if (bb->sta_exist[macid_rpt]) {
 			phl_sta_i = bb->phl_sta_info[(u8)macid_rpt];
 		} else {
-#ifdef HALBB_DBCC_SUPPORT
-			HALBB_GET_PHY_PTR(bb, bb_1, HW_PHY_1);
-			if (bb_1->sta_exist[macid_rpt]) {
-				phl_sta_i = bb_1->phl_sta_info[(u8)macid_rpt];
-			} else
-#endif
-			{
-				BB_DBG(bb, DBG_RA,
-				       "[%s][2]Error macid = %d!!\n",
-				       __func__, macid_rpt);
-				null_cnt++;
-				continue;
-			}
+			BB_DBG(bb, DBG_RA,
+			       "[%s][2]Error macid = %d!!\n",
+			       __func__, macid_rpt);
+			null_cnt++;
+			continue;
 		}
 
 		if (phl_sta_i == NULL) {
@@ -1850,7 +1794,7 @@ u32 halbb_get_txsts_rpt(struct bb_info *bb, u16 len, u8 *c2h)
 		       macid_rpt, tx_total);
 	}
 
-	if (null_cnt > 1)
+	if ((null_cnt > 1) && (macid_rpt_1 < PHL_MAX_STA_NUM))
 		BB_WARNING("====> GetTxStS : both macid sta is null, macid = {%d,%d}\n",
 			   macid_rpt_1, macid_rpt);
 
@@ -1869,7 +1813,10 @@ void halbb_ra_rssi_setting_watchdog(struct bb_info *bb)
 	struct bb_link_info *bb_link = &bb->bb_link_i;
 	u16 rssi_len = 0;
 	u32 *bb_h2c;
-	u8 rssi_a = 0, rssi_b = 0, bcn_rssi_a = 0, bcn_rssi_b = 0;
+	u8 rssi_a = 0, bcn_rssi_a = 0;
+#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT)
+	u8 rssi_b = 0, bcn_rssi_b = 0;
+#endif
 
 	rssi_len = sizeof(struct bb_h2c_rssi_setting) * PHL_MAX_STA_NUM;
 	rssi_i = hal_mem_alloc(bb->hal_com, rssi_len);
@@ -1899,31 +1846,37 @@ void halbb_ra_rssi_setting_watchdog(struct bb_info *bb)
 		/* Need modify for Nss > 2 */
 		rssi_a = (hal_sta_i->rssi_stat.rssi_ma_path[0] >> 5) & 0x7f;
 		bcn_rssi_a = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[0] >> 5) & 0x7f;
+#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT)
 		if (!bb->hal_com->dbcc_en) {
 			rssi_b = (hal_sta_i->rssi_stat.rssi_ma_path[1] >> 5) & 0x7f;
 			bcn_rssi_b = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[1] >> 5) & 0x7f;
 		}
+#endif
 		rssi_i[sta_cnt].macid = macid;
 		rssi_i[sta_cnt].rssi_a = rssi_a | BIT(7);
-		rssi_i[sta_cnt].rssi_b = rssi_b;
 		rssi_i[sta_cnt].bcn_rssi_a = bcn_rssi_a | BIT(7);
+#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT)
+		rssi_i[sta_cnt].rssi_b = rssi_b;
 		rssi_i[sta_cnt].bcn_rssi_b = bcn_rssi_b;
 		rssi_i[sta_cnt].drv_ractrl = 0; /* RSVD */
+#endif
 		rssi_i[sta_cnt].is_fixed_rate = bb_ra->fixed_rt_en;
 		rssi_i[sta_cnt].fixed_rate = bb_ra->fixed_rt_i.mcs_ss_idx;
 		rssi_i[sta_cnt].fixed_rate_md = bb_ra->fixed_rt_i.mode;
 		rssi_i[sta_cnt].fixed_giltf = bb_ra->fixed_rt_i.gi_ltf;
 		rssi_i[sta_cnt].fixed_bw = bb_ra->fixed_rt_i.bw;
 		sta_cnt++;
-
+#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT)
 		BB_DBG(bb, DBG_RA, "bcn_rssi{a,b}={%d,%d}, data_rssi{a,b}={%d,%d}\n",
 		       bcn_rssi_a, bcn_rssi_b, rssi_a, rssi_b);
-
+#else
+		BB_DBG(bb, DBG_RA, "bcn_rssi=%d, data_rssi=%d\n", bcn_rssi_a, rssi_a);
+#endif
 		if (sta_cnt == bb_link->num_linked_client) {
 			break;
 		}
 	}
-
+#if !defined(BB_8730E_SUPPORT) && !defined(BB_8720E_SUPPORT)
 	if (sta_cnt == STA_NUM_RSSI_CMD) {
 		/* Fill endcmd = 1 for last sta */
 		rssi_i[sta_cnt - 1].endcmd = 1;
@@ -1938,6 +1891,10 @@ void halbb_ra_rssi_setting_watchdog(struct bb_info *bb)
 					     HALBB_H2C_RA, bb_h2c);
 		BB_DBG(bb, DBG_RA, "sta_cnt=%d, RSSI cmd end 2\n", sta_cnt);
 	}
+#else
+	ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RSSISETTING,
+				     HALBB_H2C_RA, bb_h2c);
+#endif
 
 	BB_DBG(bb, DBG_RA, "RSSI=>h2c[0~3]: %x %x %x %x\n", bb_h2c[0], bb_h2c[1],
 	       bb_h2c[2], bb_h2c[3]);
@@ -1951,33 +1908,14 @@ void halbb_ra_rssi_setting_watchdog(struct bb_info *bb)
 	}
 }
 
-void halbb_ra_giltf_ctrl(struct bb_info *bb, u8 macid, u8 delay_sp, u8 assoc_giltf)
-{
-	struct bb_ra_info *bb_ra = &bb->bb_ra_i[macid];
-	struct bb_h2c_ra_cfg_info *ra_cfg = &bb->bb_ra_i[macid].ra_cfg;
-	enum rtw_gi_ltf giltf = RTW_GILTF_LGI_4XHE32;
-
-	if (!bb) {
-		return;
-	}
-	/*This dhould be decision before ra mask h2c*/
-	/* GI LTF decision algorithm is needed*/
-	/*if (delay_sp)
-		giltf = RTW_GILTF_LGI_4XHE32;
-	else
-		giltf = RTW_GILTF_LGI_4XHE32;
-	ra_cfg->giltf = giltf;*/
-}
-
 void halbb_ra_watchdog(struct bb_info *bb)
 {
 	struct bb_link_info *bb_link = &bb->bb_link_i;
 	u8 i = 0, sta_cnt = 0, macid = 0;
-#if 0
+
 	if (!(bb->support_ability & BB_RA)) {
 		return;
 	}
-#endif
 
 	halbb_ra_rssi_setting_watchdog(bb);
 	for (i = 0; i < PHL_MAX_STA_NUM; i++) {
@@ -2149,11 +2087,9 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u32 out_len = *_out_len;
 	u32 tmp1 = 0, tmp2 = 0, tmp3 = 0, tmp4 = 0;
 	u8 i;
-	bool ret_val = false;
 	struct rtw_ra_sta_info *bb_ra;
 	struct rtw_hal_stainfo_t *hal_sta_i;
 	//struct bb_h2c_rssi_setting *rssi_i;
-	u16 rssi_len = 0;
 	u8 rssi_a = 0, rssi_b = 0, bcn_rssi_a = 0, bcn_rssi_b = 0;
 	struct rtw_phl_com_t *phl = bb->phl_com;
 	struct dev_cap_t *dev = &phl->dev_cap;
@@ -2190,9 +2126,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		goto out;
 	}
 	for (i = 0; i < 8; i++) {
-		if (input[i + 1]) {
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
-		}
 	}
 	//rssi_len = sizeof(struct bb_h2c_rssi_setting);
 	//rssi_i = hal_mem_alloc(bb->hal_com, rssi_len);
@@ -2264,7 +2198,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			bb_ra->fixed_rt_i.bw = rssi_i.fixed_bw;
 			BB_DBG(bb, DBG_RA, "RA fix rate H2C: %x %x\n", bb_h2c[0], bb_h2c[1]);
 
-			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RSSISETTING, HALBB_H2C_RA, bb_h2c);
+			halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RSSISETTING, HALBB_H2C_RA, bb_h2c);
 		} else {
 			BB_DBG(bb, DBG_RA, "No Link ! RA rssi cmd fail!\n");
 		}
@@ -2301,7 +2235,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			bb_ra->fixed_rt_en = rssi_i.is_fixed_rate;
 			BB_DBG(bb, DBG_RA, "RA auto rate H2C: %x %x\n", bb_h2c[0], bb_h2c[1]);
 
-			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RSSISETTING, HALBB_H2C_RA, bb_h2c);
+			halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RSSISETTING, HALBB_H2C_RA, bb_h2c);
 		} else {
 			BB_DBG(bb, DBG_RA, "No Link ! RA rssi cmd fail!\n");
 		}
@@ -2323,7 +2257,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 			BB_DBG(bb, DBG_RA, "RA adjust th H2C: %x %x\n", bb_h2c[0], bb_h2c[1]);
 
-			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RA_ADJUST, HALBB_H2C_RA, bb_h2c);
+			halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RA_ADJUST, HALBB_H2C_RA, bb_h2c);
 		} else {
 			BB_DBG(bb, DBG_RA, "No Link ! RA rssi cmd fail!\n");
 		}
@@ -2353,7 +2287,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			BB_DBG(bb, DBG_RA, "RA adjust th H2C: %x %x\n",
 			       bb_h2c[0], bb_h2c[1]);
 
-			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_ADJUST_RA_MASK, HALBB_H2C_RA, bb_h2c);
+			halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_ADJUST_RA_MASK, HALBB_H2C_RA, bb_h2c);
 		} else {
 			BB_DBG(bb, DBG_RA, "No Link ! RA rssi cmd fail!\n");
 		}
@@ -2375,7 +2309,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 			BB_DBG(bb, DBG_RA, "RA d_o_timer H2C: %x\n", bb_h2c[0]);
 
-			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RA_D_O_TIMER, HALBB_H2C_RA, bb_h2c);
+			halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RA_D_O_TIMER, HALBB_H2C_RA, bb_h2c);
 		} else {
 			BB_DBG(bb, DBG_RA, "No Link ! RA d_o_timer cmd fail!\n");
 		}

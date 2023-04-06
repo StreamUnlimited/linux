@@ -5729,6 +5729,17 @@ struct fwcmd_rsvdpage {
 	u8 data6;	// loc_LTECOEX_QosNull
 };
 
+struct fwcmd_aoac_rsvdpage {
+	u8 cmd_id;	// 0x00
+	u8 loc_rmcinfo;	// loc_remoteCtrl_info
+	u8 loc_arprsp;	// loc_arp_response
+	u8 loc_ngbradv;	// loc_neighbor_advertisement
+	u8 loc_gtkrsp;	// loc_GTKResponse
+	u8 loc_gtkinfo;	// loc_GTKInformation
+	u8 loc_gtkextmem;	// loc_gtk_ext_mem
+	u8 loc_ndpinfo;	// loc_ndpInfo
+};
+
 struct fwcmd_joininfo {
 	u8 cmd_id;	// 0x01
 	u8 data0;	// opmode, macid_ind, miracast & role, macid_dest_role

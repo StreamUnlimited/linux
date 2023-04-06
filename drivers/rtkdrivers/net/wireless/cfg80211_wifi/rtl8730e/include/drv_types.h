@@ -629,7 +629,7 @@ struct registry_priv {
 #define SZ_TX_RING 		(SZ_TXREQ+SZ_HEAD_BUF+SZ_TAIL_BUF+(SZ_PKT_LIST*NUM_PKT_LIST_PER_TXREQ))
 #define SZ_MGT_RING		(SZ_TXREQ + SZ_PKT_LIST)/* MGT_TXREQ_QMGT */
 
-#define MAX_TX_RING_NUM 	4096
+#define MAX_TX_RING_NUM 	128
 #endif
 
 

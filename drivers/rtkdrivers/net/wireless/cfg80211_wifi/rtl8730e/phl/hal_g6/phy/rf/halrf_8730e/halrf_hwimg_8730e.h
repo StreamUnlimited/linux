@@ -69,17 +69,17 @@ struct halrf_radio_info {
 
 #endif
 void halrf_config_8730e_nctl_reg(struct rf_info *rf);
-void halrf_config_8730e_radio_a_reg(struct rf_info *rf, enum phl_phy_idx phy);
-void halrf_config_8730e_store_power_by_rate(struct rf_info *rf, enum phl_phy_idx phy);
-void halrf_config_8730e_store_power_limit(struct rf_info *rf, enum phl_phy_idx phy);
-void halrf_config_8730e_store_power_limit_ru(struct rf_info *rf, enum phl_phy_idx phy);
-void halrf_config_8730e_store_pwr_track(struct rf_info *rf, enum phl_phy_idx phy);
-void halrf_config_8730e_store_xtal_track(struct rf_info *rf, enum phl_phy_idx phy);
-
+void halrf_config_8730e_new_radio_a_reg(struct rf_info *rf);
+void halrf_config_8730e_store_power_by_rate(struct rf_info *rf);
+void halrf_config_8730e_store_pwr_track(struct rf_info *rf);
+void halrf_config_8730e_store_xtal_track(struct rf_info *rf);
+void halrf_config_8730e_init_power_limit(struct rf_info *rf);
+s8 halrf_config_8730e_power_limit_by_ch(struct rf_info *rf,
+					u8 limit_rate, u8 regulation, u8 chnl);
+s8 halrf_config_8730e_power_limit_ru_by_ch(struct rf_info *rf,
+		u8 regulation, u8 bandwith, u8 chnl);
 u32 halrf_get_8730e_nctl_reg_ver(void);
 u32 halrf_get_8730e_radio_reg_ver(void);
-
-void halrf_config_8730e_radio_to_fw(struct rf_info *rf);
 
 #endif
 #endif /*  _HALRF_HW_IMG_8730E_H_ */

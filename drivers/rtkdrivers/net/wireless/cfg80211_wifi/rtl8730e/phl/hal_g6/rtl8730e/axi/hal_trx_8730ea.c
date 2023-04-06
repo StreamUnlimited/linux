@@ -697,55 +697,18 @@ hal_update_txbd_8730ea(struct hal_info_t *hal,
 
 #ifdef RTW_PHL_BCN_IOT
 static enum rtw_hal_status
-hal_update_bcn_txbd_8730ea(struct hal_info_t *hal,
-			   struct tx_base_desc *txbd_ring,
-			   void *info) {
-	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
-	struct rtw_hal_com_t *hal_com = hal->hal_com;
-	struct mac_ax_bcn_priv *bcn_info = (struct mac_ax_bcn_priv *)info;
-	struct bus_hw_cap_t *bus_hw_cap = &hal_com->bus_hw_cap;
-	u16 seg_num = ((TX_BUFFER_SEG_NUM == 0) ? 2 : ((TX_BUFFER_SEG_NUM == 1) ? 4 : 8));
-	u8 ch_idx = BCN_QUEUE_IDX_8730EA;
-	u8 *ring_head = 0;
-	int i = 0;
-	u8 *target_txbd = 0;
-	u16 total_len = 0;
-
-	total_len = bcn_info->desc_len + bcn_info->bcn_len;
-	ring_head = txbd_ring[ch_idx].vir_addr;
-	target_txbd = ring_head;
-
-	SET_TXBUFFER_DESC_LEN(target_txbd, 0);
-	SET_TXBUFFER_DESC_PSB(target_txbd, 0);
-	SET_TXBUFFER_DESC_ADD_LOW(target_txbd, 0);
-
-	for (i = 1 ; i < seg_num ; i++) {
-		SET_TXBUFFER_DESC_LEN_WITH_OFFSET(target_txbd, i, 0);
-		SET_TXBUFFER_DESC_MODE_WITH_OFFSET(target_txbd, i, 0);
-		SET_TXBUFFER_DESC_ADD_LOW_WITH_OFFSET(target_txbd, i, 0);
-	}
-
-	SET_TXBUFFER_DESC_LEN(target_txbd, TX_WIFI_INFO_SIZE);
-	SET_TXBUFFER_DESC_PSB(target_txbd, RTW_DIV_ROUND_UP(total_len, TXBD_PAGE_SIZE));
-	SET_TXBUFFER_DESC_ADD_LOW(target_txbd, bcn_info->desc_phy_addr);
-	SET_TXBUFFER_DESC_OWN(target_txbd, 1);
-
-	SET_TXBUFFER_DESC_MODE_WITH_OFFSET(target_txbd, 1, 0);
-	SET_TXBUFFER_DESC_ADD_LOW_WITH_OFFSET(target_txbd, 1, bcn_info->bcn_phy_addr);
-	SET_TXBUFFER_DESC_LEN_WITH_OFFSET(target_txbd, 1, bcn_info->bcn_len);
-
-	return hstatus;
-}
-
-static enum rtw_hal_status
-hal_trigger_bcn_8730ea(struct hal_info_t *hal) {
+hal_trigger_bcn_8730ea(struct hal_info_t *hal, u8 port)
+{
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
-	u8 tx_dma_ch = BCN_QUEUE_IDX_8730EA;
-	u32 txbd_reg;
-	u16 val16 = 0;
+	u32 val32 = 0;
 
-	val16 = hal_read16(hal->hal_com, REG_RX_RXBD_NUM);
-	hal_write16(hal->hal_com, REG_RX_RXBD_NUM, val16 | BIT_POLL_BCNQ);
+	val32 = hal_read32(hal->hal_com, REG_CPU_MGQ_INFO);
+	if (port == MAC_AX_PORT_0) {
+		val32 |= BIT_BCN_POLL;
+	} else {
+		val32 |= BIT_BCN_POLL1;
+	}
+	hal_write32(hal->hal_com, REG_CPU_MGQ_INFO, val32);
 	hstatus = RTW_HAL_STATUS_SUCCESS;
 
 	return hstatus;
@@ -1162,36 +1125,66 @@ static void hal_cfg_wow_txdma_8730ea(struct hal_info_t *hal, u8 en)
 }
 static u8 hal_poll_txdma_idle_8730ea(struct hal_info_t *hal)
 {
-	return true;
+	struct rtw_hal_com_t *hal_com = hal->hal_com;
+	struct rtw_phl_com_t *phl_com = hal->phl_com;
+	struct bus_cap_t *bus_cap = &hal_com->bus_cap;
+	u16 avail_txbd = 0;
+	u16  host_idx[HIGH_QUEUE_IDX_8730EA + 1] = {0}, hw_idx[HIGH_QUEUE_IDX_8730EA + 1] = {0};
+	u8 ch = 0;
+	u32 i = 0;
+	u8 ret = false;
+#define TXDMA_IDLE_CNT (1000)
+
+	while (i < TXDMA_IDLE_CNT) {
+		for (ch = BE_QUEUE_IDX_8730EA; ch <= HIGH_QUEUE_IDX_8730EA; ch++) {
+			avail_txbd = hal_get_avail_txbd_8730ea(hal_com, ch, &host_idx[ch], &hw_idx[ch]);
+		}
+		_os_delay_us(phl_com->drv_priv, 1);
+		if ((host_idx[BE_QUEUE_IDX_8730EA] == hw_idx[BE_QUEUE_IDX_8730EA])
+		    && (host_idx[BK_QUEUE_IDX_8730EA] == hw_idx[BK_QUEUE_IDX_8730EA])
+		    && (host_idx[VI_QUEUE_IDX_8730EA] == hw_idx[VI_QUEUE_IDX_8730EA])
+		    && (host_idx[VO_QUEUE_IDX_8730EA] == hw_idx[VO_QUEUE_IDX_8730EA])
+		    && (host_idx[MGT_QUEUE_IDX_8730EA] == hw_idx[MGT_QUEUE_IDX_8730EA])
+		    && (host_idx[HIGH_QUEUE_IDX_8730EA] == hw_idx[HIGH_QUEUE_IDX_8730EA])) {
+			ret = true;
+			break;
+		}
+		_os_delay_us(phl_com->drv_priv, 1);
+		i++;
+	}
+
+	return ret;
 }
 
 static u32 hal_check_bcn_status_8730ea(struct hal_info_t *hal)
 {
 	u32 status = 0;
 
-	if ((hal->txdone_ch_map[0] & BIT_TXBCN1_OK_INT)
-#ifdef CONFIG_CONCURRENT_MODE
-	    | (hal->txdone_ch_map[2] & BIT_TXBCNOK9_INT)
-#endif
-	    ) {
-		status |= PHL_TX_BCN_OK;
+	if (hal->txdone_ch_map[0] & BIT_TXBCN1_OK_INT) {
+		status |= PHL_P0_TX_BCN_OK;
 	}
 
-	if ((hal->txdone_ch_map[0] & BIT_TXBCN1_ERR_INT)
-#ifdef CONFIG_CONCURRENT_MODE
-	    | (hal->txdone_ch_map[2] & BIT_TXBCNERR9_INT)
-#endif
-	    ) {
-		status |= PHL_TX_BCN_ERR;
+	if (hal->txdone_ch_map[0] & BIT_TXBCN1_ERR_INT) {
+		status |= PHL_P0_TX_BCN_ERR;
 	}
 
-	if ((hal->txdone_ch_map[2] & BIT_BCNERLY0_INT)
-#ifdef CONFIG_CONCURRENT_MODE
-	    | (hal->txdone_ch_map[2] & BIT_BCNERLY8_INT)
-#endif
-	    ) {
-		status |= PHL_TX_BCN_EARLY;
+	if (hal->txdone_ch_map[2] & BIT_BCNERLY0_INT) {
+		status |= PHL_P0_TX_BCN_EARLY;
 	}
+
+#ifdef CONFIG_CONCURRENT_MODE
+	if (hal->txdone_ch_map[2] & BIT_TXBCNOK9_INT) {
+		status |= PHL_P1_TX_BCN_OK;
+	}
+
+	if (hal->txdone_ch_map[2] & BIT_TXBCNERR9_INT) {
+		status |= PHL_P1_TX_BCN_ERR;
+	}
+
+	if (hal->txdone_ch_map[2] & BIT_BCNERLY8_INT) {
+		status |= PHL_P1_TX_BCN_EARLY;
+	}
+#endif
 
 	return status;
 }
@@ -1303,7 +1296,6 @@ void hal_trx_ops_init_8730ea(void)
 	ops.update_wd = hal_update_wd_8730ea;
 	ops.update_txbd = hal_update_txbd_8730ea;
 #ifdef RTW_PHL_BCN_IOT
-	ops.update_bcn_txbd = hal_update_bcn_txbd_8730ea;
 	ops.tx_bcn_start = hal_trigger_bcn_8730ea;
 #endif
 	ops.tx_start = hal_trigger_txdma_8730ea;

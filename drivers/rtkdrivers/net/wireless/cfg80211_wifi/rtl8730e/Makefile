@@ -20,6 +20,7 @@ ifeq ($(GCC_VER_49),1)
 EXTRA_CFLAGS += -Wno-date-time	# Fix compile error && warning on gcc 4.9 and later
 endif
 
+EXTRA_CFLAGS += -I$(srctree)/$(src)
 EXTRA_CFLAGS += -I$(srctree)/$(src)/include
 
 EXTRA_LDFLAGS += --strip-debug
@@ -111,7 +112,7 @@ CONFIG_RTW_LOG_LEVEL = 1
 CONFIG_PROC_DEBUG = y
 
 ######################## Wake On Lan ##########################
-CONFIG_WOWLAN = n
+CONFIG_WOWLAN = y
 # CONFIG_WAKE_TYPE definition:
 #    bit0: magic packet
 #    bit1: unicast packet (default pattern match)

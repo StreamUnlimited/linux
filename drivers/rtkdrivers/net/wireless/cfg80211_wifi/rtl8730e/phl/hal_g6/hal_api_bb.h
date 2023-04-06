@@ -27,8 +27,6 @@ bool rtw_hal_bb_proc_cmd(struct hal_info_t *hal_info,
 enum rtw_hal_status rtw_hal_bb_watchdog(struct hal_info_t *hal_info, u8 is_lps);
 enum rtw_hal_status rtw_hal_bb_simple_watchdog(struct hal_info_t *hal_info, u8 io_en);
 
-void rtw_hal_bb_fw_edcca(struct hal_info_t *hal_info);
-
 void rtw_hal_bb_reset(struct hal_info_t *hal_info);
 
 void rtw_hal_bb_dm_init(struct hal_info_t *hal_info);

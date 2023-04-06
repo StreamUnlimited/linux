@@ -72,6 +72,7 @@ struct rtw_keep_alive_info {
 	/* core */
 	u8 keep_alive_en;
 	u8 keep_alive_period;
+	u8 keep_pkt_type;
 	/* phl/hal */
 	u8 null_pkt_id;
 };

@@ -218,6 +218,8 @@ _hal_parsing_rx_wd_8730e(struct hal_info_t *hal, u8 *desc,
 		mdata->pwr_lv = GET_RX_AX_DESC_RX_PWR_LV_8730E(desc);
 		mdata->central_ch = GET_RX_AX_DESC_RX_CENTRAL_CH_8730E(desc);
 		mdata->pktlen = GET_RX_AX_DESC_PKT_LEN_8730E(desc);
+		/*https://jira.realtek.com/browse/AMEBALITE-190*/
+		mdata->pktlen -= 4;
 		break;
 	case RX_8730E_DESC_PKT_T_WIFI_NDPA_CH_INFO:
 	case RX_8730E_DESC_PKT_T_RESP_CH_INFO:
@@ -273,6 +275,7 @@ _hal_parsing_rx_wd_8730e(struct hal_info_t *hal, u8 *desc,
 	mdata->macid_vld = GET_RX_AX_DESC_MACID_VLD_8730E(desc);
 	mdata->sec_type = GET_RX_AX_DESC_SEC_TYPE_8730E(desc);
 	mdata->macid = GET_RX_AX_DESC_MACID_8730E(desc);
+	mdata->macid_rxdesc = GET_RX_AX_DESC_TXRPTMID_SRCH_8730E(desc);
 
 	if (mdata->pktlen == 0)
 	{

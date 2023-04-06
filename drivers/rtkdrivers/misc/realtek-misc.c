@@ -18,9 +18,9 @@
 #include <linux/compat.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include <misc/realtek-misc.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
+#include <misc/realtek-misc.h>
 
 static int realtek_misc_major;
 struct mutex misc_mutex;
@@ -35,18 +35,6 @@ struct realtek_misc_dev *realtek_misc_devp;
 /*****************************************************************************************/
 /*******************************  Customize ioctl functions  *****************************/
 /*****************************************************************************************/
-
-/* Example: Share virtual regmap with drivers, using of_iomap. */
-#define REG_LSYS_BOOT_CFG			0x0268
-#define LSYS_GET_ROM_VERSION_SW(x)	((u32)(((x >> 0) & 0x0000FFFF)))
-static int read_rom_info(char *result)
-{
-	/* Read ROM version, only for example */
-	u32 val = LSYS_GET_ROM_VERSION_SW(readl(realtek_misc_devp->base + REG_LSYS_BOOT_CFG));
-	sprintf(result, "V%d.%d", val & 0xFF, (val >> 8) & 0xFF);
-
-	return 0;
-}
 
 /* BT functions. */
 static uint8_t bt_ant_switch = 0;
@@ -186,7 +174,7 @@ int realtek_misc_release(struct inode *inode, struct file *filp)
 	pr_debug("Realtek miscellaneous affairs: release\n");
 
 	switch (realtek_misc_devp->current_affair) {
-	case RTK_CMD_READ_ROM_INFO:
+	case RTK_CMD_GET_RL_INFO:
 		/* May release something. */
 		break;
 	case RTK_CMD_SET_BT_POWER_ON:
@@ -198,6 +186,12 @@ int realtek_misc_release(struct inode *inode, struct file *filp)
 	}
 
 	return 0;
+}
+
+static void get_rl_version(char *result)
+{
+	int val = rtk_misc_get_rl_version();
+	*result = val & 0xFF;
 }
 
 static ssize_t realtek_misc_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
@@ -214,8 +208,8 @@ static ssize_t realtek_misc_read(struct file *filp, char __user *buf, size_t cou
 	result = kmalloc(count, GFP_KERNEL);
 
 	switch (realtek_misc_devp->current_affair) {
-	case RTK_CMD_READ_ROM_INFO:
-		read_rom_info(result);
+	case RTK_CMD_GET_RL_INFO:
+		get_rl_version(result);
 		break;
 	default:
 		pr_warn("Please set the misc ioctl affair first\n");
@@ -243,7 +237,7 @@ static long realtek_misc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 	case RTK_CMD_SET_MODE:
 		realtek_misc_set_mode(arg);
 		break;
-	case RTK_CMD_READ_ROM_INFO:
+	case RTK_CMD_GET_RL_INFO:
 		/* May add some tasks.. */
 		break;
 	case RTK_CMD_SET_BT_POWER_ON:

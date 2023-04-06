@@ -79,8 +79,8 @@ int mrdump_platform_init(struct mrdump_desc *mrdump_desc);
 struct mrdump_data_ops {
 	int (*open)(const char *path, int flags, int rights);
 	int (*close)(void);
-	int (*read)(loff_t off, size_t len, void *buf);
-	int (*write)(loff_t off, size_t len, const void *buf);
+	int (*read)(loff_t off, size_t len, size_t *buf);
+	int (*write)(loff_t off, size_t len, const size_t *buf);
 	int (*erase)(void);
 	int (*sync)(void);
 };

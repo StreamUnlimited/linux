@@ -29,6 +29,7 @@
 #define CH_DESI_OPT_NUM 4 /*CH info decimation number 1/2/4/16 */
 #define CH_INFO_BW_NUM 4 /*20/40/80/160*/
 #define CH_INFO_RXD_LEN 8 /*len of a ch_info */
+#define CH_INFO_SNR_BIN_NUM 9 /*SNR BIN number*/
 
 /*@--------------------------[Enum]------------------------------------------*/
 enum bb_ch_info_en_t {
@@ -132,6 +133,12 @@ struct bb_ch_info_drv_rpt {
 	bool get_ch_rpt_success;
 };
 
+#ifdef CONFIG_MSFT
+struct bb_ch_info_snr_bin_info {
+	u8 ch_info_snr[4][CH_INFO_SNR_BIN_NUM];
+};
+#endif
+
 struct bb_info;
 /*@--------------------------[Prptotype]-------------------------------------*/
 bool halbb_ch_info_wait_from_physts(struct bb_info *bb, u32 dly, u32 dly_max,
@@ -147,5 +154,10 @@ enum bb_ch_info_t halbb_ch_info_parsing(struct bb_info *bb, u8 *addr, u32 len,
 					struct bb_ch_rpt_hdr_info *hdr,
 					struct bb_phy_info_rpt *phy_info,
 					struct bb_ch_info_drv_rpt *drv);
+
+#ifdef CONFIG_MSFT
+void halbb_ch_info_calc_pertone_snr(struct bb_info *bb, u8 snrvalue, u16 *addr, u32 len);
+void halbb_ch_info_snr_parse(struct bb_info *bb, u8 *addr);
+#endif
 
 #endif

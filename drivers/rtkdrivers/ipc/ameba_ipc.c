@@ -28,6 +28,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/completion.h>
 #include <linux/jiffies.h>
+#include <linux/pm_wakeirq.h>
 
 /* internal head files */
 #include <ameba_ipc/ameba_ipc.h>
@@ -280,6 +281,14 @@ struct aipc_ch_node *ameba_ipc_find_int_ch(struct aipc_port *pport, \
 
 	if (list_empty(&pport->ch_list))
 		goto func_exit;
+
+	if (pport->port_id == AIPC_PORT_LP) {
+		reg_isr_empt = reg_isr_empt >> LP_OFFSET;
+		reg_isr_full = reg_isr_full >> LP_OFFSET;
+	} else {
+		reg_isr_empt = reg_isr_empt & 0xFF;
+		reg_isr_full = reg_isr_full & 0xFF;
+	}
 
 	list_for_each_entry(chn, &pport->ch_list, list) {
 		if (reg_isr_empt && (chn->ch) \
@@ -626,6 +635,12 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 
 	pport->port_id = AIPC_PORT_LP;
 	pport->name = NAME_OF_LP_PORT;
+
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		device_init_wakeup(&pdev->dev, true);
+		dev_pm_set_wake_irq(&pdev->dev, pipc_dev->irq);
+	}
+
 	/* initialize LP port end */
 	printk(KERN_INFO "%s: probe successfully.\n", AIPC_DGB_INFO);
 

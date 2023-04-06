@@ -26,6 +26,11 @@
 #define TRX_SHARE_SIZE1_8730E	8192
 #define TRX_SHARE_SIZE2_8730E	8192
 
+#define CTRL_INFO_ENTRY_SIZE_8730E 40
+#define CRC5_ENTRY_SIZE_8730E 8
+#define CTRL_INFO_BASE_8730E 0x40000 /* 0x40040000 */
+#define CRC5_BASE_8730E 0x40A80 /* 0x40040A80 */
+
 #define TX_FIFO_SIZE_LA_8730E	(TX_FIFO_SIZE_8730E >>  1)
 #define TX_FIFO_SIZE_RX_EXPAND_1BLK_8730E	\
 	(TX_FIFO_SIZE_8730E - TRX_SHARE_SIZE0_8730E)
@@ -69,18 +74,28 @@
 
 /* page 0-4 for bcn, 4 for null data, 5 for bt qos null, 6 for qos null */
 #define RSVD_PAGE_NULL_DATA (4)
-#define RSVD_PAGE_BT_QOS_NULL (5)
-#define RSVD_PAGE_QOS_NULL (6)
+#define RSVD_PAGE_BT_QOS_NULL (RSVD_PAGE_NULL_DATA + 1)
+#define RSVD_PAGE_QOS_NULL (RSVD_PAGE_BT_QOS_NULL + 1)
 #define RSVD_PAGE_PROB_RSP (0)
 #define RSVD_PAGE_PS_POLL (0)
 #define RSVD_PAGE_CTS2SELF (0)
 #define RSVD_PAGE_LTECOEX_QOSNULL (0)
 
+/* For WoWLan , more reserved page */
 #ifdef CONFIG_WOWLAN
 #define RSVD_PG_WOWLAN_NUM		0x07
 #else
 #define RSVD_PG_WOWLAN_NUM		0x00
 #endif
+
+/* ARP Rsp:1, RWC:1, GTK Info:1, GTK RSP:2, GTK EXT MEM:2 */
+#define RSVD_PAGE_GTK_WOW_START (RSVD_PG_BCNQ_NUM + RSVD_PG_BCNQ1_NUM + RSVD_PG_BCNQ2_NUM)
+#define RSVD_PAGE_REMOTE_CTRL_INFO (RSVD_PAGE_GTK_WOW_START)
+#define RSVD_PAGE_ARP_RSP (RSVD_PAGE_REMOTE_CTRL_INFO + 1)
+#define RSVD_PAGE_GTK_INFO (RSVD_PAGE_ARP_RSP + 1)
+#define RSVD_PAGE_GTK_RSP (RSVD_PAGE_GTK_INFO + 1)
+#define RSVD_PAGE_GTK_EXT_MEM (RSVD_PAGE_GTK_INFO + 2)
+#define RSVD_PAGE_GTK_WOW_END (RSVD_PAGE_GTK_EXT_MEM + 2)
 
 #define C2H_PKT_BUF_8730e		256
 
@@ -200,6 +215,8 @@ u32 init_rate_fallback_ctrl_8730e(struct mac_ax_adapter *adapter);
 
 void cfg_mac_clk_8730e(struct mac_ax_adapter *adapter);
 
+void cfg_32k_clk_8730e(struct mac_ax_adapter *adapter);
+
 u32 init_sifs_ctrl_8730e(struct mac_ax_adapter *adapter);
 
 u32 init_low_pwr_8730e(struct mac_ax_adapter *adapter);
@@ -217,6 +234,11 @@ u32 cfg_transmitter_addr_8730e(struct mac_ax_adapter *adapter,
 
 u32 cfg_net_type_8730e(struct mac_ax_adapter *adapter, u8 port,
 		       enum mac_ax_net_type net_type);
+
+u32 cfg_sta_aid_8730e(struct mac_ax_adapter *adapter, u8 port, u16 aid);
+
+u32 cfg_macid_8730e(struct mac_ax_adapter *adapter,
+		    struct rtw_phl_stainfo_t *sta);
 
 #endif /* #if MAC_AX_8730E_SUPPORT */
 #endif

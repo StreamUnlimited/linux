@@ -215,10 +215,14 @@ enum rtw_phl_config_int {
 	RTW_PHL_EN_HCI_INT,
 	RTW_PHL_DIS_HCI_INT,
 	RTW_PHL_CLR_HCI_INT,
-	RTW_PHL_EN_AP_MODE_INT,
-	RTW_PHL_DIS_AP_MODE_INT,
-	RTW_PHL_EN_TX_BCN_INT,
-	RTW_PHL_DIS_TX_BCN_INT,
+	RTW_PHL_EN_P0_AP_MODE_INT,
+	RTW_PHL_DIS_P0_AP_MODE_INT,
+	RTW_PHL_EN_P0_TX_BCN_INT,
+	RTW_PHL_DIS_P0_TX_BCN_INT,
+	RTW_PHL_EN_P1_AP_MODE_INT,
+	RTW_PHL_DIS_P1_AP_MODE_INT,
+	RTW_PHL_EN_P1_TX_BCN_INT,
+	RTW_PHL_DIS_P1_TX_BCN_INT,
 	RTW_PHL_CONFIG_INT_MAX
 };
 
@@ -2609,6 +2613,17 @@ enum phl_thermal_protect_action {
 };
 #endif
 
+struct efuse_info {
+	u8 thermal_a;
+	u8 tssi_2g[11];
+	u8 rxgain_2g_cck;
+	u8 rxgain_2g_ofdm;
+	u8 tssi_5g[14];
+	u8 rxgain_5gl;
+	u8 rxgain_5gm;
+	u8 rxgain_5gh;
+};
+
 struct rtw_phl_evt_ops;
 struct rtw_phl_com_t {
 	struct rtw_wifi_role_t wifi_roles[MAX_WIFI_ROLE_NUMBER];
@@ -2637,14 +2652,19 @@ struct rtw_phl_com_t {
 	struct rtw_dfs_t dfs_info;
 #endif
 	struct rtw_iot_t id;
+	struct efuse_info efuse_data;
 	/* Flags to control/check RX packets */
 	bool append_fcs;
 	bool accept_icv_err;
+	bool ap_on; /*provide ap on information to BB DIG*/
 
 	u8 rf_type; /*enum rf_type , is RF_PATH - GET_HAL_RFPATH*/
 	u8 rf_path_num; /*GET_HAL_RFPATH_NUM*/
 	u8 regulation;  /*regulation*/
 	u8 edcca_mode;
+	u8 bb_log;
+	u8 csa_switch_ch;/*add for bb reset rssi only when csa switch channel*/
+	s8 connecting_rssi;
 
 #ifdef CONFIG_PHL_CHANNEL_INFO
 	struct rx_chan_info_pool *chan_info_pool;

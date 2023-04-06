@@ -406,7 +406,7 @@ static int rtk_wdg_start(struct watchdog_device *wdd)
 
 static int rtk_wdg_stop(struct watchdog_device *wdd)
 {
-	pr_info("%s: Stop watchdog is not supported by realtek-wdg, please stop feeding instead.\n", __FUNCTION__);
+	pr_info("%s: Stop watchdog is not supported by realtek-wdg.\n", __FUNCTION__);
 
 	return 0;
 }
@@ -424,10 +424,16 @@ static int rtk_wdg_ping(struct watchdog_device *wdd)
 static int rtk_wdg_set_timeout(struct watchdog_device *wdd,
 							   unsigned int timeout)
 {
+#ifdef RTK_WDG_SUPPORT
 	struct rtk_wdg *wdg = to_rtk_wdg(wdd);
 	u32 actual; // seconds
 	u32 prescaler = 0;
+#endif
 
+	pr_info("%s: RTK-WDG timeout-value cannot be refreshed once the wdg is enabled.", __FUNCTION__);
+	pr_info("%s: If needed, set watchdog timeout in dts rtk,wdg-timeout.", __FUNCTION__);
+
+#ifdef RTK_WDG_SUPPORT
 	dev_dbg(wdg->dev, "Try to set watchdog timeout to %d\n", timeout);
 	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
 
@@ -452,6 +458,7 @@ static int rtk_wdg_set_timeout(struct watchdog_device *wdd,
 
 	/*Disable Register access*/
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
+#endif
 
 	return 0;
 }
