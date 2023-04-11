@@ -84,6 +84,10 @@
 	status = "disabled";
 };
 
+&psci {
+	disable-poweroff;
+};
+
 &i2c1 {
 	/*
 	 * Workaround for:
