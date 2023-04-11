@@ -208,7 +208,7 @@
 		clock-output-names = "clk_ext4";
 	};
 
-	psci {
+	psci: psci {
 		compatible = "arm,psci-1.0";
 		method = "smc";
 	};
