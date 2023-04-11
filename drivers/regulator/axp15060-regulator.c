@@ -18,6 +18,7 @@
 #include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <linux/i2c.h>
+#include <linux/pm_runtime.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/of_regulator.h>
 
@@ -262,8 +263,10 @@ static const struct regulator_desc axp15060_regulators[] = {
 
 static int axp15060_power_off(struct sys_off_data *data)
 {
-	struct device *axp15060_dev = data->cb_data;
-	if (axp15060_dev) {
+	struct i2c_client *client = data->cb_data;
+	struct device *axp15060_dev = &client->dev;
+	struct device *i2c_adapter_dev = &client->adapter->dev;
+	if (axp15060_dev && pm_runtime_resume_and_get(i2c_adapter_dev) == 0) {
 		struct regmap *regmap = dev_get_regmap(axp15060_dev, NULL);
 
 		dev_info(axp15060_dev, "power off\n");
@@ -273,20 +276,20 @@ static int axp15060_power_off(struct sys_off_data *data)
 	return NOTIFY_DONE;
 }
 
-static int axp15060_power_off_prepare(struct device *dev)
+static int axp15060_power_off_init(struct i2c_client *client)
 {
 	int err;
-	err = devm_register_sys_off_handler(dev,
-					    SYS_OFF_MODE_POWER_OFF_PREPARE,
+	err = devm_register_sys_off_handler(&client->dev,
+					    SYS_OFF_MODE_POWER_OFF,
 					    SYS_OFF_PRIO_DEFAULT,
 					    axp15060_power_off,
-					    dev);
+					    client);
 	if (err) {
-		dev_err(dev, "failed to register sys-off handler: %d\n",
+		dev_err(&client->dev, "failed to register sys-off handler: %d\n",
 			err);
 		return err;
 	}
-	dev_info(dev, "sys-off handler registered\n");
+	dev_info(&client->dev, "sys-off handler registered\n");
 
 	return 0;
 }
@@ -304,7 +307,7 @@ static int axp15060_i2c_probe(struct i2c_client *client)
 	config.driver_data = NULL;
 	config.regmap = regmap;
 
-	err = axp15060_power_off_prepare(&client->dev);
+	err = axp15060_power_off_init(client);
 	if(err)
 		return err;
 
