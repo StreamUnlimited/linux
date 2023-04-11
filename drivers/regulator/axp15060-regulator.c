@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/i2c.h>
+#include <linux/pm_runtime.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/of_regulator.h>
 
@@ -260,22 +261,14 @@ static const struct regulator_desc axp15060_regulators[] = {
 };
 
 static struct device *axp15060_dev;
+static struct device *i2c_adapter_dev;
 
 static void axp15060_power_off(void)
 {
-	if (axp15060_dev) {
+	if (axp15060_dev && pm_runtime_resume_and_get(i2c_adapter_dev) == 0) {
 		struct regmap *regmap = dev_get_regmap(axp15060_dev, NULL);
-
 		dev_info(axp15060_dev, "power off\n");
 		regmap_write(regmap, AXP15060_PWR_DIS_PWR_DWN, AXP15060_PWR_OFF_VAL);
-	}
-}
-
-static void axp15060_power_off_prepare(void)
-{
-	if (axp15060_dev) {
-		dev_info(axp15060_dev, "pm_power_off handler registered to axp15060\n");
-		pm_power_off = axp15060_power_off;
 	}
 }
 
@@ -292,7 +285,9 @@ static int axp15060_i2c_probe(struct i2c_client *client, const struct i2c_device
 	config.regmap = regmap;
 
 	axp15060_dev = &client->dev;
-	pm_power_off_prepare = axp15060_power_off_prepare;
+	i2c_adapter_dev = &client->adapter->dev;
+	if (of_device_is_system_power_controller(client->dev.of_node) && !pm_power_off)
+		pm_power_off = axp15060_power_off;
 
 	for (i = 0; i < ARRAY_SIZE(axp15060_regulators); i++) {
 		struct regulator_dev *rdev;
@@ -304,19 +299,7 @@ static int axp15060_i2c_probe(struct i2c_client *client, const struct i2c_device
 		}
 	}
 
-	return sysfs_create_group(&client->dev.kobj, &axp15060_attribute_group);
-}
-
-static int axp15060_i2c_remove(struct i2c_client *client)
-{
-	if (pm_power_off_prepare == axp15060_power_off_prepare)
-		pm_power_off_prepare = NULL;
-
-	if (pm_power_off == axp15060_power_off)
-		pm_power_off = NULL;
-
-	sysfs_remove_group(&client->dev.kobj, &axp15060_attribute_group);
-	return 0;
+	return devm_device_add_group(&client->dev, &axp15060_attribute_group);
 }
 
 static const struct of_device_id axp15060_of_match[] = {
@@ -331,7 +314,6 @@ static struct i2c_driver axp15060_i2c_driver = {
 		.of_match_table	= of_match_ptr(axp15060_of_match),
 	},
 	.probe		= axp15060_i2c_probe,
-	.remove		= axp15060_i2c_remove,
 };
 module_i2c_driver(axp15060_i2c_driver);
 

@@ -103,6 +103,7 @@
 	pmic: axp15060@36 {
 		compatible = "x-powers,axp15060";
 		reg = <0x36>;
+		system-power-controller;
 
 		regulators {
 			vdd_arm: dcdc2 {
