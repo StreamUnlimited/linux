@@ -99,9 +99,9 @@ static int snd_soc_stream195x_ppm_put(struct snd_kcontrol *kcontrol, struct snd_
 	comp = DIV_ROUND_CLOSEST_ULL((u64)PLL_NOMINAL_RATE_44k1 * abs(ppm), 1000000UL);
 	clk_rate = PLL_NOMINAL_RATE_44k1;
 	if (ppm > 0)
-		clk_rate += comp;
-	else
 		clk_rate -= comp;
+	else
+		clk_rate += comp;
 
 	ret = clk_set_rate(priv->pll11k_clk, clk_rate);
 	if (ret)
