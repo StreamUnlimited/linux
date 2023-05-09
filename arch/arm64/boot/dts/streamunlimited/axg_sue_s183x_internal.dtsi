@@ -221,11 +221,6 @@
 		};
 	};
 
-	vrtc: rtc@a8 {
-		compatible = "amlogic,meson-vrtc";
-		reg = <0x0 0x000a8 0x0 0x4>;
-	};
-
 	amlogic_reboot: amlogic_reboot{
 		compatible = "amlogic,reboot";
 		sys_reset = <0x84000009>;
@@ -307,6 +302,13 @@
 				reg = <0x0 0xffffffff>;
 			};
 		};
+	};
+};
+
+&aobus {
+	vrtc: rtc@a8 {
+		compatible = "amlogic,meson-vrtc";
+		reg = <0x0 0x00a8 0x0 0x4>;
 	};
 };
 
