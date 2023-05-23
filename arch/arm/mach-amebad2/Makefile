@@ -9,7 +9,6 @@
 #
 # Ameba
 #
-textofs-y	:= 0x00388000
 core-y		+= arch/arm/mach-amebad2/
 
 KBUILD_CPPFLAGS += -I$(srctree)/arch/arm/mach-amebad2/ -I$(srctree)/arch/arm/mach-amebad2/include
