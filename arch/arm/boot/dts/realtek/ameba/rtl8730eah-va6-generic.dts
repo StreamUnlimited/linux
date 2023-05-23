@@ -13,8 +13,8 @@
 / {
 	memory {
 		device_type = "memory";
-		// DRAM base address should be 1MB-aligned.
-		reg = <0x60300000 0x3D00000>;  // 64MB -- exclude 3MB secure memory
+		// DRAM base address should be 2MB-aligned.
+		reg = <0x60800000 0x3800000>;  // 64MB -- exclude 8MB secure memory
 	};
 };
 
