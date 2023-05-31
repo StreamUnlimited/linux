@@ -88,6 +88,18 @@
 	disable-poweroff;
 };
 
+&gpio1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_boot_detect>;
+
+	boot_detect {
+		gpio-hog;
+		gpios = <8 GPIO_ACTIVE_LOW>;
+		input;
+		line-name = "boot_detect";
+	};
+};
+
 &i2c1 {
 	/*
 	 * Workaround for:
@@ -219,6 +231,11 @@
 		pinctrl_onoff: gpiogrp {
 			fsl,pins = <
 				MX8MM_IOMUXC_UART3_TXD_GPIO5_IO27	(PAD_CTL_PE_UP | PAD_CTL_HYS)
+			>;
+		};
+		pinctrl_boot_detect: bootdetectgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_GPIO1_IO08_GPIO1_IO8	(PAD_CTL_PE_UP | PAD_CTL_HYS)	/* ENET_SPARE */
 			>;
 		};
 	};
