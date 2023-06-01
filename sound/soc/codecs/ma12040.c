@@ -43,7 +43,7 @@ static const struct reg_sequence ma12040_init_sequence[] = {
 	/* enable audio input mode overwrite (enables writes to register 0x25) */
 	{ 0x27, 0x28 },
 	/* change audio input mode to 26dB (increases maximum volume by 6dB) */
-	{ 0x25, 0x10 },
+	{ 0x25, 0x30 },
 	/* enable power mode profile PMP01 (Filterfree: optimized audio
 	 * performance, active speaker applications) */
 	{ 0x1d, 0x01 },
