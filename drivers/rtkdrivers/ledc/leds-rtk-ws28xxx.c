@@ -998,10 +998,6 @@ static void rtk_ws28xxx_led_hw_prepare(
 {
 	/* Fresh ledc reg paramters. */
 	priv->ledc_params.data_length = len;
-	priv->ledc_params.t0h_ns = 0x10;
-	priv->ledc_params.t0l_ns = 0x20;
-	priv->ledc_params.t1h_ns = 0x20;
-	priv->ledc_params.t1l_ns = 0x10;
 
 	rtk_ledc_enable_cmd(priv, DISABLE);
 
