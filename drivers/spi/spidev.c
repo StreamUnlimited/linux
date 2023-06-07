@@ -744,6 +744,7 @@ static const struct of_device_id spidev_dt_ids[] = {
 	{ .compatible = "silabs,em3581", .data = &spidev_of_check },
 	{ .compatible = "silabs,si3210", .data = &spidev_of_check },
 	{ .compatible = "realtek,ameba-spidev", .data = &spidev_of_check },
+	{ .compatible = "sue,dabfm", .data = &spidev_of_check },
 	{},
 };
 MODULE_DEVICE_TABLE(of, spidev_dt_ids);
