@@ -265,7 +265,7 @@
 			status = "okay";
 		};
 
-		spi0: spi0@0x400E8000 {
+		spi0: spi@0x400E8000 {
 			compatible = "realtek,ameba-spi";
 			rtk,spi-index = <0>;
 			reg = <0x400E8000 0x100>,
@@ -287,7 +287,7 @@
 			status = "disabled";
 		};
 
-		spi1: spi1@0x400E9000 {
+		spi1: spi@0x400E9000 {
 			compatible = "realtek,ameba-spi";
 			rtk,spi-index = <1>;
 			reg = <0x400E9000 0x100>,
@@ -534,8 +534,8 @@
 		serial2 = &uart2;
 		serial3 = &uart3;
 		spic = "/ocp/spi@44000000";
-		spi0 = "/ocp/spi0@0x400E8000";
-		spi1 = "/ocp/spi1@0x400E9000";
+		spi0 = "/ocp/spi@0x400E8000";
+		spi1 = "/ocp/spi@0x400E9000";
 		tim1 = &timer1;
 		tim2 = &timer2;
 		tim3 = &timer3;
