@@ -640,17 +640,8 @@ u32 mac_add_role(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
 		goto role_add_fail;
 	}
 
-	if (info->self_role == MAC_AX_SELF_ROLE_AP) {
-		ret = mac_h2c_join_info(adapter, info);
-		if (ret != MACSUCCESS) {
-			if (ret == MACFWNONRDY) {
-				PLTFM_MSG_WARN("skip join info\n");
-			} else {
-				PLTFM_MSG_ERR("mac_h2c_join_info: %d\n", ret);
-				return ret;
-			}
-		}
-	}
+	PLTFM_MSG_ALWAYS("Role added, macid[%d], self_role %d, upd_mode: %d, opmode %d.\n",
+			info->macid, info->self_role, info->upd_mode, info->opmode);
 
 	ret = role_info_to_hw(adapter, info);
 	if (ret == MACADDRCAMFL) {
@@ -699,20 +690,13 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 		return MACNOITEM;
 	}
 
+	PLTFM_MSG_ALWAYS("Role changed, macid[%d], self_role %d, upd_mode: %d, opmode %d.\n",
+			info->macid, info->self_role, info->upd_mode, info->opmode);
 	if (info->upd_mode == MAC_AX_ROLE_BAND_SW) {
 		if (!role->info.dbcc_role) {
 			PLTFM_MSG_ERR("role band sw runs only for dbcc role\n");
 			return MACFUNCINPUT;
 		}
-
-#if 0
-		ret = mac_dbcc_move_wmm(adapter, info);
-		if (ret != MACSUCCESS) {
-			PLTFM_MSG_ERR("mac_dbcc_move_wmm %d/%d/%d\n",
-				      info->band, info->macid, ret);
-			return ret;
-		}
-#endif
 
 		role->info.band = info->band;
 		role->info.a_info.bb_sel = info->band;
@@ -737,12 +721,8 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 		role->info = *info;
 	}
 
-	if (info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE ||
-	    info->upd_mode == MAC_AX_ROLE_REMOVE ||
-	    info->upd_mode == MAC_AX_ROLE_FW_RESTORE) {
-		if ((info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE ||
-		     info->upd_mode == MAC_AX_ROLE_FW_RESTORE) &&
-		    info->self_role == MAC_AX_SELF_ROLE_AP) {
+	if (info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE) {
+		if (info->self_role == MAC_AX_SELF_ROLE_AP) {
 			ret = mac_h2c_join_info(adapter, info);
 			if (ret != MACSUCCESS) {
 				if (ret == MACFWNONRDY) {
@@ -754,6 +734,8 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 				}
 			}
 		}
+	} else if (info->upd_mode == MAC_AX_ROLE_REMOVE) {
+		/* do nothing */
 	} else if (info->upd_mode == MAC_AX_ROLE_CON_DISCONN) {
 		if (info->opmode == MAC_AX_ROLE_DISCONN) {
 			ret = sec_info_deinit(adapter, info, role);
@@ -762,6 +744,7 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 				return ret;
 			}
 		}
+
 		ret = mac_h2c_join_info(adapter, info);
 		if (ret != MACSUCCESS) {
 			if (ret == MACFWNONRDY) {
@@ -771,17 +754,8 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 				return ret;
 			}
 		}
-	} else if (info->upd_mode == MAC_AX_ROLE_INFO_CHANGE ||
-		   info->upd_mode == MAC_AX_ROLE_BAND_SW) {
-		ret = mac_h2c_join_info(adapter, info);
-		if (ret != MACSUCCESS) {
-			if (ret == MACFWNONRDY) {
-				PLTFM_MSG_WARN("skip join info\n");
-			} else {
-				PLTFM_MSG_ERR("mac_h2c_join_info: %d\n", ret);
-				return ret;
-			}
-		}
+	} else if (info->upd_mode == MAC_AX_ROLE_INFO_CHANGE) {
+
 	} else {
 		PLTFM_MSG_ERR("role info upd_mode invalid\n");
 		return ret;
@@ -999,6 +973,7 @@ static u32 mac_h2c_join_info(struct mac_ax_adapter *adapter,
 {
 	struct fwcmd_joininfo fwcmd_tbl;
 	struct mac_ax_sta_init_info sta;
+	u8 dest_role = 0;
 	u32 ret = MACSUCCESS;
 	struct rtw_hal_com_t *hal_com = adapter->drv_adapter;
 
@@ -1028,6 +1003,16 @@ static u32 mac_h2c_join_info(struct mac_ax_adapter *adapter,
 	sta.wifi_role = info->wifi_role;
 	sta.self_role = info->self_role;
 
+	if (info->wifi_role == MAC_AX_WIFI_ROLE_AP) {
+		if (info->self_role == MAC_AX_SELF_ROLE_AP_CLIENT) {
+			dest_role = MAC_AX_WIFI_ROLE_STATION;
+		} else {
+			dest_role = MAC_AX_WIFI_ROLE_AP;
+		}
+	} else {
+		dest_role = sta.wifi_role;
+	}
+
 	/* update from macid to macid end? */
 	/* macid means mac type. Multi-mac type can be supported. */
 	macid_end = sta.macid;
@@ -1037,7 +1022,7 @@ static u32 mac_h2c_join_info(struct mac_ax_adapter *adapter,
 					  ((macid_end == sta.macid) ? 0 : FWCMD_H2C_JOININFO_MACID_IND) |
 					  (mira_scen ? FWCMD_H2C_JOININFO_MIRACAST :0 ) |
 					  (mira_role ? FWCMD_H2C_JOININFO_MIRACAST_ROLE : 0 ) |
-					  SET_WORD(sta.wifi_role, FWCMD_H2C_JOININFO_MACID_DEST_ROLE);
+					  SET_WORD(dest_role, FWCMD_H2C_JOININFO_MACID_DEST_ROLE);
 	fwcmd_tbl.data1 = sta.macid;
 	fwcmd_tbl.data2 = macid_end;
 
@@ -1057,16 +1042,8 @@ u32 mac_role_sync(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
 		return MACNOITEM;
 	}
 
-	if (info->self_role == MAC_AX_SELF_ROLE_AP) {
-		ret = mac_h2c_join_info(adapter, info);
-		if (ret) {
-			if (ret == MACFWNONRDY) {
-				PLTFM_MSG_WARN("skip join info\n");
-			} else {
-				PLTFM_MSG_ERR("mac_h2c_join_info: %d\n", ret);
-			}
-		}
-	}
+	PLTFM_MSG_ALWAYS("Role synced, macid[%d], self_role %d, upd_mode: %d, opmode %d.\n",
+			info->macid, info->self_role, info->upd_mode, info->opmode);
 	return ret;
 }
 #endif

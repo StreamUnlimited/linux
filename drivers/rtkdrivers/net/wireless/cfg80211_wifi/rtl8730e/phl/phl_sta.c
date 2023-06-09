@@ -2317,6 +2317,190 @@ void phl_bcn_watchdog(struct phl_info_t *phl)
 	}
 }
 
+/**
+ * rtw_phl_get_tx_ok_rpt() - get txok info.
+ * @phl:		struct phl_info_t *
+ * @phl_sta:		information is updated through phl_station_info.
+ * @tx_ok_cnt:		buffer address that we used to store tx ok statistics.
+ * @qsel			indicate which AC queue, or fetch all by PHL_AC_QUEUE_TOTAL
+ *
+ * Return rtw_phl_get_tx_ok_rpt's return value in enum rtw_phl_status type.
+ */
+enum rtw_phl_status
+rtw_phl_get_tx_ok_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_ok_cnt,
+ enum phl_ac_queue qsel)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
+	enum rtw_phl_status phl_sts = RTW_PHL_STATUS_SUCCESS;
+	struct rtw_hal_stainfo_t *hal_sta;
+	struct rtw_wp_rpt_stats *rpt_stats = NULL;
+
+	rpt_stats = (struct rtw_wp_rpt_stats *)hal_com->trx_stat.wp_rpt_stats;
+	if(rpt_stats) {
+		if (tx_ok_cnt && qsel <= PHL_AC_QUEUE_TOTAL) {
+			if (qsel == PHL_AC_QUEUE_TOTAL) {
+				/* copy all AC counter */
+				tx_ok_cnt[PHL_BE_QUEUE_SEL] = rpt_stats[PHL_BE_QUEUE_SEL].tx_ok_cnt;
+				tx_ok_cnt[PHL_BK_QUEUE_SEL] = rpt_stats[PHL_BK_QUEUE_SEL].tx_ok_cnt;
+				tx_ok_cnt[PHL_VI_QUEUE_SEL] = rpt_stats[PHL_VI_QUEUE_SEL].tx_ok_cnt;
+				tx_ok_cnt[PHL_VO_QUEUE_SEL] = rpt_stats[PHL_VO_QUEUE_SEL].tx_ok_cnt;
+
+				/* reset all counter */
+				_os_spinlock(phl_to_drvpriv(phl_info), &hal_com->trx_stat.tx_sts_lock, _bh, NULL);
+				rpt_stats[PHL_BE_QUEUE_SEL].tx_ok_cnt = 0;
+				rpt_stats[PHL_BK_QUEUE_SEL].tx_ok_cnt = 0;
+				rpt_stats[PHL_VI_QUEUE_SEL].tx_ok_cnt = 0;
+				rpt_stats[PHL_VO_QUEUE_SEL].tx_ok_cnt = 0;
+				_os_spinunlock(phl_to_drvpriv(phl_info), &hal_com->trx_stat.tx_sts_lock, _bh, NULL);
+			} else {
+				/*copy target AC queue counter*/
+				*tx_ok_cnt = rpt_stats[qsel].tx_ok_cnt;
+				/* reset target AC queue counter */
+				_os_spinlock(phl_to_drvpriv(phl_info), &hal_com->trx_stat.tx_sts_lock, _bh, NULL);
+				rpt_stats[qsel].tx_ok_cnt = 0;
+				_os_spinunlock(phl_to_drvpriv(phl_info), &hal_com->trx_stat.tx_sts_lock, _bh, NULL);
+			}
+		} else {
+			phl_sts = RTW_PHL_STATUS_FAILURE;
+			PHL_ERR("tx_ok_cnt = %p, qsel = %d\n", tx_ok_cnt, qsel);
+		}
+
+	} else {
+		phl_sts = RTW_PHL_STATUS_FAILURE;
+		PHL_ERR("PHL STA NULL.\n");
+	}
+	return phl_sts;
+}
+
+static u32 rtw_phl_get_hw_tx_fail_cnt(struct phl_info_t *phl_info,
+	enum phl_ac_queue qsel) {
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
+	struct rtw_wp_rpt_stats *rpt_stats = NULL;
+	u32 total = 0;
+
+	rpt_stats = (struct rtw_wp_rpt_stats *)hal_com->trx_stat.wp_rpt_stats;
+	if (rpt_stats) {
+		total = rpt_stats[qsel].rty_fail_cnt\
+				+ rpt_stats[qsel].lifetime_drop_cnt \
+				+ rpt_stats[qsel].macid_drop_cnt;
+	}
+
+	return total;
+}
+
+
+static void rtw_phl_reset_tx_fail_cnt(struct phl_info_t *phl_info,
+				      enum phl_ac_queue qsel) {
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
+	struct rtw_wp_rpt_stats *rpt_stats = NULL;
+
+	rpt_stats = (struct rtw_wp_rpt_stats *)hal_com->trx_stat.wp_rpt_stats;
+	if (rpt_stats) {
+		_os_spinlock(phl_to_drvpriv(phl_info), &hal_com->trx_stat.tx_sts_lock, _bh, NULL);
+		rpt_stats[qsel].rty_fail_cnt = 0;
+		rpt_stats[qsel].lifetime_drop_cnt = 0;
+		rpt_stats[qsel].macid_drop_cnt = 0;
+		_os_spinunlock(phl_to_drvpriv(phl_info), &hal_com->trx_stat.tx_sts_lock, _bh, NULL);
+	}
+}
+
+/**
+ * rtw_phl_get_tx_fail_rpt() - get tx fail info.
+ * @phl:		struct phl_info_t *
+ * @phl_sta:		information is updated through phl_station_info.
+ * @tx_fail_cnt:	buffer address that we used to store tx fail statistics.
+ * @qsel			indicate which AC queue, or fetch all by PHL_AC_QUEUE_TOTAL
+ *
+ * Return rtw_phl_get_tx_fail_rpt's return value in enum rtw_phl_status type.
+ */
+enum rtw_phl_status
+rtw_phl_get_tx_fail_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_fail_cnt,
+ enum phl_ac_queue qsel)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	enum rtw_phl_status phl_sts = RTW_PHL_STATUS_SUCCESS;
+	struct rtw_hal_stainfo_t *hal_sta;
+
+	if(phl_sta) {
+		hal_sta = phl_sta->hal_sta;
+
+		if (tx_fail_cnt && qsel <= PHL_AC_QUEUE_TOTAL) {
+			if (qsel == PHL_AC_QUEUE_TOTAL) {
+				/* copy all AC counter */
+				tx_fail_cnt[PHL_BE_QUEUE_SEL] = rtw_phl_get_hw_tx_fail_cnt(phl_info, PHL_BE_QUEUE_SEL);
+				tx_fail_cnt[PHL_BK_QUEUE_SEL] = rtw_phl_get_hw_tx_fail_cnt(phl_info, PHL_BK_QUEUE_SEL);
+				tx_fail_cnt[PHL_VI_QUEUE_SEL] = rtw_phl_get_hw_tx_fail_cnt(phl_info, PHL_VI_QUEUE_SEL);
+				tx_fail_cnt[PHL_VO_QUEUE_SEL] = rtw_phl_get_hw_tx_fail_cnt(phl_info, PHL_VO_QUEUE_SEL);
+				/* reset all counter */
+				rtw_phl_reset_tx_fail_cnt(phl_info, PHL_BE_QUEUE_SEL);
+				rtw_phl_reset_tx_fail_cnt(phl_info, PHL_BK_QUEUE_SEL);
+				rtw_phl_reset_tx_fail_cnt(phl_info, PHL_VI_QUEUE_SEL);
+				rtw_phl_reset_tx_fail_cnt(phl_info, PHL_VO_QUEUE_SEL);
+			} else {
+				/*copy target AC queue counter*/
+				tx_fail_cnt[qsel] = rtw_phl_get_hw_tx_fail_cnt(phl_info, qsel);
+				/* reset target AC queue counter */
+				rtw_phl_reset_tx_fail_cnt(phl_info, qsel);
+			}
+		} else {
+			phl_sts = RTW_PHL_STATUS_FAILURE;
+			PHL_ERR("tx_fail_cnt = %p, qsel = %d\n", tx_fail_cnt, qsel);
+		}
+	} else {
+		phl_sts = RTW_PHL_STATUS_FAILURE;
+		PHL_ERR("PHL STA NULL.\n");
+	}
+	return phl_sts;
+}
+
+/**
+ * rtw_phl_get_tx_retry_rpt() - get tx retry info.
+ * @phl:		struct phl_info_t *
+ * @phl_sta:		information is updated through phl_station_info.
+ * @tx_retry_cnt:	buffer address that we used to store tx fail statistics.
+ * @qsel			indicate which AC queue, or fetch all by PHL_AC_QUEUE_TOTAL
+ *
+ * Return rtw_phl_get_tx_retry_rpt's return value in enum rtw_phl_status type.
+ */
+enum rtw_phl_status
+rtw_phl_get_tx_retry_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_retry_cnt,
+ enum phl_ac_queue qsel)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	void *drv = phl_to_drvpriv(phl_info);
+	enum rtw_phl_status phl_sts = RTW_PHL_STATUS_SUCCESS;
+	struct rtw_hal_stainfo_t *hal_sta;
+
+	if(phl_sta) {
+		hal_sta = phl_sta->hal_sta;
+
+		if (tx_retry_cnt && qsel <= PHL_AC_QUEUE_TOTAL) {
+			if (qsel == PHL_AC_QUEUE_TOTAL) {
+				/* copy all AC counter */
+				_os_mem_cpy(drv, tx_retry_cnt, hal_sta->ra_info.tx_retry_cnt,
+					sizeof(u32)*PHL_AC_QUEUE_TOTAL);
+				/* reset all counter */
+				/* TODO: Here needs lock, and so does halbb_get_txsts_rpt */
+				_os_mem_set(drv, hal_sta->ra_info.tx_retry_cnt, 0, sizeof(u32)*PHL_AC_QUEUE_TOTAL);
+			} else {
+				/*copy target AC queue counter*/
+				*tx_retry_cnt = hal_sta->ra_info.tx_retry_cnt[qsel];
+				/* reset target AC queue counter */
+				/* TODO: Here needs lock, and so does halbb_get_txsts_rpt */
+				hal_sta->ra_info.tx_retry_cnt[qsel] = 0;
+			}
+		} else {
+			phl_sts = RTW_PHL_STATUS_FAILURE;
+			PHL_ERR("tx_retry_cnt = %p, qsel = %d\n", tx_retry_cnt, qsel);
+		}
+	} else {
+		phl_sts = RTW_PHL_STATUS_FAILURE;
+		PHL_ERR("PHL STA NULL.\n");
+	}
+	return phl_sts;
+}
+
 /*
  * calculate the value between current TSF and TBTT
  * TSF   0       50    180    150              250

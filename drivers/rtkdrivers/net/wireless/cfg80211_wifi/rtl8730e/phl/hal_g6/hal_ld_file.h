@@ -112,10 +112,9 @@ enum _halrf_pw_lmt_beamforming_type {
 
 /*@--------------------------Define Parameters-------------------------------*/
 #define AVG_THERMAL_NUM 8
-#define MAX_RF_PATH 4
 #define DELTA_SWINGIDX_SIZE 30
-#define BAND_NUM 4
-#define DELTA_SWINTSSI_SIZE 61
+#define BAND_NUM 1
+#define DELTA_SWINTSSI_SIZE 64
 
 /*@---------------------------End Define Parameters---------------------------*/
 

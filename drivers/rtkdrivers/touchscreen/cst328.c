@@ -31,8 +31,8 @@
 
 #include "cst328.h"
 
-#define RTK_FUNC_ENTER() printk(KERN_ERR "[RTK]%s: Enter\n", __func__)
-#define RTK_FUNC_EXIT()  printk(KERN_ERR "[RTK]%s: Exit(%d)\n", __func__, __LINE__)
+//#define RTK_FUNC_ENTER() printk(KERN_ERR "[RTK]%s: Enter\n", __func__)
+//#define RTK_FUNC_EXIT()  printk(KERN_ERR "[RTK]%s: Exit(%d)\n", __func__, __LINE__)
 
 #define RTK_DRIVER_NAME                     "rtk_ts"
 
@@ -201,17 +201,17 @@ static void rtk_ts_touch_report(void)
 	buf[1] = 0x00;
 	ret = rtk_ts_i2c_read_register(rtk_ts_data->client, buf, 7);
 	if (ret < 0) {
-		printk("i2c read touch point data failed.\n");
+		dev_err(rtk_ts_data->dev, "i2c read touch point data failed.\n");
 		goto OUT_PROCESS;
 	}
 
 	if (buf[6] != 0xAB) {
-		printk("buf[6] != 0xAB data is not valid..\r\n");
+		dev_err(rtk_ts_data->dev, "buf[6] != 0xAB data is not valid..\r\n");
 		goto OUT_PROCESS;
 	}
 
 	if (buf[0] == 0xAB) {
-		printk("buf[0]=0xAB,data is not valid..\r\n");
+		dev_err(rtk_ts_data->dev, "buf[0]=0xAB,data is not valid..\r\n");
 		goto OUT_PROCESS;
 	}
 
@@ -226,7 +226,7 @@ static void rtk_ts_touch_report(void)
 		//printk("rtk_ts_touch_report touch cnt: %d", cnt);
 		goto FINGER_PROCESS;
 	} else {
-		printk("rtk_ts_touch_report touch cnt: %d", cnt);
+		dev_err(rtk_ts_data->dev, "rtk_ts_touch_report touch cnt: %d", cnt);
 		i2c_len = (cnt - 1) * 5 + 1;
 		len_1 = i2c_len;
 
@@ -265,7 +265,7 @@ FINGER_PROCESS:
 	i2c_buf[2] = 0xAB;
 	ret = rtk_ts_i2c_write(rtk_ts_data->client, i2c_buf, 3);
 	if (ret < 0) {
-		printk(" rtk_ts send read touch info ending failed.\r\n");
+		dev_err(rtk_ts_data->dev, " rtk_ts send read touch info ending failed.\r\n");
 		goto OUT_PROCESS;
 	}
 
@@ -333,7 +333,7 @@ OUT_PROCESS:
 	buf[2] = 0xAB;
 	ret = rtk_ts_i2c_write(rtk_ts_data->client, buf, 3);
 	if (ret < 0) {
-		printk("  send read touch info ending failed.\n");
+		dev_err(rtk_ts_data->dev, "  send read touch info ending failed.\n");
 	}
 
 END:
@@ -375,7 +375,7 @@ static int rtk_input_dev_int(struct rtk_ts_data *ts_data)
 
 	ts_data->input_dev = input_allocate_device();
 	if (!ts_data->input_dev) {
-		printk("Failed to allocate input device.");
+		dev_err(ts_data->dev, "Failed to allocate input device.");
 		return -ENOMEM;
 	}
 	input_dev = ts_data->input_dev;
@@ -402,14 +402,14 @@ static int rtk_input_dev_int(struct rtk_ts_data *ts_data)
 
 	ret = input_register_device(ts_data->input_dev);
 	if (ret) {
-		printk("Failed to register input device: %d", ret);
+		dev_err(ts_data->dev, "Failed to register input device: %d", ret);
 		return ret;
 	}
 
 	thread = kthread_run(rtk_touch_handler, 0, RTK_DRIVER_NAME);
 	if (IS_ERR(thread)) {
 		ret = PTR_ERR(thread);
-		printk("rtk create touch event handler thread failed: %d.\n", ret);
+		dev_err(ts_data->dev, "rtk create touch event handler thread failed: %d.\n", ret);
 	}
 
 	//RTK_FUNC_EXIT();
@@ -438,13 +438,13 @@ static int rtk_gpio_configure(struct rtk_ts_data *data)
 	if (gpio_is_valid(data->pdata->irq_gpio)) {
 		ret = gpio_request(data->pdata->irq_gpio, NULL);
 		if (ret < 0) {
-			printk("[GPIO]irq gpio request failed");
+			dev_err(data->dev, "[GPIO]irq gpio request failed");
 			goto err_irq_gpio_req;
 		}
 
 		ret = gpio_direction_input(data->pdata->irq_gpio);
 		if (ret < 0) {
-			printk("[GPIO]set_direction for irq gpio failed");
+			dev_err(data->dev, "[GPIO]set_direction for irq gpio failed");
 			goto err_irq_gpio_dir;
 		}
 	}
@@ -453,13 +453,13 @@ static int rtk_gpio_configure(struct rtk_ts_data *data)
 	if (gpio_is_valid(data->pdata->reset_gpio)) {
 		ret = gpio_request(data->pdata->reset_gpio, NULL);
 		if (ret < 0) {
-			printk("[GPIO]reset gpio request failed");
+			dev_err(data->dev, "[GPIO]reset gpio request failed");
 			goto err_reset_gpio_req;
 		}
 
 		ret = gpio_direction_output(data->pdata->reset_gpio, 1);
 		if (ret < 0) {
-			printk("[GPIO]set_direction for reset gpio failed");
+			dev_err(data->dev, "[GPIO]set_direction for reset gpio failed");
 			goto err_reset_gpio_dir;
 		}
 	}
@@ -503,13 +503,13 @@ static int rtk_get_dt_coords(struct device *dev, char *name, struct rtk_ts_platf
 
 	coords_size = prop->length / sizeof(u32);
 	if (coords_size != RTK_COORDS_ARR_SIZE) {
-		printk("invalid:%s, size:%d", name, coords_size);
+		dev_err(dev, "invalid:%s, size:%d", name, coords_size);
 		return -EINVAL;
 	}
 
 	ret = of_property_read_u32_array(np, name, coords, coords_size);
 	if (ret < 0) {
-		printk("Unable to read %s, please check dts", name);
+		dev_err(dev, "Unable to read %s, please check dts", name);
 		pdata->x_resolution = RTK_X_DISPLAY_DEFAULT;
 		pdata->y_resolution = RTK_Y_DISPLAY_DEFAULT;
 		return -ENODATA;
@@ -532,12 +532,12 @@ static int rtk_parse_dt(struct device *dev, struct rtk_ts_platform_data *pdata)
 
 	match = of_match_device(of_match_ptr(rtk_dt_match), dev);
 	if (!match) {
-		printk("DTS Unable to find matchv device.");
+		dev_err(dev, "DTS Unable to find matchv device.");
 		return ENODEV;
 	}
 	ret = rtk_get_dt_coords(dev, "ts-display-coords", pdata);
 	if (ret < 0) {
-		printk("DTS Unable to get display-coords");
+		dev_err(dev, "DTS Unable to get display-coords");
 		return -1;
 	}
 
@@ -545,19 +545,19 @@ static int rtk_parse_dt(struct device *dev, struct rtk_ts_platform_data *pdata)
 	/* reset, irq gpio info */
 	pdata->reset_gpio = of_get_named_gpio_flags(np, "ts-reset-gpios", 0, &pdata->reset_gpio_flags);
 	if (pdata->reset_gpio < 0) {
-		printk("DTS Unable to get reset_gpio");
+		dev_err(dev, "DTS Unable to get reset_gpio");
 		return -1;
 	}
 
 	pdata->irq_gpio = of_get_named_gpio_flags(np, "ts-irq-gpios", 0, &pdata->irq_gpio_flags);
 	if (pdata->irq_gpio < 0) {
-		printk("DTS Unable to get irq_gpio");
+		dev_err(dev, "DTS Unable to get irq_gpio");
 		return -1;
 	}
 
 	ret = of_property_read_u32(np, "max-touch-number", &temp_val);
 	if (ret < 0) {
-		printk("DTS Unable to get max-touch-number, please check dts");
+		dev_err(dev, "DTS Unable to get max-touch-number, please check dts");
 		pdata->max_touch_num = RTK_MAX_POINTS;
 		return -1;
 	} else {
@@ -570,7 +570,7 @@ static int rtk_parse_dt(struct device *dev, struct rtk_ts_platform_data *pdata)
 		}
 	}
 
-	printk("DTS max touch number:%d, irq gpio:%d, reset gpio:%d", pdata->max_touch_num, pdata->irq_gpio, pdata->reset_gpio);
+	dev_info(dev, "DTS max touch number:%d, irq gpio:%d, reset gpio:%d", pdata->max_touch_num, pdata->irq_gpio, pdata->reset_gpio);
 
 	//RTK_FUNC_EXIT();
 	return ret;
@@ -585,14 +585,14 @@ static int rtk_platform_data_init(struct rtk_ts_data *ts_data)
 
 	ts_data->pdata = kzalloc(pdata_size, GFP_KERNEL);
 	if (!ts_data->pdata) {
-		printk("allocate memory for platform_data fail");
+		dev_err(ts_data->dev, "allocate memory for platform_data fail");
 		return -ENOMEM;
 	}
 
 	if (ts_data->dev->of_node) {
 		ret = rtk_parse_dt(ts_data->dev, ts_data->pdata);
 		if (ret < 0) {
-			printk("device-tree parse fail.");
+			dev_err(ts_data->dev, "device-tree parse fail.");
 			return -ENODEV;
 		}
 	}
@@ -619,7 +619,7 @@ static int rtk_ts_i2c_test(struct i2c_client *client)
 	}
 
 	if (retry == 6) {
-		printk("rtk_ts I2C TEST error.ret:%d;\n", ret);
+		dev_err(&client->dev, "rtk_ts I2C TEST error.ret:%d;\n", ret);
 	}
 
 	return ret;
@@ -666,10 +666,10 @@ static int rtk_ts_firmware_info(struct i2c_client *client)
 	rtk_ts_ic_checksum <<= 8;
 	rtk_ts_ic_checksum |= buf[4];
 
-	printk("rtk_ts ic version:0x%x, checksum:0x%x\r\n", rtk_ts_ic_version, rtk_ts_ic_checksum);
+	dev_dbg(&client->dev, "rtk_ts ic version:0x%x, checksum:0x%x\r\n", rtk_ts_ic_version, rtk_ts_ic_checksum);
 
 	if (rtk_ts_ic_version == 0xA5A5A5A5) {
-		printk("rtk_ts don't have firmware. \n");
+		dev_err(&client->dev, "rtk_ts don't have firmware. \n");
 		return -1;
 	}
 
@@ -714,16 +714,16 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	struct rtk_ts_data *ts_data = NULL;
 	//RTK_FUNC_ENTER();
 
-	printk("I2C Address: 0x%02x\n", client->addr);
+	dev_info(&client->dev, "I2C Address: 0x%02x\n", client->addr);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		printk("I2C not supported");
+		dev_err(&client->dev, "I2C not supported");
 		return -ENODEV;
 	}
 
 	ts_data = kzalloc(sizeof(*ts_data), GFP_KERNEL);
 	if (!ts_data) {
-		printk("allocate memory for ts_data fail");
+		dev_err(&client->dev, "allocate memory for ts_data fail");
 		return -ENOMEM;
 	}
 
@@ -735,7 +735,7 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	ret = rtk_platform_data_init(ts_data);
 	if (ret < 0) {
-		printk("rtk_platform_data_init fail,please check DTS.");
+		dev_err(&client->dev, "rtk_platform_data_init fail,please check DTS.");
 		goto err_end;
 		//kfree(ts_data);
 		//return ret;
@@ -743,7 +743,7 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	ret = rtk_gpio_configure(ts_data);
 	if (ret < 0) {
-		printk("rtk_gpio_configure fail");
+		dev_err(&client->dev, "rtk_gpio_configure fail");
 		//return -1;
 		goto err_end;
 	}
@@ -758,7 +758,7 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 		ret = rtk_ts_firmware_info(client);
 		if (ret < 0) {
-			printk("rtk_ts get firmware_info failed.\n");
+			dev_err(&client->dev, "rtk_ts get firmware_info failed.\n");
 			//return -1;
 			goto err_end;
 		}
@@ -766,13 +766,13 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	ret = rtk_input_dev_int(ts_data);
 	if (ret < 0) {
-		printk("Touch Probe : rtk_input_dev_int  fail...");
+		dev_err(&client->dev, "Touch Probe : rtk_input_dev_int  fail...");
 		goto err_end;
 	}
 
 	ret = rtk_irq_init(client);
 	if (ret < 0) {
-		printk("Touch Probe : rtk_irq_init  fail...");
+		dev_err(&client->dev, "Touch Probe : rtk_irq_init  fail...");
 		goto err_end;
 	}
 
@@ -869,7 +869,7 @@ static int __maybe_unused rtk_ts_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct rtk_ts_data *ts = i2c_get_clientdata(client);
 
-	printk("rtk_ts_suspend enter sleep.\n");
+	dev_dbg(&client->dev, "rtk_ts_suspend enter sleep.\n");
 
 	rtk_ts_irq_disable();
 
@@ -894,7 +894,7 @@ static int __maybe_unused rtk_ts_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct rtk_ts_data *ts = i2c_get_clientdata(client);
 
-	printk("rtk_ts_resume wake up.\n");
+	dev_dbg(&client->dev, "rtk_ts_resume wake up.\n");
 
 	for (idx = 0; idx <= 10; idx++) {
 		input_mt_slot(ts->input_dev, idx);

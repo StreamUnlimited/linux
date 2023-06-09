@@ -4467,7 +4467,7 @@ void start_ap_mode(_adapter *padapter)
 	pmlmepriv->ext_capab_ie_len = 0;
 
 #ifdef CONFIG_CONCURRENT_MODE
-	psecuritypriv->dot118021x_bmc_cam_id = INVALID_SEC_MAC_CAM_ID;
+	psecuritypriv->dot118021x_bmc_cam_id = BMC_SEC_MAC_CAM_ID;
 #endif
 
 	for (i = 0 ;  i < pstapriv->max_aid; i++) {

@@ -240,10 +240,6 @@ u32 mac_hal_init(struct mac_ax_adapter *adapter,
 	struct mac_ax_ops *mac_ops = adapter_to_mac_ops(adapter);
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	struct mac_ax_hw_info *hw_info = adapter->hw_info;
-#if MAC_AX_FEATURE_DBGPKG
-	struct mac_ax_dbgpkg dbg_val = {0};
-	struct mac_ax_dbgpkg_en dbg_en = {0};
-#endif
 	u32 ret;
 	u32 rom_addr;
 	u8 fwdl_en;
@@ -360,17 +356,6 @@ end:
 	if (ret != MACSUCCESS) {
 		adapter->sm.mac_rdy = MAC_AX_MAC_INIT_ERR;
 		PLTFM_MSG_ERR("[ERR]hal_init fail %d\n", ret);
-#if MAC_AX_FEATURE_DBGPKG
-		dbg_en.ss_dbg = 1;
-		dbg_en.dle_dbg = 1;
-		dbg_en.dmac_dbg = 1;
-		dbg_en.cmac_dbg = 1;
-		dbg_en.mac_dbg_port = 1;
-		dbg_en.plersvd_dbg = 1;
-		if (mac_ops->dbg_status_dump) {
-			mac_ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
-		}
-#endif
 	} else {
 		adapter->sm.mac_rdy = MAC_AX_MAC_RDY;
 	}
@@ -383,10 +368,6 @@ u32 mac_hal_deinit(struct mac_ax_adapter *adapter)
 	struct mac_ax_ops *ops = adapter_to_mac_ops(adapter);
 	struct mac_ax_intf_ops *intf_ops = adapter_to_intf_ops(adapter);
 	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
-#if MAC_AX_FEATURE_DBGPKG
-	struct mac_ax_dbgpkg dbg_val = {0};
-	struct mac_ax_dbgpkg_en dbg_en = {0};
-#endif
 	u32 ret;
 
 	adapter->sm.mac_rdy = MAC_AX_MAC_NOT_RDY;
@@ -445,15 +426,6 @@ end:
 	if (ret != MACSUCCESS) {
 		adapter->sm.mac_rdy = MAC_AX_MAC_DEINIT_ERR;
 		PLTFM_MSG_ERR("[ERR]hal_deinit fail %d\n", ret);
-#if MAC_AX_FEATURE_DBGPKG
-		dbg_en.ss_dbg = 1;
-		dbg_en.dle_dbg = 1;
-		dbg_en.dmac_dbg = 1;
-		dbg_en.cmac_dbg = 1;
-		dbg_en.mac_dbg_port = 1;
-		dbg_en.plersvd_dbg = 1;
-		ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
-#endif
 	}
 
 	return ret;
@@ -467,10 +439,6 @@ u32 mac_hal_fast_init(struct mac_ax_adapter *adapter,
 	struct mac_ax_ops *mac_ops = adapter_to_mac_ops(adapter);
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	struct mac_ax_hw_info *hw_info = adapter->hw_info;
-#if MAC_AX_FEATURE_DBGPKG
-	struct mac_ax_dbgpkg dbg_val = {0};
-	struct mac_ax_dbgpkg_en dbg_en = {0};
-#endif
 	u32 rom_addr;
 	u32 ret;
 	u8 fwdl_en;
@@ -564,15 +532,6 @@ end:
 	if (ret != MACSUCCESS) {
 		adapter->sm.mac_rdy = MAC_AX_MAC_FINIT_ERR;
 		PLTFM_MSG_ERR("[ERR]hal_fast_init fail %d\n", ret);
-#if MAC_AX_FEATURE_DBGPKG
-		dbg_en.ss_dbg = 1;
-		dbg_en.dle_dbg = 1;
-		dbg_en.dmac_dbg = 1;
-		dbg_en.cmac_dbg = 1;
-		dbg_en.mac_dbg_port = 1;
-		dbg_en.plersvd_dbg = 1;
-		mac_ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
-#endif
 	} else {
 		adapter->sm.mac_rdy = MAC_AX_MAC_RDY;
 	}
@@ -584,10 +543,6 @@ u32 mac_hal_fast_deinit(struct mac_ax_adapter *adapter)
 {
 	struct mac_ax_ops *ops = adapter_to_mac_ops(adapter);
 	struct mac_ax_intf_ops *intf_ops = adapter_to_intf_ops(adapter);
-#if MAC_AX_FEATURE_DBGPKG
-	struct mac_ax_dbgpkg dbg_val = {0};
-	struct mac_ax_dbgpkg_en dbg_en = {0};
-#endif
 	u32 ret;
 
 	adapter->sm.mac_rdy = MAC_AX_MAC_NOT_RDY;
@@ -615,15 +570,6 @@ end:
 	if (ret != MACSUCCESS) {
 		adapter->sm.mac_rdy = MAC_AX_MAC_FDEINIT_ERR;
 		PLTFM_MSG_ERR("[ERR]hal_fast_deinit fail %d\n", ret);
-#if MAC_AX_FEATURE_DBGPKG
-		dbg_en.ss_dbg = 1;
-		dbg_en.dle_dbg = 1;
-		dbg_en.dmac_dbg = 1;
-		dbg_en.cmac_dbg = 1;
-		dbg_en.mac_dbg_port = 1;
-		dbg_en.plersvd_dbg = 1;
-		ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
-#endif
 	}
 
 	return ret;

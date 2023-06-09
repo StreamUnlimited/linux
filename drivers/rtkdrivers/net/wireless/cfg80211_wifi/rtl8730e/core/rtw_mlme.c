@@ -3349,6 +3349,8 @@ static int rtw_check_join_candidate(struct mlme_priv *mlme
 {
 	int updated = _FALSE;
 	_adapter *adapter = container_of(mlme, _adapter, mlmepriv);
+	struct dvobj_priv *pdvobj = adapter->dvobj;
+	struct rtw_phl_com_t *phl_com = GET_PHL_COM(pdvobj);
 	struct rf_ctl_t *rfctl = adapter_to_rfctl(adapter);
 	RT_CHANNEL_INFO *chset = rfctl->channel_set;
 	u8 ch = competitor->network.Configuration.DSConfig;
@@ -3398,6 +3400,7 @@ static int rtw_check_join_candidate(struct mlme_priv *mlme
 	}
 
 	if (updated) {
+		phl_com->connecting_rssi = (*candidate)->network.PhyInfo.rssi;
 		RTW_INFO("[by_bssid:%u][assoc_ssid:%s][to_roam:%u] "
 			 "new candidate: %s("MAC_FMT", ch%u) rssi:%d\n",
 			 mlme->assoc_by_bssid,

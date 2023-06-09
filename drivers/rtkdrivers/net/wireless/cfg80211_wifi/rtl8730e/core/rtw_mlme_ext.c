@@ -6444,10 +6444,6 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
-	struct dvobj_priv *pdvobj = padapter->dvobj;
-	struct rtw_phl_com_t *phl_com = GET_PHL_COM(pdvobj);
-	struct rtw_phl_ppdu_sts_info *psts_info = &(phl_com->ppdu_sts_info);
-	struct rtw_phl_ppdu_sts_ent *ppdu_sts_ent = &psts_info->sts_ent[HW_BAND_0][0];
 
 	if (adapter_is_tx_blocked_by_ch_waiting(padapter)) {
 		return;
@@ -6585,7 +6581,6 @@ void issue_auth(_adapter *padapter, struct sta_info *psta, unsigned short status
 
 	pattrib->last_txcmdsz = pattrib->pktlen;
 
-	phl_com->connecting_rssi = ppdu_sts_ent->phy_info.rssi;
 	rtw_wep_encrypt(padapter, (u8 *)pmgntframe);
 	RTW_INFO("%s\n", __FUNCTION__);
 	dump_mgntframe(padapter, pmgntframe);

@@ -391,7 +391,7 @@
 #define PLL_BIT_ISO                         ((u32)0x00000001 << 10)          /*!<R/W 1'b0  1 for ISO ck_fref/ck_frefb */
 #define PLL_BIT_REF_CLK_SEL                 ((u32)0x00000001 << 9)          /*!<R/W 1'b0  xtal clk from 0 special route 1 APR */
 #define PLL_BIT_CK_MON_EN                   ((u32)0x00000001 << 8)          /*!<R/W 1'b0  ckmon enable */
-#define PLL_MASK_CK_SEL                     ((u32)0x0000000F << 4)          /*!<R/W 4'b0000  ckmon clk sel 1111:CK_400M_ISP 1110:READY_400M 1101:CK_ISPS 1100:READY_ISPS 1011:CK_300M_SYS 1010:READY_300M 1001:CK_240M_ENC 1000:READY_240M_ENC 0111:CK_80M_NP 0110:READY_80M_NP 0101:CK_98P304M_I2S 0100:CK_24P576M_I2S 0011:READY_I2S 0010:CK_45P158M_PCM 0001:READY_45P158M_PCM 0000:TL */
+#define PLL_MASK_CK_SEL                     ((u32)0x0000000F << 4)          /*!<R/W 4'b0000  ckmon clk sel 1111:CK_400M_ISP 1110:READY_400M 1101:CK_ISPS 1100:READY_ISPS 1011:CK_300M_SYS 1010:READY_300M 1001:CK_240M_ENC 1000:READY_240M_ENC 0111:CK_80M_NP 0110:READY_80M_NP 0101:CK_98P304M_I2S 0100:CK_24P576M_I2S 0011:READY_I2S 0010:CK_45P1584M_PCM 0001:READY_45P1584M_PCM 0000:TL */
 #define PLL_CK_SEL(x)                       ((u32)(((x) & 0x0000000F) << 4))
 #define PLL_GET_CK_SEL(x)                   ((u32)(((x >> 4) & 0x0000000F)))
 #define PLL_MASK_DRV_SEL                    ((u32)0x00000003 << 2)          /*!<R/W 2'b11  AGPIO driving sel */

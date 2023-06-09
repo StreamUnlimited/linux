@@ -962,22 +962,7 @@ struct rxd_parse_type {
 	u32(*handler)(struct mac_ax_adapter *adapter,
 		      struct mac_ax_rxpkt_info *info, u8 *buf, u32 len);
 };
-/*
-enum hal_security_type {
-	HAL_SECURITY_TYPE_NONE = 0,
-	HAL_SECURITY_TYPE_WEP40 = 1,
-	HAL_SECURITY_TYPE_WEP104 = 2,
-	HAL_SECURITY_TYPE_TKIP = 3,
-	HAL_SECURITY_TYPE_AES128 = 4,
-	HAL_SECURITY_TYPE_WAPI = 5,
-	HAL_SECURITY_TYPE_AES256 = 6,
-	HAL_SECURITY_TYPE_GCMP128 = 7,
-	HAL_SECURITY_TYPE_GCMP256 = 8,
-	HAL_SECURITY_TYPE_GCMSMS4 = 9,
-	HAL_SECURITY_TYPE_BIP = 10,
-	HAL_SECURITY_TYPE_UNDEFINE = 0x7F
-};
-*/
+
 /**
  * @enum mac_ax_bw
  *

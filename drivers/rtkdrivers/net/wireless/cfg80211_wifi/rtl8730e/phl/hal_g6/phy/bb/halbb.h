@@ -184,9 +184,9 @@ struct bb_gain_info {
 struct bb_efuse_info {
 	bool normal_efuse_check;
 	bool hidden_efuse_check;
-	s8 gain_offset[HALBB_MAX_PATH][BB_BAND_NUM_MAX]; // S(8,0)
-	s8 gain_cs[HALBB_MAX_PATH][BB_BAND_NUM_MAX]; // S(8,0)
-	s8 gain_cg[HALBB_MAX_PATH][BB_BAND_NUM_MAX]; // S(8,0)
+	s8 gain_offset[HALBB_EFUSE_MAX_PATH][BB_BAND_NUM_MAX]; // S(8,0)
+	s8 gain_cs[HALBB_EFUSE_MAX_PATH][BB_BAND_NUM_MAX]; // S(8,0)
+	s8 gain_cg[HALBB_EFUSE_MAX_PATH][BB_BAND_NUM_MAX]; // S(8,0)
 	s8 hidden_efuse[BB_HIDE_EFUSE_SIZE];
 
 	s8 lna_err_2g[HALBB_MAX_PATH][7]; // S(6,2)

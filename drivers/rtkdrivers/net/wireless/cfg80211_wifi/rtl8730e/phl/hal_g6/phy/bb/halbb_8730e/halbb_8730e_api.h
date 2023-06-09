@@ -197,6 +197,7 @@ void halbb_normal_efuse_verify_cck_8730e(struct bb_info *bb, s8 rx_gain_offset,
 		enum rf_path rx_path,
 		enum phl_phy_idx phy_idx);
 void halbb_tssi_ctrl_set_dbw_table_8730e(struct bb_info *bb);
+void halbb_bb_rf_rx_ant(struct bb_info *bb, u8 rfe_idx, u8 ant);
 #endif
 #endif
 #endif /*  __INC_PHYDM_API_H_8730E__ */

@@ -161,14 +161,30 @@ void halbb_ccx_trigger(struct bb_info *bb)
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s]===>\n", __func__);
 
 	/*Due to IFS_CLM clock gating : [HALBB-58]*/
+#ifdef IFS_CLM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->ifs_clm_clr, cr->ifs_clm_clr_m, false);
+#endif
+#ifdef CLM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->clm_en, cr->clm_en_m, false);
+#endif
+#ifdef NHM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->nhm_en, cr->nhm_en_m, false);
+#endif
+#ifdef EDCCA_CLM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->edcca_clm_en, cr->edcca_clm_en_m, false);
+#endif
+#ifdef IFS_CLM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->ifs_clm_clr, cr->ifs_clm_clr_m, true);
+#endif
+#ifdef CLM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->clm_en, cr->clm_en_m, true);
+#endif
+#ifdef NHM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->nhm_en, cr->nhm_en_m, true);
+#endif
+#ifdef EDCCA_CLM_SUPPORT
 	halbb_set_reg_curr_phy(bb, cr->edcca_clm_en, cr->edcca_clm_en_m, true);
+#endif
 
 	env->ccx_trigger_time = bb->bb_sys_up_time;
 	env->ccx_rpt_stamp++;
@@ -968,11 +984,12 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 #endif /*#ifdef NHM_SUPPORT*/
 #ifdef CLM_SUPPORT
 
-void halbb_clm_get_utility(struct bb_info *bb)
+u8 halbb_clm_get_utility(struct bb_info *bb)
 {
 	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
 
 	env->clm_ratio = (u8)halbb_ccx_get_ratio(bb, env->clm_result, 100);
+	return env->clm_ratio;
 }
 
 bool
@@ -3178,7 +3195,6 @@ void halbb_env_mntr(struct bb_info *bb)
 	struct fahm_para_info fahm_para = {0};
 	struct fahm_report fahm_rpt = {0};
 	struct fahm_trig_report fahm_trig_rpt = {0};
-	u8 chk_result = CCX_FAIL;
 	bool fahm_chk_result = false;
 
 	BB_DBG(bb, DBG_ENV_MNTR, "[%s]===>\n", __func__);
@@ -3204,7 +3220,7 @@ void halbb_env_mntr(struct bb_info *bb)
 		para.ccx_edcca_opt_sc_idx = CCX_EDCCA_SEG0_P0;
 
 		para.clm_app = CLM_BACKGROUND;
-		para.clm_input_opt = CLM_CCA_S80_S40_S20;
+		para.clm_input_opt = CLM_CCA_P20;
 
 		para.nhm_app = NHM_BACKGROUND;
 		para.nhm_incld_cca = NHM_EXCLUDE_CCA;
@@ -3213,12 +3229,12 @@ void halbb_env_mntr(struct bb_info *bb)
 
 		para.edcca_clm_app = EDCCA_CLM_BACKGROUND;
 
-		chk_result = halbb_env_mntr_trigger(bb, &para, &trig_rpt,
+		env->ccx_chk_result = halbb_env_mntr_trigger(bb, &para, &trig_rpt,
 						    bb->bb_phy_idx);
 #ifdef HALBB_DBG_TRACE_SUPPORT
 		BB_DBG(bb, DBG_ENV_MNTR,
 		       "get_result=0x%x, chk_result:0x%x\n",
-		       env->ccx_watchdog_result, chk_result);
+			   env->ccx_watchdog_result, env->ccx_chk_result);
 #endif
 	}
 

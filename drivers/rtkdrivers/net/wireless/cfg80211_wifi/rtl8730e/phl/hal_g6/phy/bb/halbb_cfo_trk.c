@@ -130,11 +130,11 @@ void halbb_digital_cfo_comp_init(struct bb_info *bb)
 	halbb_set_reg(bb, cr->r_cfo_comp_seg0_vld, cr->r_cfo_comp_seg0_vld_m, 1);
 
 	// 0x4490[27:24] r_cfo_weighting
-	halbb_set_reg(bb, cr->r_cfo_wgting, cr->r_cfo_wgting_m, 8);
+	halbb_set_reg(bb, cr->r_cfo_wgting, cr->r_cfo_wgting_m, 0);
 
 	/* 0xD248 */
 	/* All scenario set CFO comp.*/
-	rtw_hal_mac_write_msk_pwr_reg(bb->hal_com, 0, 0xd248, 0x7, 0);
+	rtw_hal_mac_write_msk_pwr_reg(bb->hal_com, 0, 0xd248, 0x7, 6);
 }
 
 void halbb_cfo_trk_reset(struct bb_info *bb)

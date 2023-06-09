@@ -29,7 +29,7 @@
 #define ENV_MNTR_FAIL_BYTE		0xff
 #define ENV_MNTR_FAIL_WORD		0xffff
 #define ENV_MNTR_FAIL_DWORD	0xffffffff
-#define MAX_ENV_MNTR_TIME		8	/*second*/
+#define MAX_ENV_MNTR_TIME		2	/*second*/
 #define MS_TO_4US_RATIO		250
 /*NHM*/
 #define RSSI_2_NHM_TH(rssi)	((rssi) << 1) /*NHM_threshold = u(8,1)*/
@@ -477,6 +477,7 @@ struct bb_info;
 #ifdef CLM_SUPPORT
 void halbb_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		   char *output, u32 *_out_len);
+u8 halbb_clm_get_utility(struct bb_info *bb);
 #endif
 #ifdef NHM_SUPPORT
 void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,

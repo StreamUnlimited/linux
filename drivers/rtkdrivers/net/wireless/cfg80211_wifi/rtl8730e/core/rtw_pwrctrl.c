@@ -2286,6 +2286,8 @@ void rtw_ps_deny(_adapter *padapter, PS_DENY_REASON reason)
 	pwrpriv->ps_deny |= BIT(reason);
 	_exit_pwrlock(&pwrpriv->lock);
 
+	rtw_phl_ps_set_rt_cap((void *)padapter->dvobj->phl_com->phl_priv, HW_BAND_0, false, PS_RT_DEBUG);
+
 	/* 	RTW_INFO("-" FUNC_ADPT_FMT ": Now PS deny for 0x%08X\n",
 	 *		FUNC_ADPT_ARG(padapter), pwrpriv->ps_deny); */
 }
@@ -2297,7 +2299,6 @@ void rtw_ps_deny(_adapter *padapter, PS_DENY_REASON reason)
 void rtw_ps_deny_cancel(_adapter *padapter, PS_DENY_REASON reason)
 {
 	struct pwrctrl_priv *pwrpriv;
-
 
 	/* 	RTW_INFO("+" FUNC_ADPT_FMT ": Cancel PS deny for %d(0x%08X)\n",
 	 *		FUNC_ADPT_ARG(padapter), reason, BIT(reason)); */
@@ -2311,6 +2312,11 @@ void rtw_ps_deny_cancel(_adapter *padapter, PS_DENY_REASON reason)
 	}
 	pwrpriv->ps_deny &= ~BIT(reason);
 	_exit_pwrlock(&pwrpriv->lock);
+
+	/* All ps deny cancelled. Deny ps if any reason kept. */
+	if (pwrpriv->ps_deny == 0) {
+		rtw_phl_ps_set_rt_cap((void *)padapter->dvobj->phl_com->phl_priv, HW_BAND_0, true, PS_RT_DEBUG);
+	}
 
 	/* 	RTW_INFO("-" FUNC_ADPT_FMT ": Now PS deny for 0x%08X\n",
 	 *		FUNC_ADPT_ARG(padapter), pwrpriv->ps_deny); */
@@ -2383,4 +2389,3 @@ void rtw_ssmps_leave(_adapter *adapter, struct sta_info *sta)
 	sta->phl_sta->asoc_cap.sm_ps = SM_PS_DISABLE;
 	_rtw_ssmps(adapter, sta);
 }
-

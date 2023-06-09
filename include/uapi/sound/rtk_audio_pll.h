@@ -4,7 +4,7 @@
 #include <linux/types.h>
 
 #define PLL_24P576M			0
-#define PLL_45P158M			1
+#define PLL_45P1584M			1
 #define PLL_98P304M			2
 #define PLL_XTAL40M			3
 #define PLL_AUTO			0
@@ -16,7 +16,7 @@
 #define AUDIO_PLL_GET_CLOCK_FOR_SPORT    _IOW(MAGIC, 1, struct audio_clock_info)
 
 struct micro_adjust_params {
-	/*can be PLL_24P576M, PLL_45P158M, or PLL_98P304M*/
+	/*can be PLL_24P576M, PLL_45P1584M, or PLL_98P304M*/
 	unsigned int clock;
 	/*can be #define PLL_AUTO, PLL_FASTER, or PLL_SLOWER*/
 	unsigned int action;

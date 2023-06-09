@@ -29,31 +29,6 @@ bool halrf_nctl_init_reg_by_hdr(void *rf_void)
 	struct rf_info *rf = (struct rf_info *)rf_void;
 
 	bool result = true;
-#ifdef RF_8852A_SUPPORT
-	if (rf->ic_type == RF_RTL8852A)	{
-		halrf_config_8852a_nctl_reg(rf);
-	}
-#endif
-#ifdef RF_8852B_SUPPORT
-	if (rf->ic_type == RF_RTL8852B) {
-		halrf_config_8852b_nctl_reg(rf);
-	}
-#endif
-#ifdef RF_8832BR_SUPPORT
-	if (rf->ic_type == RF_RTL8832BR) {
-		halrf_config_8832br_nctl_reg(rf);
-	}
-#endif
-#ifdef RF_8192XB_SUPPORT
-	if (rf->ic_type == RF_RTL8192XB) {
-		halrf_config_8192xb_nctl_reg(rf);
-	}
-#endif
-#ifdef RF_8852BP_SUPPORT
-	if (rf->ic_type == RF_RTL8852BP) {
-		halrf_config_8852bp_nctl_reg(rf);
-	}
-#endif
 #ifdef RF_8730E_SUPPORT
 	if (rf->ic_type == RF_RTL8730E) {
 		halrf_config_8730e_nctl_reg(rf);
@@ -75,41 +50,6 @@ bool halrf_config_radio_a_reg(void *rf_void, bool is_form_folder,
 	struct rtw_hal_com_t *hal_com = rf->hal_com;
 	bool result = true;
 
-#ifdef RF_8852A_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852A) {
-		halrf_config_8852a_radio_a_reg(rf, 0);
-	}
-#endif
-
-#ifdef RF_8852B_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852B) {
-		halrf_config_8852b_radio_a_reg(rf, 0);
-	}
-#endif
-
-#ifdef RF_8852C_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852C) {
-		halrf_config_8852c_radio_a_reg(rf, 0);
-	}
-#endif
-
-#ifdef RF_8832BR_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8832BR) {
-		halrf_config_8832br_radio_a_reg(rf, 0);
-	}
-#endif
-
-#ifdef RF_8192XB_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8192XB) {
-		halrf_config_8192xb_radio_a_reg(rf, 0);
-	}
-#endif
-
-#ifdef RF_8852BP_SUPPORT
-	if (hal_com->chip_id == CHIP_WIFI6_8852BP) {
-		halrf_config_8852bp_radio_a_reg(rf, 0);
-	}
-#endif
 #ifdef RF_8730E_SUPPORT
 	if (rf->ic_type == RF_RTL8730E) {
 		halrf_config_8730e_new_radio_a_reg(rf);
@@ -269,6 +209,18 @@ bool halrf_config_store_power_limit(void *rf_void,
 #ifdef RF_8852BP_SUPPORT
 	if (hal_com->chip_id == CHIP_WIFI6_8852BP) {
 		halrf_config_8852bp_store_power_limit(rf, 0);
+	}
+#endif
+
+#ifdef RF_8730E_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8730E) {
+		halrf_config_8730e_init_power_limit(rf);
+	}
+#endif
+
+#ifdef RF_8720E_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8720E) {
+		halrf_config_8720e_init_power_limit(rf);
 	}
 #endif
 

@@ -70,55 +70,7 @@ u32 mac_txdesc_len_8730e(struct mac_ax_adapter *adapter,
 {
 	return TX_DESC_LEN;
 }
-/*
-static u32 txdes_proc_h2c_fwdl_8730e(struct mac_ax_adapter *adapter,
-				     struct rtw_t_meta_data *info, u8 *buf, u32 len)
-{
-	struct wd_body_t *wdb;
 
-	if (len != mac_txdesc_len_8852a(adapter, info)) {
-		PLTFM_MSG_ERR("[ERR] illegal len %d\n", len);
-		return MACBUFSZ;
-	}
-
-	if (info->pktlen > AX_TXD_TXPKTSIZE_MSK || !info->pktlen) {
-		PLTFM_MSG_ERR("[ERR] illegal txpktsize %d\n", info->pktlen);
-		return MACFUNCINPUT;
-	}
-
-	wdb = (struct wd_body_t *)buf;
-	wdb->dword0 = cpu_to_le32(SET_WORD(MAC_AX_DMA_H2C, AX_TXD_CH_DMA) |
-			(info->type == RTW_PHL_PKT_TYPE_FWDL ? AX_TXD_FWDL_EN : 0));
-	wdb->dword1 = 0;
-	wdb->dword2 = cpu_to_le32(SET_WORD(info->pktlen, AX_TXD_TXPKTSIZE));
-	wdb->dword3 = 0;
-	wdb->dword4 = 0;
-	wdb->dword5 = 0;
-
-	return MACSUCCESS;
-}
-
-
-#if MAC_AX_FEATURE_HV
-static u32 txdes_proc_hv_8852a(struct mac_ax_adapter *adapter,
-			       struct rtw_t_meta_data *info,
-			       struct wd_body_t *wdb,
-			       struct wd_info_t *wdi)
-{
-	struct hv_txpkt_info *hv_info = (struct hv_txpkt_info *)info->mac_priv;
-
-	wdb->dword0 |= cpu_to_le32((hv_info->chk_en ? AX_TXD_CHK_EN : 0));
-	wdi->dword3 |=
-		cpu_to_le32((hv_info->null_1 ? AX_TXD_NULL_1 : 0) |
-			    (hv_info->null_0 ? AX_TXD_NULL_0 : 0) |
-			    (hv_info->tri_frame ? AX_TXD_TRI_FRAME : 0) |
-			    (hv_info->ht_data_snd ? AX_TXD_HT_DATA_SND : 0));
-	wdi->dword5 |= cpu_to_le32(SET_WORD(hv_info->ndpa_dur, AX_TXD_NDPA_DURATION));
-
-	return MACSUCCESS;
-}
-#endif
-*/
 static u32 txdes_proc_data_8730e(struct mac_ax_adapter *adapter,
 				 struct rtw_t_meta_data *info, u8 *buf, u32 len)
 {
@@ -172,7 +124,7 @@ static u32 txdes_proc_data_8730e(struct mac_ax_adapter *adapter,
 		case RTW_ENC_CCMP:
 			sec_type = 0x3;
 			break;
-		case HAL_SECURITY_TYPE_BIP:
+		case RTW_ENC_BIP_CCMP128:
 			if (1 == info->bc) {
 				sec_type = 0x0;
 			} else {
@@ -331,7 +283,7 @@ static u32 txdes_proc_mgnt_8730e(struct mac_ax_adapter *adapter,
 		case RTW_ENC_CCMP:
 			sec_type = 0x3;
 			break;
-		case HAL_SECURITY_TYPE_BIP:
+		case RTW_ENC_BIP_CCMP128:
 			if (1 == info->bc) {
 				sec_type = 0x0;
 			} else {
@@ -448,7 +400,6 @@ static u32 txdes_proc_mgnt_8730e(struct mac_ax_adapter *adapter,
 }
 
 static struct txd_proc_type txdes_proc_mac_8730e[] = {
-//8730e no PKT_TYPE_H2C & PKT_TYPE_FWDL
 	{RTW_PHL_PKT_TYPE_DATA, txdes_proc_data_8730e},
 	{RTW_PHL_PKT_TYPE_MGNT, txdes_proc_mgnt_8730e},
 	{RTW_PHL_PKT_TYPE_MAX, NULL},
@@ -476,35 +427,7 @@ u32 mac_build_txdesc_8730e(struct mac_ax_adapter *adapter,
 
 	return handler(adapter, info, buf, len);
 }
-/*
-u32 mac_refill_txdesc_8730e(struct mac_ax_adapter *adapter,
-			    struct rtw_t_meta_data *txpkt_info,
-			    struct mac_ax_refill_info *mask,
-			    struct mac_ax_refill_info *info)
-{
-	u32 dw0 = ((struct wd_body_t *)info->pkt)->dword0;
-	u32 dw1 = ((struct wd_body_t *)info->pkt)->dword1;
-	u32 ret;
 
-	if (mask->packet_offset)
-		((struct wd_body_t *)info->pkt)->dword0 =
-			dw0 | (info->packet_offset ? AX_TXD_PKT_OFFSET : 0);
-
-	if (mask->agg_num == AX_TXD_DMA_TXAGG_NUM_MSK)
-		((struct wd_body_t *)info->pkt)->dword1 =
-			SET_CLR_WORD(dw1, info->agg_num, AX_TXD_DMA_TXAGG_NUM);
-
-	if (adapter->hw_info->wd_checksum_en) {
-		ret = mac_wd_checksum_8852a(adapter, txpkt_info, info->pkt);
-		if (ret != MACSUCCESS) {
-			PLTFM_MSG_ERR("[ERR] mac_wd_checksum %d\n", ret);
-			return ret;
-		}
-	}
-
-	return MACSUCCESS;
-}
-*/
 static u32 rxdes_parse_comm_8730e(struct mac_ax_adapter *adapter,
 				  struct mac_ax_rxpkt_info *info, u8 *buf)
 {
@@ -531,15 +454,6 @@ static u32 rxdes_parse_wifi_8730e(struct mac_ax_adapter *adapter,
 	return MACSUCCESS;
 }
 
-/*
-static u32 rxdes_parse_c2h_8730e(struct mac_ax_adapter *adapter,
-				 struct mac_ax_rxpkt_info *info, u8 *buf, u32 len)
-{
-	info->type = MAC_AX_PKT_C2H;
-
-	return MACSUCCESS;
-}
-*/
 static u32 rxdes_parse_ch_info_8730e(struct mac_ax_adapter *adapter,
 				     struct mac_ax_rxpkt_info *info, u8 *buf, u32 len)
 {
@@ -639,54 +553,5 @@ u32 mac_txdesc_checksum_8730e(struct mac_ax_adapter *adapter,
 		SET_CLR_WORD(txdw7, (u16)(chksum), AX_TXD_CHECK_SUM);
 	return MACSUCCESS;
 }
-/*
-u32 mac_patch_rx_rate_8730e(struct mac_ax_adapter *adapter,
-			    struct rtw_r_meta_data *info)
-{
-	u32 nss;
-
-	if (is_cv(adapter, CBV)) {
-		if (info->rpkt_type != RX_8852A_DESC_PKT_T_WIFI ||
-		    info->ppdu_type != RX_8852A_DESC_PPDU_T_HE_SU ||
-		    info->rx_gi_ltf != RX_8852A_DESC_RX_GI_LTF_4X_0_8)
-			return MACSUCCESS;
-
-		nss = GET_NSS_FROM_RX_RATE(info->rx_rate);
-
-		if (nss == NSS_1) // real nss = 2
-			info->rx_rate = SET_NSS_TO_RX_RATE(info->rx_rate, NSS_2);
-		else if (nss == NSS_8) // real nss = 1
-			info->rx_rate = SET_NSS_TO_RX_RATE(info->rx_rate, NSS_1);
-	}
-
-	return MACSUCCESS;
-}
-
-u32 mac_get_wp_offset_8730e(struct mac_ax_adapter *adapter,
-			    struct mac_txd_ofld_wp_offset *ofld_conf, u16 *val)
-{
-	u16 ret_val = 0;
-
-	if (ofld_conf->hw_amsdu_type == MAC_TXD_OFLD_HW_AMSDU_CONF_MISSING) {
-		PLTFM_MSG_ERR("missing configurations: HW AMSDU type\n");
-		return MACFUNCINPUT;
-	}
-	if (ofld_conf->hw_hdr_conv_type == MAC_TXD_OFLD_HW_HDR_CONV_CONF_MISSING) {
-		PLTFM_MSG_ERR("missing configurations: HW HDR CONV type\n");
-		return MACFUNCINPUT;
-	}
-
-	if (ofld_conf->hw_hdr_conv_type == MAC_TXD_OFLD_HW_HDR_CONV_ETHII_TO_WLAN)
-		ret_val += (HDR_SIZE_WLAN_MAX + HDR_SIZE_LLC - HDR_SIZE_802P3);
-	else if (ofld_conf->hw_hdr_conv_type == MAC_TXD_OFLD_HW_HDR_CONV_SNAP_TO_WLAN)
-		ret_val += (HDR_SIZE_WLAN_MAX - HDR_SIZE_802P3);
-
-	if (ofld_conf->hw_amsdu_type == MAC_TXD_OFLD_HW_AMSDU_ON)
-		ret_val += HDR_SIZE_AMSDU;
-
-	*val = (ret_val / WP_OFFSET_UNIT_8852A);
-
-	return MACSUCCESS;
-}*/
 
 #endif /* #if MAC_AX_8730E_SUPPORT */

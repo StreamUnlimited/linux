@@ -24,6 +24,11 @@
 
 /*--------------------Define ----------------------------------------*/
 #define SEC_CAM_ENTRY_NUM 0x20
+#ifdef CONFIG_CONCURRENT_MODE
+#define SEC_CAM_AP_BMC_NUM (2)
+#else
+#define SEC_CAM_AP_BMC_NUM (0)
+#endif
 #define SEC_CAM_BASE (0x40050800 - MAC_BASE)
 
 #define ADDRCAM_VALID BIT0
@@ -92,12 +97,12 @@ struct dctl_secinfo_entry_t {
  *
  * @var sec_cam_table_t::sec_cam_entry
  * Please Place Description here.
- * @var sec_cam_table_t::next_cam_storage_idx
+ * @var sec_cam_table_t::invalid_cam_idx
  * Please Place Description here.
  */
 struct sec_cam_table_t {
 	struct sec_cam_entry_t *sec_cam_entry[SEC_CAM_ENTRY_NUM];
-	u8 next_cam_storage_idx;
+	u8 invalid_cam_idx;
 };
 
 struct dctl_sec_info_t {

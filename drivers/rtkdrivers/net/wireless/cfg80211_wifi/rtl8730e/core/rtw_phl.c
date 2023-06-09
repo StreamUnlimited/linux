@@ -14,6 +14,7 @@
  *****************************************************************************/
 #define _RTW_PHL_C_
 #include <drv_types.h>
+#include "../phl/phl_headers.h"
 
 
 /***************** export API to osdep/core*****************/
@@ -2765,7 +2766,6 @@ static u32 rtw_tx_sts_total(u32 *tx_sts, u8 num)
 
 int rtw_get_sta_tx_stat(_adapter *adapter, struct sta_info *psta)
 {
-#if defined(CONFIG_PCI_HCI)
 	struct stainfo_stats	*pstats = NULL;
 
 	u32 tx_retry_cnt[PHL_AC_QUEUE_TOTAL] = {0};
@@ -2786,9 +2786,7 @@ int rtw_get_sta_tx_stat(_adapter *adapter, struct sta_info *psta)
 
 	pstats->tx_fail_cnt_sum += pstats->tx_fail_cnt;
 	pstats->tx_retry_cnt_sum += pstats->tx_retry_cnt;
-#else
-	RTW_INFO("%s() not support\n", __func__);
-#endif
+
 	return 0;
 }
 

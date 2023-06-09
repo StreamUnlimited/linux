@@ -29,6 +29,7 @@
 					<0x42008840 0x000040>;
 			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM9> ;
+			status = "disabled";
 		};
 
 		sport:sport@0x4100D000 {
@@ -54,6 +55,7 @@
 			rtk,sport-multi-io = <0>;
 			rtk,sport-mode = <0>;
 			rtk,sport-mclk-multiplier = <0>;
+			rtk,sport-mclk-fixed-max = <0>;
 			clocks = <&rcc RTK_CKE_SPORT2>;
 			rtk,sport-clock = <&rcc>;
 			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
@@ -66,6 +68,7 @@
 			rtk,sport-multi-io = <0>;
 			rtk,sport-mode = <0>;
 			rtk,sport-mclk-multiplier = <0>;
+			rtk,sport-mclk-fixed-max = <0>;
 			clocks = <&rcc RTK_CKE_SPORT3>;
 			rtk,sport-clock = <&rcc>;
 			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;

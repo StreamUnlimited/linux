@@ -65,9 +65,9 @@ void halbb_antdiv_reg_init(struct bb_info *bb)
 
 #if (defined(HALBB_COMPILE_AP_SERIES) || defined(HALBB_COMPILE_AP2_SERIES))
 	/* r_trsw_tx_extend = 0us */
-	halbb_set_reg_cmn(bb, 0x2728, 0xf, 0x0, HW_PHY_0);
+	halbb_set_reg_cmn(bb, 0x728, 0xf, 0x0, HW_PHY_0);
 	/* dis r_hw_antsw_dis_by_gnt_bt */
-	halbb_set_reg_cmn(bb, 0x2728, BIT(12), 0x0, HW_PHY_0);
+	halbb_set_reg_cmn(bb, 0x728, BIT(12), 0x0, HW_PHY_0);
 #endif
 
 
@@ -96,10 +96,6 @@ void halbb_antdiv_init(struct bb_info *bb)
 	struct rtw_phl_com_t *phl = bb->phl_com;
 	struct dev_cap_t *dev = &phl->dev_cap;
 
-	if (dev->rfe_type != 50) {
-		return;
-	}
-
 	/* HW reg. init to set mux & ctrler for antdiv */
 	halbb_antdiv_reg_init(bb);
 
@@ -107,35 +103,101 @@ void halbb_antdiv_init(struct bb_info *bb)
 	bb_ant_div->antdiv_mode = AUTO_ANT;
 	bb_ant_div->pre_antdiv_mode = AUTO_ANT;
 	bb_ant_div->antdiv_method = EVM_BASED_ANTDIV;
-	bb_ant_div->tp_decision_method = TP_HIGHEST_DOMINATION;
+	//bb_ant_div->tp_decision_method = TP_HIGHEST_DOMINATION;
 	bb_ant_div->evm_decision_method = EVM_LINEAR_AVG;
+	bb_ant_div->tx_by_ext_pwr_lmt = false;
 
 	/* Algorithm parameter setting */
-	bb_ant_div->antdiv_period = ANTDIV_PERIOD;
-	bb_ant_div->antdiv_train_num = ANTDIV_TRAINING_NUM;
-	bb_ant_div->antdiv_delay = ANTDIV_DELAY;
-	bb_ant_div->antdiv_intvl = ANTDIV_INTVL;
 	bb_ant_div->tp_diff_th_high = ANTDIV_DEC_TP_HIGH;
 	bb_ant_div->tp_diff_th_low = ANTDIV_DEC_TP_LOW;
-	bb_ant_div->evm_diff_th = ANTDIV_DEC_EVM;
+	bb_ant_div->rssi_diff_th = ANTDIV_DEC_RSSI;
+	bb_ant_div->fixant_rssi_diff = ANTDIV_FIXANT_RSSI;
 	bb_ant_div->tp_lb = TP_LOWER_BOUND;
+
+	if (bb->ic_type & BB_IC_1SS) {
+		bb_ant_div->antdiv_period = ANTDIV_PERIOD_1SS;
+		bb_ant_div->antdiv_train_num = ANTDIV_TRAINING_NUM_1SS;
+		bb_ant_div->antdiv_delay = ANTDIV_DELAY_1SS;
+		bb_ant_div->antdiv_intvl = ANTDIV_INTVL_1SS;
+		bb_ant_div->tp_decision_method = TP_MAX_DOMINATION;
+		bb_ant_div->evm_diff_th = ANTDIV_DEC_EVM_1SS;
+	} else {
+		bb_ant_div->antdiv_period = ANTDIV_PERIOD;
+		bb_ant_div->antdiv_train_num = ANTDIV_TRAINING_NUM;
+		bb_ant_div->antdiv_delay = ANTDIV_DELAY;
+		bb_ant_div->antdiv_intvl = ANTDIV_INTVL;
+		bb_ant_div->tp_decision_method = TP_HIGHEST_DOMINATION;
+		bb_ant_div->evm_diff_th = ANTDIV_DEC_EVM;
+	}
 
 	/* variable init */
 	bb_ant_div->antdiv_wd_cnt = 0;
 	bb_ant_div->antdiv_training_state_cnt = 0;
 	bb_ant_div->get_stats = false;
 	bb_ant_div->antdiv_use_ctrl_frame = true;
-
+	bb_ant_div->antdiv_notrain_num = ANTDIV_NOTRAINING_NUM;
+	bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
 
 	bb_ant_div->target_ant = ANTDIV_INIT;
 	bb_ant_div->target_ant_evm = ANTDIV_INIT;
 	bb_ant_div->target_ant_tp = ANTDIV_INIT;
+	bb_ant_div->target_ant_rssi =  ANTDIV_INIT;
 	bb_ant_div->training_ant = ANTDIV_INIT;
 	bb_ant_div->pre_target_ant = MAIN_ANT;
 
 	halbb_antdiv_reset(bb);
 
 	BB_DBG(bb, DBG_INIT, "Init ant_diversity timer");
+}
+u8 halbb_antdiv_sel_tx_ant_by_ext_pwr_lmt(struct bb_info *bb)
+{
+	u8 ret = MAIN_ANT;
+	BB_DBG(bb, DBG_ANT_DIV, "Error flow power_lmt");
+	return ret;
+}
+
+void halbb_antdiv_set_tx_ant(struct bb_info *bb, u8 ant)
+{
+	struct bb_antdiv_cr_info *cr = &bb->bb_ant_div_i.bb_antdiv_cr_i;
+	u8 default_ant;
+
+	if (ant == MAIN_ANT) {
+		default_ant = ANT1_2G;
+	} else {
+		default_ant = ANT2_2G;
+	}
+
+	halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf000, default_ant, HW_PHY_0);
+
+	BB_DBG(bb, DBG_ANT_DIV, "Set Tx Antenna=%s\n",
+		   (ant == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
+
+#ifdef HALBB_DUAL_SAR_LMT_TB_8851B
+	if (bb->ic_type == BB_RTL8851B) {
+		rtw_hal_rf_set_pwr_lmt_main_or_aux(bb->hal_com, default_ant);
+	}
+#endif
+}
+
+void halbb_antdiv_fix_ant(struct bb_info *bb, u8 ant)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+
+	if (bb->support_ability & BB_ANT_DIV) {
+		if (ant == MAIN_ANT) {
+			bb_ant_div->antdiv_mode = FIX_MAIN_ANT;
+			halbb_antdiv_set_ant(bb, MAIN_ANT);
+			bb_ant_div->pre_target_ant = MAIN_ANT;
+		} else if (ant == AUX_ANT) {
+			bb_ant_div->antdiv_mode = FIX_AUX_ANT;
+			halbb_antdiv_set_ant(bb, AUX_ANT);
+			bb_ant_div->pre_target_ant = AUX_ANT;
+		} else {
+			bb_ant_div->antdiv_mode = AUTO_ANT;
+		}
+	} else {
+		return;
+	}
 }
 
 void halbb_antdiv_set_ant(struct bb_info *bb, u8 ant)
@@ -146,30 +208,58 @@ void halbb_antdiv_set_ant(struct bb_info *bb, u8 ant)
 	struct rtw_hal_com_t *hal = bb->hal_com;
 	u8 band = bb->hal_com->band[0].cur_chandef.band;
 	u8 default_ant, optional_ant;
+	u8 tx_ant = 0;
 
 	if ((bb_ant_div->pre_target_ant != ant) || (bb_ant_div->training_ant != ant)) {
 		BB_DBG(bb, DBG_ANT_DIV, "Set Antenna =%s\n",
 		       (ant == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
 		if (ant == MAIN_ANT) {
-			default_ant = ANT1_2G;
-			optional_ant = ANT2_2G;
+			default_ant = ANT_MAIN_5G;
+			optional_ant = ANT_AUX_5G;
 		} else {
-			default_ant = ANT2_2G;
-			optional_ant = ANT1_2G;
+			default_ant = ANT_AUX_5G;
+			optional_ant = ANT_MAIN_5G;
 		}
 
-		/* Original Rx antenna */
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0x20000, default_ant, HW_PHY_0);
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf0, default_ant, HW_PHY_0);
-		/* Alternative Rx antenna */
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf00, optional_ant, HW_PHY_0);
-		/* Tx antenna, same as orig. rx ant. */
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf000, default_ant, HW_PHY_0);
+//		/* Original Rx antenna */
+//		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0x20000, default_ant, HW_PHY_0);
+//		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf0, default_ant, HW_PHY_0);
+//		/* Alternative Rx antenna */
+//		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf00, optional_ant, HW_PHY_0);
+//		/* Tx antenna, same as orig. rx ant. */
+//		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf000, default_ant, HW_PHY_0);
 
-		rtw_hal_rf_rx_ant(hal, ant);
+//		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf000, 0x1, HW_PHY_0);
+		rtw_hal_rf_rx_ant(bb, hal, ant);
 
 	} else {
 		BB_DBG(bb, DBG_ANT_DIV, "Stay in Ori-ant\n");
+	}
+}
+
+void rtw_hal_rf_rx_ant(struct bb_info *bb, struct rtw_hal_com_t *hal, u8 ant)
+{
+	struct bb_antdiv_cr_info *cr = &bb->bb_ant_div_i.bb_antdiv_cr_i;
+	struct rtw_phl_com_t *phl = bb->phl_com;
+	struct dev_cap_t *dev = &phl->dev_cap;
+	u8 rfe_idx = dev->rfe_type;
+
+	u8 rf_ant_sel = (ant == MAIN_ANT) ? 0x1 : 0x0;
+	u8 rf_ant_AUX = (ant == MAIN_ANT) ? 0x0 : 0x1;
+	if (rfe_idx == 16) {
+		halbb_set_reg_cmn(bb, cr->path0_r_rfsw_ant_31_0, cr->path0_r_rfsw_ant_31_0_m, rf_ant_sel, HW_PHY_0);
+		BB_DBG(bb, DBG_ANT_DIV, "rf_ant_sel [%d]\n", rf_ant_sel);
+	} else if (rfe_idx == 15) {
+		/* 5G antenna */
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(25), 1, HW_PHY_0);
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(24), rf_ant_AUX, HW_PHY_0); /*1: AUX 0: MAIN*/
+
+		/* 2G antenna */
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(23), 1, HW_PHY_0);
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(22), rf_ant_AUX, HW_PHY_0);
+		BB_DBG(bb, DBG_ANT_DIV, "rf_ant_AUX [%d]\n", rf_ant_AUX);
+	} else {
+		BB_DBG(bb, DBG_ANT_DIV, "RFE_TYPE = %d ant_sel_unfinished", dev->rfe_type);
 	}
 }
 
@@ -185,16 +275,92 @@ void halbb_antdiv_get_rssi(struct bb_info *bb)
 	rssi->rssi_ofdm_avg = (u8)HALBB_DIV(rssi->rssi_ofdm_avg_acc, rssi->pkt_cnt_ofdm);
 	rssi->rssi_t_avg = (u8)HALBB_DIV(rssi->rssi_t_avg_acc, rssi->pkt_cnt_t);
 
+	rssi->main_rssi_cck_avg = (u8)HALBB_DIV(rssi->main_rssi_cck_avg_acc, rssi->main_pkt_cnt_cck);
+	rssi->main_rssi_ofdm_avg = (u8)HALBB_DIV(rssi->main_rssi_ofdm_avg_acc, rssi->main_pkt_cnt_ofdm);
+	rssi->main_rssi_t_avg = (u8)HALBB_DIV(rssi->main_rssi_t_avg_acc, rssi->main_pkt_cnt_t);
 
-	if (rate_i->mode == BB_LEGACY_MODE) {
-		if (cmn_rpt->is_cck_rate) {
-			rssi->rssi_final = rssi->rssi_cck_avg;
-		} else {
-			rssi->rssi_final = rssi->rssi_ofdm_avg;
-		}
-	} else {
+	rssi->aux_rssi_cck_avg = (u8)HALBB_DIV(rssi->aux_rssi_cck_avg_acc, rssi->aux_pkt_cnt_cck);
+	rssi->aux_rssi_ofdm_avg = (u8)HALBB_DIV(rssi->aux_rssi_ofdm_avg_acc, rssi->aux_pkt_cnt_ofdm);
+	rssi->aux_rssi_t_avg = (u8)HALBB_DIV(rssi->aux_rssi_t_avg_acc, rssi->aux_pkt_cnt_t);
+
+	if ((rssi->pkt_cnt_t >= rssi->pkt_cnt_cck) && (rssi->pkt_cnt_t >= rssi->pkt_cnt_ofdm)) {
 		rssi->rssi_final = rssi->rssi_t_avg;
+	} else if ((rssi->pkt_cnt_ofdm >= rssi->pkt_cnt_cck) && (rssi->pkt_cnt_ofdm >= rssi->pkt_cnt_t)) {
+		rssi->rssi_final = rssi->rssi_ofdm_avg;
+	} else {
+		rssi->rssi_final = rssi->rssi_cck_avg;
 	}
+
+	if (rssi->main_pkt_cnt_t || rssi->aux_pkt_cnt_t) {
+		rssi->main_rssi_final =  rssi->main_rssi_t_avg;
+		rssi->aux_rssi_final = rssi->aux_rssi_t_avg;
+	} else if (rssi->main_pkt_cnt_ofdm || rssi->aux_pkt_cnt_ofdm) {
+		rssi->main_rssi_final = rssi->main_rssi_ofdm_avg;
+		rssi->aux_rssi_final = rssi->aux_rssi_ofdm_avg;
+	} else {
+		rssi->main_rssi_final = rssi->main_rssi_cck_avg;
+		rssi->aux_rssi_final = rssi->aux_rssi_cck_avg;
+	}
+
+	/*
+		if ((rssi->main_pkt_cnt_t >= rssi->main_pkt_cnt_cck) && (rssi->main_pkt_cnt_t >= rssi->main_pkt_cnt_ofdm))
+			rssi->main_rssi_final = rssi->main_rssi_t_avg;
+		else if ((rssi->main_pkt_cnt_ofdm >= rssi->main_pkt_cnt_cck) && (rssi->main_pkt_cnt_ofdm >= rssi->main_pkt_cnt_t))
+			rssi->main_rssi_final = rssi->main_rssi_ofdm_avg;
+		else
+			rssi->main_rssi_final = rssi->main_rssi_cck_avg;
+
+		if ((rssi->aux_pkt_cnt_t >= rssi->aux_pkt_cnt_cck) && (rssi->aux_pkt_cnt_t >= rssi->aux_pkt_cnt_ofdm))
+			rssi->aux_rssi_final = rssi->aux_rssi_t_avg;
+		else if ((rssi->aux_pkt_cnt_ofdm >= rssi->aux_pkt_cnt_cck) && (rssi->aux_pkt_cnt_ofdm >= rssi->aux_pkt_cnt_t))
+			rssi->aux_rssi_final = rssi->aux_rssi_ofdm_avg;
+		else
+			rssi->aux_rssi_final = rssi->aux_rssi_cck_avg; */
+}
+
+void halbb_antdiv_get_rssi_target_ant(struct bb_info *bb)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+	struct bb_antdiv_rssi_info *rssi = &bb_ant_div->bb_rssi_i;
+	u8 main_rssi_final, aux_rssi_final, target_ant_rssi;
+	bool no_change_flag = false;
+
+	halbb_antdiv_get_rssi(bb);
+
+	main_rssi_final = rssi->main_rssi_final >> 1;
+	aux_rssi_final = rssi->aux_rssi_final >> 1;
+	rssi->rssi_diff = DIFF_2(main_rssi_final, aux_rssi_final);
+
+	/*prevent pkt_cnt=0 causing rssi=0*/
+	/*if ((rssi->main_pkt_cnt_cck == 0 && rssi->main_pkt_cnt_ofdm == 0 && rssi->main_pkt_cnt_t == 0) ||
+		(rssi->aux_pkt_cnt_cck == 0 && rssi->aux_pkt_cnt_ofdm == 0 && rssi->aux_pkt_cnt_t == 0)) {
+		target_ant_rssi = bb_ant_div->pre_target_ant;
+		no_change_flag= true;
+	}*/
+	if (main_rssi_final == aux_rssi_final) {
+		target_ant_rssi = bb_ant_div->pre_target_ant;
+		no_change_flag = true;
+	} else if (main_rssi_final == 0 || aux_rssi_final == 0) {
+		target_ant_rssi = bb_ant_div->pre_target_ant;
+		//no_change_flag= true;
+	} else if (rssi->rssi_diff < bb_ant_div->rssi_diff_th) {
+		target_ant_rssi = bb_ant_div->pre_target_ant;
+		no_change_flag = true;
+	} else if (main_rssi_final > aux_rssi_final) {
+		target_ant_rssi = MAIN_ANT;
+	} else {
+		target_ant_rssi = AUX_ANT;
+	}
+
+	rssi->no_change_flag = no_change_flag;
+	bb_ant_div->target_ant_rssi = target_ant_rssi;
+
+	BB_DBG(bb, DBG_ANT_DIV, "Main RSSI = [%d], AUX RSSI = [%d]\n", main_rssi_final, aux_rssi_final);
+	BB_DBG(bb, DBG_ANT_DIV, "Main[cck_cnt, ofdm_cnt, t_cnt] = [%d, %d, %d]\n", rssi->main_pkt_cnt_cck, rssi->main_pkt_cnt_ofdm, rssi->main_pkt_cnt_t);
+	BB_DBG(bb, DBG_ANT_DIV, "AUX[cck_cnt, ofdm_cnt, t_cnt] = [%d, %d, %d]\n", rssi->aux_pkt_cnt_cck, rssi->aux_pkt_cnt_ofdm, rssi->aux_pkt_cnt_t);
+	BB_DBG(bb, DBG_ANT_DIV, "RSSI DIFF = [%d], TH = [%d]\n", rssi->rssi_diff, bb_ant_div->rssi_diff_th);
+	BB_DBG(bb, DBG_ANT_DIV, "RSSI based TargetAnt= [%s]\n",
+		   (bb_ant_div->target_ant_rssi == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
 }
 
 void halbb_antdiv_get_cn_target_ant(struct bb_info *bb)
@@ -241,8 +407,8 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 	struct bb_rate_info *rate_i = &cmn_rpt->bb_rate_i;
 	struct bb_antdiv_rate_info *bb_rate_i = &bb_ant_div->bb_rate_i;
 
-	u16 main_max_cnt = 0;
-	u16 aux_max_cnt = 0;
+	u16 main_max_cnt = 1;
+	u16 aux_max_cnt = 1;
 	u16 main_max_idx = 0;
 	u16 aux_max_idx = 0;
 	u8 ss_ofst = 0;
@@ -419,7 +585,7 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 			ss_ofst = (i << 3);
 
 			BB_DBG(bb, DBG_ANT_DIV,
-			       "*HT%02d:%02d cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+				   "*Main-Ant HT%02d:%02d cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
 			       (ss_ofst), (ss_ofst + 7),
 			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 0],
 			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 1],
@@ -431,7 +597,7 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 7]);
 
 			BB_DBG(bb, DBG_ANT_DIV,
-			       "*HT%02d:%02d cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+				   "*Aux-Ant HT%02d:%02d cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
 			       (ss_ofst), (ss_ofst + 7),
 			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 0],
 			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 1],
@@ -526,9 +692,9 @@ void halbb_antdiv_get_evm_target_ant(struct bb_info *bb)
 	//u8 main_2ss_evm_avg, aux_2ss_evm_avg;
 	u8 main_1ss_evm = 0;
 	u8 aux_1ss_evm = 0;
-	u8 target_ant_evm_1ss, target_ant_evm_2ss;
-	u8 decision_evm_ss;
-	u8 evm_diff_1ss, evm_diff_2ss;
+	u8 target_ant_evm_1ss = 0, target_ant_evm_2ss = 0;
+	u8 decision_evm_ss = 0;
+	u8 evm_diff_1ss = 0, evm_diff_2ss = 0;
 	bool no_change_flag_1ss = false;
 	bool no_change_flag_2ss = false;
 
@@ -777,6 +943,88 @@ void halbb_antdiv_decision_state(struct bb_info *bb)
 
 }
 
+void halbb_antdiv_1ss_decision_state(struct bb_info *bb)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+	struct bb_antdiv_rssi_info *bb_rssi_i = &bb_ant_div->bb_rssi_i;
+	struct bb_antdiv_rate_info *bb_rate_i = &bb_ant_div->bb_rate_i;
+	struct bb_antdiv_evm_info *bb_evm_i = &bb_ant_div->bb_evm_i;
+
+	BB_DBG(bb, DBG_ANT_DIV, "%s ======>\n", __func__);
+
+	bb_ant_div->get_stats = false;
+	bb_ant_div->antdiv_training_state_cnt = 0;
+
+	/* Check highest MCS idx of main & aux antenna*/
+	halbb_antdiv_get_highest_mcs(bb);
+
+	/* EVM based antenna diversity */
+	halbb_antdiv_get_evm_target_ant(bb);
+
+	/* RSSI based antenna diversity*/
+	halbb_antdiv_get_rssi_target_ant(bb);
+
+	/* Final Decision */
+	if ((bb_rate_i->main_cnt_all + bb_rate_i->aux_cnt_all) == 0) {
+		BB_DBG(bb, DBG_ANT_DIV, "Not enough count, remain previous antenna\n");
+		bb_ant_div->target_ant = bb_ant_div->pre_target_ant;
+		BB_DBG(bb, DBG_ANT_DIV, "Make decision again ASAP\n");
+		bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
+		bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+		return;
+	}
+
+	if (bb_rate_i->no_change_flag && bb_evm_i->no_change_flag && bb_rssi_i->no_change_flag) {
+		BB_DBG(bb, DBG_ANT_DIV, "No Decision, remain previous antenna\n");
+		bb_ant_div->target_ant = bb_ant_div->pre_target_ant;
+		BB_DBG(bb, DBG_ANT_DIV, "Make decision again ASAP\n");
+		bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
+		bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+		return;
+	}
+
+	if ((bb_ant_div->target_ant_rssi == bb_ant_div->target_ant_tp) &&
+		(bb_ant_div->target_ant_rssi == bb_ant_div->target_ant_evm) &&
+		(!bb_rate_i->no_change_flag) && (!bb_rssi_i->no_change_flag) && (!bb_evm_i->no_change_flag)) {
+		BB_DBG(bb, DBG_ANT_DIV, "Decision confidence is enough\n");
+		bb_ant_div->target_ant = bb_ant_div->target_ant_rssi;
+	} else {
+		if (bb_rate_i->tp_diff >= bb_ant_div->tp_diff_th_high) {
+			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %lld >= %d, Decided by MCS based\n"
+				   , bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_high);
+			bb_ant_div->target_ant = bb_ant_div->target_ant_tp;
+		} else if (bb_evm_i->evm_diff >= bb_ant_div->evm_diff_th) {
+			BB_DBG(bb, DBG_ANT_DIV, "EVM confidence is more than %d, Decided by EVM based\n"
+				   , bb_ant_div->evm_diff_th);
+			bb_ant_div->target_ant = bb_ant_div->target_ant_evm;
+		} else if (bb_rate_i->tp_diff >= bb_ant_div->tp_diff_th_low) {
+			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %lld > %d, Decided by MCS based\n"
+				   , bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_low);
+			bb_ant_div->target_ant = bb_ant_div->target_ant_tp;
+		} else if (!bb_rssi_i->no_change_flag) {
+			BB_DBG(bb, DBG_ANT_DIV, "Decided by RSSI based!\n");
+			bb_ant_div->target_ant = bb_ant_div->target_ant_rssi;
+		} else {
+			BB_DBG(bb, DBG_ANT_DIV, "Decision confidence is not enough, remain previous antenna\n");
+			bb_ant_div->target_ant = bb_ant_div->pre_target_ant;
+			BB_DBG(bb, DBG_ANT_DIV, "Make decision again ASAP\n");
+			bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
+			bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+			return;
+		}
+	}
+
+	if (bb_ant_div->target_ant != bb_ant_div->pre_target_ant) {
+		bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
+		bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+	} else { /*if ant. doesn't change, no training for 2 x antdiv_notrain_cnt_th sec.*/
+		bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
+		bb_ant_div->antdiv_notrain_cnt = 0;
+		BB_DBG(bb, DBG_ANT_DIV, "Ant no change, no training for 2 x antdiv_notrain_cnt_th sec.\n");
+	}
+	BB_DBG(bb, DBG_ANT_DIV, "TargetAnt= [%s]\n", (bb_ant_div->target_ant == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
+}
+
 void halbb_evm_based_antdiv(struct bb_info *bb)
 {
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
@@ -792,8 +1040,12 @@ void halbb_evm_based_antdiv(struct bb_info *bb)
 		halbb_antdiv_training_state(bb);
 		return;
 	} else {
-		halbb_antdiv_decision_state(bb);
-		halbb_antdiv_reset_training_stat(bb);
+		if (bb->ic_type & BB_IC_1SS) {
+			halbb_antdiv_1ss_decision_state(bb);
+			//halbb_antdiv_reset_training_stat(bb);
+		} else {
+			halbb_antdiv_decision_state(bb);
+		}
 	}
 
 	/* Set new target antenna */
@@ -802,6 +1054,7 @@ void halbb_evm_based_antdiv(struct bb_info *bb)
 	halbb_antdiv_set_ant(bb, bb_ant_div->target_ant);
 
 	/* Re-assign to next step reqired variable */
+	bb_ant_div->target_ant_rssi = bb_ant_div->target_ant;
 	bb_ant_div->target_ant_evm = bb_ant_div->target_ant;
 	bb_ant_div->target_ant_tp = bb_ant_div->target_ant;
 	bb_ant_div->target_ant_cn = bb_ant_div->target_ant;
@@ -816,16 +1069,11 @@ void halbb_antenna_diversity(struct bb_info *bb)
 	struct bb_antdiv_rssi_info *rssi_stat = &bb_ant_div->bb_rssi_i;
 	struct rtw_phl_com_t *phl = bb->phl_com;
 	struct dev_cap_t *dev = &phl->dev_cap;
-	u8 rssi;
-
-
-	halbb_antdiv_get_rssi(bb);
-
-	rssi = rssi_stat->rssi_final >> 2;
-	BB_DBG(bb, DBG_ANT_DIV, "RSSI=%d\n", rssi);
+	u8 rssi, rssi_pre;
 
 	BB_DBG(bb, DBG_ANT_DIV, "%s ======>\n", __func__);
 
+	BB_DBG(bb, DBG_ANT_DIV, "RFE_TYPE = %d\n", dev->rfe_type);
 	/* Early return */
 
 	if (phl_is_mp_mode(bb->phl_com)) {
@@ -833,40 +1081,31 @@ void halbb_antenna_diversity(struct bb_info *bb)
 		return;
 	}
 
-	if (dev->rfe_type != 50) {
-		return;
-	}
-
 	if (!(bb->support_ability & BB_ANT_DIV)) {
 		BB_DBG(bb, DBG_ANT_DIV, "Early return - Not support antenna diversity\n");
 		return;
 	}
-	BB_DBG(bb, DBG_CMN, "WARNING!! ANT_DIV is enable now\n");
+	BB_DBG(bb, DBG_ANT_DIV, "WARNING!! ANT_DIV is enable now\n");
 
-	if (!(bb_link->is_linked) && !(bb_link->is_one_entry_only)) {
+	if (!(bb_link->is_linked) || !(bb_link->is_one_entry_only)) {
 		BB_DBG(bb, DBG_ANT_DIV, "Early return - is_linked=%d, one_entry_only=%d\n",
 		       bb_link->is_linked, bb_link->is_one_entry_only);
 		return;
 	}
 
-	if (rssi < ANTDIV_RSSI_TH_HIGH) {
+	halbb_antdiv_get_rssi(bb);
+	rssi = rssi_stat->rssi_final >> 1;
+	rssi_pre = bb_ant_div->rssi_pre >> 1;
+	BB_DBG(bb, DBG_ANT_DIV, "RSSI=%d, RSSI_pre=%d, FIX_ANT_RSSI_DIFF_th=%d\n", rssi, rssi_pre, bb_ant_div->fixant_rssi_diff);
+	BB_DBG(bb, DBG_ANT_DIV, "[cck_cnt, ofdm_cnt, t_cnt] = [%d, %d, %d]\n", rssi_stat->pkt_cnt_cck, rssi_stat->pkt_cnt_ofdm, rssi_stat->pkt_cnt_t);
+	bb_ant_div->rssi_pre =  rssi_stat->rssi_final;
+	halbb_mem_set(bb, rssi_stat, 0, sizeof(struct bb_antdiv_rssi_info));
+
+	/*if (rssi < ANTDIV_RSSI_TH_HIGH) {
 		BB_DBG(bb, DBG_ANT_DIV, "RSSI=%d is too low to do Ant_diveristy\n", rssi);
 		halbb_antdiv_set_ant(bb, MAIN_ANT);
 		return;
-	}
-
-	if (bb_link->one_entry_tp_active_occur) { // if TP > th., do antdiv per watchdog
-		BB_DBG(bb, DBG_ANT_DIV, "TP occur, do antdv immediately\n");
-		bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
-	}
-	if (bb_ant_div->antdiv_wd_cnt < bb_ant_div->antdiv_period) { // else, do antdiv after specific watchdog
-		BB_DBG(bb, DBG_ANT_DIV, "Ant-div period = %d, watchdog count = %d\n",
-		       bb_ant_div->antdiv_period, bb_ant_div->antdiv_wd_cnt);
-		bb_ant_div->antdiv_wd_cnt++;
-		return;
-	} else {
-		bb_ant_div->antdiv_wd_cnt = 0;
-	}
+	}*/
 
 	/* Fixed-antenna diversity mode */
 	if (bb_ant_div->antdiv_mode != AUTO_ANT) {
@@ -885,6 +1124,33 @@ void halbb_antenna_diversity(struct bb_info *bb)
 		return;
 	}
 
+	if (bb->ic_type & BB_IC_1SS) {
+		if (DIFF_2(rssi, rssi_pre) >= bb_ant_div->fixant_rssi_diff) {
+			bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+		}
+		if (bb_ant_div->antdiv_notrain_cnt < bb_ant_div->antdiv_notrain_num) {
+			bb_ant_div->antdiv_notrain_cnt++;
+			BB_DBG(bb, DBG_ANT_DIV, "notrain_num = %d, notrain_cnt = %d\n",
+				   bb_ant_div->antdiv_notrain_num, bb_ant_div->antdiv_notrain_cnt);
+			return;
+		} else {
+			bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+		}
+	}
+
+	if (bb_link->one_entry_tp_active_occur) { // if TP > th., do antdiv per watchdog
+		BB_DBG(bb, DBG_ANT_DIV, "TP occur, do antdv immediately\n");
+		bb_ant_div->antdiv_wd_cnt = bb_ant_div->antdiv_period;
+	}
+	if (bb_ant_div->antdiv_wd_cnt < bb_ant_div->antdiv_period) { // else, do antdiv after specific watchdog
+		BB_DBG(bb, DBG_ANT_DIV, "Ant-div period = %d, watchdog count = %d\n",
+			   bb_ant_div->antdiv_period, bb_ant_div->antdiv_wd_cnt);
+		bb_ant_div->antdiv_wd_cnt++;
+		return;
+	} else {
+		bb_ant_div->antdiv_wd_cnt = 0;
+	}
+
 	/* Main section of EVM/TP based antenna diversity*/
 	BB_DBG(bb, DBG_ANT_DIV, "RSSI=%d, Ant_diversity start\n", rssi);
 	halbb_evm_based_antdiv(bb);
@@ -897,7 +1163,6 @@ void halbb_antdiv_get_rssi_stat(struct bb_info *bb)
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
 	struct bb_antdiv_rssi_info *rssi = &bb_ant_div->bb_rssi_i;
 	struct bb_rate_info *rate_i = &cmn_rpt->bb_rate_i;
-	u8 i = 0;
 
 	if (rate_i->mode == BB_LEGACY_MODE) {
 		if (cmn_rpt->is_cck_rate) {
@@ -912,6 +1177,43 @@ void halbb_antdiv_get_rssi_stat(struct bb_info *bb)
 	} else {
 		rssi->rssi_t_avg_acc += psts_h->rssi_avg;
 		rssi->pkt_cnt_t++;
+	}
+
+	/* Only get main/aux rssi stats @ training period */
+	if (!bb_ant_div->get_stats) {
+		return;
+	}
+
+	if (bb_ant_div->training_ant == MAIN_ANT) {
+		if (rate_i->mode == BB_LEGACY_MODE) {
+			if (cmn_rpt->is_cck_rate) {
+				rssi->main_rssi_cck_avg_acc += psts_h->rssi_avg;
+				rssi->main_pkt_cnt_cck++;
+
+			} else {
+				rssi->main_rssi_ofdm_avg_acc += psts_h->rssi_avg;
+				rssi->main_pkt_cnt_ofdm++;
+
+			}
+		} else {
+			rssi->main_rssi_t_avg_acc += psts_h->rssi_avg;
+			rssi->main_pkt_cnt_t++;
+		}
+	} else if (bb_ant_div->training_ant == AUX_ANT) {
+		if (rate_i->mode == BB_LEGACY_MODE) {
+			if (cmn_rpt->is_cck_rate) {
+				rssi->aux_rssi_cck_avg_acc += psts_h->rssi_avg;
+				rssi->aux_pkt_cnt_cck++;
+
+			} else {
+				rssi->aux_rssi_ofdm_avg_acc += psts_h->rssi_avg;
+				rssi->aux_pkt_cnt_ofdm++;
+
+			}
+		} else {
+			rssi->aux_rssi_t_avg_acc += psts_h->rssi_avg;
+			rssi->aux_pkt_cnt_t++;
+		}
 	}
 }
 
@@ -1209,6 +1511,8 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 	if ((_os_strcmp(input[1], help) == 0)) {
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+					"Init Antenna Diversity: {0}: halbb_antdiv_init.\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Set Antenna Diversity Mode: {1} {0}: Auto-mode {1}: Fix main ant. {2}: Fix aux ant.\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Set Antenna Diversity Method: {2} {0}: EVM based {1}: CN based\n");
@@ -1221,7 +1525,7 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Set training delay: {6} {ms} (how long to wait RA stable)\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "Set decision threshold: {7} {TP high th.} {TP low th.} {EVM th.}\n");
+					"Set decision threshold: {7} {TP high th.} {TP low th.} {EVM th.} {RSSI th.}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "TP lower bound: {8} {th.}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1229,13 +1533,23 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "EVM decision method: {10} {0}:Linear avg. {1}: dB avg.\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+					"Set notrain number: {11} {num}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+					"Set fix_ant_rssi_diff_th: {12} {th}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+					"Set tx_by_ext_pwr_lmt: {13} {en}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Show all parameter: {100}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "[ONLY DEBUG] {101} 0x586c[16]={0,1}\n");
 	} else {
 		HALBB_SCAN(input[1], DCMD_DECIMAL, &var[0]);
 
-		if (var[0] == 1) {
+		if (var[0] == 0) {
+			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
+			halbb_antdiv_init(bb);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used, "Init antdiv !\n");
+		} else if (var[0] == 1) {
 			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
 			bb_ant_div->antdiv_mode = (u8)var[1];
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1278,15 +1592,18 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
 			HALBB_SCAN(input[3], DCMD_DECIMAL, &var[2]);
 			HALBB_SCAN(input[4], DCMD_DECIMAL, &var[3]);
+			HALBB_SCAN(input[5], DCMD_DECIMAL, &var[4]);
 			bb_ant_div->tp_diff_th_high = (u16)var[1];
 			bb_ant_div->tp_diff_th_low = (u16)var[2];
 			bb_ant_div->evm_diff_th = (u8)var[3];
+			bb_ant_div->rssi_diff_th = (u8)var[4];
 
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				    "Decision threshold: {TP high = %d} {TP low = %d} {EVM = %d}\n",
-				    bb_ant_div->tp_diff_th_high,
-				    bb_ant_div->tp_diff_th_low,
-				    bb_ant_div->evm_diff_th);
+						"Decision threshold: {TP high = %d} {TP low = %d} {EVM = %d} {RSSI = %d}\n",
+						bb_ant_div->tp_diff_th_high,
+						bb_ant_div->tp_diff_th_low,
+						bb_ant_div->evm_diff_th,
+						bb_ant_div->rssi_diff_th);
 		} else if (var[0] == 8) {
 			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
 			bb_ant_div->tp_lb = (u8)var[1];
@@ -1302,15 +1619,28 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			bb_ant_div->evm_decision_method = (u8)var[1];
 			BB_DBG(bb, DBG_ANT_DIV, "EVM decision method=(( %d ))\n",
 			       bb_ant_div->evm_decision_method);
+		} else if (var[0] == 11) {
+			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
+			bb_ant_div->antdiv_notrain_num = (u8)var[1];
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"No train Num =%d\n", bb_ant_div->antdiv_notrain_num);
+			bb_ant_div->antdiv_notrain_cnt = bb_ant_div->antdiv_notrain_num;
+		} else if (var[0] == 12) {
+			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
+			bb_ant_div->fixant_rssi_diff = (u8)var[1];
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"fixant_rssi_diff_th =%d\n", bb_ant_div->fixant_rssi_diff);
+		} else if (var[0] == 13) {
+			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
+			bb_ant_div->tx_by_ext_pwr_lmt = (bool)var[1];
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"tx_by_ext_pwr_lmt=%d\n",
+						bb_ant_div->tx_by_ext_pwr_lmt);
 		} else if (var[0] == 100) {
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				    "Ant-Div Mode = {%d}\n", bb_ant_div->antdiv_mode);
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				    "Ant-Div training method = {%d}\n", bb_ant_div->antdiv_method);
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				    "TP decision method = {%d}\n", bb_ant_div->tp_decision_method);
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				    "EVM decision method = {%d}\n", bb_ant_div->evm_decision_method);
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				    "Ant-Div period = {#%d-watchdog}\n", bb_ant_div->antdiv_period);
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1320,12 +1650,21 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				    "Ant-Div training delay = {%d}\n", bb_ant_div->antdiv_delay);
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				    "Decision threshold: {TP high = %d} {TP low = %d} {EVM = %d}\n",
-				    bb_ant_div->tp_diff_th_high,
-				    bb_ant_div->tp_diff_th_low,
-				    bb_ant_div->evm_diff_th);
+						"Decision threshold: {TP high = %d} {TP low = %d} {EVM = %d} {RSSI = %d}\n",
+						bb_ant_div->tp_diff_th_high, bb_ant_div->tp_diff_th_low,
+						bb_ant_div->evm_diff_th, bb_ant_div->rssi_diff_th);
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				    "TP lower bound = {%d}\n", bb_ant_div->tp_lb);
+						"TP lower bound = {%d}\n", bb_ant_div->tp_lb);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"TP decision method = {%d}\n", bb_ant_div->tp_decision_method);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"EVM decision method = {%d}\n", bb_ant_div->evm_decision_method);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"No traing Num = {%d}\n", bb_ant_div->antdiv_notrain_num);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"Fix ant rssi diff th = {%d}\n", bb_ant_div->fixant_rssi_diff);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+						"tx_by_ext_pwr_lmt=%d\n", bb_ant_div->tx_by_ext_pwr_lmt);
 		} else if (var[0] == 101) {
 			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
 			halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(16), var[1], HW_PHY_0);
@@ -1352,7 +1691,7 @@ void halbb_antdiv_callback(void *context)
 	BB_DBG(bb, DBG_ANT_DIV, "[%s]===>\n", __func__);
 	timer->timer_state = BB_TIMER_IDLE;
 
-	if (bb->phl_com->hci_type == RTW_HCI_PCIE) {
+	if (bb->phl_com->hci_type == RTW_HCI_AXI) {
 		halbb_antdiv_io_en(bb);
 	} else {
 		rtw_hal_cmd_notify(bb->phl_com, MSG_EVT_NOTIFY_BB, (void *)(&timer->event_idx), bb->bb_phy_idx);

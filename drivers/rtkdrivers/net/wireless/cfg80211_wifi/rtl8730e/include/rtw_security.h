@@ -72,7 +72,8 @@ u32 security_type_bip_to_gmcs(enum security_type type);
 /* For BIP-CMAC-128 only */
 #define RTW_IGTK_LEN 16
 
-#define INVALID_SEC_MAC_CAM_ID	0xFF
+#define BMC_SEC_MAC_CAM_ID 30
+#define INVALID_SEC_MAC_CAM_ID 0xFF
 
 typedef enum {
 	ENCRYP_PROTOCOL_OPENSYS,   /* open system */

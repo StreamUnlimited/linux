@@ -132,6 +132,13 @@ rtw_phl_alloc_stainfo_sw(void *phl,
 			 struct rtw_wifi_role_t *wrole);
 
 enum rtw_phl_status
+rtw_phl_register_tx_ring(void *phl, u16 macid, u8 hw_band,
+			 u8 hw_wmm, u8 hw_port);
+
+enum rtw_phl_status
+rtw_phl_deregister_tx_ring(void *phl, u16 macid);
+
+enum rtw_phl_status
 rtw_phl_free_stainfo_sw(void *phl, struct rtw_phl_stainfo_t *sta);
 
 enum rtw_phl_status

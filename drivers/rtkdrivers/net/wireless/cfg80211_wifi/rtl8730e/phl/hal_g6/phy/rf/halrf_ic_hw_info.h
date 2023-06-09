@@ -67,24 +67,16 @@ enum halrf_ic {
 #define RF_AX_SERIES	(RF_AX_1SS | RF_AX_2SS |\
 				 RF_AX_3SS | RF_AX_4SS)
 /*@==========================================================================*/
-#if defined (RF_8852C_SUPPORT)
-#define KIP_REG 3136
-#elif defined (RF_8852B_SUPPORT)
-#define KIP_REG 2048
-#elif defined (RF_8730E_SUPPORT) || defined (RF_8720E_SUPPORT)
+#if defined (RF_8730E_SUPPORT) || defined (RF_8720E_SUPPORT)
 #define KIP_REG 128
 #else
 #define KIP_REG 2048
 #endif
 
-#if defined(RF_8834A_SUPPORT)
-#define KPATH 4
-#elif (defined(RF_8852A_SUPPORT) || defined(RF_8852B_SUPPORT) ||\
-       defined(RF_8852C_SUPPORT) || defined(RF_8832BR_SUPPORT) ||\
-       defined(RF_8192XB_SUPPORT) || defined(RF_8852BP_SUPPORT))
-#define KPATH 2
-#else
+#if defined (RF_8730E_SUPPORT) || defined (RF_8720E_SUPPORT)
 #define KPATH 1
+#else
+#define KPATH 2
 #endif
 
 /*@==========================================================================*/

@@ -59,6 +59,7 @@ u32 mac_send_bcn(struct mac_ax_adapter *adapter, struct mac_ax_bcn_info *info)
 	mdata.hw_seq_mode = info->ssn_mode;
 	mdata.sw_seq = info->ssn_sel;
 	mdata.wdinfo_en = 1;
+	mdata.group_bit_ie_offset = info->grp_ie_ofst;
 	desc_len = adapter->ops->txdesc_len(adapter, NULL);
 	if (desc_len + info->pld_len >= 4 * 128) {
 		PLTFM_MSG_ERR("bcn size is exceed!\n");

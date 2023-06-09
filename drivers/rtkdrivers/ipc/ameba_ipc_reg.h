@@ -49,8 +49,11 @@
 /* to operate normal registers, include AIPC_REG_TX_DATA,
  * AIPC_REG_RX_DATA and AIPC_REG_ICR.
  */
-#define AIPC_SET_NP_CH_NR(ch, reg) (u32)(reg | (0x00000001 << NP_OFFSET) << ch)
-#define AIPC_SET_LP_CH_NR(ch, reg) (u32)(reg | (0x00000001 << LP_OFFSET) << ch)
+
+/* Do not write 1 to other channel. Do not use |= ()!!! */
+#define AIPC_SET_NP_CH_NR(ch) (u32)((0x00000001 << NP_OFFSET) << ch)
+#define AIPC_SET_LP_CH_NR(ch) (u32)((0x00000001 << LP_OFFSET) << ch)
+
 #define AIPC_GET_NP_CH_NR(ch, reg) (u32)(reg & ((0x00000001 << NP_OFFSET) << ch))
 #define AIPC_GET_LP_CH_NR(ch, reg) (u32)(reg & ((0x00000001 << LP_OFFSET) << ch))
 #define AIPC_CLR_NP_CH_NR(ch, reg) (u32)(reg & ~((0x00000001 << NP_OFFSET) << ch))

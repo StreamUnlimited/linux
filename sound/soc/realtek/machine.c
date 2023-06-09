@@ -59,24 +59,28 @@ static struct snd_soc_dai_link amebad2_dai[] = {
 		.name = "codec AIF1",
 		.stream_name = "Pri_Dai",
 		.ops = &amebad2_ops,
+		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif1),
 	},
 	{
 		.name = "codec AIF2",
 		.stream_name = "Sec_Dai",
 		.ops = &amebad2_ops,
+		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif2),
 	},
 	{
 		.name = "codec AIF3",
 		.stream_name = "SPORT2_I2s_Dai",
 		.ops = &amebad2_ops,
+		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif3),
 	},
 	{
 		.name = "codec AIF4",
 		.stream_name = "SPORT3_I2S_Dai",
 		.ops = &amebad2_ops,
+		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif4),
 	},
 };

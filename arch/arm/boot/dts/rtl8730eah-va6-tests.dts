@@ -19,6 +19,10 @@
 
 // Configure peripherals, avoid pinmux conflicts.
 
+&captimer {
+	status = "okay";
+};
+
 &codec{
 	pinctrl-names = "default";
 	pinctrl-0 = <&audio_ext_amp_pins>;

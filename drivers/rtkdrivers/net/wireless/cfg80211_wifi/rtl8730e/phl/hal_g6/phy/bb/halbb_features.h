@@ -48,7 +48,7 @@
 #endif
 #ifndef DRV_BB_ENV_MNTR_DISABLE
 #define HALBB_ENV_MNTR_SUPPORT
-//#define CLM_SUPPORT
+#define CLM_SUPPORT
 //#define NHM_SUPPORT
 //#define IFS_CLM_SUPPORT
 //#define FAHM_SUPPORT

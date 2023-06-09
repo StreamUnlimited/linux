@@ -271,7 +271,7 @@ rtw_hal_mac_addr_cam_del_entry(struct hal_info_t *hal_info,
 
 enum rtw_hal_status
 rtw_hal_mac_add_key(struct hal_info_t *hal_info, u8 macid, u8 type, u8 ext_key,
-		    u8 spp,	u8 keyid, u8 keytype, u8 *keybuf);
+		    u8 spp, u8 keyid, u8 keytype, u8 mic, u8 *keybuf);
 enum rtw_hal_status
 rtw_hal_mac_delete_key(struct hal_info_t *hal_info, u8 macid, u8 type,
 		       u8 ext_key, u8 spp, u8 keyid, u8 keytype);

@@ -921,7 +921,6 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 	struct mac_ax_port_info *pinfo;
 	u8 band = para->band;
 	u8 port = para->port;
-
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u32 mbssid_idx = para->mbssid_idx;
 	u32 set_val = para->val;
@@ -932,6 +931,9 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 	u8 i = 0, j = 0;
 	u32 ret = MACSUCCESS;
 	u8 mbssid_num = 0;
+#ifdef CONFIG_CONCURRENT_MODE
+	static u8 ap_port;
+#endif
 
 	if (port >= MAC_AX_PORT_NUM) {
 		PLTFM_MSG_ERR("[ERR] invalid port idx %d\n", port);
@@ -1036,6 +1038,27 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 		}
 		break;
 
+	case MAC_AX_PCFG_EN_UDT_TSF:
+		val32 = MAC_REG_R32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1);
+		switch (port) {
+		case MAC_AX_PORT_0:
+			if (set_val == 1) {
+				val32 &= ~BIT_P0_DIS_TSF_UDT;
+			} else {
+				val32 |= BIT_P0_DIS_TSF_UDT;
+			}
+			break;
+		case MAC_AX_PORT_1:
+			if (set_val == 1) {
+				val32 &= ~BIT_P1_DIS_TSF_UDT;
+			} else {
+				val32 |= BIT_P1_DIS_TSF_UDT;
+			}
+			break;
+		}
+		MAC_REG_W32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1, val32);
+		break;
+
 	case MAC_AX_PCFG_HIQ_WIN:
 		if (mbssid_idx < 2) {
 			MAC_REG_W16(hiq_win_mbid_regl[mbssid_idx], (u8)set_val);
@@ -1060,8 +1083,12 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 
 	case MAC_AX_PCFG_HIQ_NOLIMIT:
 		val32 = MAC_REG_R32(REG_ATIMWND6_7_URGENT_NOLIMTHGQ);
-		w_val32 = set_val ? val32 | b_hiq_nolmt_mbid_l[mbssid_idx] :
-			  val32 & ~b_hiq_nolmt_mbid_l[mbssid_idx];
+		if (port == MAC_AX_PORT_0)
+			w_val32 = set_val ? val32 | b_hiq_nolmt_mbid_l[mbssid_idx] :
+				  val32 & ~b_hiq_nolmt_mbid_l[mbssid_idx];
+		else
+			w_val32 = set_val ? val32 | b_hiq_nolmt_mbid_l[port] :
+				  val32 & ~b_hiq_nolmt_mbid_l[port];
 		if (w_val32 != val32) {
 			MAC_REG_W32(REG_ATIMWND6_7_URGENT_NOLIMTHGQ, w_val32);
 		}
@@ -1209,6 +1236,11 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 			val8 |= BIT(0); // ENSWBCN
 			MAC_REG_W8(REG_CR + 1, val8);
 
+			/* enable ap bssid fit uintcast */
+			val32 = MAC_REG_R32(REG_MACID_H);
+			val32 |= BIT_AP_BSSID_FIT_UC;
+			MAC_REG_W32(REG_MACID_H, val32);
+
 			/* Software beacon should set this bit */
 			val32 = MAC_REG_R32(REG_AXI_CTRL);
 			val32 |= BIT_MBSSID_ENSWBCN_BACKDOOR;
@@ -1229,20 +1261,34 @@ u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 				break;
 			}
 			MAC_REG_W32(REG_DWBCN1_CTRL, val32);
+#ifdef CONFIG_CONCURRENT_MODE
+			ap_port = port;
+#endif
 		} else {
-			/* set REG_CR bit 8 */
-			val8 = MAC_REG_R8(REG_CR + 1);
-			val8 &= ~BIT(0); // ENSWBCN
-			MAC_REG_W8(REG_CR + 1, val8);
+#ifdef CONFIG_CONCURRENT_MODE
+			if (port == ap_port) {
+#endif
+				/* set REG_CR bit 8 */
+				val8 = MAC_REG_R8(REG_CR + 1);
+				val8 &= ~BIT(0); // ENSWBCN
+				MAC_REG_W8(REG_CR + 1, val8);
 
-			/* Software beacon should set this bit */
-			val32 = MAC_REG_R32(REG_AXI_CTRL);
-			val32 &= ~BIT_MBSSID_ENSWBCN_BACKDOOR;
-			MAC_REG_W32(REG_AXI_CTRL, val32);
+				/* enable ap bssid fit uintcast */
+				val32 = MAC_REG_R32(REG_MACID_H);
+				val32 &= ~BIT_AP_BSSID_FIT_UC;
+				MAC_REG_W32(REG_MACID_H, val32);
 
-			val32 = MAC_REG_R32(REG_DWBCN1_CTRL);
-			val32 &= ~(BIT_SW_BCN_SEL_EN | BITS_SW_BCN_SEL);
-			MAC_REG_W32(REG_DWBCN1_CTRL, val32);
+				/* Software beacon should set this bit */
+				val32 = MAC_REG_R32(REG_AXI_CTRL);
+				val32 &= ~BIT_MBSSID_ENSWBCN_BACKDOOR;
+				MAC_REG_W32(REG_AXI_CTRL, val32);
+
+				val32 = MAC_REG_R32(REG_DWBCN1_CTRL);
+				val32 &= ~(BIT_SW_BCN_SEL_EN | BITS_SW_BCN_SEL);
+				MAC_REG_W32(REG_DWBCN1_CTRL, val32);
+#ifdef CONFIG_CONCURRENT_MODE
+			}
+#endif
 		}
 #endif
 		break;
@@ -1410,8 +1456,8 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 			return ret;
 		}
 
-		/* set high queue to no limit mode */
-		cfg_para.val = 1;
+		/* set high queue to limit mode, for broadcast */
+		cfg_para.val = 0;
 		ret = mac_port_cfg(adapter, MAC_AX_PCFG_HIQ_NOLIMIT, &cfg_para);
 		if (ret != MACSUCCESS) {
 			PLTFM_MSG_ERR("[ERR]P%d mbid%d cfg hiq no limit %d\n",
@@ -1454,6 +1500,13 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 			      port, ret);
 			return ret;
 		}
+		cfg_para.val = 1;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_EN_UDT_TSF, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d enable TSF update failed %d\n",
+			      port, ret);
+			return ret;
+		}
 		break;
 	case MAC_AX_NET_TYPE_ADHOC:
 		pinfo->stat = PORT_ST_ADHOC;
@@ -1467,6 +1520,13 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 			      port, ret);
 			return ret;
 		}
+		cfg_para.val = 1;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_EN_UDT_TSF, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d enable TSF update failed %d\n",
+			      port, ret);
+			return ret;
+		}
 		break;
 	case MAC_AX_NET_TYPE_AP:
 		pinfo->stat = PORT_ST_AP;
@@ -1474,6 +1534,13 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 		ret = mac_port_cfg(adapter, MAC_AX_PCFG_SW_BCN, &cfg_para);
 		if (ret != MACSUCCESS) {
 			PLTFM_MSG_ERR("[ERR]P%d enable sw beacon fail %d\n",
+			      port, ret);
+			return ret;
+		}
+		cfg_para.val = 0;
+		ret = mac_port_cfg(adapter, MAC_AX_PCFG_EN_UDT_TSF, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]P%d disable TSF update failed %d\n",
 			      port, ret);
 			return ret;
 		}
@@ -1521,40 +1588,42 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
 	return ret;
 }
 #if 1
-u32 mac_tsf_sync(struct mac_ax_adapter *adapter, u8 from_port, u8 to_port,
-		 s32 sync_offset, enum mac_ax_tsf_sync_act action)
+u32 mac_tsf_sync(struct mac_ax_adapter *adapter)
 {
 	u32 val32, ret = MACSUCCESS;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	struct mac_ax_tsf_sync_info *sync_info = &adapter->tsf_sync_info;
 
-	if (sync_offset > BIT_MASK_TSFTR_SYNC_OFFSET) {
+	if (sync_info->sync_offset > BIT_MASK_TSFTR_SYNC_OFFSET) {
 		PLTFM_MSG_ERR("[ERR] Invalid tsf_sync offset.\n");
 		return MACFUNCINPUT;
 	}
 
 	val32 = MAC_REG_R32(REG_TSFT_SYN_OFFSET_SLOT);
-	val32 = BIT_SET_TSFTR_SYNC_OFFSET(val32, sync_offset);
+	val32 = BIT_SET_TSFTR_SYNC_OFFSET(val32, sync_info->sync_offset);
 	MAC_REG_W32(REG_TSFT_SYN_OFFSET_SLOT, val32);
 
-	switch (action) {
+	switch (sync_info->dir) {
 	case MAC_AX_P0_P1:
-		MAC_REG_W32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1,
-			    MAC_REG_R32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1) | BIT_TSFTR_SYNC_EN);
-		break;
-	case MAC_AX_P1_P0:
+		/* sync to port 1 with port 0 + offset */
 		MAC_REG_W32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1,
 			    MAC_REG_R32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1) | BIT_TSFTR1_SYNC_EN);
 		break;
-	case MAC_AX_P1_P2:
-		MAC_REG_W32(REG_DISATIM_BCNERLY_TBTTHOLD_BCNCS,
-			    MAC_REG_R32(REG_DISATIM_BCNERLY_TBTTHOLD_BCNCS) | BIT_TSFTR2_SYNC_EN);
+	case MAC_AX_P1_P0:
+		/* sync to port 0 with port 1 + offset */
+		MAC_REG_W32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1,
+			    MAC_REG_R32(REG_TSTRST_P2PRST_BCN_CTRL_PORT0_1) | BIT_TSFTR_SYNC_EN);
 		break;
-	case MAC_AX_P2_P1:
+	case MAC_AX_P1_P2:
 		MAC_REG_W32(REG_DISATIM_BCNERLY_TBTTHOLD_BCNCS,
 			    MAC_REG_R32(REG_DISATIM_BCNERLY_TBTTHOLD_BCNCS) | BIT_TSFTR3_SYNC_EN);
 		break;
+	case MAC_AX_P2_P1:
+		MAC_REG_W32(REG_DISATIM_BCNERLY_TBTTHOLD_BCNCS,
+			    MAC_REG_R32(REG_DISATIM_BCNERLY_TBTTHOLD_BCNCS) | BIT_TSFTR2_SYNC_EN);
+		break;
 	default:
-		PLTFM_MSG_ERR("[ERR] Invalid tsf_sync input.\n");
+		PLTFM_MSG_ERR("ERR] Invalid tsf_sync dir.\\n");
 		return MACFUNCINPUT;
 	}
 

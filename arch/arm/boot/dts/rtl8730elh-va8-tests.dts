@@ -73,6 +73,10 @@
 	status = "okay";
 };
 
+&captimer {
+	status = "okay";
+};
+
 // Pinmux Group2
 &captouch {
 	pinctrl-names = "default";
@@ -96,12 +100,16 @@
 	status = "okay";
 };
 
-// Pinmux Group0
 &dsi {
-	pinctrl-names="default";
-	pinctrl-0 = <&drm_disable_swd_pins>;
-	mipi-gpios = <&gpioa 14 0>;
 	status = "okay";
+
+	panel {
+		compatible = "realtek,st7701s";
+		pinctrl-names="default";
+		pinctrl-0 = <&drm_disable_swd_pins>;
+		mipi-gpios = <&gpioa 14 0>;
+		status = "okay";
+	};
 };
 
 &hash {

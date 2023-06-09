@@ -1795,7 +1795,7 @@ rtw_hal_mac_addr_cam_del_entry(struct hal_info_t *hal_info,
 
 enum rtw_hal_status
 rtw_hal_mac_add_key(struct hal_info_t *hal_info, u8 macid, u8 type, u8 ext_key,
-		    u8 spp, u8 keyid, u8 keytype, u8 *keybuf) {
+		    u8 spp, u8 keyid, u8 keytype, u8 mic, u8 *keybuf) {
 	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
 	void *drv = hal_to_drvpriv(hal_info);
 	struct mac_ax_sec_cam_info sec_cam;
@@ -1804,6 +1804,9 @@ rtw_hal_mac_add_key(struct hal_info_t *hal_info, u8 macid, u8 type, u8 ext_key,
 	sec_cam.type = type;
 	sec_cam.ext_key = ext_key;
 	sec_cam.spp_mode = spp;
+	sec_cam.mic = mic;
+	sec_cam.mgnt = 0;
+	sec_cam.rpt_md = 0;
 	_os_mem_set(drv, &sec_cam.key, 0, sizeof(sec_cam.key));
 
 	switch (type)
@@ -7400,30 +7403,42 @@ rtw_hal_mac_tsf_sync(struct hal_info_t *hal_info,
 		     u8 from_port, u8 to_port, enum phl_band_idx band,
 		     s32 sync_offset_tu, enum hal_tsf_sync_act action) {
 	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
+	struct mac_ax_tsf_sync_info *sync_info = &mac->tsf_sync_info;
 	enum mac_ax_tsf_sync_act mac_action = MAC_AX_TSF_SYNC_NOW_ONCE;
-	s32 sync_offset_unit = 0;/* for halmac API use, unit is 32us  */
 
 	switch (action)
 	{
 	case HAL_TSF_SYNC_NOW_ONCE :
-		mac_action = MAC_AX_TSF_SYNC_NOW_ONCE;
 		break;
 	case HAL_TSF_EN_SYNC_AUTO :
-		mac_action = MAC_AX_TSF_EN_SYNC_AUTO;
+		sync_info->en_auto_sync = true;
 		break;
 	case HAL_TSF_DIS_SYNC_AUTO :
-		mac_action = MAC_AX_TSF_DIS_SYNC_AUTO;
+		sync_info->en_auto_sync = false;
 		break;
 	default :
 		PHL_ERR("Unknown tsf sync action %d\n", action);
 		goto _error;
 	}
 
-	/* covert TU to unit(unit is 32us, 1TU=1024us=32*32us) */
-	sync_offset_unit = sync_offset_tu * 32;
+	if ((from_port == MAC_AX_PORT_1) && (to_port == MAC_AX_PORT_0)) {
+		sync_info->dir = MAC_AX_P1_P0;
+	} else if ((from_port == MAC_AX_PORT_0) && (to_port == MAC_AX_PORT_1)) {
+		sync_info->dir = MAC_AX_P0_P1;
+	} else if ((from_port == MAC_AX_PORT_1) && (to_port == MAC_AX_PORT_2)) {
+		sync_info->dir = MAC_AX_P1_P2;
+	} else if ((from_port == MAC_AX_PORT_2) && (to_port == MAC_AX_PORT_1)) {
+		sync_info->dir = MAC_AX_P2_P1;
+	} else {
+		PHL_ERR("Unknown tsf sync port.\\n");
+		return MACFUNCINPUT;
+	}
 
-	if (mac->ops->tsf_sync(mac, from_port, to_port,
-			       sync_offset_unit, mac_action) == MACSUCCESS)
+	/* covert TU to unit(unit is 32us, 1TU=1024us=32*32us) */
+	sync_info->sync_offset = sync_offset_tu * 32;
+	/* for halmac API use, unit is 32us  */
+
+	if (mac->ops->tsf_sync(mac) == MACSUCCESS)
 	{
 		return RTW_HAL_STATUS_SUCCESS;
 	}

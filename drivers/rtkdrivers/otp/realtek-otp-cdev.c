@@ -41,13 +41,13 @@ struct otp_init_table {
 
 int realtek_otp_open(struct inode *inode, struct file *filp)
 {
-	pr_info("Realtek OTP: open success.");
+	pr_debug("Realtek OTP: open success.");
 	return 0;
 }
 
 int realtek_otp_release(struct inode *inode, struct file *filp)
 {
-	pr_info("\nRealtek OTP: release.");
+	pr_debug("\nRealtek OTP: release.");
 	return 0;
 }
 
@@ -165,7 +165,7 @@ fail_malloc:
 
 void realtek_otp_exit(void)
 {
-	pr_info("End realtek_otp");
+	pr_debug("End realtek_otp");
 	cdev_del(&realtek_otp_devp->cdev);
 	kfree(realtek_otp_devp);
 	unregister_chrdev_region(MKDEV(realtek_otp_major, 0), 1);

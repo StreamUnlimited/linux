@@ -229,8 +229,7 @@ u32 mac_port_init(struct mac_ax_adapter *adapter,
  * @return Please Place Description here.
  * @retval u32
  */
-u32 mac_tsf_sync(struct mac_ax_adapter *adapter, u8 from_port, u8 to_port,
-		 s32 sync_offset, enum mac_ax_tsf_sync_act action);
+u32 mac_tsf_sync(struct mac_ax_adapter *adapter);
 /**
  * @}
  * @}

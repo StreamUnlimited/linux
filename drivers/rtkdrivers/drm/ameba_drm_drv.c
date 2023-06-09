@@ -29,74 +29,69 @@
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
 
+#include "ameba_lcdc.h"
 #include "ameba_drm_drv.h"
 
-extern struct ameba_drm_data lcdc_driver_data;
+
+#define to_ameba_crtc(crtc) container_of(crtc, struct ameba_crtc, base)
+#define to_ameba_plane(plane) container_of(plane, struct ameba_plane, base)
+
+#define  LCDC_LAYER_IMG_FORMAT_NOT_SUPPORT (LCDC_LAYER_IMG_FORMAT_ARGB8666+1)
 
 
-
-/*
-	mipi dsi underflow issue
-*/
-struct ameba_lcdc_param_struct {
-	//used for underflow
-	u32 under_flow_count ;
-	volatile u32 under_flow_flag ;
-	void *lcdc_hw_ctx ; 	//struct lcdc_hw_ctx_type handle
-	void *dsi_local ;  		//dsi dev handle
+/* ameba-format translate table */
+struct ameba_format {
+	u32 pixel_bpp;
+	u32 pixel_format;
+	u32 hw_format;
 };
-static struct ameba_lcdc_param_struct lcdcUndFlwInstance={0,0,NULL,NULL} ;
+struct ameba_crtc {
+	struct drm_crtc base;
 
-//struct ameba_lcdc_param_struct
-void* drm_get_param_handle(void)
-{
-	return &lcdcUndFlwInstance ;
-}
-void drm_underflow_flag_add(unsigned char value)
-{
-	lcdcUndFlwInstance.under_flow_flag += value ;
-	lcdcUndFlwInstance.under_flow_count += value ;
-}
-void drm_underflow_flag_reset()
-{
-	lcdcUndFlwInstance.under_flow_flag = 0 ;
-}
-u32 drm_get_underflow_flag(void)
-{
-	return lcdcUndFlwInstance.under_flow_flag;
-}
+	void *lcdc_hw_ctx;	/* struct lcdc_hw_ctx_type handle */
+	bool enable;
+};
+struct ameba_plane {
+	struct drm_plane base;
 
-//mipi
-void drm_set_mipidsi_param(void *data)
-{
-	lcdcUndFlwInstance.dsi_local = data;
-}
-void* drm_get_mipidsi_param(void)
-{
-	return lcdcUndFlwInstance.dsi_local ;
-}
-void* drm_get_mipidsi_param2(void* data)
-{
-	struct ameba_lcdc_param_struct *phandle = (struct ameba_lcdc_param_struct*)data;
-	return phandle->dsi_local ;
-}
-//lcdc
-void drm_set_lcdc_param(void *data)
-{
-	lcdcUndFlwInstance.lcdc_hw_ctx = data;
-}
-void* drm_get_lcdc_param(void)
-{
-	return lcdcUndFlwInstance.lcdc_hw_ctx ;
-}
+	void *lcdc_hw_ctx;	/* struct lcdc_hw_ctx_type handle */
+	u32 ch;	///layer index
+};
+struct ameba_drm_private {
+	struct ameba_crtc crtc;
+	struct ameba_plane planes[LCDC_LAYER_MAX_NUM];
 
+	void *lcdc_hw_ctx; /* struct lcdc_hw_ctx_type handle */
+};
+
+/* display controller init/cleanup ops */
+struct ameba_drm_driver_data {
+	const u32 *channel_formats;
+	u32 channel_formats_cnt;
+	u32 num_planes;
+	u32 prim_plane;
+	int config_max_width;
+	int config_max_height;
+
+	struct drm_driver *driver;
+	const struct drm_crtc_helper_funcs *crtc_helper_funcs;
+	const struct drm_crtc_funcs *crtc_funcs;
+	const struct drm_plane_helper_funcs *plane_helper_funcs;
+	const struct drm_plane_funcs  *plane_funcs;
+	const struct drm_mode_config_funcs *mode_config_funcs;
+
+	void *(*alloc_hw_ctx)(struct platform_device *pdev,struct drm_crtc *crtc);
+	void (*cleanup_hw_ctx)(struct platform_device *pdev, void *hw_ctx);
+};
+
+#include "ameba_drm_obj.c"
 
 static int ameba_drm_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
-							   struct drm_plane *plane,
-							   const struct ameba_drm_data *driver_data)
+							struct drm_plane *plane,
+							const struct ameba_drm_driver_data *driver_data)
 {
-	struct device_node *port;
-	int ret;
+	struct device_node      *port;
+	int                     ret;
 
 	/* set crtc port so that
 	 * drm_of_find_possible_crtcs call works
@@ -123,14 +118,14 @@ static int ameba_drm_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 
 static int ameba_drm_plane_init(struct drm_device *dev, struct drm_plane *plane,
 								enum drm_plane_type type,
-								const struct ameba_drm_data *data)
+								const struct ameba_drm_driver_data *data)
 {
 	int ret = 0;
 
 	ret = drm_universal_plane_init(dev, plane, 0xff, data->plane_funcs,
-								   data->channel_formats,
-								   data->channel_formats_cnt,
-								   NULL, type, NULL);
+								data->channel_formats,
+								data->channel_formats_cnt,
+								NULL, type, NULL);
 	if (ret) {
 		DRM_DEV_ERROR(dev->dev, "fail to init plane\n");
 		return ret;
@@ -142,45 +137,48 @@ static int ameba_drm_plane_init(struct drm_device *dev, struct drm_plane *plane,
 	return 0;
 }
 
-static void ameba_drm_private_cleanup(struct drm_device *dev)
+static void ameba_drm_private_cleanup(struct drm_device *drm)
 {
-	struct ameba_drm_data 		*data;
-	struct ameba_drm_private 	*ameba_priv = dev->dev_private;
-	struct platform_device		*pdev = to_platform_device(dev->dev);
+	struct ameba_drm_driver_data        *data;
+	struct ameba_drm_struct             *ameba_struct = drm->dev_private;
+	struct ameba_drm_private            *ameba_priv = ameba_struct->ameba_drm_priv;
+	struct platform_device              *pdev = to_platform_device(drm->dev);
 
-	data = (struct ameba_drm_data *)of_device_get_match_data(dev->dev);
+	data = (struct ameba_drm_driver_data *)of_device_get_match_data(drm->dev);
 	if (data->cleanup_hw_ctx) {
 		data->cleanup_hw_ctx(pdev, ameba_priv->lcdc_hw_ctx);
 	}
 
-	devm_kfree(dev->dev, ameba_priv);
+	devm_kfree(drm->dev, ameba_priv);
 
-	dev->dev_private = NULL;
+	ameba_struct->ameba_drm_priv = NULL;
 }
 
-static int ameba_drm_private_init(struct drm_device *dev,
-								  const struct ameba_drm_data *driver_data)
+static int ameba_drm_private_init(struct drm_device *drm,
+								const struct ameba_drm_driver_data *driver_data)
 {
-	u32 ch;
-	int ret;
-	void *ctx;
-	enum drm_plane_type 		type;
-	struct drm_plane 			*prim_plane;
-	struct ameba_drm_private 	*ameba_priv;
-	struct platform_device 		*pdev = to_platform_device(dev->dev);
+	u32                         ch;
+	int                         ret;
+	void                        *ctx;
+	enum drm_plane_type         type;
+	struct drm_plane            *prim_plane;
+	struct ameba_drm_private    *ameba_priv;
+	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
+	struct platform_device      *pdev = to_platform_device(drm->dev);
 
-	ameba_priv = devm_kzalloc(dev->dev, sizeof(*ameba_priv), GFP_KERNEL);
+	ameba_priv = devm_kzalloc(drm->dev, sizeof(*ameba_priv), GFP_KERNEL);
 	if (!ameba_priv) {
-		DRM_DEV_ERROR(dev->dev, "failed to alloc ameba_drm_private\n");
+		DRM_DEV_ERROR(drm->dev, "failed to alloc ameba_drm_private\n");
 		return -ENOMEM;
 	}
 
 	ctx = driver_data->alloc_hw_ctx(pdev, &ameba_priv->crtc.base);
 	if (IS_ERR(ctx)) {
-		DRM_DEV_ERROR(dev->dev, "failed to initialize ameba_priv hw ctx\n");
+		DRM_DEV_ERROR(drm->dev, "failed to initialize ameba_priv hw ctx\n");
 		return -EINVAL;
 	}
 	ameba_priv->lcdc_hw_ctx = ctx;
+	ameba_struct->lcdc_hw_ctx = ctx;
 
 	/*
 	 * plane init, support all plane info
@@ -191,8 +189,7 @@ static int ameba_drm_private_init(struct drm_device *dev,
 		} else {
 			type = DRM_PLANE_TYPE_OVERLAY;
 		}
-		ret = ameba_drm_plane_init(dev, &ameba_priv->planes[ch].base,
-								   type, driver_data);
+		ret = ameba_drm_plane_init(drm, &ameba_priv->planes[ch].base, type, driver_data);
 		if (ret) {
 			return ret;
 		}
@@ -202,23 +199,22 @@ static int ameba_drm_private_init(struct drm_device *dev,
 
 	/* crtc init */
 	prim_plane = &ameba_priv->planes[driver_data->prim_plane].base;
-	ret = ameba_drm_crtc_init(dev, &ameba_priv->crtc.base,
-							  prim_plane, driver_data);
+	ret = ameba_drm_crtc_init(drm, &ameba_priv->crtc.base, prim_plane, driver_data);
 	if (ret) {
 		return ret;
 	}
 	ameba_priv->crtc.lcdc_hw_ctx = ctx;
 	ameba_priv->crtc.enable = false ;
 
-	dev->dev_private = ameba_priv;
+	ameba_struct->ameba_drm_priv = ameba_priv;
 
 	return 0;
 }
 
 static int ameba_drm_kms_init(struct drm_device *dev,
-							  const struct ameba_drm_data *driver_data)
+							  const struct ameba_drm_driver_data *driver_data)
 {
-	int ret;
+	int                         ret;
 
 	/* dev->mode_config initialization */
 	drm_mode_config_init(dev);
@@ -232,9 +228,8 @@ static int ameba_drm_kms_init(struct drm_device *dev,
 		goto err_mode_config_cleanup;
 	}
 
-	//update the display size
-	dev->mode_config.max_width = ameba_drm_get_display_width();
-	dev->mode_config.max_height = ameba_drm_get_display_height();
+	dev->mode_config.max_width = driver_data->config_max_width;
+	dev->mode_config.max_height = driver_data->config_max_width;
 
 	/* bind and init sub drivers */
 	ret = component_bind_all(dev->dev, dev);
@@ -286,102 +281,71 @@ static int ameba_drm_kms_cleanup(struct drm_device *dev)
 	return 0;
 }
 
-static int ameba_drm_connectors_register(struct drm_device *dev)
-{
-	int ret;
-	struct drm_connector *connector = NULL;
-	struct drm_connector *failed_connector;
-	struct drm_connector_list_iter conn_iter;
-
-	mutex_lock(&dev->mode_config.mutex);
-	drm_connector_list_iter_begin(dev, &conn_iter);
-
-	drm_for_each_connector_iter(connector, &conn_iter) {
-		ret = drm_connector_register(connector);
-		if (ret) {
-			failed_connector = connector;
-			goto err;
-		}
-	}
-	drm_connector_list_iter_end(&conn_iter);
-	mutex_unlock(&dev->mode_config.mutex);
-
-	return 0;
-
-err:
-	drm_connector_list_iter_begin(dev, &conn_iter);
-	drm_for_each_connector_iter(connector, &conn_iter) {
-		if (failed_connector == connector) {
-			break;
-		}
-		drm_connector_unregister(connector);
-	}
-	drm_connector_list_iter_end(&conn_iter);
-	mutex_unlock(&dev->mode_config.mutex);
-
-	return ret;
-}
-
 static int ameba_drm_bind(struct device *dev)
 {
-	struct ameba_drm_data *driver_data;
-	struct drm_device *drm_dev;
-	int ret;
+	struct ameba_drm_struct         *ameba_struct;
+	struct ameba_drm_driver_data    *driver_data;
+	struct drm_device               *drm;
+	int                             ret;
+	AMEBA_DRM_DEBUG
 
-	driver_data = (struct ameba_drm_data *)of_device_get_match_data(dev);
+	driver_data = (struct ameba_drm_driver_data *)of_device_get_match_data(dev);
 	if (!driver_data) {
 		return -EINVAL;
 	}
 
 	//will call drm_dev_init
-	drm_dev = drm_dev_alloc(driver_data->driver, dev);
-	if (IS_ERR(drm_dev)) {
-		return PTR_ERR(drm_dev);
+	drm = drm_dev_alloc(driver_data->driver, dev);
+	if (IS_ERR(drm)) {
+		return PTR_ERR(drm);
 	}
-	dev_set_drvdata(dev, drm_dev);
+
+	ameba_struct = kzalloc(sizeof(*ameba_struct), GFP_KERNEL);
+	if (!ameba_struct)
+		return -ENOMEM;
+
+	ameba_struct->dev = dev;
+	ameba_struct->drm = drm;
+
+	drm->dev_private = ameba_struct;
+	dev_set_drvdata(dev, drm);
 
 	/* display controller init */
-	ret = ameba_drm_kms_init(drm_dev, driver_data);
+	ret = ameba_drm_kms_init(drm, driver_data);
 	if (ret) {
 		goto err_drm_dev_put;
 	}
 
 	//register the device
-	ret = drm_dev_register(drm_dev, 0);
+	ret = drm_dev_register(drm, 0);
 	if (ret) {
 		goto err_kms_cleanup;
 	}
 
-	/* connectors should be registered after drm device register */
-	if (driver_data->register_connects) {
-		ret = ameba_drm_connectors_register(drm_dev);
-		if (ret) {
-			goto err_drm_dev_unregister;
-		}
-	}
-
 	return 0;
 
-err_drm_dev_unregister:
-	drm_dev_unregister(drm_dev);
 err_kms_cleanup:
-	ameba_drm_kms_cleanup(drm_dev);
+	ameba_drm_kms_cleanup(drm);
 err_drm_dev_put:
-	drm_dev_put(drm_dev);
+	drm_dev_put(drm);
 
 	return ret;
 }
 
 static void ameba_drm_unbind(struct device *dev)
 {
-	struct drm_device *drm_dev = dev_get_drvdata(dev);
+	struct drm_device           *drm = dev_get_drvdata(dev);
+	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
 
-	drm_dev_unregister(drm_dev);
+	drm_dev_unregister(drm);
 
-	ameba_drm_kms_cleanup(drm_dev);
+	ameba_drm_kms_cleanup(drm);
 
-	drm_dev_put(drm_dev);
+	component_unbind_all(drm->dev, drm);
 
+	drm_dev_put(drm);
+
+	kfree(ameba_struct);
 }
 
 static const struct component_master_ops ameba_drm_ops = {
@@ -391,11 +355,11 @@ static const struct component_master_ops ameba_drm_ops = {
 
 static int ameba_drm_platform_probe(struct platform_device *pdev)
 {
-	struct device_node 		*remote;
-	struct component_match 	*match = NULL;
-	struct device 			*dev = &pdev->dev;
-	struct device_node 		*np = dev->of_node;
-
+	struct device_node      *remote;
+	struct component_match  *match = NULL;
+	struct device           *dev = &pdev->dev;
+	struct device_node      *np = dev->of_node;
+	AMEBA_DRM_DEBUG
 	remote = of_graph_get_remote_node(np, 0, 0);
 	if (!remote) {
 		return -ENODEV;

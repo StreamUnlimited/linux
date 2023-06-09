@@ -765,6 +765,7 @@ enum mac_ax_port_cfg_type {
 	MAC_AX_PCFG_TBTT_AGG,
 	//MAC_AX_PCFG_TBTT_SHIFT,//not support
 	MAC_AX_PCFG_RST_TSF,
+	MAC_AX_PCFG_EN_UDT_TSF,
 	//MAC_AX_PCFG_RST_TPR,//not support
 	MAC_AX_PCFG_BCAID,
 	MAC_AX_PCFG_HIQ_WIN,
@@ -3730,6 +3731,9 @@ enum mac_ax_tsf_sync_act {
 	MAC_AX_TSF_SYNC_NOW_ONCE,
 	MAC_AX_TSF_EN_SYNC_AUTO,
 	MAC_AX_TSF_DIS_SYNC_AUTO,
+};
+
+enum mac_ax_tsf_sync_dir {
 	MAC_AX_P0_P1,
 	MAC_AX_P1_P0,
 	MAC_AX_P1_P2,
@@ -4288,8 +4292,7 @@ enum mac_ax_upd_mode {
 	MAC_AX_ROLE_TYPE_CHANGE,
 	MAC_AX_ROLE_INFO_CHANGE,
 	MAC_AX_ROLE_CON_DISCONN,
-	MAC_AX_ROLE_BAND_SW,
-	MAC_AX_ROLE_FW_RESTORE
+	MAC_AX_ROLE_BAND_SW
 };
 
 /**
@@ -4416,18 +4419,14 @@ enum mac_ax_dbcc_wmm {
 };
 
 enum hal_security_type {
-	HAL_SECURITY_TYPE_NONE = 0,
-	HAL_SECURITY_TYPE_WEP40 = 1,
-	HAL_SECURITY_TYPE_WEP104 = 2,
-	HAL_SECURITY_TYPE_TKIP = 3,
-	HAL_SECURITY_TYPE_AES128 = 4,
-	HAL_SECURITY_TYPE_WAPI = 5,
-	HAL_SECURITY_TYPE_AES256 = 6,
-	HAL_SECURITY_TYPE_GCMP128 = 7,
-	HAL_SECURITY_TYPE_GCMP256 = 8,
-	HAL_SECURITY_TYPE_GCMSMS4 = 9,
-	HAL_SECURITY_TYPE_BIP = 10,
-	HAL_SECURITY_TYPE_UNDEFINE = 0x7F,
+	HAL_SEC_TYPE_NONE = 0,
+	HAL_SEC_TYPE_WEP40 = 1,
+	HAL_SEC_TYPE_TKIP_NO_MIC = 2,
+	HAL_SEC_TYPE_TKIP_MIC = 3,
+	HAL_SEC_TYPE_AES = 4,
+	HAL_SEC_TYPE_WEP104 = 5,
+	HAL_SEC_TYPE_WAPI_SMS4 = 6,
+	HAL_SEC_TYPE_GCMP = 7,
 };
 /*--------------------Define FAST_CH_SW related enum-------------------------------------*/
 /**
@@ -4973,6 +4972,13 @@ enum btc_gnt_setup_state {
 	BTC_GNT_SW_LOW		= 0x1,
 	BTC_GNT_SW_HIGH		= 0x3,
 	BTC_GNT_SETUP_MAX
+};
+
+enum SEC_CAM_KEY_TYPE {
+	SEC_CAM_KEY_TYPE_UNI = 0,
+	SEC_CAM_KEY_TYPE_GROUP = 1,
+	SEC_CAM_KEY_TYPE_BIP = 2,
+	SEC_CAM_KEY_TYPE_DEFAULT = 3
 };
 
 /*--------------------Define Struct-------------------------------------*/
@@ -13589,7 +13595,7 @@ struct halmac_cam_entry_format {
 };
 
 struct halmac_cam_entry_info {
-	enum hal_security_type security_type;
+	enum rtw_enc_algo security_type;
 	u32 key[4];
 	u8 mac_address[6];
 	u8 unicast;
@@ -13752,17 +13758,16 @@ struct mac_ax_bssid_cam_info {
  */
 struct mac_ax_sec_cam_info {
 	u8 sec_cam_idx; /* Security cam entry index */
-	u8 type : 3;
-	u8 mic: 1;
-	u8 grp_bit: 1;
-	u8 mgnt: 1;
-	u8 rpt_md: 1;
-	u8 ext_key : 1;
-	u8 rsvd: 5;
+	u8 type;
+	u8 mic;
+	u8 grp_bit;
+	u8 mgnt;
+	u8 rpt_md;
+	u8 ext_key;
 	u8 addr[6];
-	u8 spp_mode : 1;
+	u8 spp_mode;
 	u32 key[4];
-	u8 mfb: 7;
+	u8 mfb;
 };
 
 struct mac_ax_sec_iv_info {
@@ -14306,6 +14311,11 @@ struct mac_ax_port_tsf {
 	u8 band;
 };
 
+struct mac_ax_tsf_sync_info {
+	enum mac_ax_tsf_sync_dir dir;
+	bool en_auto_sync;
+	s32 sync_offset;
+};
 /**
  * @struct mac_ax_gnt
  * @brief mac_ax_gnt
@@ -15571,6 +15581,7 @@ struct mac_ax_adapter {
 	enum halmac_dma_mapping pq_map[HALMAC_PQ_MAP_NUM];
 	struct halmac_txff_allocation txff_alloc;
 	struct halmac_hw_cfg_info hw_cfg_info;
+	struct mac_ax_tsf_sync_info tsf_sync_info;
 };
 
 /**
@@ -17057,9 +17068,7 @@ struct mac_ax_ops {
 	u32(*trigger_cmac_err)(struct mac_ax_adapter *adapter);
 	u32(*trigger_cmac1_err)(struct mac_ax_adapter *adapter);
 	u32(*trigger_dmac_err)(struct mac_ax_adapter *adapter);
-	u32(*tsf_sync)(struct mac_ax_adapter *adapter, u8 from_port,
-		       u8 to_port, s32 sync_offset,
-		       enum mac_ax_tsf_sync_act action);
+	u32(*tsf_sync)(struct mac_ax_adapter *adapter);
 	u32(*read_xtal_si)(struct mac_ax_adapter *adapter, u8 offset, u8 *val);
 	u32(*write_xtal_si)(struct mac_ax_adapter *adapter, u8 offset, u8 val,
 			    u8 bitmask);

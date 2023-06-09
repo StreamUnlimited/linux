@@ -34,4 +34,7 @@
  */
 u8 shift_mask(u32 mask);
 
+u32 mac_watchdog(struct mac_ax_adapter *adapter,
+		 struct mac_ax_wdt_param *wdt_param);
+
 #endif

@@ -201,6 +201,7 @@ _hal_parsing_rx_wd_8730e(struct hal_info_t *hal, u8 *desc,
 	 */
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
+	u8 hw_sec_type = HAL_SEC_TYPE_NONE, ext_sectype = 0;
 
 	mdata->shift = GET_RX_AX_DESC_MH_SHIFT_8730E(desc);
 	mdata->sniffer_len = GET_RX_AX_DESC_SNIFFER_LEN_8730E(desc);
@@ -273,7 +274,45 @@ _hal_parsing_rx_wd_8730e(struct hal_info_t *hal, u8 *desc,
 	mdata->frag_num = GET_RX_AX_DESC_FRAG_8730E(desc);
 
 	mdata->macid_vld = GET_RX_AX_DESC_MACID_VLD_8730E(desc);
-	mdata->sec_type = GET_RX_AX_DESC_SEC_TYPE_8730E(desc);
+	hw_sec_type = GET_RX_AX_DESC_SEC_TYPE_8730E(desc);
+	ext_sectype = GET_RX_AX_DESC_EXT_SECTYPE_8730E(desc);
+	switch (hw_sec_type) {
+	case HAL_SEC_TYPE_NONE:
+		mdata->sec_type = RTW_ENC_NONE;
+		break;
+	case HAL_SEC_TYPE_WEP40:
+		mdata->sec_type = RTW_ENC_WEP40;
+		break;
+	case HAL_SEC_TYPE_TKIP_NO_MIC:
+	case HAL_SEC_TYPE_TKIP_MIC:
+		mdata->sec_type = RTW_ENC_TKIP;
+		break;
+	case HAL_SEC_TYPE_AES:
+		if (ext_sectype) {
+			mdata->sec_type = RTW_ENC_CCMP256;
+		} else {
+			mdata->sec_type = RTW_ENC_CCMP;
+		}
+		break;
+	case HAL_SEC_TYPE_WEP104:
+		mdata->sec_type = RTW_ENC_WEP104;
+		break;
+	case HAL_SEC_TYPE_WAPI_SMS4:
+		if (ext_sectype) {
+			mdata->sec_type = RTW_ENC_GCMSMS4;
+		} else {
+			mdata->sec_type = RTW_ENC_WAPI;
+		}
+		break;
+	case HAL_SEC_TYPE_GCMP:
+		if (ext_sectype) {
+			mdata->sec_type = RTW_ENC_GCMP256;
+		} else {
+			mdata->sec_type = RTW_ENC_GCMP;
+		}
+		break;
+	}
+
 	mdata->macid = GET_RX_AX_DESC_MACID_8730E(desc);
 	mdata->macid_rxdesc = GET_RX_AX_DESC_TXRPTMID_SRCH_8730E(desc);
 

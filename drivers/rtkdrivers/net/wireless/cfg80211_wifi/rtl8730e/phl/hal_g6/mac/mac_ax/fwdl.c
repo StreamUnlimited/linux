@@ -581,11 +581,6 @@ static void fwdl_fail_dump(struct mac_ax_adapter *adapter,
 	u32 val32;
 	u16 val16, index;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-#if MAC_AX_FEATURE_DBGPKG
-	struct mac_ax_ops *mac_ops = adapter_to_mac_ops(adapter);
-	struct mac_ax_dbgpkg dbg_val = {0};
-	struct mac_ax_dbgpkg_en dbg_en = {0};
-#endif
 
 	PLTFM_MSG_ERR("[ERR]fwdl ret = %d\n", ret);
 	val32 = MAC_REG_R32(R_AX_WCPU_FW_CTRL);
@@ -635,15 +630,6 @@ static void fwdl_fail_dump(struct mac_ax_adapter *adapter,
 	//mac_dump_ple_dbg_page(adapter, 0);
 
 end:
-#if MAC_AX_FEATURE_DBGPKG
-	dbg_en.ss_dbg = 0;
-	dbg_en.dle_dbg = 1;
-	dbg_en.dmac_dbg = 1;
-	dbg_en.cmac_dbg = 1;
-	dbg_en.mac_dbg_port = 1;
-	dbg_en.plersvd_dbg = 1;
-	mac_ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
-#endif
 	adapter->hw_info->dbg_port_cnt--;
 	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->dbg_port_lock);
 }

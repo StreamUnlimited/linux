@@ -157,30 +157,25 @@ static int ameba_ipc_send_work(struct aipc_ch_node *chn, ipc_msg_struct_t *msg)
 	if (ch->port_id == AIPC_PORT_LP) {
 		/* check the TX data */
 		if (AIPC_GET_LP_CH_NR(ch->ch_id, reg_tx_data)) {
-			printk(KERN_ERR "%s: tx is busy!\n",
-			      AIPC_DGB_INFO);
-			reg_tx_data = AIPC_CLR_LP_CH_NR(ch->ch_id, reg_tx_data);
+			printk(KERN_ERR "%s: tx is busy!\n", AIPC_DGB_INFO);
 			ret = -EBUSY;
 		} else {
 			/* copy data to the lp shared memory */
 			memcpy_toio((u8*)chn->ch_wmem, (u8*)msg, sizeof(ipc_msg_struct_t));
-			reg_tx_data = AIPC_SET_LP_CH_NR(ch->ch_id, reg_tx_data);
+			reg_tx_data = AIPC_SET_LP_CH_NR(ch->ch_id);
 		}
 	} else if (ch->port_id == AIPC_PORT_NP) {
 		/* check the TX data */
 		if (AIPC_GET_NP_CH_NR(ch->ch_id, reg_tx_data)) {
-			printk(KERN_ERR "%s: tx is busy!\n",
-			      AIPC_DGB_INFO);
-			reg_tx_data = AIPC_CLR_NP_CH_NR(ch->ch_id, reg_tx_data);
+			printk(KERN_ERR "%s: tx is busy!\n", AIPC_DGB_INFO);
 			ret = -EBUSY;
 		} else {
 			/* copy data to the lp shared memory */
 			memcpy_toio((u8*)chn->ch_wmem, (u8*)msg, sizeof(ipc_msg_struct_t));
-			reg_tx_data = AIPC_SET_NP_CH_NR(ch->ch_id, reg_tx_data);
+			reg_tx_data = AIPC_SET_NP_CH_NR(ch->ch_id);
 		}
 	} else {
-		printk(KERN_ERR "%s: inavalib port id!\n",
-		       AIPC_DGB_INFO);
+		printk(KERN_ERR "%s: inavalib port id!\n", AIPC_DGB_INFO);
 		ret = -EINVAL;
 	}
 
@@ -398,10 +393,6 @@ static irqreturn_t ameba_ipc_int_hdl(int irq, void *dev)
 	/* There is a bug in test chip. The isr cannot be clean cometimes. So to clear
 	 * it three times.
 	 */
-	writel(reg_isr, pipc->preg_isr);
-	udelay(1);
-	writel(reg_isr, pipc->preg_isr);
-	udelay(1);
 	writel(reg_isr, pipc->preg_isr);
 	reg_imr = readl(pipc->preg_imr);
 

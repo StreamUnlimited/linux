@@ -17,7 +17,6 @@
 
 /*@--------------------------Define Parameters-------------------------------*/
 #define AVG_THERMAL_NUM 8
-#define MAX_RF_PATH 4
 #define DELTA_SWINGIDX_SIZE 30
 #define BAND_NUM 3
 #define BAND_NUM_6G 4

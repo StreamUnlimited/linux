@@ -44,12 +44,12 @@ rtw_hal_set_key(void *hal, struct rtw_phl_stainfo_t *sta, u8 type, u8 ext_key, u
 		/* add key */
 		if (ext_key) {
 			hal_status = rtw_hal_mac_add_key(hal_info, macid, type, ext_key,
-							 spp, keyid, keytype, keybuf);
+							 spp, keyid, keytype, 0, keybuf);
 			hal_status = rtw_hal_mac_add_key(hal_info, macid, type, ext_key, spp,
-							 keyid, keytype, (keybuf + 16));
+							 keyid, keytype, 1, (keybuf + 16));
 		} else {
 			hal_status = rtw_hal_mac_add_key(hal_info, macid, type, 0,
-							 spp, keyid, keytype, keybuf);
+							 spp, keyid, keytype, 0, keybuf);
 		}
 	}
 

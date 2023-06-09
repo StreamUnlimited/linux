@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config PANEL_ST7701S
+	tristate "DRM support for ST7701S display panels"
+	depends on OF
+	depends on DRM_DSI_RTK_AMEBA
+	select VIDEOMODE_HELPERS
+	select DRM_PANEL
+	default n
+	help
+	  DRM driver for the following ST7701S panels
+
+config PANEL_R63353
+	tristate "DRM support for Synaptics R63353 display panels"
+	depends on OF
+	depends on DRM_DSI_RTK_AMEBA
+	select VIDEOMODE_HELPERS
+	select DRM_PANEL
+	default n
+	help
+	  DRM driver for the following Synaptics R63353 panels
+
+

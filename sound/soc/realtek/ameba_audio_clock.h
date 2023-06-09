@@ -7,7 +7,7 @@
 #define CKSL_I2S_XTAL40M			0x04
 
 #define PLL_CLOCK_24P576M           24576000
-#define PLL_CLOCK_45P1584M          45158400
+#define PLL_CLOCK_45P1584M           45158400
 #define PLL_CLOCK_98P304M           98304000
 
 #define SPORT_MCLK_DIV_MAX_NUM      3
@@ -28,7 +28,7 @@ struct audio_clock_driver {
 	int (*update_24MP576_input_clock_status)(struct audio_clock_component* acc, bool enabled);
 	int (*pll_i2s_98P304M_clk_tune)(struct audio_clock_component* acc, u32 ppm, u32 action);
 	int (*pll_i2s_24P576M_clk_tune)(struct audio_clock_component* acc, u32 ppm, u32 action);
-	int (*pll_i2s_45P158M_clk_tune)(struct audio_clock_component* acc, u32 ppm, u32 action);
+	int (*pll_i2s_45P1584M_clk_tune)(struct audio_clock_component* acc, u32 ppm, u32 action);
 	int (*get_audio_clock_info_for_sport)(struct audio_clock_component* acc, unsigned int sport_index);
 	int (*choose_input_clock_for_sport_index)(struct audio_clock_component* acc, unsigned int sport_index, unsigned int clock);
 	int (*update_fen_cke_sport_status)(struct audio_clock_component* acc, unsigned int sport_index, bool enabled);
@@ -56,9 +56,10 @@ int update_45MP158_input_clock_status(bool enabled);
 int update_24MP576_input_clock_status(bool enabled);
 int pll_i2s_98P304M_clk_tune(u32 ppm, u32 action);
 int pll_i2s_24P576M_clk_tune(u32 ppm, u32 action);
-int pll_i2s_45P158M_clk_tune(u32 ppm, u32 action);
+int pll_i2s_45P1584M_clk_tune(u32 ppm, u32 action);
 int get_audio_clock_info_for_sport(unsigned int sport_index);
-int choose_pll_clock(unsigned int channel_count, unsigned int channel_len, unsigned int rate, unsigned int codec_multiplier_with_rate, struct clock_params* params);
+int choose_pll_clock(unsigned int channel_count, unsigned int channel_len, unsigned int rate,
+					unsigned int codec_multiplier_with_rate, unsigned int sport_mclk_fixed_max, struct clock_params* params);
 int update_fen_cke_sport_status(unsigned int sport_index, bool enabled);
 int choose_input_clock_for_sport_index(unsigned int sport_index, unsigned int clock);
 int set_rate_divider(unsigned int sport_index, unsigned int divider);

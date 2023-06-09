@@ -35,11 +35,11 @@ u32 pwr_poll_u32(struct mac_ax_adapter *adapter, u32 offset,
 #endif
 
 	while (--cnt) {
+		PLTFM_DELAY_MS(MAC_AX_PWR_POLL_MS);
 		val = MAC_REG_R32(offset);
 		if ((val & mask) == pwr_val) {
 			return MACSUCCESS;
 		}
-		PLTFM_DELAY_MS(MAC_AX_PWR_POLL_MS);
 	}
 
 	PLTFM_MSG_ERR("[ERR] Power sequence polling timeout\n");

@@ -30,28 +30,22 @@
 #define   DISABLE   0
 #endif
 
-//dsi issue
-#define MIPI_DSI_DISPLAY_X	 			(480)
-#define MIPI_DSI_DISPLAY_Y	 			(800)
-#define MIPI_DSI_FRAME_RATE	 			(30)
+//dsi default value
+#define LCDC_KG_COLOR                       0xFFFFFFFF
+#define LCDC_UNDFLOW_COLOR                  0xFFFFFFFF
 
-#define LCDC_KG_COLOR					0xFFFFFFFF
-#define LCDC_UNDFLOW_COLOR				0xFFFFFFFF
-
-#define LCDC_LAY_COLOR_KEY				0x00000000
-#define LCDC_LAY_BLEND_ALPHA			0xff
-
-
-#define assert_param(expr) ((expr) ? (void)0 : printk("assert issue:%s,%d",__func__,__LINE__))
-#define DRM_TEST_PRINTK(...)  printk(KERN_DEBUG __VA_ARGS__)
+#define LCDC_LAY_COLOR_KEY                  0x00000000
+#define LCDC_LAY_BLEND_ALPHA                0xff
 
 //while disable lcdc ctl, mipi will show the pattern
-#define ENABLE_LCDC_CTL (1)
+#define ENABLE_LCDC_CTL                     (1)
 //#undef ENABLE_LCDC_CTL 
 
-#define UPDATE_DUMP_LDCD_REG			(10)
+#define UPDATE_DUMP_LDCD_REG                (10)
 
-#define DRM_MODE_CONFIG_DEBUG
-#undef DRM_MODE_CONFIG_DEBUG
+
+#define assert_param(expr)                  ((expr) ? (void)0 : printk("[DRM]assert issue:%s,%d",__func__,__LINE__))
+#define AMEBA_DRM_DEBUG                     //DRM_INFO("%s Enter %d\n", __func__, __LINE__);
+
 
 #endif  /*_AMEBAD2_DRM_BASE_H_*/

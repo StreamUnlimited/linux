@@ -215,7 +215,7 @@ int _rtw_gcmp_decrypt(_adapter *padapter, u8 *key, u32 key_len, uint hdrlen, u8 
 }
 
 
-#if  defined(CONFIG_IEEE80211W) | defined(CONFIG_TDLS)
+#if  defined(CONFIG_IEEE80211W) || defined(CONFIG_TDLS)
 u8 _bip_ccmp_protect(const u8 *key, size_t key_len,
 		     const u8 *data, size_t data_len, u8 *mic)
 {

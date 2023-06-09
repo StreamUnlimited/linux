@@ -370,6 +370,12 @@ phl_register_tx_ring(void *phl, u16 macid, u8 hw_band, u8 hw_wmm, u8 hw_port) {
 	return phl_status;
 }
 
+enum rtw_phl_status
+rtw_phl_register_tx_ring(void *phl, u16 macid, u8 hw_band,
+			 u8 hw_wmm, u8 hw_port)
+{
+	return phl_register_tx_ring(phl, macid, hw_band, hw_wmm, hw_port);
+}
 
 
 enum rtw_phl_status phl_deregister_tx_ring(void *phl, u16 macid)
@@ -403,6 +409,12 @@ enum rtw_phl_status phl_deregister_tx_ring(void *phl, u16 macid)
 	}
 
 	return phl_status;
+}
+
+enum rtw_phl_status
+rtw_phl_deregister_tx_ring(void *phl, u16 macid)
+{
+	return phl_deregister_tx_ring(phl, macid);
 }
 
 void phl_free_deferred_tx_ring(struct phl_info_t *phl_info)

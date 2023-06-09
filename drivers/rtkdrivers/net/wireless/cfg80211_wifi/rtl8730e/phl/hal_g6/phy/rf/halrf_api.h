@@ -95,8 +95,6 @@ void halrf_reload_bkprf(struct rf_info *rf,
 			u8 path_num);
 void halrf_bt_ultra_low_pwr_adv(struct rf_info *rf);
 
-void halrf_trigger_thermal(struct rf_info *rf);
-
 u8 halrf_only_get_thermal(struct rf_info *rf, enum rf_path path);
 
 void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index);

@@ -453,6 +453,23 @@ void halbb_adc_en(struct bb_info *bb, bool en)
 
 void halbb_tssi_cont_en(struct bb_info *bb, bool en, enum rf_path path)
 {
+	switch (bb->ic_type) {
+
+#ifdef BB_8730E_SUPPORT
+	case BB_RTL8730E:
+		halbb_tssi_cont_en_8730e(bb, en, path);
+		break;
+#endif
+
+#ifdef BB_8720E_SUPPORT
+	case BB_RTL8720E:
+		halbb_tssi_cont_en_8720e(bb, en, path);
+		break;
+#endif
+
+	default:
+		break;
+	}
 }
 
 void halbb_bb_reset_en(struct bb_info *bb, bool en, enum phl_phy_idx phy_idx)
@@ -1360,5 +1377,31 @@ exit:
 void halbb_btc_bb_switchchannel_para(struct bb_info *bb, u8 central_ch, u8 bt_on)
 {
 	halbb_set_gain_error_8730e(bb, central_ch, MAIN_ANT, bt_on);
+}
+
+u64 halbb_ability_ops(struct bb_info *bb, enum bb_ablty_ops ops, u32 ability)
+{
+	u64 result = 0;
+
+	switch (ops) {
+	case HALBB_DIS_ALL_FUNC:
+		bb->support_ability = 0x0;
+		break;
+	case HALBB_FUNC_CLR:
+		bb->support_ability &= ~(ability);
+		break;
+	case HALBB_ABILITY_SET:
+		bb->support_ability |= ability;
+		break;
+	case HALBB_ABILITY_GET:
+		result = bb->support_ability;
+		break;
+	case HALBB_ABILITY_SET_ALL:
+		bb->support_ability = ability;
+		break;
+	default:
+		break;
+	}
+	return result;
 }
 

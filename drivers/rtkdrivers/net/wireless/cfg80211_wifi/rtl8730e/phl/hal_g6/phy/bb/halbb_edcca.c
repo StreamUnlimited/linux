@@ -490,7 +490,7 @@ void halbb_edcca_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	struct bb_edcca_info *bb_edcca = &bb->bb_edcca_i;
 	struct edcca_hw_rpt *rpt = &bb_edcca->edcca_rpt;
 	struct rtw_hal_com_t *hal = bb->hal_com;
-	enum channel_width bw = 0;
+	enum channel_width bw = CHANNEL_WIDTH_20;
 	char help[] = "-h";
 	u32 var[10] = {0};
 	u32 used = *_used;

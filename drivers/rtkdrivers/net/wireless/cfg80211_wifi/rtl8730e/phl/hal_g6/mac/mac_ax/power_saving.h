@@ -23,7 +23,7 @@
 
 #define	MACID_GRP_SH	5
 #define	MACID_GRP_MASK	0x1F
-#define PORT_SH		4
+#define PORT_SH		2
 
 /**
  * @enum last_rpwm_mode

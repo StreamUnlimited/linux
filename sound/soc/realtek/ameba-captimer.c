@@ -285,7 +285,7 @@ static int tim9_i2spll2_adjust(struct i2spll2_micro_adjust_params *args)
 		ameba_update_i2s_pll_input_clock_status(true, 15);
 	} else if (p_tmp->clock == I2SPLL2_45P158M_DIV2) {
 		sdm.DIVN_SDM = 7;
-		sdm.F0F_SDM = 2071;
+		sdm.F0F_SDM = 2076;
 		sdm.F0N_SDM = 0;
 		res = ameba_i2s_pll2_clk_tune(p_tmp->ppm, p_tmp->action, &sdm);
 		ameba_update_i2s_pll_input_clock_status(true, 12);
@@ -370,7 +370,7 @@ static int rtk_capture_timer_probe(struct platform_device *pdev)
 	}
 
 	sdm.DIVN_SDM = 7;
-	sdm.F0F_SDM = 2071;
+	sdm.F0F_SDM = 2076;
 	sdm.F0N_SDM = 0;
 	ameba_i2s_pll2_clk_tune(0, 0, &sdm);
 	ameba_update_i2s_pll_input_clock_status(true, 12);

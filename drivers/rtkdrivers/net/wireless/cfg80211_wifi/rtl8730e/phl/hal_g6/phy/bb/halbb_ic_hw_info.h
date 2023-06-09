@@ -153,6 +153,8 @@ enum bb_cr_t {
 #else
 #define HALBB_MAX_PATH	1
 #endif
+
+#define HALBB_EFUSE_MAX_PATH 2
 /*@==========================================================================*/
 
 #if (defined(BB_8852A_2_SUPPORT))

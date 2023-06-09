@@ -323,7 +323,6 @@ void halbb_5m_mask_8730e(struct bb_info *bb, u8 pri_ch, enum channel_width bw,
 u16 halbb_sco_mapping_8730e(struct bb_info *bb, enum band_type band, u8 central_ch)
 {
 	u16 central_freq = 0;
-	u8 sco = 0;
 
 #ifdef BB_SUPPORT_BAND6G
 	if (band == BAND_ON_6G) {
@@ -429,10 +428,6 @@ bool halbb_write_rf_reg_8730e(struct bb_info *bb, enum rf_path path,
 #ifdef SUPPORT_BTG
 void halbb_ctrl_btg_8730e(struct bb_info *bb, bool btg)
 {
-	struct rtw_phl_com_t *phl = bb->phl_com;
-	struct dev_cap_t *dev = &phl->dev_cap;
-
-
 	BB_DBG(bb, DBG_PHY_CONFIG, "<====== %s ======>\n", __func__);
 
 	if (bb->hal_com->band[0].cur_chandef.band != BAND_ON_24G) {
@@ -663,8 +658,6 @@ bool halbb_ctrl_bw_8730e(struct bb_info *bb, u8 pri_ch, enum channel_width bw,
 bool halbb_ch_setting_8730e(struct bb_info *bb, u8 central_ch, enum rf_path path,
 			    bool *is_2g_ch)
 {
-	u32 rf_reg18 = 0;
-
 	*is_2g_ch = (central_ch <= 14) ? true : false;
 	//RF_18 R/W already move to RF API
 	BB_DBG(bb, DBG_PHY_CONFIG, "[Success][ch_setting] CH: %d for Path-%d\n",
@@ -1569,7 +1562,6 @@ void halbb_dbgport_dump_all_8730e(struct bb_info *bb, u32 *_used, char *output,
 void halbb_physts_brk_fail_pkt_rpt_8730e(struct bb_info *bb, bool enable,
 		enum phl_phy_idx phy_idx)
 {
-	u32 val32 = (enable) ? 0 : 0x3;
 
 	halbb_set_reg_cmn(bb, 0x0738, 0xC, 0x3, phy_idx);
 }
@@ -2152,10 +2144,10 @@ void halbb_gpio_setting_init_8730e(struct bb_info *bb)
 	halbb_gpio_trsw_table_8851b(bb, BB_PATH_A, 1, 1, 1, 1, 0);
 #endif
 	//PA5 ON
-	val8 = hal_sys_read8(hal_com, 0x42008000, 0xa14);
-	val8 = (val8 & 0xE0) | 0x16;
-	hal_sys_write8(hal_com, 0x42008000, 0xa14, val8);
-	halbb_set_reg(bb, (path_cr_base | 0x90), BIT(1), 1); /* rfe_inv */
+	//val8 = hal_sys_read8(hal_com, 0x42008000, 0xa14);
+	//val8 = (val8 & 0xE0) | 0x16;
+	//hal_sys_write8(hal_com, 0x42008000, 0xa14, val8);
+	//halbb_set_reg(bb, (path_cr_base | 0x90), BIT(1), 1); /* rfe_inv */
 
 }
 
@@ -2176,15 +2168,15 @@ void halbb_gpio_setting_rfetype(struct bb_info *bb, u8 rfe_idx, enum bb_rfe_src_
 		halbb_set_reg(bb, (path_cr_base | 0x80), MASKDWORD, 0x88);
 		halbb_set_reg(bb, (path_cr_base | 0x90), MASKDWORD, 0x2);
 		halbb_set_reg(bb, (path_cr_base | 0x70), MASKDWORD, 0x1); /* 1 PA4_high PA5_low/ 0 PA4_low PA5_high */
-		halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x1000);
+		halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x0000);
 	} else if (rfe_idx == 15) {
 		if (src_sel == GNT_BT) {
 			halbb_set_reg(bb, 0x334, MASKDWORD, 0x2); /*output mode[31:0]*/
 			halbb_set_reg(bb, (path_cr_base | 0x80), MASKDWORD, 0x60); /* 6: GNT_bt*/
 			/* 5890=0x2, pa15 = ~gnt_bt = gnt_wl */
-			halbb_set_reg(bb, (path_cr_base | 0x90), MASKDWORD, 0x2);
-			halbb_set_reg(bb, (path_cr_base | 0x70), MASKDWORD, 0x1);
-			halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x1000);
+			halbb_set_reg(bb, (path_cr_base | 0x90), MASKDWORD, 0x0);
+			halbb_set_reg(bb, (path_cr_base | 0x70), MASKDWORD, 0x0);
+			halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x0000);
 		} else {
 			/* SW control */
 		}
@@ -2193,16 +2185,47 @@ void halbb_gpio_setting_rfetype(struct bb_info *bb, u8 rfe_idx, enum bb_rfe_src_
 		halbb_set_reg(bb, 0x334, MASKDWORD, 0x3); /*output mode[31:0]*/
 		halbb_set_reg(bb, (path_cr_base | 0x80), MASKDWORD, 0x78);
 		halbb_set_reg(bb, (path_cr_base | 0x90), BIT(1), 1); /* rfe_inv PA5_high*/
-		halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x1000); /* tx_ant*/
+		halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x0000); /* tx_ant*/
 	} else {
 		BB_DBG(bb, DBG_INIT, "[rfe_type] rfe_idx = %d  invalid RFE type\n", rfe_idx);
 		/* QFN100 Signle Control PA4, PA5 always on */
 		halbb_set_reg(bb, 0x334, MASKDWORD, 0x3); /*output mode[31:0]*/
 		halbb_set_reg(bb, (path_cr_base | 0x80), MASKDWORD, 0x78);
 		halbb_set_reg(bb, (path_cr_base | 0x90), BIT(1), 1); /* rfe_inv PA5_high*/
-		halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x1000); /* tx_ant*/
+		halbb_set_reg(bb, (path_cr_base | 0x6c), MASKDWORD, 0x0000); /* tx_ant*/
 	}
 }
+
+void halbb_bb_rf_rx_ant(struct bb_info *bb, u8 rfe_idx, u8 ant)
+{
+	u32 path_cr_base = 0x5800;
+	u8 rf_ant_sel = (ant == MAIN_ANT) ? 0x1 : 0x0;
+	u8 rf_ant_AUX = (ant == MAIN_ANT) ? 0x0 : 0x1;
+
+	BB_DBG(bb, DBG_ANT_DIV, "RFE_TYPE = [%d] \n", rfe_idx);
+
+	if (rfe_idx == 16) {
+		halbb_set_reg_cmn(bb, (path_cr_base | 0x70), MASKDWORD, rf_ant_sel, HW_PHY_0);
+		BB_DBG(bb, DBG_ANT_DIV, "[Success] rf_ant_sel [%d]\n", rf_ant_sel);
+	} else if (rfe_idx == 15) {
+		if (bb->hal_com->band[0].cur_chandef.band == BAND_ON_24G) {
+			BB_DBG(bb, DBG_ANT_DIV, "[Fail] rf_set_ant AUX invalid BAND_ON_2.4G\n");
+			/* 2G antenna */
+//			halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(23), 1, HW_PHY_0);
+//			halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(22), rf_ant_AUX, HW_PHY_0);
+		} else { /* 5G antenna */
+			halbb_set_reg_cmn(bb, (path_cr_base | 0x6c), BIT(25), 1, HW_PHY_0);
+			halbb_set_reg_cmn(bb, (path_cr_base | 0x6c), BIT(24), rf_ant_AUX, HW_PHY_0); /*1: AUX 0: MAIN*/
+		}
+		BB_DBG(bb, DBG_ANT_DIV, "[Success] rf_set_ant is [%d] 1:AUX 0:MAIN \n", rf_ant_AUX);
+	} else if ((rfe_idx > 1 && rfe_idx < 6) || (rfe_idx > 7 && rfe_idx < 14)) {
+		halbb_set_reg_cmn(bb, (path_cr_base | 0x70), MASKDWORD, rf_ant_sel, HW_PHY_0);
+		BB_DBG(bb, DBG_ANT_DIV, "[Success] rfe_type [%d] rf_ant_sel [%d]\n", rfe_idx, rf_ant_sel);
+	} else {
+		BB_DBG(bb, DBG_ANT_DIV, "[Fail] RFE_TYPE = [%d] not support ant_sel", rfe_idx);
+	}
+}
+
 
 #endif
 

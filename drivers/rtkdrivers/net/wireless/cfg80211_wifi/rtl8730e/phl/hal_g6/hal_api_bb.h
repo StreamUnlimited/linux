@@ -48,6 +48,8 @@ void rtw_hal_bb_deinit(struct rtw_phl_com_t *phl_com,
 
 void rtw_hal_init_bb_reg(struct hal_info_t *hal_info);
 
+void rtw_hal_cfg_bb_rfe_gpio(struct hal_info_t *hal_info);
+
 u32 rtw_hal_read_rf_reg(struct rtw_hal_com_t *hal_com,
 			enum rf_path path, u32 addr, u32 mask);
 

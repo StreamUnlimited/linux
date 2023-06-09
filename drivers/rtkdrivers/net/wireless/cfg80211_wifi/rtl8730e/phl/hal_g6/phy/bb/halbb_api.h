@@ -43,6 +43,13 @@ enum bb_rfe_src_sel {
 	ANTSEL_7		= 0xf
 };
 
+enum bb_ablty_ops {
+	HALBB_DIS_ALL_FUNC,
+	HALBB_FUNC_CLR,
+	HALBB_ABILITY_SET,
+	HALBB_ABILITY_SET_ALL,
+	HALBB_ABILITY_GET,
+};
 
 /*@--------------------------[Structure]-------------------------------------*/
 struct bb_api_info {
@@ -78,4 +85,5 @@ void halbb_ic_hw_setting(struct bb_info *bb);
 void halbb_ic_hw_setting_dbg(struct bb_info *bb, char input[][16],
 			     u32 *_used, char *output, u32 *_out_len);
 void halbb_btc_bb_switchchannel_para(struct bb_info *bb, u8 central_ch, u8 bt_on);
+u64 halbb_ability_ops(struct bb_info *bb, enum bb_ablty_ops ops, u32 ability);
 #endif

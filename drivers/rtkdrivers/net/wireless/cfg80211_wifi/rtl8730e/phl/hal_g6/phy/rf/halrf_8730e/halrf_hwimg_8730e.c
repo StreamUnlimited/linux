@@ -461,22 +461,32 @@ halrf_config_8730e_store_power_by_rate(struct rf_info *rf)
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	//struct rtw_para_info_t *phy_reg_info = NULL;
 
-	u32 i, j;
-	u32 array_len = 0;
-	u32 *array = NULL;
+	u8 i, j;
+	u8 array_len = 0;
+	s8 *array = NULL;
 
-	array_len = sizeof(array_mp_txpwr_byrate) / sizeof(u32);
-	array = (u32 *)array_mp_txpwr_byrate;
+	/******2G******/
+	array_len = sizeof(array_mp_txpwr_byrate_2g) / sizeof(s8);
+	array = (s8 *)array_mp_txpwr_byrate_2g;
 
-
+	/*rate_idx = halrf_pw_by_rate_rate_type0~6*/
 	for (i = 0; i < array_len; i += 4) {
-		u32	band = array[i];
-		u32	tx_num = array[i + 1];
-		u32	rate_id = array[i + 2];
-		u32	data = array[i + 3];
-
-		halrf_power_by_rate_store_to_array(rf, band, tx_num, rate_id, data);
+		u8 rate_idx = i / 4;
+		u32 data = (array[i] << 24) + (array[i + 1] << 16) + (array[i + 2] << 8) + array[i + 3];
+		halrf_power_by_rate_store_to_array(rf, PW_LMT_BAND_2_4G, PW_BYRATE_PARA_NSS1, rate_idx, data);
 	}
+
+	/*******5G*******/
+	array_len = sizeof(array_mp_txpwr_byrate_5g) / sizeof(s8);
+	array = (s8 *)array_mp_txpwr_byrate_5g;
+
+	/*rate_idx = halrf_pw_by_rate_rate_type1~6 WO_CCK*/
+	for (i = 0; i < array_len; i += 4) {
+		u8 rate_idx = (i / 4) + 1;
+		u32 data = (array[i] << 24) + (array[i + 1] << 16) + (array[i + 2] << 8) + array[i + 3];
+		halrf_power_by_rate_store_to_array(rf, PW_LMT_BAND_5G, PW_BYRATE_PARA_NSS1, rate_idx, data);
+	}
+
 	for (i = 0; i < PW_LMT_MAX_BAND; i++)
 		for (j = 0; j < HALRF_DATA_RATE_MAX; j++)
 			RF_DBG(rf, DBG_RF_INIT, "pwr_by_rate[%d][%03d]=%d\n",
@@ -806,23 +816,23 @@ halrf_config_8730e_store_pwr_track(struct rf_info *rf)
 
 	hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_2ga_p,
 		    (void *)delta_swingidx_mp_2ga_p_txpwrtrkssi_8730e,
-		    DELTA_SWINGIDX_SIZE);
+				DELTA_SWINTSSI_SIZE);
 	hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_2ga_n,
 		    (void *)delta_swingidx_mp_2ga_n_txpwrtrkssi_8730e,
-		    DELTA_SWINGIDX_SIZE);
+				DELTA_SWINTSSI_SIZE);
 	hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_2g_cck_a_p,
 		    (void *)delta_swingidx_mp_2g_cck_a_p_txpwrtrkssi_8730e,
-		    DELTA_SWINGIDX_SIZE);
+				DELTA_SWINTSSI_SIZE);
 	hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_2g_cck_a_n,
 		    (void *)delta_swingidx_mp_2g_cck_a_n_txpwrtrkssi_8730e,
-		    DELTA_SWINGIDX_SIZE);
+				DELTA_SWINTSSI_SIZE);
 
 	hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_5ga_p,
 		    (void *)delta_swingidx_mp_5ga_p_txpwrtrkssi_8730e,
-		    DELTA_SWINGIDX_SIZE * 3);
+				DELTA_SWINTSSI_SIZE * 3);
 	hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_5ga_n,
 		    (void *)delta_swingidx_mp_5ga_n_txpwrtrkssi_8730e,
-		    DELTA_SWINGIDX_SIZE * 3);
+				DELTA_SWINTSSI_SIZE * 3);
 
 }
 

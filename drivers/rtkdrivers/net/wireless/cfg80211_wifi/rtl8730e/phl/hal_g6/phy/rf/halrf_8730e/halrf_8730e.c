@@ -858,7 +858,7 @@ void halrf_set_rx_dck_8730e(struct rf_info *rf, bool band)
 		       halrf_rrf(rf, 0, 0x9D, MASKRF));
 		RF_DBG(rf, DBG_RF_RXDCK, "[RFC DCK][RXBB]RF 0x9C = 0x%x, 0x9D = 0x%x\n",
 		       ((halrf_rrf(rf, 0, 0x9C, MASKRF) & 0xFC000) >> 14),
-		       ((halrf_rrf(rf, 00, 0x9D, MASKRF) & 0xFC000) >> 14));
+		       ((halrf_rrf(rf, 0, 0x9D, MASKRF) & 0xFC000) >> 14));
 
 		RF_DBG(rf, DBG_RF_RXDCK, "[RFC DCK][TIA]RF 0x9F = 0x%x\n", rf_9F);
 		RF_DBG(rf, DBG_RF_RXDCK, "[RFC DCK][TIA]WL RF 0x9F[19:18] = %x, 0x9F[17:16] = %x, RF 0x9F[15:8] = %x, 0x9F[7:0] = %x\n",

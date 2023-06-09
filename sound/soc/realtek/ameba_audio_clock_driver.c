@@ -24,7 +24,6 @@ int audio_pll_clk_open(struct inode *inode, struct file *filp);
 int audio_pll_clk_release(struct inode *indoe, struct file *filp);
 long int audio_pll_clk_ioctl (struct file *filp, unsigned int cmd, unsigned long args);
 
-static int realtek_audio_pll_major;
 struct cdev *audio_pll_cdev;
 struct class *realtek_audio_pll_class;
 dev_t devno;
@@ -50,8 +49,8 @@ static int audio_pll_micro_adjust(struct micro_adjust_params *args)
 	}
 	if (p_tmp->clock == PLL_24P576M)
 		res = pll_i2s_24P576M_clk_tune(p_tmp->ppm, p_tmp->action);
-	else if (p_tmp->clock == PLL_45P158M)
-		res = pll_i2s_45P158M_clk_tune(p_tmp->ppm, p_tmp->action);
+	else if (p_tmp->clock == PLL_45P1584M)
+		res = pll_i2s_45P1584M_clk_tune(p_tmp->ppm, p_tmp->action);
 	else if (p_tmp->clock == PLL_98P304M)
 		res = pll_i2s_98P304M_clk_tune(p_tmp->ppm, p_tmp->action);
 
@@ -116,6 +115,210 @@ struct file_operations fops =
     .unlocked_ioctl  = audio_pll_clk_ioctl,
     .release = audio_pll_clk_release,
 };
+
+/**
+  * @brief  I2S1 PLL output adjust by ppm.
+  * @param  ppm: ~1.55ppm per FOF step
+  * @param  action: slower or faster or reset
+  *          This parameter can be one of the following values:
+  *            @arg PLL_AUTO: reset to auto 98.304M
+  *            @arg PLL_FASTER: pll clock faster than 98.304M
+  *            @arg PLL_SLOWER: pll clock slower than 98.304M
+  * real_diff(M) = out_clock - auto(0)out_clock
+  * ppm_expected_diff = 98.304 * ppm / 1000000
+  * our experiment result for example:
+  * 	   ppm	out_clock	real_diff(M)	ppm_expected_diff
+  * Auto	0	98.3053
+  * Faster	800	98.3835  	0.0782	        0.0786432
+  * 	    500	98.3542	    0.0489	        0.049152
+  * 	    200	98.3249	    0.0196	        0.0196608
+  * Slower	800	98.2272	    0.0781	        0.0786432
+  * 	    500	98.2565	    0.0488	        0.049152
+  * 	    200	98.2858	    0.0195	        0.0196608
+  */
+
+static int ameba_pll_i2s_98P304M_clk_tune(struct audio_clock_component* acc, u32 ppm, u32 action)
+{
+	u32 F0F_new;
+	u32 tmp;
+	struct audio_clock_data* data = get_audio_clock_data(acc);
+
+	if (ppm > 1000) {
+		pr_info("invalid ppm:%d", ppm);
+		return -EINVAL;
+	}
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp &= (~PLL_MASK_IPLL1_DIVN_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp |= (PLL_IPLL1_DIVN_SDM(7));
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+
+	if (action == PLL_FASTER) {
+		F0F_new = 5269 + ppm * 64 / 100;
+	} else if (action == PLL_SLOWER) {
+		F0F_new = 5269 - ppm * 64 / 100;
+	} else {
+		F0F_new = 5269;
+	}
+
+	//pr_info("%s, acc:0x%x, data->addr:0x%x, ppm:%d, action:%d, F0F_new:%d", __func__, acc, data->addr, ppm, action, F0F_new);
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp &= (~PLL_MASK_IPLL1_F0F_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp |= (PLL_IPLL1_F0F_SDM(F0F_new));
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp &= (~PLL_MASK_IPLL1_F0N_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp |= (PLL_IPLL1_F0N_SDM(6));
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp |= (PLL_BIT_IPLL1_TRIG_FREQ);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp &= (~PLL_BIT_IPLL1_TRIG_FREQ);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+
+	return 0;
+}
+
+/**
+  * @brief  I2S1 PLL output adjust by ppm.
+  * @param  ppm: ~0.3875ppm per FOF step
+  * @param  action: slower or faster or reset
+  *          This parameter can be one of the following values:
+  *            @arg PLL_AUTO: reset to auto 24.576M
+  *            @arg PLL_FASTER: pll clock faster than 24.576M
+  *            @arg PLL_SLOWER: pll clock slower than 24.576M
+  * Actually 24.576M clock is from 98.304 in hardware.So if user wants to micro adjust 24.576M
+  * we actually adjust 98.304M.
+  * For example, if user wants to set ppm 200, basing on 24.576M, which ppm expected diff:200/1000000*24.576
+  * We can achieve this by setting 200 /1000000 * (98.304/4), so for 98.304,also set ppm 200
+  * real_diff(M) = out_clock - auto(0)out_clock
+  * ppm_expected_diff = 24.576 * ppm / 1000000
+  *	       ppm  	out_clock	real_diff(M)	ppm_expected_diff
+  * Auto	0	    24.5763
+  * Faster	800	    24.5959	    0.0196	        0.0196608
+  *	        500	    24.5885	    0.0122	        0.012288
+  *	        200	    24.5812	    0.0049	        0.0049152
+  * Slower	800	    24.5568	    0.0195	        0.0196608
+  *	        500	    24.5641	    0.0122	        0.012288
+  *	        200	    24.5714	    0.0049	        0.0049152
+  */
+static int ameba_pll_i2s_24P576M_clk_tune(struct audio_clock_component* acc, u32 ppm, u32 action)
+{
+	u32 F0F_new;
+	u32 tmp;
+	struct audio_clock_data* data = get_audio_clock_data(acc);
+
+	if (ppm > 1000) {
+		pr_info("invalid ppm:%d", ppm);
+		return -EINVAL;
+	}
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp &= (~PLL_MASK_IPLL1_DIVN_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp |= (PLL_IPLL1_DIVN_SDM(7));
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+
+	if (action == PLL_FASTER) {
+		F0F_new = 5269 + ppm * 64 / 100;
+	} else if (action == PLL_SLOWER) {
+		F0F_new = 5269 - ppm * 64 / 100;
+	} else {
+		F0F_new = 5269;
+	}
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp &= (~PLL_MASK_IPLL1_F0F_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp |= (PLL_IPLL1_F0F_SDM(F0F_new));
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp &= (~PLL_MASK_IPLL1_F0N_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+	tmp |= (PLL_IPLL1_F0N_SDM(6));
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp |= (PLL_BIT_IPLL1_TRIG_FREQ);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+	tmp &= (~PLL_BIT_IPLL1_TRIG_FREQ);
+	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
+
+	return 0;
+}
+
+/**
+  * @brief  I2S2 PLL output adjust by ppm.
+  * @param  ppm: ~1.69ppm per FOF step
+  * @param  action: slower or faster or reset
+  *          This parameter can be one of the following values:
+  *            @arg PLL_AUTO: reset to auto 45.1584M
+  *            @arg PLL_FASTER: pll clock faster than 45.1584M
+  *            @arg PLL_SLOWER: pll clock slower than 45.1584M
+  * real_diff(M) = out_clock - auto(0)out_clock
+  * ppm_expected_diff = 45.1584 * ppm / 1000000
+  *	       ppm	out_clock	real_diff(M)	ppm_expected_diff
+  *Auto	   0	45.1586
+  *Faster  800	45.1946	    0.036	        0.0361267
+  *	       500	45.1811	    0.0225	        0.0225792
+  *	       200	45.1676	    0.009	        0.0090317
+  *Slower  800	45.1226	    0.036	        0.0361267
+  *	       500	45.1361	    0.0225	        0.0225792
+  *	       200	45.1496	    0.009	        0.0090317
+
+  */
+static int ameba_pll_i2s_45P1584M_clk_tune(struct audio_clock_component* acc, u32 ppm, u32 action)
+{
+
+	u32 F0F_new;
+	u32 tmp;
+	struct audio_clock_data* data = get_audio_clock_data(acc);
+
+	if (ppm > 1000) {
+		pr_info("invalid ppm:%d", ppm);
+		return -EINVAL;
+	}
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL1);
+	tmp &= (~PLL_MASK_IPLL2_DIVN_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
+	tmp |= (PLL_IPLL2_DIVN_SDM(7));
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
+
+	if (action == PLL_FASTER) {
+		F0F_new = 2076 + ppm * 59 / 100;
+	} else if (action == PLL_SLOWER) {
+		F0F_new = 2076 - ppm * 59 / 100;
+	} else {
+		F0F_new = 2076;
+	}
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL3);
+	tmp &= (~PLL_MASK_IPLL2_F0F_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
+	tmp |= (PLL_IPLL2_F0F_SDM(F0F_new));
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL3);
+	tmp &= (~PLL_MASK_IPLL2_F0N_SDM);
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
+	tmp |= (PLL_IPLL2_F0N_SDM(0));
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
+
+	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL1);
+	tmp |= (PLL_BIT_IPLL2_TRIG_FREQ);
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
+	tmp &= (~PLL_BIT_IPLL2_TRIG_FREQ);
+	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
+
+	return 0;
+}
 
 static int ameba_update_98P304M_input_clock_status(struct audio_clock_component* acc, bool enabled)
 {
@@ -211,11 +414,14 @@ static int ameba_update_98P304M_input_clock_status(struct audio_clock_component*
 	return res;
 }
 
-static int ameba_update_45P158_input_clock_status(struct audio_clock_component* acc, bool enabled)
+static int ameba_update_45P1584_input_clock_status(struct audio_clock_component* acc, bool enabled)
 {
 	int res = 0;
 	u32 tmp;
 	struct audio_clock_data* data = get_audio_clock_data(acc);
+
+	//the default I2S2 clock is 45.158M, tune to 45.1584 here.
+	ameba_pll_i2s_45P1584M_clk_tune(acc, 0, 0);
 
 	if (enabled == true) {
 		//avoid repeated enabling operations
@@ -386,211 +592,6 @@ static int ameba_update_24P576_input_clock_status(struct audio_clock_component* 
 	return res;
 }
 
-/**
-  * @brief  I2S1 PLL output adjust by ppm.
-  * @param  ppm: ~1.55ppm per FOF step
-  * @param  action: slower or faster or reset
-  *          This parameter can be one of the following values:
-  *            @arg PLL_AUTO: reset to auto 98.304M
-  *            @arg PLL_FASTER: pll clock faster than 98.304M
-  *            @arg PLL_SLOWER: pll clock slower than 98.304M
-  * real_diff(M) = out_clock - auto(0)out_clock
-  * ppm_expected_diff = 98.304 * ppm / 1000000
-  * our experiment result for example:
-  * 	   ppm	out_clock	real_diff(M)	ppm_expected_diff
-  * Auto	0	98.3053
-  * Faster	800	98.3835  	0.0782	        0.0786432
-  * 	    500	98.3542	    0.0489	        0.049152
-  * 	    200	98.3249	    0.0196	        0.0196608
-  * Slower	800	98.2272	    0.0781	        0.0786432
-  * 	    500	98.2565	    0.0488	        0.049152
-  * 	    200	98.2858	    0.0195	        0.0196608
-  */
-
-static int ameba_pll_i2s_98P304M_clk_tune(struct audio_clock_component* acc, u32 ppm, u32 action)
-{
-	u32 F0F_new;
-	u32 tmp;
-	struct audio_clock_data* data = get_audio_clock_data(acc);
-
-	if (ppm > 1000) {
-		pr_info("invalid ppm:%d", ppm);
-		return -EINVAL;
-	}
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp &= (~PLL_MASK_IPLL1_DIVN_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp |= (PLL_IPLL1_DIVN_SDM(7));
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-
-	if (action == PLL_FASTER) {
-		F0F_new = 5269 + ppm * 64 / 100;
-	} else if (action == PLL_SLOWER) {
-		F0F_new = 5269 - ppm * 64 / 100;
-	} else {
-		F0F_new = 5269;
-	}
-
-	//pr_info("%s, acc:0x%x, data->addr:0x%x, ppm:%d, action:%d, F0F_new:%d", __func__, acc, data->addr, ppm, action, F0F_new);
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp &= (~PLL_MASK_IPLL1_F0F_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp |= (PLL_IPLL1_F0F_SDM(F0F_new));
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp &= (~PLL_MASK_IPLL1_F0N_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp |= (PLL_IPLL1_F0N_SDM(6));
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp |= (PLL_BIT_IPLL1_TRIG_FREQ);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp &= (~PLL_BIT_IPLL1_TRIG_FREQ);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-
-	return 0;
-}
-
-/**
-  * @brief  I2S1 PLL output adjust by ppm.
-  * @param  ppm: ~0.3875ppm per FOF step
-  * @param  action: slower or faster or reset
-  *          This parameter can be one of the following values:
-  *            @arg PLL_AUTO: reset to auto 24.576M
-  *            @arg PLL_FASTER: pll clock faster than 24.576M
-  *            @arg PLL_SLOWER: pll clock slower than 24.576M
-  * Actually 24.576M clock is from 98.304 in hardware.So if user wants to micro adjust 24.576M
-  * we actually adjust 98.304M.
-  * For example, if user wants to set ppm 200, basing on 24.576M, which ppm expected diff:200/1000000*24.576
-  * We can achieve this by setting 200 /1000000 * (98.304/4), so for 98.304,also set ppm 200
-  * real_diff(M) = out_clock - auto(0)out_clock
-  * ppm_expected_diff = 24.576 * ppm / 1000000
-  *	       ppm  	out_clock	real_diff(M)	ppm_expected_diff
-  * Auto	0	    24.5763
-  * Faster	800	    24.5959	    0.0196	        0.0196608
-  *	        500	    24.5885	    0.0122	        0.012288
-  *	        200	    24.5812	    0.0049	        0.0049152
-  * Slower	800	    24.5568	    0.0195	        0.0196608
-  *	        500	    24.5641	    0.0122	        0.012288
-  *	        200	    24.5714	    0.0049	        0.0049152
-  */
-static int ameba_pll_i2s_24P576M_clk_tune(struct audio_clock_component* acc, u32 ppm, u32 action)
-{
-	u32 F0F_new;
-	u32 tmp;
-	struct audio_clock_data* data = get_audio_clock_data(acc);
-
-	if (ppm > 1000) {
-		pr_info("invalid ppm:%d", ppm);
-		return -EINVAL;
-	}
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp &= (~PLL_MASK_IPLL1_DIVN_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp |= (PLL_IPLL1_DIVN_SDM(7));
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-
-	if (action == PLL_FASTER) {
-		F0F_new = 5269 + ppm * 64 / 100;
-	} else if (action == PLL_SLOWER) {
-		F0F_new = 5269 - ppm * 64 / 100;
-	} else {
-		F0F_new = 5269;
-	}
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp &= (~PLL_MASK_IPLL1_F0F_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp |= (PLL_IPLL1_F0F_SDM(F0F_new));
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp &= (~PLL_MASK_IPLL1_F0N_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-	tmp |= (PLL_IPLL1_F0N_SDM(6));
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL3);
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp |= (PLL_BIT_IPLL1_TRIG_FREQ);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-	tmp &= (~PLL_BIT_IPLL1_TRIG_FREQ);
-	writel(tmp, data->addr + REG_PLL_I2SPLL1_CTRL1);
-
-	return 0;
-}
-
-/**
-  * @brief  I2S2 PLL output adjust by ppm.
-  * @param  ppm: ~1.69ppm per FOF step
-  * @param  action: slower or faster or reset
-  *          This parameter can be one of the following values:
-  *            @arg PLL_AUTO: reset to auto 45.158M
-  *            @arg PLL_FASTER: pll clock faster than 45.158M
-  *            @arg PLL_SLOWER: pll clock slower than 45.158M
-  * real_diff(M) = out_clock - auto(0)out_clock
-  * ppm_expected_diff = 45.158 * ppm / 1000000
-  *	       ppm	out_clock	real_diff(M)	ppm_expected_diff
-  *Auto	   0	45.1586
-  *Faster  800	45.1946	    0.036	        0.0361264
-  *	       500	45.1811	    0.0225	        0.022579
-  *	       200	45.1676	    0.009	        0.0090316
-  *Slower  800	45.1226	    0.036	        0.0361264
-  *	       500	45.1361	    0.0225	        0.022579
-  *	       200	45.1496	    0.009	        0.0090316
-
-  */
-static int ameba_pll_i2s_45P158M_clk_tune(struct audio_clock_component* acc, u32 ppm, u32 action)
-{
-
-	u32 F0F_new;
-	u32 tmp;
-	struct audio_clock_data* data = get_audio_clock_data(acc);
-
-	if (ppm > 1000) {
-		pr_info("invalid ppm:%d", ppm);
-		return -EINVAL;
-	}
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL1);
-	tmp &= (~PLL_MASK_IPLL2_DIVN_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
-	tmp |= (PLL_IPLL2_DIVN_SDM(7));
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
-
-
-	if (action == PLL_FASTER) {
-		F0F_new = 2071 + ppm * 59 / 100;
-	} else if (action == PLL_SLOWER) {
-		F0F_new = 2071 - ppm * 59 / 100;
-	} else {
-		F0F_new = 2071;
-	}
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL3);
-	tmp &= (~PLL_MASK_IPLL2_F0F_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
-	tmp |= (PLL_IPLL2_F0F_SDM(F0F_new));
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL3);
-	tmp &= (~PLL_MASK_IPLL2_F0N_SDM);
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
-	tmp |= (PLL_IPLL2_F0N_SDM(0));
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL3);
-
-	tmp = readl(data->addr + REG_PLL_I2SPLL2_CTRL1);
-	tmp |= (PLL_BIT_IPLL2_TRIG_FREQ);
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
-	tmp &= (~PLL_BIT_IPLL2_TRIG_FREQ);
-	writel(tmp, data->addr + REG_PLL_I2SPLL2_CTRL1);
-
-	return 0;
-}
-
 static int ameba_get_audio_clock_info_for_sport(struct audio_clock_component* acc, unsigned int sport_index)
 {
 	struct audio_clock_data* data = get_audio_clock_data(acc);
@@ -655,7 +656,7 @@ static int ameba_choose_input_clock_for_sport_index(struct audio_clock_component
 		data->pll_clk_for_sport[sport_index] = PLL_98P304M;
 		break;
 	case CKSL_I2S_PLL45M:
-		data->pll_clk_for_sport[sport_index] = PLL_45P158M;
+		data->pll_clk_for_sport[sport_index] = PLL_45P1584M;
 		break;
 	case CKSL_I2S_PLL24M:
 		data->pll_clk_for_sport[sport_index] = PLL_24P576M;
@@ -790,11 +791,11 @@ static void ameba_clock_dump(struct audio_clock_component* acc)
 
 static const struct audio_clock_driver clk_driver = {
 	.update_98MP304M_input_clock_status = ameba_update_98P304M_input_clock_status,
-	.update_45MP158_input_clock_status = ameba_update_45P158_input_clock_status,
+	.update_45MP158_input_clock_status = ameba_update_45P1584_input_clock_status,
 	.update_24MP576_input_clock_status = ameba_update_24P576_input_clock_status,
 	.pll_i2s_98P304M_clk_tune = ameba_pll_i2s_98P304M_clk_tune,
 	.pll_i2s_24P576M_clk_tune = ameba_pll_i2s_24P576M_clk_tune,
-	.pll_i2s_45P158M_clk_tune = ameba_pll_i2s_45P158M_clk_tune,
+	.pll_i2s_45P1584M_clk_tune = ameba_pll_i2s_45P1584M_clk_tune,
 	.get_audio_clock_info_for_sport = ameba_get_audio_clock_info_for_sport,
 	.choose_input_clock_for_sport_index = ameba_choose_input_clock_for_sport_index,
 	.update_fen_cke_sport_status = ameba_update_fen_cke_sport_status,
@@ -873,11 +874,8 @@ static int amebad2_audio_clock_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		return ret;
 	}
-	realtek_audio_pll_major = MAJOR(devno);
 
 	audio_pll_cdev = cdev_alloc();
-
-	devno = MKDEV(realtek_audio_pll_major, 0);
 
 	cdev_init(audio_pll_cdev, &fops);
 	audio_pll_cdev->owner = THIS_MODULE;
@@ -889,19 +887,20 @@ static int amebad2_audio_clock_probe(struct platform_device *pdev)
 	}
 
 	realtek_audio_pll_class = class_create(THIS_MODULE, "audio_pll_clk");
-	device_create(realtek_audio_pll_class, NULL, MKDEV(realtek_audio_pll_major, 0), NULL, "audio_pll_clk");
+	device_create(realtek_audio_pll_class, NULL, devno, NULL, "audio_pll_clk");
 
 	return 0;
 }
 
 static int amebad2_audio_clock_remove(struct platform_device *pdev)
 {
-
 	int res = 0;
 	device_destroy(realtek_audio_pll_class, devno);
+	class_destroy(realtek_audio_pll_class);
+	realtek_audio_pll_class = NULL;
 	cdev_del(audio_pll_cdev);
-	realtek_audio_pll_class->class_release(realtek_audio_pll_class);
-	unregister_chrdev_region(MKDEV(realtek_audio_pll_major, 0), 1);
+	audio_pll_cdev = NULL;
+	unregister_chrdev_region(devno, 1);
 
 	return res;
 }

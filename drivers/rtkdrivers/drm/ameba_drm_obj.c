@@ -35,8 +35,10 @@
 #include <drm/drm_vblank.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 
+#include "ameba_lcdc.h"
 #include "ameba_drm_drv.h"
-#include "ameba_drm_util.h"
+#include "ameba_drm_comm.h"
+
 
 #define CHECK_IS_NULL(a) ((NULL==a)?(1):(0))
 
@@ -57,9 +59,10 @@ static struct ameba_buf_struct sec_layer_info[LCDC_LAYER_MAX_NUM]={0,};
   * @brief  lcdc hw control struction 
   */
 struct lcdc_hw_ctx_type {
+	void __iomem *reg_base_addr; 		//LCDC Register first place
+	struct device *dev; 				//lcdc dev
 
 	LCDC_InitTypeDef lcdc_initstancd; 	//LCDC Init Structure Definition
-	void __iomem *reg_base_addr; 		//LCDC Register
 
 	u32 ldcd_writeback_buffer_length;
 	u32 ldcd_writeback_buffer ;
@@ -74,10 +77,6 @@ struct lcdc_hw_ctx_type {
 	u32 lcdc_debug;
 
 	//display config params
-	u32 lcdc_width;
-	u32 lcdc_height;
-	u32 lcdc_framerate;
-
 	u32 lcdc_bkg_color;
 	u32 lcdc_undflw_mode;
 	u32 lcdc_undflw_color;
@@ -92,21 +91,14 @@ struct lcdc_hw_ctx_type {
 	u32 lcdc_layblend_alpha; 
 };
 
-void lcdc_underflow_reset(void *data)
-{
-	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)data ;
-	void __iomem* plcdc_reg = lcdc_ctx->reg_base_addr;
+static void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx,struct ameba_drm_struct *ameba_struct);
 
-	ameba_lcdc_enable(plcdc_reg, DISABLE);
-	ameba_lcdc_enable(plcdc_reg, ENABLE);
-
-	DRM_TEST_PRINTK("Reset lcdc finish...\n");
-}
-
+//sys debug
 static ssize_t lcdc_debug_show(struct device *dev, struct device_attribute*attr, char *buf)
 {
-	struct drm_device			*drm_dev = dev_get_drvdata(dev);
-	struct ameba_drm_private	*ameba_priv = (struct ameba_drm_private*)(drm_dev->dev_private);
+	struct drm_device			*drm = dev_get_drvdata(dev);
+	struct ameba_drm_struct 	*ameba_struct = drm->dev_private;
+	struct ameba_drm_private	*ameba_priv = (struct ameba_drm_private*)(ameba_struct->ameba_drm_priv);
 	struct lcdc_hw_ctx_type		*lcdc_ctx = (struct lcdc_hw_ctx_type*)(ameba_priv->lcdc_hw_ctx);
 
 	return sprintf(buf, "lcdc_debug=%d\n", lcdc_ctx->lcdc_debug);
@@ -114,15 +106,15 @@ static ssize_t lcdc_debug_show(struct device *dev, struct device_attribute*attr,
 
 static ssize_t lcdc_debug_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct drm_device			*drm_dev = dev_get_drvdata(dev);
-	struct ameba_drm_private	*ameba_priv = (struct ameba_drm_private*)(drm_dev->dev_private);
+	struct drm_device			*drm = dev_get_drvdata(dev);
+	struct ameba_drm_struct 	*ameba_struct = drm->dev_private;
+	struct ameba_drm_private	*ameba_priv = (struct ameba_drm_private*)(ameba_struct->ameba_drm_priv);
 	struct lcdc_hw_ctx_type		*lcdc_ctx = (struct lcdc_hw_ctx_type*)(ameba_priv->lcdc_hw_ctx);
 	u32 tmp = 0 ;
 	char c;
 	size_t tmp_count = count;
 	char* pbuf = (char*)buf;
 
-	//printk("count=%d/buf=%s\n",tmp_count,pbuf);
 	while(*pbuf != 0 && tmp_count > 1)
 	{
 		c = *pbuf;
@@ -242,9 +234,11 @@ static irqreturn_t ameba_irq_handler(int irq, void *data)
 {
 	/* vblank irq */
 	u32 irq_status;
-	struct drm_crtc 			*crtc = (struct drm_crtc *)data ;
+	struct ameba_drm_struct 	*ameba_struct = (struct ameba_drm_struct *)data;
+	struct drm_crtc 			*crtc = ameba_struct->crtc ;
 	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
 	struct lcdc_hw_ctx_type 	*lcdc_ctx;
+	struct ameba_drm_reg_t 		*dsi;
 
 	if( CHECK_IS_NULL(kcrtc) 
 		|| CHECK_IS_NULL(kcrtc->lcdc_hw_ctx))
@@ -261,9 +255,12 @@ static irqreturn_t ameba_irq_handler(int irq, void *data)
 	}
 
 	if (irq_status & LCDC_BIT_DMA_UN_INTS) {
-		drm_underflow_flag_add(1);
-		if (drm_get_underflow_flag() == 1) {
-			mipi_dsi_underflow_reset();
+		ameba_struct->under_flow_count ++;
+		ameba_struct->under_flow_flag ++;
+		if (1 == ameba_struct->under_flow_flag) {
+			DRM_DEV_INFO(NULL,"underflow happen [%d-%d]\n",ameba_struct->under_flow_count,ameba_struct->under_flow_flag);
+			dsi = (struct ameba_drm_reg_t *)dev_get_drvdata(ameba_struct->dsi_dev);
+			mipi_dsi_underflow_reset(dsi->reg);
 		}
 	}
 
@@ -305,7 +302,7 @@ static inline void ameba_dump_regs(struct lcdc_hw_ctx_type *ctx, const char *fil
 {
 #ifdef ENABLE_LCDC_CTL
 	if(ctx->lcdc_debug){
-		LcdcDumpRegValue(ctx->reg_base_addr, filename);
+		LcdcDumpRegValue(ctx->dev, ctx->reg_base_addr, filename);
 	}
 #endif
 }
@@ -314,16 +311,27 @@ static void ameba_crtc_atomic_enable(struct drm_crtc *crtc,
 									 struct drm_crtc_state *old_state)
 {
 	struct lcdc_hw_ctx_type 	*ctx;
+	struct device 				*dev;
+	struct drm_device 			*drm;
+	struct ameba_drm_struct 	*ameba_struct;
 	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
-
+	AMEBA_DRM_DEBUG
 	if( CHECK_IS_NULL(kcrtc) 
 		|| kcrtc->enable )
 		return ;
 
 	ctx = kcrtc->lcdc_hw_ctx;
+	dev = ctx->dev;
+	drm = dev_get_drvdata(dev);
+	ameba_struct = drm->dev_private;
+
+	//update the register value
+	ameba_drm_reconfig_hw(ctx,ameba_struct);
+
 	ameba_display_enable(ctx);
 	ameba_dump_regs(ctx, __func__);
 	drm_crtc_vblank_on(crtc);
+
 	kcrtc->enable = true;
 }
 
@@ -488,9 +496,11 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 	struct drm_gem_cma_object 	*gem_cma_obj ;
 	struct drm_plane_state 		*state;
 	struct ameba_plane 			*kplane = to_ameba_plane(plane);
-	int display_width  = ameba_drm_get_display_width();
-	int display_height = ameba_drm_get_display_height();
+	int display_width;
+	int display_height;
 	u32 src_x, src_y, src_w, src_h;
+	struct drm_device 			*drm ;
+	struct ameba_drm_struct 	*ameba_struct ;
 
 #ifdef ENABLE_LCDC_CTL
 	if( CHECK_IS_NULL(plane) 
@@ -513,6 +523,11 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 		return ;
 
 	fmt = ameba_get_format(fb->format->format);
+	drm = fb->dev;
+	ameba_struct = drm->dev_private;
+	display_width = ameba_struct->display_width;
+	display_height = ameba_struct->display_height;
+
 	/*
 		crtc_* is the display position
 		src_*  is the source display position
@@ -621,7 +636,6 @@ static int ameba_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	return drm_gem_cma_mmap(filp, vma);
 }
 
-
 static const struct vm_operations_struct ameba_drm_gem_vm_ops = {
 	.open = drm_gem_vm_open,
 	.close = drm_gem_vm_close,
@@ -641,11 +655,13 @@ static const struct file_operations ameba_drm_file_fops = {
 void ameba_drm_gem_free_object(struct drm_gem_object *gem_obj)
 {
 	u8 i = 0 ;
-	struct drm_gem_cma_object *cma_obj = to_drm_gem_cma_obj(gem_obj);
+	struct drm_gem_cma_object 	*cma_obj = to_drm_gem_cma_obj(gem_obj);
+	struct drm_device 			*drm = gem_obj->dev;
+	struct ameba_drm_struct 	*ameba_struct = drm->dev_private;
+	struct lcdc_hw_ctx_type 	*lcdc_local = (struct lcdc_hw_ctx_type *)ameba_struct->lcdc_hw_ctx;
 
 #ifdef ENABLE_LCDC_CTL
 	for (i = 0 ; i < LCDC_LAYER_MAX_NUM ; i ++) {
-		struct lcdc_hw_ctx_type *lcdc_local = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
 		LCDC_InitTypeDef *lcdc_tmp = &(lcdc_local->lcdc_initstancd) ;
 		if (cma_obj->vaddr && ((u32)cma_obj->vaddr) == sec_layer_info[i].layer_address) {
 			ameba_lcdc_layer_enable(lcdc_tmp, i, DISABLE);
@@ -705,50 +721,37 @@ static int ameba_drm_update_plane(struct drm_plane *plane,
 
 //plane
 static const struct drm_plane_helper_funcs ameba_plane_helper_funcs = {
-	.atomic_check = ameba_plane_atomic_check,
-	.atomic_update = ameba_plane_atomic_update,
+	.atomic_check   = ameba_plane_atomic_check,
+	.atomic_update  = ameba_plane_atomic_update,
 };
 
 static struct drm_plane_funcs ameba_plane_funcs = {
-	.update_plane	= ameba_drm_update_plane,
-	.disable_plane	= drm_atomic_helper_disable_plane,
-	.destroy = drm_plane_cleanup,
-	.reset = drm_atomic_helper_plane_reset,
+	.update_plane           = ameba_drm_update_plane,
+	.disable_plane          = drm_atomic_helper_disable_plane,
+	.destroy                = drm_plane_cleanup,
+	.reset                  = drm_atomic_helper_plane_reset,
 	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
-	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+	.atomic_destroy_state   = drm_atomic_helper_plane_destroy_state,
 };
-
-int ameba_drm_get_display_width(void)
-{
-	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
-	return (NULL == lcdc_ctx || 0 == lcdc_ctx->lcdc_width)?(MIPI_DSI_DISPLAY_X):(lcdc_ctx->lcdc_width);
-}
-int ameba_drm_get_display_height(void)
-{
-	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
-	return (NULL == lcdc_ctx || 0 == lcdc_ctx->lcdc_height)?(MIPI_DSI_DISPLAY_Y):(lcdc_ctx->lcdc_height);
-}
-int ameba_drm_get_framerate(void)
-{
-	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)drm_get_lcdc_param();
-	return (NULL == lcdc_ctx || 0 == lcdc_ctx->lcdc_framerate)?(MIPI_DSI_FRAME_RATE):(lcdc_ctx->lcdc_framerate);
-}
 
 static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 								struct drm_crtc *crtc)
 {
-	struct resource 		*res;
-	struct device 			*dev = &pdev->dev;
-//	struct device_node		*np = dev->of_node;
-	struct lcdc_hw_ctx_type *lcdc_ctx = NULL;
-	int ret;
-	u8  idx;
-	
+	struct resource             *res;
+	struct device               *dev = &pdev->dev;
+	struct drm_device           *drm = dev_get_drvdata(dev);
+	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
+	struct lcdc_hw_ctx_type     *lcdc_ctx = NULL;
+	int                         ret;
+
 	lcdc_ctx = devm_kzalloc(dev, sizeof(*lcdc_ctx), GFP_KERNEL);
 	if (!lcdc_ctx) {
 		DRM_DEV_ERROR(dev, "failed to alloc lcdc_hw_ctx\n");
 		return ERR_PTR(-ENOMEM);
 	}
+	lcdc_ctx->crtc = crtc;
+	lcdc_ctx->dev = dev;
+	ameba_struct->lcdc_hw_ctx = lcdc_ctx;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	lcdc_ctx->reg_base_addr = devm_ioremap_resource(dev, res);
@@ -779,7 +782,8 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 	/*
 		irq init
 	*/
-	ret = devm_request_irq(dev, lcdc_ctx->irq, ameba_irq_handler, 0, dev_name(dev), crtc);
+	ameba_struct->crtc = crtc;
+	ret = devm_request_irq(dev, lcdc_ctx->irq, ameba_irq_handler, 0, dev_name(dev), ameba_struct);
 	if (ret) {
 		return ERR_PTR(-EIO);
 	}
@@ -791,29 +795,21 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 		return ERR_PTR(-ENODEV);
 	}
 
-	lcdc_ctx->crtc = crtc;
-
 	//debug attribute
 	lcdc_ctx->lcdc_debug = 0;
 	if ( sysfs_create_group(&pdev->dev.kobj,&lcdc_debug_attr_grp) )
 		DRM_DEV_INFO(&pdev->dev, "Error creating lcdc sysfs entry\n");
 
-	lcdc_ctx->lcdc_width = MIPI_DSI_DISPLAY_X;
-	lcdc_ctx->lcdc_height = MIPI_DSI_DISPLAY_Y;
-	lcdc_ctx->lcdc_framerate = MIPI_DSI_FRAME_RATE;
-	lcdc_ctx->lcdc_burstsize = LCDC_LAYER_BURSTSIZE_4X64BYTES;
 
+	lcdc_ctx->lcdc_burstsize = LCDC_LAYER_BURSTSIZE_4X64BYTES;
 	lcdc_ctx->lcdc_bkg_color = LCDC_KG_COLOR;
 	lcdc_ctx->lcdc_undflw_mode = 1;
 	lcdc_ctx->lcdc_undflw_color = LCDC_UNDFLOW_COLOR;
-
 	lcdc_ctx->lcdc_laycolor_key_en = 0;
 	lcdc_ctx->lcdc_laycolor_key = LCDC_LAY_COLOR_KEY;
-
 	lcdc_ctx->lcdc_layblend_factor = 1;
 	lcdc_ctx->lcdc_layblend_alpha = LCDC_LAY_BLEND_ALPHA;
 
-	drm_set_lcdc_param(lcdc_ctx);
 /*
 	lcdc_ctx->ldcd_writeback_buffer_length = (MIPI_DISPLAY_X * MIPI_DISPLAY_Y * LDCD_PIXFORMAT_MAX_LEN) ;
 	//lcdc_ctx->ldcd_writeback_buffer = dma_alloc_coherent(&pdev->dev, lcdc_ctx->ldcd_writeback_buffer_length, &(lcdc_ctx->dump_paddr), GFP_KERNEL);
@@ -830,9 +826,15 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 	lcdc_ctx->ldcd_writeback_buffer = 0 ;
 	lcdc_ctx->ldcd_writeback_buffer_length = 0 ;
 
+	return lcdc_ctx;
+}
+void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx,struct ameba_drm_struct *ameba_struct)
+{
+	u8  idx,ret;
+
 	//init the lcdc info
-	ameba_lcdc_reset_config(&(lcdc_ctx->lcdc_initstancd),  lcdc_ctx->lcdc_width, lcdc_ctx->lcdc_height, lcdc_ctx->lcdc_bkg_color);
-	ameba_lcdc_set_planesize(&(lcdc_ctx->lcdc_initstancd), lcdc_ctx->lcdc_width, lcdc_ctx->lcdc_height);
+	ameba_lcdc_reset_config(&(lcdc_ctx->lcdc_initstancd),  ameba_struct->display_width, ameba_struct->display_height, lcdc_ctx->lcdc_bkg_color);
+	ameba_lcdc_set_planesize(&(lcdc_ctx->lcdc_initstancd), ameba_struct->display_width, ameba_struct->display_height);
 	ameba_lcdc_set_background_color(&(lcdc_ctx->lcdc_initstancd), lcdc_ctx->lcdc_bkg_color);
 
 	//dma issue
@@ -840,7 +842,7 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 	ameba_lcdc_dma_config_keeplastFrm(lcdc_ctx->reg_base_addr, lcdc_ctx->lcdc_undflw_mode, lcdc_ctx->lcdc_undflw_color);
 
 	/*line number interrupt*/
-	ameba_lcdc_irq_linepos(lcdc_ctx->reg_base_addr, lcdc_ctx->lcdc_height * 4 / 5);
+	ameba_lcdc_irq_linepos(lcdc_ctx->reg_base_addr, ameba_struct->display_height * 4 / 5);
 	//enable dma underflow interrupt
 	ameba_lcdc_irq_config(lcdc_ctx->reg_base_addr, LCDC_BIT_DMA_UN_INTEN, ENABLE);
 
@@ -868,18 +870,16 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 		struct ameba_buf_struct * layinfo = &(sec_layer_info[ret]);
 		layinfo->layer_address = 0;
 		layinfo->use_sec_buffer = 0 ;
-		layinfo->size = round_up(lcdc_ctx->lcdc_width * lcdc_ctx->lcdc_height * 4, PAGE_SIZE);
-		layinfo->sec_vaddr = dma_alloc_coherent(dev, layinfo->size, &(layinfo->sec_paddr), GFP_KERNEL);
+		layinfo->size = round_up(ameba_struct->display_width * ameba_struct->display_height * 4, PAGE_SIZE);
+		layinfo->sec_vaddr = dma_alloc_coherent(lcdc_ctx->dev, layinfo->size, &(layinfo->sec_paddr), GFP_KERNEL);
 	}
 
-	return lcdc_ctx;
 }
-
 static void ameba_hw_ctx_cleanup(struct platform_device *pdev, void *hw_ctx)
 {
-	int ret; 
-	struct device 			*dev = &pdev->dev;
-	struct lcdc_hw_ctx_type *lcdc_ctx = (struct lcdc_hw_ctx_type *)hw_ctx ;
+	int                         ret; 
+	struct device               *dev = &pdev->dev;
+	struct lcdc_hw_ctx_type     *lcdc_ctx = (struct lcdc_hw_ctx_type *)hw_ctx ;
 
 	//release all resource
 	devm_free_irq(dev, lcdc_ctx->irq, lcdc_ctx->crtc);
@@ -922,35 +922,33 @@ static int ameba_drm_atomic_helper_commit(struct drm_device *dev,
 }
 
 static const struct drm_mode_config_funcs ameba_mode_config_funcs = {
-	.fb_create = ameba_user_fb_create,
-	.atomic_check = ameba_drm_atomic_helper_check,
-	.atomic_commit = ameba_drm_atomic_helper_commit,
+	.fb_create      = ameba_user_fb_create,
+	.atomic_check   = ameba_drm_atomic_helper_check,
+	.atomic_commit  = ameba_drm_atomic_helper_commit,
 };
 
 static struct drm_driver ameba_lcdc_driver = {
-	.driver_features = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
+	.driver_features            = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
+	.fops                       = &ameba_drm_file_fops,
+	.dumb_create                = drm_gem_cma_dumb_create_internal,
+	.gem_vm_ops                 = &ameba_drm_gem_vm_ops,
+	.gem_free_object_unlocked   = ameba_drm_gem_free_object,
+	.get_vblank_timestamp       = ameba_drm_get_vblank_timestamp,
 
-//	.release		=  ameba_drm_release,
-	.fops			= &ameba_drm_file_fops,
-
-	.dumb_create	= drm_gem_cma_dumb_create_internal,
-	.gem_vm_ops		= &ameba_drm_gem_vm_ops,
-	.gem_free_object_unlocked = ameba_drm_gem_free_object,
-	.get_vblank_timestamp	=  ameba_drm_get_vblank_timestamp,
-
-	.name = "amebad2",
-	.desc = "Realtek AmebaD2 SoC DRM Driver",
-	.date = "20210916",
-	.major = 1,
-	.minor = 0,
+	.name   = "amebad2",
+	.desc   = "Realtek AmebaD2 SoC DRM Driver",
+	.date   = "20210916",
+	.major  = 1,
+	.minor  = 0,
 };
 
-struct ameba_drm_data lcdc_driver_data = {
-	.register_connects = false,
+static struct ameba_drm_driver_data lcdc_driver_data = {
 	.num_planes = LCDC_LAYER_MAX_NUM,
 	.prim_plane = LCDC_LAYER_LAYER1,
 	.channel_formats = ameba_channel_formats,
 	.channel_formats_cnt = ARRAY_SIZE(ameba_channel_formats),
+	.config_max_width = 2048,
+	.config_max_height = 2048,
 	.driver = &ameba_lcdc_driver,
 	.crtc_helper_funcs = &ameba_crtc_helper_funcs,
 	.crtc_funcs = &ameba_crtc_funcs,
@@ -958,7 +956,7 @@ struct ameba_drm_data lcdc_driver_data = {
 	.plane_funcs = &ameba_plane_funcs,
 	.mode_config_funcs = &ameba_mode_config_funcs,
 
-	.alloc_hw_ctx = ameba_hw_ctx_alloc,
+	.alloc_hw_ctx   = ameba_hw_ctx_alloc,
 	.cleanup_hw_ctx = ameba_hw_ctx_cleanup,
 };
 

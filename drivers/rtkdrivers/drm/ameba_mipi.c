@@ -22,9 +22,10 @@
   */
 
 //#include "ameba_soc.h"
+#include <drm/drm_print.h>
 #include "ameba_drm_base.h"
 #include "ameba_mipi.h"
-#include "ameba_drm_util.h"
+#include "ameba_drm_comm.h"
 
 void MIPI_DPHY_Reset(void __iomem *MIPIx_)
 {
@@ -58,7 +59,7 @@ void MIPI_DPHY_Reset(void __iomem *MIPIx_)
 	writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
 }
 
-void MIPI_DPHY_Reset_Release(void __iomem *MIPIx_, u32 dataLane_freq, u8 lane_num)
+static void MIPI_DPHY_Reset_Release(struct device *dev, void __iomem *MIPIx_, u32 dataLane_freq, u8 lane_num)
 {
 	u32 Value32;
 	u8 div4, div2;
@@ -103,7 +104,7 @@ void MIPI_DPHY_Reset_Release(void __iomem *MIPIx_, u32 dataLane_freq, u8 lane_nu
 	} else if (lane_num == 2) {
 		Value32 |= (MIPI_BIT_PLL_LANE1_ENABLE | MIPI_BIT_PLL_LANE0_ENABLE | MIPI_BIT_LANE1_EN | MIPI_BIT_LANE0_EN);
 	} else {
-		printk("MIPI not support %d lane\n", lane_num);
+		DRM_DEV_ERROR(dev, "MIPI not support %d lane\n", lane_num);
 	}
 	writel(Value32, (void*)(MIPIx + MIPI_CLOCK_GEN_OFFSET));
 
@@ -111,7 +112,7 @@ void MIPI_DPHY_Reset_Release(void __iomem *MIPIx_, u32 dataLane_freq, u8 lane_nu
 	DelayUs(4);
 }
 
-void MIPI_DPHY_PLL_Set(void __iomem *MIPIx_, u32 dataLane_freq)
+void MIPI_DPHY_PLL_Set(struct device *dev, void __iomem *MIPIx_, u32 dataLane_freq)
 {
 	u8 div_number = 1, ncode, xtal_clk = 40;
 	u16 fcode;
@@ -119,7 +120,7 @@ void MIPI_DPHY_PLL_Set(void __iomem *MIPIx_, u32 dataLane_freq)
 	u32 MIPIx = (u32) MIPIx_ ;
 
 	if (dataLane_freq < 100) {
-		printk("dataLane_freq %d cannot less than 100M\n", dataLane_freq);
+		DRM_DEV_ERROR(dev, "dataLane_freq %d cannot less than 100M\n", dataLane_freq);
 		return;
 	} else if (dataLane_freq <= 200) { //100Mbps ~ 200Mbps
 		div_number = 4;
@@ -300,12 +301,12 @@ void MIPI_DPHY_Timing_Set(void __iomem *MIPIx_, u32 dataLane_freq)
 #endif
 }
 
-void MIPI_DPHY_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct)
+void MIPI_DPHY_init(struct device *dev, void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct)
 {
 	MIPI_DPHY_Reset(MIPIx);
-	MIPI_DPHY_PLL_Set(MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq);
+	MIPI_DPHY_PLL_Set(dev, MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq);
 	MIPI_DPHY_Timing_Set(MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq);
-	MIPI_DPHY_Reset_Release(MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LaneNum);
+	MIPI_DPHY_Reset_Release(dev, MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LaneNum);
 }
 
 void MIPI_DSI_TC0_Set(void __iomem *MIPIx_, u16 HSA, u16 HACT, u8 VideoDataFormat)
@@ -665,7 +666,7 @@ void MIPI_StructInit(MIPI_InitTypeDef *MIPI_InitStruct)
 	MIPI_InitStruct->MIPI_BTADis = DISABLE;
 
 	MIPI_InitStruct->MIPI_LaneNum = 2;
-	MIPI_InitStruct->MIPI_FrameRate = MIPI_DSI_FRAME_RATE;
+	MIPI_InitStruct->MIPI_FrameRate = 60;
 
 	/*DataLaneFreq * LaneNum = FrameRate * (VSA+VBP+VACT+VFP) * (HSA+HBP+HACT+HFP) * PixelFromat*/
 	MIPI_InitStruct->MIPI_VideDataLaneFreq = 775;
@@ -686,9 +687,21 @@ void MIPI_StructInit(MIPI_InitTypeDef *MIPI_InitStruct)
 
 }
 
+void MIPI_BG_CMD(void __iomem *sys_aip_ctrl, u32 NewStatus)
+{
+	u32 lsys_aip_ctrl1 = (u32) sys_aip_ctrl;
+	u32 Temp = readl((void*)lsys_aip_ctrl1);
+	if (NewStatus) {
+		Temp |= LSYS_BIT_BG_PWR | LSYS_BIT_BG_ON_MIPI;
+	} else {
+		Temp &= ~LSYS_BIT_BG_ON_MIPI; //Do not close LSYS_BIT_BG_PWR for usb/ddr may use it
+	}
+	writel(Temp, (void*)lsys_aip_ctrl1);
+}
+#if 0
 void MIPI_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct)
 {
 	MIPI_DPHY_init(MIPIx, MIPI_InitStruct);
 	MIPI_DSI_init(MIPIx, MIPI_InitStruct);
 }
-
+#endif

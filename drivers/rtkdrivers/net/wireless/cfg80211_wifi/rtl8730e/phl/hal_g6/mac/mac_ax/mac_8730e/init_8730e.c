@@ -156,7 +156,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_build_txdesc_8730e, /* build_txdesc */
 	NULL, /* refill_txdesc */
 	mac_parse_rxdesc_8730e, /* parse_rxdesc */
-	NULL, /* watchdog */
+	mac_watchdog, /* watchdog */
 	/*FW offload related*/
 	mac_reset_fwofld_state,
 	NULL,
@@ -963,6 +963,11 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	MAC_REG_W8(REG_RXPKT_CTL, WLAN_RXPKT_MAX_SZ_512);
 	MAC_REG_W8(REG_RXPKT_CTL + 1, 0x05);
 
+	/* enable hw to update beacon's time field */
+	val8 = MAC_REG_R8(REG_TCR);
+	val8 |= BIT_WMAC_TCR_UPD_TIMIE;
+	MAC_REG_W8(REG_TCR, val8);
+	/*TX CG*/
 	MAC_REG_W8(REG_TCR + 2, WLAN_TX_FUNC_CFG2);
 	MAC_REG_W8(REG_TCR + 1, WLAN_TX_FUNC_CFG1);
 
@@ -1524,14 +1529,6 @@ u32 cfg_net_type_8730e(struct mac_ax_adapter *adapter, u8 port,
 	u8 net_type_tmp = 0;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
-
-	value32 = MAC_REG_R32(REG_MACID_H);
-	if (net_type == MAC_AX_NET_TYPE_AP) {
-		value32 |= BIT_AP_BSSID_FIT_UC;
-	} else {
-		value32 &= ~BIT_AP_BSSID_FIT_UC;
-	}
-	MAC_REG_W32(REG_MACID_H, value32);
 
 	switch (port) {
 	case MAC_AX_PORT_0:

@@ -29,9 +29,8 @@
 #include <linux/of.h>
 #include <linux/pm_wakeirq.h>
 
-#define AMEBA_NR_UARTS	1
+static struct uart_port log_port;
 
-static struct uart_port ports[AMEBA_NR_UARTS];
 extern void ameba_console_putchar(struct uart_port *port, int ch);
 
 /*
@@ -200,6 +199,20 @@ static void ameba_uart_stop_rx(struct uart_port *port)
 	val &= ~(LOGUART_IER_ELSI | LOGUART_IER_ERBI);
 	ameba_uart_writel(port, val, AMEBA_LOGUART_DLH_INTCR);
 #endif
+}
+
+/*
+ * serial core request to config interrupts
+ */
+static void ameba_uart_intr_config(struct uart_port *port, unsigned int intr, int state)
+{
+	unsigned int val = ameba_uart_readl(port, AMEBA_LOGUART_DLH_INTCR);
+	if (state != 0) {
+		val |= intr;
+	} else {
+		val &= ~intr;
+	}
+	ameba_uart_writel(port, val, AMEBA_LOGUART_DLH_INTCR);
 }
 
 /*
@@ -417,6 +430,9 @@ static int ameba_uart_startup(struct uart_port *port)
 	if (ret) {
 		return ret;
 	}
+
+	ameba_uart_intr_config(port, LOGUART_IER_ERBI, 1);
+
 	ameba_uart_enable(port);
 
 	return 0;
@@ -427,6 +443,7 @@ static int ameba_uart_startup(struct uart_port *port)
  */
 static void ameba_uart_shutdown(struct uart_port *port)
 {
+	ameba_uart_intr_config(port, LOGUART_IER_ERBI, 0);
 #ifdef UART_TODO
 	ameba_uart_disable(port);
 	free_irq(port->irq, port);
@@ -476,7 +493,6 @@ static void ameba_uart_baudparagetfull(unsigned int IPclk, unsigned int baudrate
   */
 static void ameba_uart_setbaud(struct uart_port *port, unsigned int bandrate)
 {
-	unsigned int RegValue;
 	unsigned int Ovsr;
 	unsigned int Ovsr_adj;
 	unsigned int val;
@@ -502,8 +518,8 @@ static void ameba_uart_setbaud(struct uart_port *port, unsigned int bandrate)
 
 	/* Set OVSR_ADJ[10:0] (xfactor_adj[26:16]) */
 	val = ameba_uart_readl(port, AMEBA_LOGUART_SPR);
-	RegValue &= ~(RUART_SP_REG_XFACTOR_ADJ);
-	RegValue |= ((Ovsr_adj << 16) & RUART_SP_REG_XFACTOR_ADJ);
+	val &= ~(RUART_SP_REG_XFACTOR_ADJ);
+	val |= ((Ovsr_adj << 16) & RUART_SP_REG_XFACTOR_ADJ);
 	ameba_uart_writel(port, val, AMEBA_LOGUART_SPR);
 
 	/* clear DLAB bit */
@@ -514,18 +530,18 @@ static void ameba_uart_setbaud(struct uart_port *port, unsigned int bandrate)
 
 	/*rx baud rate configureation*/
 	val = ameba_uart_readl(port, AMEBA_LOGUART_MON_BAUD_STS);
-	RegValue &= (~RUART_LP_RX_XTAL_CYCNUM_PERBIT);
-	RegValue |= Ovsr;
+	val &= (~RUART_LP_RX_XTAL_CYCNUM_PERBIT);
+	val |= Ovsr;
 	ameba_uart_writel(port, val, AMEBA_LOGUART_MON_BAUD_STS);
 
 	val = ameba_uart_readl(port, AMEBA_LOGUART_MON_BAUD_CTRL);
-	RegValue &= (~RUART_LP_RX_OSC_CYCNUM_PERBIT);
-	RegValue |= (Ovsr << 9);
+	val &= (~RUART_LP_RX_OSC_CYCNUM_PERBIT);
+	val |= (Ovsr << 9);
 	ameba_uart_writel(port, val, AMEBA_LOGUART_MON_BAUD_CTRL);
 
 	val = ameba_uart_readl(port, AMEBA_LOGUART_RX_PATH);
-	RegValue &= (~RUART_REG_RX_XFACTOR_ADJ);
-	RegValue |= (Ovsr_adj << 3);
+	val &= (~RUART_REG_RX_XFACTOR_ADJ);
+	val |= (Ovsr_adj << 3);
 	ameba_uart_writel(port, val, AMEBA_LOGUART_RX_PATH);
 }
 #endif
@@ -537,8 +553,7 @@ static void ameba_uart_set_termios(struct uart_port *port,
 								   struct ktermios *new,
 								   struct ktermios *old)
 {
-#ifdef UART_TODO
-	unsigned int ctl, baud, quot, ier;
+	unsigned int ctl, ier;
 	unsigned long flags;
 	int tries;
 
@@ -549,9 +564,9 @@ static void ameba_uart_set_termios(struct uart_port *port,
 		mdelay(10);
 	}
 
+
 	/* disable uart while changing speed */
-	ameba_uart_disable(port);
-	//bcm_uart_flush(port);
+	//ameba_uart_disable(port);
 
 	/* update Control register */
 	ctl = ameba_uart_readl(port, AMEBA_LOGUART_LCR);
@@ -584,14 +599,14 @@ static void ameba_uart_set_termios(struct uart_port *port,
 	}
 	ameba_uart_writel(port, ctl, AMEBA_LOGUART_LCR);
 
-	/* update Baudword register */
-	baud = uart_get_baud_rate(port, new, old, 0, port->uartclk / 16);
-	ameba_uart_setbaud(port, baud);
+	/* Never change loguart baudrate */
+	//baud = uart_get_baud_rate(port, new, old, 0, port->uartclk / 16);
+	//ameba_uart_setbaud(port, baud);
 
 	/* update Interrupt register */
 	ier = ameba_uart_readl(port, AMEBA_LOGUART_DLH_INTCR);
 
-	ier &= LOGUART_IER_EDSSI;
+	ier &= ~LOGUART_IER_EDSSI;
 	if (UART_ENABLE_MS(port, new->c_cflag)) {
 		ier |= LOGUART_IER_EDSSI;
 	}
@@ -620,10 +635,9 @@ static void ameba_uart_set_termios(struct uart_port *port,
 		port->ignore_status_mask |= UART_FIFO_VALID_MASK;
 	}
 #endif
-	uart_update_timeout(port, new->c_cflag, baud);
+	uart_update_timeout(port, new->c_cflag, 1500000);
 	ameba_uart_enable(port);
 	spin_unlock_irqrestore(&port->lock, flags);
-#endif
 }
 
 /*
@@ -738,7 +752,7 @@ static void ameba_console_write(struct console *co, const char *s,
 	//unsigned long flags;
 	int locked;
 
-	port = &ports[co->index];
+	port = &log_port;
 
 	//local_irq_save(flags);
 	if (port->sysrq) {
@@ -776,11 +790,7 @@ static int ameba_console_setup(struct console *co, char *options)
 	int parity = 'n';
 	int flow = 'n';
 
-	if (co->index < 0 || co->index >= AMEBA_NR_UARTS) {
-		return -EINVAL;
-	}
-
-	port = &ports[co->index];
+	port = &log_port;
 	if (!port->membase) {
 		return -ENODEV;
 	}
@@ -831,13 +841,13 @@ OF_EARLYCON_DECLARE(ameba_uart, "realtek,amebad2-loguart", ameba_early_console_s
 #endif /* CONFIG_SERIAL_RTK_AMEBA_CONSOLE */
 
 static struct uart_driver ameba_uart_driver = {
-	.owner		= THIS_MODULE,
+	.owner			= THIS_MODULE,
 	.driver_name	= "ameba_uart",
-	.dev_name	= "ttyS",
-	.major		= TTY_MAJOR,
-	.minor		= 64,
-	.nr		= AMEBA_NR_UARTS,
-	.cons		= AMEBA_CONSOLE,
+	.dev_name		= "ttyS",
+	.major			= TTY_MAJOR,
+	.minor			= 64,
+	.nr				= 1,
+	.cons			= AMEBA_CONSOLE,
 };
 
 /*
@@ -846,33 +856,13 @@ static struct uart_driver ameba_uart_driver = {
 static int ameba_uart_probe(struct platform_device *pdev)
 {
 	struct resource *res_mem;
-	struct uart_port *port;
-#ifdef UART_FIXME
-	struct clk *clk;
-#endif
+	struct uart_port *port = &log_port;
 	int ret, irq;
+	u32 clk_rate;
 
-#ifdef UART_TODO
-	if (pdev->dev.of_node) {
-		pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
-
-		if (pdev->id < 0) {
-			pdev->id = of_alias_get_id(pdev->dev.of_node, "uart");
-		}
-	}
-#else
 	pdev->id = 0;
-#endif
+	memset(port, 0, sizeof(struct uart_port));
 
-	if (pdev->id < 0 || pdev->id >= AMEBA_NR_UARTS) {
-		return -EINVAL;
-	}
-
-	port = &ports[pdev->id];
-	if (port->membase) {
-		return -EBUSY;
-	}
-	memset(port, 0, sizeof(*port));
 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res_mem) {
 		return -ENODEV;
@@ -889,16 +879,10 @@ static int ameba_uart_probe(struct platform_device *pdev)
 		return irq;
 	}
 
-#ifdef UART_FIXME
-	clk = clk_get(&pdev->dev, "refclk");
-	if (IS_ERR(clk) && pdev->dev.of_node) {
-		clk = of_clk_get(pdev->dev.of_node, 0);
+	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency", &clk_rate);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Fail to get clock rate %d\n", ret);
 	}
-
-	if (IS_ERR(clk)) {
-		return -ENODEV;
-	}
-#endif
 
 	port->iotype = UPIO_MEM;
 	port->irq = irq;
@@ -908,23 +892,22 @@ static int ameba_uart_probe(struct platform_device *pdev)
 	port->fifosize = 16;
 	port->line = pdev->id;
 	port->type = PORT_AMEBA;
-#ifdef UART_FIXME
-	port->uartclk = clk_get_rate(clk) / 2;
-	clk_put(clk);
-#endif
+	port->uartclk = clk_rate;
+
+	spin_lock_init(&port->lock);
 
 	ret = uart_add_one_port(&ameba_uart_driver, port);
 	if (ret) {
-		ports[pdev->id].membase = NULL;
+		port->membase = NULL;
 		return ret;
 	}
+
 	platform_set_drvdata(pdev, port);
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
 		device_init_wakeup(&pdev->dev, true);
 		dev_pm_set_wake_irq(&pdev->dev, port->irq);
 	}
-
 
 	return 0;
 }
@@ -936,7 +919,7 @@ static int ameba_uart_remove(struct platform_device *pdev)
 	port = platform_get_drvdata(pdev);
 	uart_remove_one_port(&ameba_uart_driver, port);
 	/* mark port as free */
-	ports[pdev->id].membase = NULL;
+	port->membase = NULL;
 	return 0;
 }
 

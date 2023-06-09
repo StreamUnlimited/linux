@@ -7467,6 +7467,8 @@ void fill_txreq_mdata(_adapter *padapter, struct xmit_frame *pxframe)
 
 	PHLTX_LOG;
 
+	/* clear mdata for new packet */
+	memset(mdata, 0, sizeof(struct rtw_t_meta_data));
 	if (pxframe->attrib.order) {
 		htc_option = _TRUE;
 	}

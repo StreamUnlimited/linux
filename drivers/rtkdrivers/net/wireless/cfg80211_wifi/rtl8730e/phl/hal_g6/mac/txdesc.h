@@ -48,7 +48,7 @@
 #define AX_TXD_QSEL_SH		8
 #define AX_TXD_QSEL_MSK		0x1f
 #define AX_TXD_BIP_KEYID_SEL		BIT(7)
-#define AX_TXD_MACID_SH		7
+#define AX_TXD_MACID_SH		0
 #define AX_TXD_MACID_MSK		0x7f
 
 /* dword2 */   /* offset8 */

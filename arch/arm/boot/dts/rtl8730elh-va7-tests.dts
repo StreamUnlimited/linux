@@ -60,6 +60,10 @@
 	status = "okay";
 };
 
+&captimer {
+	status = "okay";
+};
+
 // Pinmux Group2
 &captouch {
 	pinctrl-names = "default";

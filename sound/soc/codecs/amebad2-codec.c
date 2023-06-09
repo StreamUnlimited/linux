@@ -40,6 +40,7 @@
 #define MAX_AMIC_NUM    5
 #define MIC_TYPE_AMIC   0
 #define MIC_TYPE_DMIC   1
+#define MAX_DAI_NUM     2
 
 struct ameba_priv {
 	/* IOREMAP'd SFRs */
@@ -66,6 +67,7 @@ struct ameba_priv {
 	u8 amic_gains[MAX_AMIC_NUM];
 	int dmic_tdm_num;
 	u8 tdm_dmic_numbers[MAX_TDM_NUM];
+	unsigned int dai_fmt[MAX_DAI_NUM];
 
 	int gpio_index;
 };
@@ -357,7 +359,39 @@ static int amebad2_codec_dai_set_dai_sysclk(struct snd_soc_dai *dai,
 
 static int amebad2_codec_dai_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
+	struct snd_soc_component *component = dai->component;
+	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
+
+	codec_priv->dai_fmt[dai->id] = fmt;
+
 	return 0;
+}
+
+static unsigned int get_df_for_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+{
+	unsigned int sp_df = DF_LEFT;
+	struct snd_soc_component *component = dai->component;
+
+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK)
+	{
+	case SND_SOC_DAI_FORMAT_I2S:
+		sp_df = DF_I2S;
+		break;
+	case SND_SOC_DAI_FORMAT_LEFT_J:
+		sp_df = DF_LEFT;
+		break;
+	case SND_SOC_DAI_FORMAT_DSP_A:
+		sp_df = DF_PCM_A;
+		break;
+	case SND_SOC_DAI_FORMAT_DSP_B:
+		sp_df = DF_PCM_B;
+		break;
+	default:
+		dev_err(component->dev,"unsupported fmt:%d", fmt);
+		break;
+	}
+
+	return sp_df;
 }
 
 static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
@@ -404,8 +438,7 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 				return -EINVAL;
 		}
 		i2s_init.codec_sel_i2s_tx_ch = CH_LR;
-		i2s_init.codec_sel_i2s_tx_data_format = DF_LEFT;
-
+		i2s_init.codec_sel_i2s_tx_data_format = get_df_for_fmt(dai, codec_priv->dai_fmt[dai->id]);
 		audio_codec_i2s_enable(&i2s_init,codec_priv->digital_addr,codec_priv->analog_addr, I2S0);
 		audio_codec_i2s_init(&i2s_init,codec_priv->digital_addr,codec_priv->analog_addr, I2S0);
 
@@ -429,7 +462,7 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 				return -EINVAL;
 		}
 
-		i2s_init.codec_sel_i2s_rx_data_format = DF_LEFT;
+		i2s_init.codec_sel_i2s_rx_data_format = get_df_for_fmt(dai, codec_priv->dai_fmt[dai->id]);
 
 		switch (params_channels(params)) {     //params_channels - Get the number of channels from the hw params
 			case 8:
@@ -1003,6 +1036,9 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	codec_priv->amic_gains[2] = MICBST_GAIN_30DB;
 	codec_priv->amic_gains[3] = MICBST_GAIN_30DB;
 	codec_priv->amic_gains[4] = MICBST_GAIN_30DB;
+
+	codec_priv->dai_fmt[0] = DF_LEFT;
+	codec_priv->dai_fmt[1] = DF_LEFT;
 
 	codec_info(1,&pdev->dev,"%s,digital_base:%x,digital_size:%x,analog_base:%x,analog_size:%x\n",__func__,codec_priv->digital_base,codec_priv->digital_size, codec_priv->analog_base, codec_priv->analog_size);	
 	codec_info(1,&pdev->dev,"tdm_amic_0:%d, amic_1:%d, amic_2:%d, amic_3:%d", codec_priv->tdm_amic_numbers[0], codec_priv->tdm_amic_numbers[1], codec_priv->tdm_amic_numbers[2], codec_priv->tdm_amic_numbers[3]);

@@ -155,6 +155,16 @@ void rtw_hal_init_bb_reg(struct hal_info_t *hal_info)
 	halbb_reset_bb(hal_info->bb);
 }
 
+void rtw_hal_cfg_bb_rfe_gpio(struct hal_info_t *hal_info)
+{
+	struct rtw_phl_com_t *phl_com = hal_info->phl_com;
+	u8 rfe_type = phl_com->dev_cap.rfe_type;
+	enum bb_rfe_src_sel src_sel = ANTSEL_0;
+
+	/* cfg bb rfe gpio */
+	halbb_gpio_setting_rfetype(hal_info->bb, rfe_type, src_sel);
+}
+
 u32 rtw_hal_read_rf_reg(struct rtw_hal_com_t *hal_com,
 			enum rf_path path, u32 addr, u32 mask)
 {
@@ -1782,6 +1792,10 @@ void rtw_hal_bb_deinit(struct rtw_phl_com_t *phl_com,
 }
 
 void rtw_hal_init_bb_reg(struct hal_info_t *hal_info)
+{
+}
+
+void rtw_hal_cfg_bb_rfe_gpio(struct hal_info_t *hal_info)
 {
 }
 

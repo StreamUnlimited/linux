@@ -223,37 +223,6 @@ void halrf_iqk_init(struct rf_info *rf)
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
 	switch (hal_i->chip_id) {
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		iqk_init_8852ab(rf);
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case CHIP_WIFI6_8852B:
-		iqk_init_8852b(rf);
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case CHIP_WIFI6_8852C:
-		iqk_init_8852c(rf);
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case CHIP_WIFI6_8832BR:
-		iqk_init_8832br(rf);
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case CHIP_WIFI6_8192XB:
-		iqk_init_8192xb(rf);
-		break;
-#endif
-#ifdef RF_8852BP_SUPPORT
-	case CHIP_WIFI6_8852BP:
-		iqk_init_8852bp(rf);
-		break;
-#endif
-
 #ifdef RF_8730E_SUPPORT
 	case CHIP_WIFI6_8730E:
 		iqk_init_8730e(rf);
@@ -515,31 +484,6 @@ u32 halrf_get_iqk_ver(struct rf_info * rf) {
 	u32 tmp = 0x0;
 
 	switch (hal_i->chip_id) {
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		tmp = halrf_get_iqk_ver_8852a();
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case CHIP_WIFI6_8852B:
-		tmp = halrf_get_iqk_ver_8852b();
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case CHIP_WIFI6_8852C:
-		tmp = halrf_get_iqk_ver_8852c();
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case CHIP_WIFI6_8832BR:
-		tmp = halrf_get_iqk_ver_8832br();
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case CHIP_WIFI6_8192XB:
-		tmp = halrf_get_iqk_ver_8192xb();
-		break;
-#endif
 #ifdef RF_8720E_SUPPORT
 	case CHIP_WIFI6_8720E:
 		tmp = halrf_get_iqk_ver_8720e();

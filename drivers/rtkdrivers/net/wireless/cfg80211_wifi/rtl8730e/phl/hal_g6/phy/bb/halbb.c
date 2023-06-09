@@ -1369,8 +1369,8 @@ void halbb_pause_func_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 len = 0;
 	u32 buf[5] = {0};
 	u8 pause_result = 0;
-	enum halbb_pause_type type = 0;
-	enum halbb_pause_lv_type lv = 0;
+	enum halbb_pause_type type = HALBB_PAUSE_NO_SET;
+	enum halbb_pause_lv_type lv = HALBB_PAUSE_LV_0;
 	u8 halbb_ary_size = sizeof(halbb_func_i) / sizeof(halbb_func_i[0]); //bb->bb_cmn_hooker->bb_dm_number;
 	enum habb_fun_t id = F_DEFAULT;
 

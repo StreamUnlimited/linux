@@ -294,7 +294,7 @@ u64 halbb_supportability_default(struct bb_info *bb)
 			/*BB_DFS |*/
 			BB_EDCCA |
 			BB_CFO_TRK |
-			/*BB_ENVMNTR |*/
+			BB_ENVMNTR |
 			BB_DIG |
 			/*BB_UL_TB_CTRL |*/
 			/*BB_PWR_CTRL |*/

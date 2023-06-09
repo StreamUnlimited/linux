@@ -16,16 +16,69 @@
 
 #if MAC_AX_8730E_SUPPORT
 
+/* WIFI RF Calibration area: 0x7B0 ~ 0x7D0 32 bytes. */
+#define MAX_PHY_EFUASE_LOCAL	32
+#define LOCAL_EFUSE_BASE	0x7b0
+
+/* Save physical efuse for ips efficiency. Refresh only when reboot is excuted. */
+static u8 phy_common_efuse[MAX_PHY_EFUASE_LOCAL][2] = {0};
+
+void efuse_save_phy_local_8730e(u32 addr, u8 *data, int len)
+{
+	int i;
+
+	if (((addr + len) > (MAX_PHY_EFUASE_LOCAL + LOCAL_EFUSE_BASE)) || addr < LOCAL_EFUSE_BASE) {
+		/* Exceed WIFI RF Calibration area. */
+		return;
+	}
+
+	for (i = 0; i < len; i++) {
+		if (!phy_common_efuse[addr + i - LOCAL_EFUSE_BASE][0]) {
+			phy_common_efuse[addr + i - LOCAL_EFUSE_BASE][1] = *(data + i);
+			phy_common_efuse[addr + i - LOCAL_EFUSE_BASE][0] = 1;
+		}
+	}
+}
+
+u32 efuse_check_phy_local_8730e(u32 addr, u8 *data, int len)
+{
+	int i;
+
+	if (((addr + len) > (MAX_PHY_EFUASE_LOCAL + LOCAL_EFUSE_BASE)) || addr < LOCAL_EFUSE_BASE) {
+		/* Exceed WIFI RF Calibration area. */
+		return 1;
+	}
+
+	for (i = 0; i < len; i++) {
+		if (!phy_common_efuse[addr + i - LOCAL_EFUSE_BASE][0]) {
+			/* Include new phy efuse. */
+			return 1;
+		} else {
+			/* set data by local efuse. */
+			*(data + i) = phy_common_efuse[addr + i - LOCAL_EFUSE_BASE][1];
+		}
+	}
+
+	/* All phy efuse can be read by local. */
+	return 0;
+}
+
 u32 efuse_read_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 *data, int len)
 {
 	u32 ret = MACSUCCESS;
 	otp_ipc_host_req_t otp_req = {0};
 	u32 max_size = adapter->hw_info->efuse_size;
 	int retry = 100;
+	int new_phy_efuse = 1;
 
 	if (addr + len >= max_size) {
 		*data = 0xFF;
 		return MACEFUSEADDR;
+	}
+
+	new_phy_efuse = efuse_check_phy_local_8730e(addr, data, len);
+	if (!new_phy_efuse) {
+		return MACSUCCESS;
 	}
 
 	otp_req.otp_id = LINUX_IPC_OTP_PHY_READ8;
@@ -39,6 +92,10 @@ u32 efuse_read_8730e(struct mac_ax_adapter *adapter, u32 addr, u8 *data, int len
 	}
 
 	ret = (ret == 1) ? MACSUCCESS : MACEFUSEREAD;
+
+	if (ret == MACSUCCESS) {
+		efuse_save_phy_local_8730e(addr, data, len);
+	}
 
 	return ret;
 }

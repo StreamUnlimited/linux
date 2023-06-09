@@ -29,13 +29,6 @@ struct addr_sec_only_info {
 	u32 dword2;
 };
 
-enum SEC_CAM_KEY_TYPE {
-	SEC_CAM_KEY_TYPE_UNI = 0,
-	SEC_CAM_KEY_TYPE_GROUP = 1,
-	SEC_CAM_KEY_TYPE_BIP = 2,
-	SEC_CAM_KEY_TYPE_DEFAULT = 3
-};
-
 enum ADDR_CAM_SEC_MODE {
 	ADDR_CAM_SEC_MODE_ZERO = 0,
 	ADDR_CAM_SEC_MODE_ONE  = 1,

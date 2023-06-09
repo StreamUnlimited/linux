@@ -28,3 +28,15 @@ u8 shift_mask(u32 mask)
 	return i;
 }
 
+u32 mac_watchdog(struct mac_ax_adapter *adapter,
+		 struct mac_ax_wdt_param *wdt_param)
+{
+	struct mac_ax_tsf_sync_info *sync_info = &adapter->tsf_sync_info;
+	u32 ret = MACSUCCESS;
+
+	if (sync_info->en_auto_sync) {
+		return adapter->ops->tsf_sync(adapter);
+	}
+
+	return ret;
+}

@@ -237,6 +237,7 @@ endif
 
 ifeq ($(CONFIG_BTC), y)
 EXTRA_CFLAGS += -DCONFIG_BTC
+EXTRA_CFLAGS += -DCONFIG_BTCOEX
 endif
 
 ifeq ($(CONFIG_WAPI_SUPPORT), y)

@@ -14,6 +14,17 @@
 #include <linux/psci.h>
 #include <linux/arm-smccc.h>
 #include <asm/suspend.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+
+#define REG_CTRL_BASE_LP			0x42008000
+#define REG_LSYS_AP_STATUS_SW 		0x266
+#define LSYS_BIT_AP_RUNNING			((u32)0x00000001 << 1)
+
+#define REG_CTRL_BASE_HP			0x41000000
+#define REG_HSYS_HP_CKE				0x000C
+#define HSYS_BIT_CKE_AP				((u32)0x00000001 << 0)
+
 
 #define IPC_PM_CHAN_NUM			0
 
@@ -29,7 +40,8 @@ typedef struct {
 struct aipc_ch *pm_ch;
 ipc_msg_struct_t pm_msg;
 SLEEP_ParamDef pm_param;
-
+void __iomem *reg_lsys_ap_status_sw;
+void __iomem *reg_hsys_hp_cke;
 
 static u32 rtk_pm_test(aipc_ch_t *ch, ipc_msg_struct_t *pmsg)
 {
@@ -83,21 +95,36 @@ static int rtk_pm_enter(suspend_state_t state)
 
 	if (state == PM_SUSPEND_CG) {
 		pr_info("sleep mode cg\n");
+
+		/* set flag that ap is not running */
+		writeb(readb(reg_lsys_ap_status_sw) & (~ LSYS_BIT_AP_RUNNING),
+			   reg_lsys_ap_status_sw);
+
 		pm_param.sleep_type = 0x1;
 		pm_param.sleep_time = 0;
 		pm_param.dlps_enable = 0x0;
-
 		clean_dcache_area(&pm_param, sizeof(ipc_msg_struct_t));
 		ret = ameba_ipc_channel_send(pm_ch, (ipc_msg_struct_t *)&pm_param);
 		if (ret < 0) {
 			pr_err("ipc channel send failed: %d\n", ret);
 		}
 
+		/* disable cke by itself */
+		writel(readl(reg_hsys_hp_cke) & (~HSYS_BIT_CKE_AP),
+			   reg_hsys_hp_cke);
+
+		/* Non-wakeup-source interrupt has been disabled, so wfi is safe */
 		wfi();
 
 	} else if (state == PM_SUSPEND_PG) {
 		pr_info("sleep mode pg\n");
+
+		/* set flag that ap is not running */
+		writeb(readb(reg_lsys_ap_status_sw) & (~ LSYS_BIT_AP_RUNNING),
+			   reg_lsys_ap_status_sw);
+
 		cpu_suspend(0, rtk_psci_cpu_suspend);
+
 	} else {
 		pr_info("sleep mode standby\n");
 		wfi();
@@ -116,6 +143,18 @@ static const struct platform_suspend_ops rtk_pm_ops = {
 static int __init rtk_pm_init(void)
 {
 	pr_info("rtk_pm_init\n");
+
+	reg_lsys_ap_status_sw = ioremap(REG_CTRL_BASE_LP + REG_LSYS_AP_STATUS_SW, 1);
+	if (!reg_lsys_ap_status_sw) {
+		pr_err("Remap register REG_LSYS_AP_STATUS_SW fail\n");
+		return -ENOMEM;
+	}
+
+	reg_hsys_hp_cke = ioremap(REG_CTRL_BASE_HP + REG_HSYS_HP_CKE, 4);
+	if (!reg_hsys_hp_cke) {
+		pr_err("Remap register REG_HSYS_HP_CKE fail\n");
+		return -ENOMEM;
+	}
 
 	suspend_set_ops(&rtk_pm_ops);
 

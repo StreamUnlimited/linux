@@ -33,10 +33,18 @@
 
 		dsi: dsi@0x400EA000 {
 			compatible = "realtek,amebad2-dsi";
-			reg = <0x400EA000 0xC10>;
+			reg = <0x400EA000 0xC10>,
+			      <0x4200825C 0x04>;
 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
 			rtk,lcdc-vo-clock = <&rcc>;
 			status = "disabled";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+			panel {
+				reg = <0>;
+				status = "disabled";
+			};
 
 			// 0 for input port
 			port {

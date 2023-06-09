@@ -208,6 +208,7 @@ enum rtw_hal_status hal_start_8730e(struct rtw_phl_com_t *phl_com,
 {
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
 	struct phy_cap_t *phy_cap = phl_com->phy_cap;
+	struct rtw_chan_def ch = {0};
 	u8 val = 0;
 
 	/* Read phy parameter files */
@@ -254,6 +255,17 @@ enum rtw_hal_status hal_start_8730e(struct rtw_phl_com_t *phl_com,
 	/* start watchdog/dm */
 	rtw_hal_rf_dm_init(hal);
 	rtw_hal_bb_dm_init(hal);
+
+	ch.band = BAND_MAX;
+	ch.bw = CHANNEL_WIDTH_20;
+	ch.offset = CHAN_OFFSET_NO_EXT;
+	ch.chan = 0;
+	hal_status = rtw_hal_set_ch_bw(hal, HW_BAND_0, &ch, true);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
+		goto hal_init_fail;
+	}
+
+	rtw_hal_cfg_bb_rfe_gpio(hal);
 
 	hal_status = rtw_hal_mac_get_append_fcs(hal, &val);
 	if (hal_status != RTW_HAL_STATUS_SUCCESS) {

@@ -308,6 +308,8 @@ void _dpk_kip_restore_8730e(struct rf_info *rf)
 	//halrf_wreg(rf, 0x8000, BIT(3), 0x0); //do not set for iqk oneshot
 	halrf_wreg(rf, 0x8008, BIT(7), 0x0);
 	halrf_wreg(rf, 0x80f8, MASKDWORD, 0x00000000);
+	//inner lbk restore
+	halrf_wreg(rf, 0x8090, MASKDWORD, 0x0005e018);
 	//RF_DBG(rf, DBG_RF_DPK, "[DPK]  restore KIP\n");
 }
 
@@ -357,30 +359,30 @@ void _dpk_lut_sram_write_8730e(struct rf_info *rf)
 	u32 small_pwr;
 	u16 reg;
 
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00020000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
+	halrf_wreg(rf, 0x81d8, BIT(17), 1);
 
 	// read LUT1
 	//small_pwr = halrf_rreg(rf, 0x99a0, MASKDWORD); //point 9
 	small_pwr = halrf_rreg(rf, 0x998c, MASKDWORD); //point 4
 
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00020000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
+	halrf_wreg(rf, 0x81d8, BIT(17), 1);
 
 	// write LUT1
 	for (reg = 0x9980; reg < 0x998c ; reg += 4) {
 		halrf_wreg(rf, reg, MASKDWORD, small_pwr);
 	}
 
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
 }
 
 void _dpk_lut_sram_clear_8730e(struct rf_info *rf)
 {
 	u16 reg;
 
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00020000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
+	halrf_wreg(rf, 0x81d8, BIT(17), 1);
 #if 0
 	// write LUT0
 	for (reg = 0x9900; reg < 0x9980 ; reg += 4) {
@@ -394,7 +396,7 @@ void _dpk_lut_sram_clear_8730e(struct rf_info *rf)
 	for (reg = 0x9980; reg < 0x9a00 ; reg += 4) {
 		halrf_wreg(rf, reg, MASKDWORD, 0x02000000);
 	}
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
 }
 
 void _dpk_lut_sram_read_8730e(
@@ -403,8 +405,8 @@ void _dpk_lut_sram_read_8730e(
 #ifdef RFDBG_TRACE_EN
 	u16 reg;
 
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00020000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
+	halrf_wreg(rf, 0x81d8, BIT(17), 1);
 #if 0
 	// read LUT0
 	for (reg = 0x9900; reg < 0x9980 ; reg += 4) {
@@ -419,7 +421,7 @@ void _dpk_lut_sram_read_8730e(
 		RF_DBG(rf, DBG_RF_DPK, "[DPK][LUT] 0x%04x = 0x%07x\n", reg,
 		       halrf_rreg(rf, reg, MASKDWORD));
 	}
-	halrf_wreg(rf, 0x81d8, MASKDWORD, 0x00000000);
+	halrf_wreg(rf, 0x81d8, BIT(17), 0);
 #endif
 }
 

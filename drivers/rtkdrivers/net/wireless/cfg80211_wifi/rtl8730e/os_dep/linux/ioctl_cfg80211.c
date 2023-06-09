@@ -2365,7 +2365,10 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) */
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
+	struct sta_priv *stapriv = &padapter->stapriv;
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
+	struct sta_info *sta = NULL;
+	u8 keytype = 0;
 
 	RTW_INFO(FUNC_NDEV_FMT" key_index=%d, addr=%pM\n", FUNC_NDEV_ARG(ndev), key_index, mac_addr);
 
@@ -2374,7 +2377,29 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
 		psecuritypriv->bWepDefaultKeyIdxSet = 0;
 	}
 
-	return 0;
+	if ((key_index >= WEP_KEYS) && (key_index <= BIP_MAX_KEYID) && !pairwise) {
+		keytype = 2;
+		/* bip key is not stored in hw keycam. */
+		return 0;
+	}
+
+	if (mac_addr == NULL) {
+		/* group key */
+		keytype = 1;
+		sta = rtw_get_bcmc_stainfo(padapter);
+		if (!sta) {
+			return -ENOENT;
+		}
+	} else {
+		/* unicast key */
+		keytype = 0;
+		sta = rtw_get_stainfo(stapriv, mac_addr);
+		if (!sta) {
+			return -ENOENT;
+		}
+	}
+
+	return rtw_hw_del_key(padapter, sta, key_index, keytype, PHL_CMD_DIRECTLY, 0);
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy,
@@ -5605,6 +5630,10 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev,
 {
 	int ret = 0;
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
+	struct rtw_wifi_role_t *wrole = NULL;
+#ifdef CONFIG_CONCURRENT_MODE
+	void *phl = GET_PHL_INFO(adapter_to_dvobj(adapter->stapriv.padapter));
+#endif
 
 	if (adapter_to_dvobj(adapter)->wpas_type == RTW_WPAS_W1FI) {
 		struct mlme_ext_priv *pmlmeext = &(adapter->mlmeextpriv);
@@ -5621,13 +5650,10 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev,
 		goto exit;
 	}
 
+	wrole = adapter->phl_role;
 #ifdef RTW_PHL_BCN
-	{
-		struct rtw_wifi_role_t *wrole = adapter->phl_role;
-
-		if (wrole) {
-			wrole->bcn_cmn.bcn_added = 0;
-		}
+	if (wrole) {
+		wrole->bcn_cmn.bcn_added = 0;
 	}
 #endif
 
@@ -5676,6 +5702,12 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev,
 				 pbss_network->Ssid.Ssid, pbss_network->Ssid.SsidLength,
 				 pbss_network_ext->Ssid.Ssid, pbss_network_ext->Ssid.SsidLength);
 	}
+
+#ifdef CONFIG_CONCURRENT_MODE
+	rtw_phl_register_tx_ring(phl, BMC_SEC_MAC_CAM_ID,
+				 wrole->hw_band, wrole->hw_wmm,
+				 wrole->hw_port);
+#endif
 
 exit:
 	return ret;
@@ -5744,9 +5776,16 @@ static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *nd
 static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
 {
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
+#ifdef CONFIG_CONCURRENT_MODE
+	void *phl = GET_PHL_INFO(adapter_to_dvobj(adapter->stapriv.padapter));
+	struct rtw_wifi_role_t *wrole = adapter->phl_role;
+#endif
 
 	RTW_INFO(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 
+#ifdef CONFIG_CONCURRENT_MODE
+	rtw_phl_deregister_tx_ring(phl, BMC_SEC_MAC_CAM_ID);
+#endif
 	rtw_mi_buddy_set_scan_deny(adapter, 300);
 	rtw_mi_scan_abort(adapter, _TRUE);
 	rtw_stop_ap_cmd(adapter, RTW_CMDF_WAIT_ACK);

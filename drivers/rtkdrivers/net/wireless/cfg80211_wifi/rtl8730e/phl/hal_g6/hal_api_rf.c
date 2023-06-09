@@ -68,11 +68,6 @@ void rtw_hal_init_rf_reg(struct rtw_phl_com_t *phl_com, void *hal)
 		halrf_config_store_power_by_rate(hal_info->rf, phy_reg_info->para_src,
 						 phy_reg_info->para_data_len, phy_reg_info->para_data);
 	}
-	for (phy_idx = 0; phy_idx < 1 ; phy_idx++) {
-		phy_reg_info = &phl_com->phy_sw_cap[phy_idx].rf_txpwrtrack_info;
-		halrf_config_store_power_track(hal_info->rf, phy_reg_info->para_src,
-					       phy_reg_info->para_data_len, phy_reg_info->para_data);
-	}
 
 	for (phy_idx = 0; phy_idx < 1 ; phy_idx++) {
 		pwrlmt_info = &phl_com->phy_sw_cap[phy_idx].rf_txpwrlmt_info;
@@ -84,6 +79,12 @@ void rtw_hal_init_rf_reg(struct rtw_phl_com_t *phl_com, void *hal)
 		pwrlmt_info = &phl_com->phy_sw_cap[phy_idx].rf_txpwrlmt_ru_info;
 		halrf_config_store_power_limit_ru(hal_info->rf, pwrlmt_info->para_src,
 						  pwrlmt_info->para_data_len, pwrlmt_info->para_data);
+	}
+
+	for (phy_idx = 0; phy_idx < 1 ; phy_idx++) {
+		phy_reg_info = &phl_com->phy_sw_cap[phy_idx].rf_txpwrtrack_info;
+		halrf_config_store_power_track(hal_info->rf, phy_reg_info->para_src,
+					       phy_reg_info->para_data_len, phy_reg_info->para_data);
 	}
 }
 

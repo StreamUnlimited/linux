@@ -332,15 +332,12 @@ u32 mac_ps_pwr_state(struct mac_ax_adapter *adapter,
 
 u32 mac_chk_leave_lps(struct mac_ax_adapter *adapter, u8 macid)
 {
-#if 0
-	u8 band = 0;
 	u8 port = 0;
 	u32 chk_msk = 0;
 	struct mac_role_tbl *role;
-	u16 pwrbit_set_reg[2] = {R_AX_PPWRBIT_SETTING, R_AX_PPWRBIT_SETTING_C1};
-	u32 pwr_mgt_en_bit = 0xE;
+	u16 pwrbit_set_reg = REG_PWRBIT_SETTING;
+	u32 pwr_mgt_en_bit = 0x2;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	u32 reg_pause = 0;
 	u32 reg_sleep = 0;
 	u8 macid_grp = macid >> MACID_GRP_SH;
 	u8 macid_sh = macid & MACID_GRP_MASK;
@@ -352,45 +349,34 @@ u32 mac_chk_leave_lps(struct mac_ax_adapter *adapter, u8 macid)
 		return MACNOITEM;
 	}
 
-	band = role->info.a_info.bb_sel;
 	port = role->info.a_info.port_int;
 
 	chk_msk = pwr_mgt_en_bit << (PORT_SH * port);
 	switch (macid_grp) {
 	case MACID_GRP_0:
-		reg_sleep = R_AX_MACID_SLEEP_0;
-		reg_pause = R_AX_SS_MACID_PAUSE_0;
+		reg_sleep = REG_MACID_SLEEP;
 		break;
 	case MACID_GRP_1:
-		reg_sleep = R_AX_MACID_SLEEP_1;
-		reg_pause = R_AX_SS_MACID_PAUSE_1;
+		reg_sleep = REG_MACID_SLEEP1;
 		break;
 	case MACID_GRP_2:
-		reg_sleep = R_AX_MACID_SLEEP_2;
-		reg_pause = R_AX_SS_MACID_PAUSE_2;
+		reg_sleep = REG_MACID_SLEEP2;
 		break;
 	case MACID_GRP_3:
-		reg_sleep = R_AX_MACID_SLEEP_3;
-		reg_pause = R_AX_SS_MACID_PAUSE_3;
+		reg_sleep = REG_MACID_SLEEP3;
 		break;
 	default:
 		return MACPSSTATFAIL;
 	}
 
-	// Bypass Tx pause check during STOP SER period
-	if (adapter->sm.ser_ctrl_st != MAC_AX_SER_CTRL_STOP)
-		if (MAC_REG_R32(reg_pause) & BIT(macid_sh)) {
-			return MACPSSTATFAIL;
-		}
 
 	if ((MAC_REG_R32(reg_sleep) & BIT(macid_sh))) {
 		return MACPSSTATFAIL;
 	}
 
-	if ((MAC_REG_R32(pwrbit_set_reg[band]) & chk_msk)) {
+	if ((MAC_REG_R32(pwrbit_set_reg) & chk_msk)) {
 		return MACPSSTATPWRBITFAIL;
 	}
-#endif
 
 	return MACSUCCESS;
 }
@@ -486,60 +472,32 @@ u32 mac_cfg_ips(struct mac_ax_adapter *adapter, u8 macid,
 
 u32 mac_chk_leave_ips(struct mac_ax_adapter *adapter, u8 macid)
 {
-	u8 band = 0;
-	u8 port = 0;
-	u32 chk_msk = 0;
-	struct mac_role_tbl *role;
-	u32 pwr_mgt_en_bit = 0xE;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	u32 reg_pause = 0;
 	u32 reg_sleep = 0;
 	u8 macid_grp = macid >> MACID_GRP_SH;
 	u8 macid_sh = macid & MACID_GRP_MASK;
-#if 0
 
-	role = mac_role_srch(adapter, macid);
-
-	if (!role) {
-		PLTFM_MSG_ERR("[ERR]cannot find macid: %d\n", macid);
-		return MACNOITEM;
-	}
-
-	band = role->info.a_info.bb_sel;
-	port = role->info.a_info.port_int;
-
-	chk_msk = pwr_mgt_en_bit << (PORT_SH * port);
 	switch (macid_grp) {
 	case MACID_GRP_0:
-		reg_sleep = R_AX_MACID_SLEEP_0;
-		reg_pause = R_AX_SS_MACID_PAUSE_0;
+		reg_sleep = REG_MACID_SLEEP;
 		break;
 	case MACID_GRP_1:
-		reg_sleep = R_AX_MACID_SLEEP_1;
-		reg_pause = R_AX_SS_MACID_PAUSE_1;
+		reg_sleep = REG_MACID_SLEEP1;
 		break;
 	case MACID_GRP_2:
-		reg_sleep = R_AX_MACID_SLEEP_2;
-		reg_pause = R_AX_SS_MACID_PAUSE_2;
+		reg_sleep = REG_MACID_SLEEP2;
 		break;
 	case MACID_GRP_3:
-		reg_sleep = R_AX_MACID_SLEEP_3;
-		reg_pause = R_AX_SS_MACID_PAUSE_3;
+		reg_sleep = REG_MACID_SLEEP3;
 		break;
 	default:
 		return MACPSSTATFAIL;
 	}
 
 	// Bypass Tx pause check during STOP SER period
-	if (adapter->sm.ser_ctrl_st != MAC_AX_SER_CTRL_STOP)
-		if (MAC_REG_R32(reg_pause) & BIT(macid_sh)) {
-			return MACPSSTATFAIL;
-		}
-
 	if (MAC_REG_R32(reg_sleep) & BIT(macid_sh)) {
 		return MACPSSTATFAIL;
 	}
-#endif
 
 	return MACSUCCESS;
 }

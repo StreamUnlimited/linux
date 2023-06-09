@@ -62,6 +62,11 @@ enum {
 	PS_STATE_ENTERED
 };
 
+/* Enter ips only if mac has left ips longer than 2s. */
+#define PHY_IPS_THRESHOLD 1
+/* add critical ips to prevent overly-sensitive ips trigger. */
+static int critical_ips = 0;
+
 static const char *_ps_state_to_str(u8 ps_state)
 {
 	switch (ps_state) {
@@ -270,6 +275,9 @@ enum rtw_phl_status _leave_ps(struct cmd_ps *ps, bool leave_proto, char *rson)
 	struct phl_info_t *phl_info = ps->phl_info;
 	enum rtw_phl_status status = RTW_PHL_STATUS_FAILURE;
 	struct ps_cfg cfg = {0};
+
+	/* Any leave request can reset critical ips condition. */
+	critical_ips = 0;
 
 	if (ps->ps_state == PS_STATE_LEAVED) {
 		PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS_CMD], %s(): not in power saving.\n", __func__);
@@ -865,6 +873,10 @@ static bool _chk_wrole_with_ps_mode(struct cmd_ps *ps,
 			ps->sta = sta;
 			*macid = sta->macid;
 			ret = true;
+			if (critical_ips < PHY_IPS_THRESHOLD) {
+				PHL_TRACE(COMP_PHL_PS, _PHL_DEBUG_, "[PS_CMD], %s(): only enter ips exceed phy ips threshold.\n", __func__);
+				return false;
+			}
 		}
 	} else if (target_mode == PS_MODE_LPS) {
 		role = _get_role_of_ps_permitted(ps, PS_MODE_LPS);
@@ -966,6 +978,9 @@ static bool _chk_ps_cap(struct cmd_ps *ps, u8 mode)
  */
 static bool _chk_ips_enter(struct cmd_ps *ps, u16 *macid)
 {
+	/* disable IPS */
+	return false;
+
 	if (TEST_STATUS_FLAG(ps->phl_info->phl_com->dev_state, RTW_DEV_RESUMING)) {
 		PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS_CMD], %s(): resume in progress.\n", __func__);
 		return false;
@@ -1169,6 +1184,9 @@ _ps_watchdog_post_hdlr(struct cmd_ps *ps) {
 	{
 		_enter_ps(ps, PS_MODE_IPS, macid, "watchdog");
 	}
+
+	/* Use watchdog as a timer. Enter ips only 2s after leave ips. */
+	critical_ips++;
 
 	_ps_watchdog_info_dump(ps);
 
@@ -1795,10 +1813,13 @@ static enum phl_mdl_ret_code _ps_cap_chg_msg_hdlr(struct cmd_ps *ps, struct phl_
 		}
 	} else {
 		if (ps->rt_stop_rson == PS_RT_RSON_NONE) {
+			/* set allow ps, but not enter ps by this reason. */
+#if 0
 			PHL_TRACE(COMP_PHL_PS, _PHL_DEBUG_, "[PS_CMD], %s(): try enter ips.\n", __func__);
 			if (_chk_ips_enter(ps, &macid)) {
 				_enter_ps(ps, PS_MODE_IPS, macid, "cap chg");
 			}
+#endif
 		}
 	}
 

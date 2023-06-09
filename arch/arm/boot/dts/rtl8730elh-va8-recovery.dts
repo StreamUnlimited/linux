@@ -307,23 +307,23 @@
 					};
 					partition@7 {
 						label = "KM4 image2 slotA";
-						reg = <0x20000 0x1C0000>;
+						reg = <0x20000 0x120000>;
 					};
 					partition@8 {
 						label = "AP boot image slotA";
-						reg = <0x200000 0x100000>;
+						reg = <0x140000 0x180000>;
 					};
 					partition@9 {
 						label = "KM4 boot slotB";
-						reg = <0x300000 0x40000>;
+						reg = <0x2C0000 0x40000>;
 					};
 					partition@10 {
 						label = "KM4 image2 slotB";
-						reg = <0x340000 0x1C0000>;
+						reg = <0x300000 0x120000>;
 					};
 					partition@11 {
 						label = "AP boot image slotB";
-						reg = <0x520000 0x100000>;
+						reg = <0x420000 0x180000>;
 					};
 				};
 			};

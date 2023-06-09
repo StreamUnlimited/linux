@@ -18,32 +18,6 @@ void halrf_cmn_info_self_init(struct rf_info *rf)
 {
 	struct rtw_hal_com_t *hal_i = rf->hal_com;
 
-	if (hal_i->chip_id == CHIP_WIFI6_8852A) {
-		rf->ic_type = RF_RTL8852A;
-	} else if (hal_i->chip_id == CHIP_WIFI6_8834A) {
-		rf->ic_type = RF_RTL8834A;
-	} else if (hal_i->chip_id == CHIP_WIFI6_8852B) {
-		rf->ic_type = RF_RTL8852B;
-	} else if (hal_i->chip_id == CHIP_WIFI6_8852C) {
-		rf->ic_type = RF_RTL8852C;
-	}
-
-#ifdef RF_8832BR_SUPPORT
-	if (hal_i->chip_id == CHIP_WIFI6_8832BR) {
-		rf->ic_type = RF_RTL8832BR;
-	}
-#endif
-#ifdef RF_8192XB_SUPPORT
-	if (hal_i->chip_id == CHIP_WIFI6_8192XB) {
-		rf->ic_type = RF_RTL8192XB;
-	}
-#endif
-#ifdef RF_8852BP_SUPPORT
-	else if (hal_i->chip_id == CHIP_WIFI6_8852BP) {
-		rf->ic_type = RF_RTL8852BP;
-	}
-#endif
-
 #ifdef RF_8730E_SUPPORT
 	if (hal_i->chip_id == CHIP_WIFI6_8730E) {
 		rf->ic_type = RF_RTL8730E;
@@ -81,36 +55,6 @@ void halrf_cmn_info_self_init(struct rf_info *rf)
 	/*@=== [HALRF Structure] ============================================*/
 
 	switch (hal_i->chip_id) {
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		rf->rfk_iqk_info = &rf_iqk_hwspec_8852a;
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case CHIP_WIFI6_8852B:
-		rf->rfk_iqk_info = &rf_iqk_hwspec_8852b;
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case CHIP_WIFI6_8852C:
-		rf->rfk_iqk_info = &rf_iqk_hwspec_8852c;
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case CHIP_WIFI6_8832BR:
-		rf->rfk_iqk_info = &rf_iqk_hwspec_8832br;
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case CHIP_WIFI6_8192XB:
-		rf->rfk_iqk_info = &rf_iqk_hwspec_8192xb;
-		break;
-#endif
-#ifdef RF_8852BP_SUPPORT
-	case CHIP_WIFI6_8852BP:
-		rf->rfk_iqk_info = &rf_iqk_hwspec_8852bp;
-		break;
-#endif
 #ifdef RF_8730E_SUPPORT
 	case CHIP_WIFI6_8730E:
 		rf->rfk_iqk_info = &rf_iqk_hwspec_8730e;
@@ -139,11 +83,6 @@ void halrf_rfk_self_init(struct rf_info *rf)
 	txgapk_info->is_gapk_init = false;
 
 	/*[RXDCK_init*/
-#ifdef RF_8852C_SUPPORT
-	if (halrf_rrf(rf, RF_PATH_A, 0x95, BIT(3)) == 0x1) { /*if auto DCK enabled*/
-		rx_dck->is_auto_res = true;
-	}
-#endif
 	rx_dck->is_rxdck_track_en = true;
 	iqk_info->is_iqk_init = false;
 
@@ -165,120 +104,6 @@ void halrf_rfability_init_mp(struct rf_info *rf)
 	//u64 support_ability = 0;
 
 	switch (rf->ic_type) {
-#ifdef RF_8852A_SUPPORT
-	case RF_RTL8852A:
-		rf->hw_rf_ability |=
-			/*HAL_RF_TX_PWR_TRACK |*/
-			HAL_RF_TSSI_TRK |
-			HAL_RF_IQK |
-			/*HAL_RF_LCK |*/
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_RXGAINK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			/*HAL_RF_XTAL_TRACK |*/
-			0;
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case RF_RTL8852B:
-		rf->hw_rf_ability |=
-			/*HAL_RF_TX_PWR_TRACK |*/
-			HAL_RF_IQK |
-			/*HAL_RF_LCK |*/
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			/*HAL_RF_RXGAINK |*/
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			/*HAL_RF_XTAL_TRACK |*/
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case RF_RTL8852C:
-		rf->hw_rf_ability =
-			/*HAL_RF_TX_PWR_TRACK |*/
-			HAL_RF_IQK |
-			HAL_RF_LCK |
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			/*HAL_RF_TXGAPK |*/
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case RF_RTL8832BR:
-		rf->hw_rf_ability =
-			/*HAL_RF_TX_PWR_TRACK |*/
-			HAL_RF_IQK |
-			HAL_RF_LCK |
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case RF_RTL8192XB:
-		rf->hw_rf_ability =
-			/*HAL_RF_TX_PWR_TRACK |*/
-			HAL_RF_IQK |
-			HAL_RF_LCK |
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8852BP_SUPPORT
-	case RF_RTL8852BP:
-		rf->hw_rf_ability |=
-			/*HAL_RF_TX_PWR_TRACK |*/
-			/*HAL_RF_IQK |*/
-			/*HAL_RF_LCK |*/
-			/*HAL_RF_DPK |*/
-			/*HAL_RF_DACK |*/
-			/*HAL_RF_TXGAPK |*/
-			/*HAL_RF_DPK_TRACK |*/
-			/*HAL_RF_RXDCK |*/
-			/*HAL_RF_RXGAINK |*/
-			/*HAL_RF_THER_TRIM |*/
-			/*HAL_RF_PABIAS_TRIM |*/
-			/*HAL_RF_TSSI_TRIM |*/
-			/*HAL_RF_XTAL_TRACK |*/
-			/*HAL_RF_TX_SHAPE |*/
-			0;
-		break;
-#endif
 #ifdef RF_8730E_SUPPORT
 	case RF_RTL8730E:
 		rf->hw_rf_ability |=
@@ -340,123 +165,6 @@ void halrf_rfability_init(struct rf_info *rf)
 {
 
 	switch (rf->ic_type) {
-#ifdef RF_8852A_SUPPORT
-	case RF_RTL8852A:
-		rf->hw_rf_ability =
-			HAL_RF_TX_PWR_TRACK |
-			HAL_RF_TSSI_TRK |
-			HAL_RF_IQK |
-			/*HAL_RF_LCK |*/
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_RXGAINK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			HAL_RF_XTAL_TRACK |
-			0;
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case RF_RTL8852B:
-		rf->hw_rf_ability |=
-			HAL_RF_TX_PWR_TRACK |
-			HAL_RF_IQK |
-			/*HAL_RF_LCK |*/
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			/*HAL_RF_RXGAINK |*/
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			/*HAL_RF_XTAL_TRACK |*/
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case RF_RTL8852C:
-		rf->hw_rf_ability |=
-			HAL_RF_TX_PWR_TRACK |
-			HAL_RF_IQK |
-			HAL_RF_LCK |
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			/*HAL_RF_TXGAPK |*/
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			/*HAL_RF_XTAL_TRACK |*/
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case RF_RTL8832BR:
-		rf->hw_rf_ability =
-			HAL_RF_TX_PWR_TRACK |
-			HAL_RF_IQK |
-			HAL_RF_LCK |
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			/*HAL_RF_XTAL_TRACK |*/
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case RF_RTL8192XB:
-		rf->hw_rf_ability =
-			HAL_RF_TX_PWR_TRACK |
-			HAL_RF_IQK |
-			HAL_RF_LCK |
-			HAL_RF_DPK |
-			HAL_RF_DACK |
-			HAL_RF_TXGAPK |
-			HAL_RF_DPK_TRACK |
-			HAL_RF_RXDCK |
-			HAL_RF_THER_TRIM |
-			HAL_RF_PABIAS_TRIM |
-			HAL_RF_TSSI_TRIM |
-			/*HAL_RF_XTAL_TRACK |*/
-			HAL_RF_TX_SHAPE |
-			0;
-		break;
-#endif
-#ifdef RF_8852BP_SUPPORT
-	case RF_RTL8852BP:
-		rf->hw_rf_ability |=
-			/*HAL_RF_TX_PWR_TRACK |*/
-			HAL_RF_IQK |
-			/*HAL_RF_LCK |*/
-			/*HAL_RF_DPK |*/
-			/*HAL_RF_DACK |*/
-			/*HAL_RF_TXGAPK |*/
-			/*HAL_RF_DPK_TRACK |*/
-			/*HAL_RF_RXDCK |*/
-			/*HAL_RF_RXGAINK |*/
-			/*HAL_RF_THER_TRIM |*/
-			/*HAL_RF_PABIAS_TRIM |*/
-			/*HAL_RF_TSSI_TRIM |*/
-			/*HAL_RF_XTAL_TRACK |*/
-			/*HAL_RF_TX_SHAPE |*/
-			0;
-		break;
-#endif
 #ifdef RF_8730E_SUPPORT
 	case RF_RTL8730E:
 		rf->hw_rf_ability |=
@@ -554,36 +262,6 @@ void halrf_rfe_init(struct rf_info *rf)
 {
 
 	switch (rf->ic_type) {
-#ifdef RF_8852A_SUPPORT
-		u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
-	case RF_RTL8852A:
-		/*2G FEM check*/
-		if (rfe_type == 11 || rfe_type == 12 || rfe_type == 17 ||
-		    rfe_type == 18 || rfe_type == 51 || rfe_type == 52 ||
-		    rfe_type == 53 || rfe_type == 54) {
-			rf->fem.epa_2g = 1;
-			rf->fem.elna_2g = 1;
-		}
-		/*5G FEM check*/
-		if (rfe_type == 9 || rfe_type == 10 || rfe_type == 11 ||
-		    rfe_type == 12 || rfe_type == 15 || rfe_type == 16 ||
-		    rfe_type == 17 || rfe_type == 18 || rfe_type == 37 ||
-		    rfe_type == 38 || rfe_type == 51 || rfe_type == 52 ||
-		    rfe_type == 53 || rfe_type == 54) {
-			rf->fem.epa_5g = 1;
-			rf->fem.elna_5g = 1;
-		}
-		/*6G FEM check*/
-		if (rfe_type == 13 || rfe_type == 14 || rfe_type == 15 ||
-		    rfe_type == 16 || rfe_type == 17 || rfe_type == 18 ||
-		    rfe_type == 37 || rfe_type == 38 || rfe_type == 51 ||
-		    rfe_type == 52 || rfe_type == 53 ||
-		    rfe_type == 54) {
-			rf->fem.epa_6g = 1;
-			rf->fem.elna_6g = 1;
-		}
-		break;
-#endif
 	default:
 		break;
 	}

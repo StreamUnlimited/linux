@@ -250,13 +250,6 @@ static const struct drm_display_mode drm_dmt_modes[] = {
 	{ DRM_MODE("640x480", DRM_MODE_TYPE_DRIVER, 36000, 640, 696,
 		   752, 832, 0, 480, 481, 484, 509, 0,
 		   DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC) },
-
-
-	{ DRM_MODE("480x800", DRM_MODE_TYPE_DRIVER, 30720, ///yiyuan 
-		480, 481, 484, 500, 0,
-		800, 824, 896, 1024, 0,
-		DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */  //choose this one
-
 		   
 	/* 0x08 - 800x600@56Hz */
 	{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 36000, 800, 824,
@@ -597,15 +590,7 @@ static const struct drm_display_mode drm_dmt_modes[] = {
 static const struct drm_display_mode edid_est_modes[] = {
 	{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 40000, 800, 840,
 		   968, 1056, 0, 600, 601, 605, 628, 0,
-		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */  //choose this one
-
-
-	{ DRM_MODE("480x800", DRM_MODE_TYPE_DRIVER, 30720, 
-		480, 481, 484, 500, 0,
-		800, 824, 896, 1024, 0,
-		DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */  //choose this one
-
-
+		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@60Hz */
 	{ DRM_MODE("800x600", DRM_MODE_TYPE_DRIVER, 36000, 800, 824,
 		   896, 1024, 0, 600, 601, 603,  625, 0,
 		   DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC) }, /* 800x600@56Hz */

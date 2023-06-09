@@ -40,7 +40,7 @@ void halbb_dbg_comp_init(struct bb_info *bb)
 		/*DBG_RA |		*/
 		/*DBG_PHY_STS |		*/
 		/*DBG_FA_CNT |		*/
-		/*DBG_RSSI_MNTR |	*/
+		/*DBG_ENV_MNTR |	*/
 		/*DBG_DFS |		*/
 		/*DBG_EDCCA |		*/
 		/*DBG_ENV_MNTR |	*/

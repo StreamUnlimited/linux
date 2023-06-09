@@ -167,4 +167,22 @@ bool phl_self_stainfo_chk(struct phl_info_t *phl_info,
 			  struct rtw_wifi_role_t *wrole,
 			  struct rtw_phl_stainfo_t *sta);
 
+enum rtw_phl_status
+rtw_phl_get_tx_ok_rpt(void *phl,
+		      struct rtw_phl_stainfo_t *phl_sta,
+		      u32 *tx_ok_cnt,
+		      enum phl_ac_queue qsel);
+
+enum rtw_phl_status
+rtw_phl_get_tx_fail_rpt(void *phl,
+			struct rtw_phl_stainfo_t *phl_sta,
+			u32 *tx_fail_cnt,
+			enum phl_ac_queue qsel);
+
+enum rtw_phl_status
+rtw_phl_get_tx_retry_rpt(void *phl,
+			 struct rtw_phl_stainfo_t *phl_sta,
+			 u32 *tx_retry_cnt,
+			 enum phl_ac_queue qsel);
+
 #endif  /*_PHL_STA_H_*/

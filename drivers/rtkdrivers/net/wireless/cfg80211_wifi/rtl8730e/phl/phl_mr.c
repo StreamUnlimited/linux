@@ -3734,7 +3734,7 @@ _phl_mr_2g_scc_1ap_1sta_btc_disable(struct phl_info_t *phl,
 
 	if (!_mr_is_2g_scc_1ap_1sta(phl, band_idx, &ap_wr))
 	{
-		PHL_TRACE(COMP_PHL_MCC, _PHL_WARNING_, "%s: It¡¦s not 2g_scc_1ap_1sta\n",
+		PHL_TRACE(COMP_PHL_MCC, _PHL_WARNING_, "%s: It is not 2g_scc_1ap_1sta\n",
 			  __FUNCTION__);
 		goto exit;
 	}

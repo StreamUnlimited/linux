@@ -302,37 +302,6 @@ void _halrf_dpk_info(struct rf_info *rf, char input[][16], u32 *_used,
 
 	switch (hal_i->chip_id) {
 #ifdef RFDBG_TRACE_EN
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		ic_name = "8852A";
-		dpk_ver = DPK_VER_8852A;
-		rf_para_min = 16;
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case CHIP_WIFI6_8852B:
-		ic_name = "8852B";
-		dpk_ver = DPK_VER_8852B;
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case CHIP_WIFI6_8852C:
-		ic_name = "8852C";
-		dpk_ver = DPK_VER_8852C;
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case CHIP_WIFI6_8832BR:
-		ic_name = "8832BR";
-		dpk_ver = DPK_VER_8832BR;
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case CHIP_WIFI6_8192XB:
-		ic_name = "8192XB";
-		dpk_ver = DPK_VER_8192XB;
-		break;
-#endif
 #ifdef RF_8720E_SUPPORT
 	case CHIP_WIFI6_8720E:
 		ic_name = "8720E";
@@ -1044,31 +1013,6 @@ static void _halrf_iqk_info(struct rf_info *rf, char input[][16], u32 *_used,
 	//RF_DBG(rf, DBG_RF_IQK, "[IQK]===>%s\n", __func__);
 	switch (hal_i->chip_id) {
 #ifdef RFDBG_TRACE_EN
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		ic_name = "8852A";
-		break;
-#endif
-#ifdef RF_8852B_SUPPORT
-	case CHIP_WIFI6_8852B:
-		ic_name = "8852B";
-		break;
-#endif
-#ifdef RF_8852C_SUPPORT
-	case CHIP_WIFI6_8852C:
-		ic_name = "8852C";
-		break;
-#endif
-#ifdef RF_8832BR_SUPPORT
-	case CHIP_WIFI6_8832BR:
-		ic_name = "8832BR";
-		break;
-#endif
-#ifdef RF_8192XB_SUPPORT
-	case CHIP_WIFI6_8192XB:
-		ic_name = "8192XB";
-		break;
-#endif
 #ifdef RF_8720E_SUPPORT
 	case CHIP_WIFI6_8720E:
 		ic_name = "8720E";
@@ -1263,7 +1207,9 @@ void halrf_iqk_dbg_cmd(struct rf_info *rf, char input[][16], u32 *_used,
 		RF_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    " NBIQK Trigger!!\n");
 	} else if (_os_strcmp(input[1], cmd[6]) == 0) {
+#ifdef RFDBG_TRACE_EN
 		rxevm = halrf_iqk_get_rxevm(rf);
+#endif
 		RF_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    " RXEVM = -%d dB!!\n", rxevm);
 	} else {

@@ -3759,6 +3759,7 @@ exit:
 void rtw_dfs_ch_switch_hdl_0(_adapter *adapter)
 {
 	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct rtw_phl_com_t *phl_com = GET_PHL_COM(dvobj);
 	struct rf_ctl_t *rfctl = dvobj_to_rfctl(dvobj);
 	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
 	u8 ifbmp_m = rtw_mi_get_ap_mesh_ifbmp(adapter);
@@ -3884,7 +3885,9 @@ void rtw_dfs_ch_switch_hdl_0(_adapter *adapter)
 		}
 #endif
 
+		phl_com->csa_switch_ch = 1;
 		set_channel_bwmode(adapter, req_ch, req_offset, req_bw, _TRUE);
+		phl_com->csa_switch_ch = 0;
 		/* update union ch/bw/offset for STA only */
 		rtw_mi_update_union_chan_inf(adapter, req_ch, req_offset, req_bw);
 		rtw_rfctl_update_op_mode(rfctl, 0, 0);

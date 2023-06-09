@@ -20,7 +20,6 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
-#include <linux/of_gpio.h>
 #include <linux/of_address.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_device.h>
@@ -29,11 +28,15 @@
 #include <drm/drm_of.h>
 #include <drm/drm_print.h>
 #include <drm/drm_probe_helper.h>
+#include <drm/drm_drv.h>
+#include <drm/drm_panel.h>
 
+#include "panel/ameba_panel_base.h"
 #include "ameba_drm_base.h"
 #include "ameba_mipi.h"
 #include "ameba_drm_drv.h"
-#include "ameba_drm_util.h"
+#include "ameba_drm_comm.h"
+
 
 #define LSYS_MASK_CKD_MIPI                         ((u32)0x0000003F << 24)          /*!<R/WPD 6'd14  mipi vo clock divider, it is based on nppll clock Max timing signoff clock is 66.7M . Default is 800/12 = 66.7 divider by this value + 1 */
 #define LSYS_CKD_MIPI(x)                           ((u32)(((x) & 0x0000003F) << 24))
@@ -48,38 +51,50 @@ void MIPI_DSI_Pat_Gen(MIPI_TypeDef *mipireg, u8 new_state, u8 pg_type, u32 user_
 /*
 *	below is mipi dsi struct
 */
-#define encoder_to_dsi(encoder) container_of(encoder, struct ameba_hw_dsi, encoder)
+#define encoder_to_dsi(param)           container_of(param, struct ameba_hw_dsi, encoder)
+#define connector_to_dsi(param)         container_of(param, struct ameba_hw_dsi, connector)
+#define host_to_dsi(param)              container_of(param, struct ameba_hw_dsi, dsi_host)
 
 struct ameba_hw_dsi {
+	void __iomem *mipi_reg;	//put in first place
+	struct device *dsidev;
+
+	struct ameba_drm_struct *ameba_struct;
+
 	struct drm_encoder encoder;
 	struct drm_connector connector;
-	struct drm_display_mode cur_mode;
+	struct mipi_dsi_device *paneldev;
+
+	//panel driver issue
+	struct drm_panel *panel;
+	struct mipi_dsi_host dsi_host; 
 
 	//mipi dsi register  & data struction
 	MIPI_InitTypeDef dsi_ctx;
-	void __iomem *mipi_reg;
+	void __iomem *lsys_aip_ctrl1;
 
 	u32 mipi_ckd;
 	void __iomem *sysctl_base_lp;//vo clk div
 
 	bool enable;
 
-	int irq;
-	int gpio;
+	int irq;  /* cmd replay,underflow reset issue */
 
-	u32 dsi_send_cmd;//command tx done
+	u32 dsi_tx_done;//command tx done
+	u32 dsi_rx_cmd;//it is read command
 
 	u32 dsi_debug;
 };
 
+//debug 
 static ssize_t dsi_debug_show(struct device *dev, struct device_attribute*attr, char *buf)
 {
-	struct ameba_hw_dsi 		*dsi = dev_get_drvdata(dev);
+	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
 	return sprintf(buf, "dsi_debug=%d\n", dsi->dsi_debug);
 }
 static ssize_t dsi_debug_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct ameba_hw_dsi 		*dsi = dev_get_drvdata(dev);
+	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
 	u32 tmp = 0 ;
 	char c;
 	size_t tmp_count = count;
@@ -110,52 +125,78 @@ static const struct attribute_group dsi_debug_attr_grp = {
         .attrs = dsi_debug_attrs,
 };
 
-
+/* underflow issue */
 static irqreturn_t mipi_dsi_underflow_irq(int irq, void *data)
 {
-	struct device *dev = (struct device *)drm_get_mipidsi_param2(data);
-	struct ameba_hw_dsi *dsi = dev_get_drvdata(dev);
-	void __iomem *pmipi_reg = dsi->mipi_reg ;
-	
+	struct ameba_hw_dsi 	*dsi = (struct ameba_hw_dsi*)data;
+	struct device 			*dev = dsi->dsidev;
+	void __iomem 			*pmipi_reg = dsi->mipi_reg;
+	struct ameba_drm_struct *ameba_struct = dsi->ameba_struct;
+	struct ameba_drm_reg_t	*lcdc_ctx = (struct ameba_drm_reg_t *)ameba_struct->lcdc_hw_ctx;
+	void __iomem 			*plcdc_reg = lcdc_ctx->reg;
+
 	u32 reg_val = MIPI_DSI_INTS_ACPU_Get(pmipi_reg);
 	MIPI_DSI_INTS_ACPU_Clr(pmipi_reg, reg_val);
 
 	if (reg_val) {
 		DRM_DEV_INFO(dev, "count=%d[0x%x]\n",
-			drm_get_underflow_flag(),readl((void*)(dsi->sysctl_base_lp + REG_LSYS_CKD_GRP0)));
+			ameba_struct->under_flow_count,readl((void*)(dsi->sysctl_base_lp + REG_LSYS_CKD_GRP0)));
 
 		MIPI_DSI_INT_Config(pmipi_reg, DISABLE, DISABLE, DISABLE);
 
 		/*reset the LCDC*/
-		lcdc_underflow_reset(drm_get_lcdc_param());
-		drm_underflow_flag_reset();
+		lcdc_underflow_reset(plcdc_reg);
+		ameba_struct->under_flow_flag = 0;
 
 		MIPI_DSI_Mode_Switch(pmipi_reg, ENABLE);
 
 		if(dsi->dsi_debug){
-			MipiDumpRegValue(pmipi_reg);
+			MipiDumpRegValue(dev, pmipi_reg);
 		}
 	}
 
 	return IRQ_HANDLED; 
 }
 
-void mipi_dsi_underflow_reset()
-{
-	struct device 		*dev = (struct device *)(drm_get_mipidsi_param());
-	struct ameba_hw_dsi *dsi = dev_get_drvdata(dev);
-	void __iomem		*pmipi_reg = dsi->mipi_reg ;
 
-	MIPI_DSI_INTS_ACPU_Clr(pmipi_reg, MIPI_DSI_INTS_ACPU_Get(pmipi_reg));
-	MIPI_DSI_INT_Config(pmipi_reg, ENABLE, DISABLE, ENABLE);//enable acpu, disable scpu
-	MIPI_DSI_Mode_Switch(pmipi_reg, DISABLE);
+static void MipiDsiReadCMD_Decode(struct device *dev, MIPI_TypeDef *MIPIx, u8 rcmd_idx)
+{
+	u32 rcmd_val, payload_len, addr, word0, word1;
+	u8 data_id, byte0, byte1;
+
+	rcmd_val = MIPI_DSI_CMD_Rxcv_CMD(MIPIx, rcmd_idx);
+	if (rcmd_val & (MIPI_BIT_RCMDx_CRC_CHK_ERR | MIPI_BIT_RCMDx_ECC_CHK_ERR | MIPI_BIT_RCMDx_ECC_ERR_FIX)) {
+		DRM_DEV_DEBUG(dev, "RCMD[%d] Error\n", rcmd_idx + 1);
+	}
+
+	if (rcmd_val & MIPI_BIT_RCMDx_ECC_NO_ERR) {
+		data_id = MIPI_GET_RCMDx_DATAID(rcmd_val);
+		byte0 = MIPI_GET_RCMDx_BYTE0(rcmd_val);
+		byte1 = MIPI_GET_RCMDx_BYTE1(rcmd_val);
+		DRM_DEV_INFO(dev, "RCMD[%d]:\n", rcmd_idx + 1);
+		DRM_DEV_INFO(dev, "DataID: 0x%02x, BYTE0: 0x%02x, BYTE1: 0x%02x\n", data_id, byte0, byte1);
+
+		/* Peripheral to Processor Transactions Long Packet is 0x1A or 0x1C */
+		if (MIPI_LPRX_IS_LONGRead(data_id)) {
+			payload_len = (byte1 << 8) + byte0;
+		} else {
+			payload_len = 0;
+		}
+		DRM_DEV_INFO(dev, "payload_len[%d]:\n", payload_len);
+		/* the addr payload_len 1 ~ 8 is 0 */
+		for (addr = 0; addr < (payload_len + 7) / 8; addr++) {
+			MIPI_DSI_CMD_LongPkt_MemQWordRW(MIPIx, addr, &word0, &word1, TRUE);
+			DRM_DEV_INFO(dev, "addr[%x]: 0x%08x 0x%08x\n", addr * 8, word0, word1);
+		}
+	}
 }
 
+//command mode 
 static irqreturn_t mipi_dsi_irq_handler(int irq, void *data)
 {
 	u32 reg_val, reg_val2, reg_dphy_err,Value32;
-	struct device 			*dev = (struct device *)drm_get_mipidsi_param2(data);
-	struct ameba_hw_dsi 	*mipi_dsi = dev_get_drvdata(dev);
+	struct ameba_hw_dsi 	*mipi_dsi = (struct ameba_hw_dsi*)data;
+	struct device 			*dev = mipi_dsi->dsidev;
 	void __iomem			*mipi_reg = mipi_dsi->mipi_reg ;
 
 	reg_val = MIPI_DSI_INTS_Get(mipi_reg);
@@ -166,13 +207,34 @@ static irqreturn_t mipi_dsi_irq_handler(int irq, void *data)
 
 	if (reg_val & MIPI_BIT_CMD_TXDONE) { //command tx done
 		reg_val &= ~MIPI_BIT_CMD_TXDONE;
-		mipi_dsi->dsi_send_cmd = 1;
+		if(mipi_dsi->dsi_rx_cmd == 0) {
+			mipi_dsi->dsi_tx_done = 1;
+		}
+	}
+
+	if(reg_val & (MIPI_BIT_RCMD1|MIPI_BIT_RCMD2|MIPI_BIT_RCMD3 )) {
+		/* 1. Read CMD Response */
+		if (reg_val & MIPI_BIT_RCMD1) {
+			DRM_DEV_DEBUG(dev, "RCMD1\n");
+			MipiDsiReadCMD_Decode(dev, mipi_reg, 0);
+		}
+		/* 2. error report packet */
+		if (reg_val & MIPI_BIT_RCMD2) {
+			DRM_DEV_DEBUG(dev, "RCMD2\n");
+			MipiDsiReadCMD_Decode(dev, mipi_reg, 1);
+		}
+		/* 3. eotp */
+		if (reg_val & MIPI_BIT_RCMD3) {
+			DRM_DEV_DEBUG(dev, "RCMD3\n");
+			MipiDsiReadCMD_Decode(dev, mipi_reg, 2);
+		}
+		mipi_dsi->dsi_tx_done = 1;
 	}
 
 	if (reg_val & MIPI_BIT_ERROR) {
 		reg_dphy_err = readl(mipi_reg+MIPI_DPHY_ERR_OFFSET);
 		writel(reg_dphy_err,mipi_reg+MIPI_DPHY_ERR_OFFSET) ;
-		printk(KERN_WARNING"LPTX ISSUE: 0x%x, DPHY ISSUE: 0x%x\n", reg_val, reg_dphy_err);
+		DRM_DEV_DEBUG(dev, "LPTX ISSUE: 0x%x, DPHY ISSUE: 0x%x\n", reg_val, reg_dphy_err);
 
 		Value32 = readl(mipi_reg+MIPI_CONTENTION_DETECTOR_AND_STOPSTATE_DT_OFFSET) ;
 		if (Value32 & MIPI_MASK_DETECT_ENABLE) {
@@ -181,82 +243,40 @@ static irqreturn_t mipi_dsi_irq_handler(int irq, void *data)
 
 			writel(reg_dphy_err,mipi_reg+MIPI_DPHY_ERR_OFFSET);
 			MIPI_DSI_INTS_Clr(mipi_reg, MIPI_BIT_ERROR);
-			printk(KERN_WARNING"LPTX ISSUE CLR: 0x%x, DPHY: 0x%x\n", readl(mipi_reg+MIPI_INTS_OFFSET), readl(mipi_reg+MIPI_DPHY_ERR_OFFSET));
+			DRM_DEV_DEBUG(dev, "LPTX ISSUE CLR: 0x%x, DPHY: 0x%x\n", readl(mipi_reg+MIPI_INTS_OFFSET), readl(mipi_reg+MIPI_DPHY_ERR_OFFSET));
 		}
 
 		if (readl(mipi_reg+MIPI_DPHY_ERR_OFFSET) == reg_dphy_err) {
-			printk(KERN_WARNING"LPTX Still Error\n");
+			DRM_DEV_DEBUG(dev, "LPTX Still Error\n");
 			MIPI_DSI_INT_Config(mipi_reg, ENABLE, DISABLE, false);
 		}
 		reg_val &= ~MIPI_BIT_ERROR;
 	}
 
 	if (reg_val) {
-		printk(KERN_DEBUG"LPTX Error Occur: 0x%x\n", reg_val);
+		DRM_DEV_ERROR(dev, "LPTX Error Occur: 0x%x\n", reg_val);
 	}
 
 	if (reg_val2) {
-		printk(KERN_DEBUG"ACPU interrupt Occur: 0x%x\n", reg_val2);
+		DRM_DEV_INFO(dev, "ACPU interrupt Occur: 0x%x\n", reg_val2);
 	}
 
 	return IRQ_HANDLED;
 }
-
-static inline void dsi_gpio_set_pin(int gpio_index,u8 Newstatus)
+static void dsi_mipi_init_pre(struct device *dev, struct ameba_hw_dsi *dsi)
 {
-	gpio_set_value(gpio_index, Newstatus);
-}
-static int dsi_gpio_reset(int iod)
-{	
-	int req_status;
-	int set_direct_status;
-	int gpio_index = iod ;	
-
-	req_status = gpio_request(gpio_index, NULL);
-	if (req_status != 0) {
-		DRM_WARN("gpio request failed!\n");
-		return -EINVAL;
-	}
-
-	set_direct_status = gpio_direction_output(gpio_index,0);
-	if (IS_ERR_VALUE(set_direct_status)) {
-		DRM_WARN("set gpio direction output failed\n");
-		return -EINVAL;
-	}
-
-	/* to prevent electric leakage */
-	dsi_gpio_set_pin(iod,1);
-	mdelay(10);
-	dsi_gpio_set_pin(iod,0);
-	mdelay(10);
-	dsi_gpio_set_pin(iod,1);
-	gpio_free(gpio_index);
-
-	mdelay(120);
-
-	return  0 ;
-}
-
-static int dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
-{
-	int ret;
-	void *pdev_id ;
 	u32 reg_value, reg_tmp;
+	struct ameba_drm_struct 	*ameba_struct = dsi->ameba_struct;
 
 	MIPI_InitTypeDef 	*pdsi_ctx = &(dsi->dsi_ctx);
 	void __iomem		*pmipi_reg = dsi->mipi_reg ;
+	void __iomem		*lsys_aip_ctrl1 = dsi->lsys_aip_ctrl1;
 
-	//TODO  maybe should put this in a task , to decrease the timecost when kernel start @20211022	
-	// reset Core
+	// reset mipi core
 	MIPI_StructInit(pdsi_ctx);
-	MIPI_InitStruct_Config(pdsi_ctx,ameba_drm_get_display_width(),ameba_drm_get_display_height(),ameba_drm_get_framerate(),&(dsi->mipi_ckd));
-	MIPI_DPHY_init(pmipi_reg, pdsi_ctx);
-
-	ret = dsi_gpio_reset(dsi->gpio);
-	if (ret) {
-		DRM_DEV_ERROR(dev, "Failed to set dis spio\n");
-		return ret ;
-	}
+	MIPI_InitStruct_Config(dev,pdsi_ctx,ameba_struct->display_width,ameba_struct->display_height,ameba_struct->display_framerate,&(dsi->mipi_ckd));
+	MIPI_BG_CMD(lsys_aip_ctrl1, ENABLE);//bandgap issue
+	MIPI_DPHY_init(dev, pmipi_reg, pdsi_ctx);
 
 	//set the vo div
 	reg_value = ameba_lcdc_reg_read(dsi->sysctl_base_lp + REG_LSYS_CKD_GRP0);
@@ -264,22 +284,44 @@ static int dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
 	reg_value &= ~LSYS_MASK_CKD_MIPI;
 	reg_value |= LSYS_CKD_MIPI(dsi->mipi_ckd);
 	ameba_lcdc_reg_write(dsi->sysctl_base_lp + REG_LSYS_CKD_GRP0, reg_value);
-	DRM_DEV_INFO(dev, "0x%x-0x%x\n", reg_tmp, ameba_lcdc_reg_read(dsi->sysctl_base_lp + REG_LSYS_CKD_GRP0));
+	DRM_DEV_DEBUG(dev, "0x%x-0x%x\n", reg_tmp, ameba_lcdc_reg_read(dsi->sysctl_base_lp + REG_LSYS_CKD_GRP0));
+}
+static int dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
+{
+	struct mipi_dsi_device          *paneldev;
+	struct ameba_drm_panel_struct   *handle;
+	LCM_setting_table_t             *table;
+	MIPI_InitTypeDef                *pdsi_ctx = &(dsi->dsi_ctx);
+	void __iomem                    *pmipi_reg = dsi->mipi_reg ;
+	int                             ret;
 
-	pdev_id = drm_get_param_handle();
 	//register MIPI ISR
-	ret = devm_request_irq(dev,dsi->irq, mipi_dsi_irq_handler,0,dev_name(dev), pdev_id);
+	ret = devm_request_irq(dev,dsi->irq, mipi_dsi_irq_handler,0,dev_name(dev), dsi);
 	if (ret)
 	{
 		DRM_DEV_ERROR(dev, "failed to set irq for dsi command \n");
 		return -ENODEV;
 	}
 	//enable_irq(dsi->irq);
-	MipiDsi_Do_Init(pmipi_reg,pdsi_ctx,&(dsi->dsi_send_cmd));//set command to dsi
+	//set command to dsi
+	paneldev = dsi->paneldev;
+	handle = mipi_dsi_get_drvdata(paneldev);
+	table = handle->init_table;
+	MipiDsi_Do_Init(pmipi_reg,pdsi_ctx,&(dsi->dsi_tx_done),&(dsi->dsi_rx_cmd),table);
 	//disable_irq(dsi->irq);
 
-	devm_free_irq(dev, dsi->irq, pdev_id);//unregister dsi ISR
-	ret = devm_request_irq(dev,dsi->irq, mipi_dsi_underflow_irq, 0, dev_name(dev), pdev_id);
+	devm_free_irq(dev, dsi->irq, dsi);//unregister dsi ISR
+
+	return 0;
+}
+
+static int dsi_mipi_init_irq(struct device *dev, struct ameba_hw_dsi *dsi)
+{
+	int                 ret;
+#ifndef ENABLE_LCDC_CTL
+	void __iomem        *pmipi_reg = dsi->mipi_reg ;
+#endif
+	ret = devm_request_irq(dev,dsi->irq, mipi_dsi_underflow_irq, 0, dev_name(dev), dsi);
 	if (ret)
 	{
 		DRM_DEV_ERROR(dev, "failed to set irq for underflow \n");
@@ -301,8 +343,12 @@ static int dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
 */
 static void dsi_encoder_disable(struct drm_encoder *encoder)
 {
-	void __iomem			*pmipi_reg ;
-	struct ameba_hw_dsi 	*dsi = encoder_to_dsi(encoder);
+	void __iomem            *pmipi_reg ;
+	struct ameba_hw_dsi     *dsi = encoder_to_dsi(encoder);
+	AMEBA_DRM_DEBUG
+
+	if (dsi && dsi->panel)
+		drm_panel_disable(dsi->panel);
 
 	if( NULL == dsi || !dsi->enable)
 		return;
@@ -312,15 +358,36 @@ static void dsi_encoder_disable(struct drm_encoder *encoder)
 
 	dsi->enable = false;
 }
-
 static void dsi_encoder_enable(struct drm_encoder *encoder)
 {
-	void __iomem		*pmipi_reg ;
-	MIPI_InitTypeDef 	*pdsi_ctx ;
+	int                 ret ;
+	void __iomem        *pmipi_reg ;
+	MIPI_InitTypeDef    *pdsi_ctx ;
 	struct ameba_hw_dsi *dsi = encoder_to_dsi(encoder);
+	AMEBA_DRM_DEBUG
 
 	if( NULL == dsi || dsi->enable)
 		return;
+
+	dsi_mipi_init_pre(dsi->dsidev, dsi);
+
+	ret = drm_panel_enable(dsi->panel);
+	if (ret) {
+		DRM_DEV_ERROR(dsi->dsidev, "Failed to init mipi dsi\n");
+		return;
+	}
+
+	ret = dsi_mipi_init(dsi->dsidev, dsi);
+	if (ret) {
+		DRM_DEV_ERROR(dsi->dsidev, "Failed to init mipi req\n");
+		return;
+	}
+
+	ret = dsi_mipi_init_irq(dsi->dsidev, dsi);
+	if (ret) {
+		DRM_DEV_ERROR(dsi->dsidev, "Failed to init mipi req\n");
+		return;
+	}
 
 	pmipi_reg = dsi->mipi_reg;	
 	pdsi_ctx = &(dsi->dsi_ctx);
@@ -331,15 +398,14 @@ static void dsi_encoder_enable(struct drm_encoder *encoder)
 	MIPI_DSI_Mode_Switch(pmipi_reg,ENABLE);
 
 	if(dsi->dsi_debug){
-		MipiDumpRegValue(pmipi_reg);
+		MipiDumpRegValue(dsi->dsidev, pmipi_reg);
 	}
 
 	dsi->enable = true;
 }
-
 static enum drm_mode_status dsi_encoder_mode_valid(struct drm_encoder *encoder,
 					const struct drm_display_mode *mode)
-{	
+{
 	return MODE_OK;
 }
 
@@ -347,25 +413,37 @@ static void dsi_encoder_mode_set(struct drm_encoder *encoder,
 				 struct drm_display_mode *mode,
 				 struct drm_display_mode *adj_mode)
 {
-	struct ameba_hw_dsi *dsi = encoder_to_dsi(encoder);
+	struct ameba_hw_dsi     *dsi = encoder_to_dsi(encoder);
+	AMEBA_DRM_DEBUG
 
-	drm_mode_copy(&dsi->cur_mode, adj_mode);
+	///valid mode
+	if(dsi->ameba_struct)
+	{
+		dsi->ameba_struct->display_height = adj_mode->vdisplay;
+		dsi->ameba_struct->display_width = adj_mode->hdisplay;
+		dsi->ameba_struct->display_framerate = adj_mode->vrefresh;
+	}
 }
 
 static int dsi_encoder_atomic_check(struct drm_encoder *encoder,
 				    struct drm_crtc_state *crtc_state,
 				    struct drm_connector_state *conn_state)
 {
+	AMEBA_DRM_DEBUG
 	return 0;
+}
+static void dsi_encoder_prepare(struct drm_encoder *encoder)
+{
+	AMEBA_DRM_DEBUG
 }
 
 static const struct drm_encoder_helper_funcs ameba_encoder_helper_funcs = {
-	.atomic_check	= dsi_encoder_atomic_check,
-	.mode_valid	= dsi_encoder_mode_valid,
-	.mode_set	= dsi_encoder_mode_set,
-	
-	.enable		= dsi_encoder_enable,
-	.disable	= dsi_encoder_disable
+	.atomic_check   = dsi_encoder_atomic_check,
+	.mode_valid     = dsi_encoder_mode_valid,
+	.mode_set       = dsi_encoder_mode_set,	
+	.prepare        = dsi_encoder_prepare,
+	.enable         = dsi_encoder_enable,
+	.disable        = dsi_encoder_disable
 };
 
 static const struct drm_encoder_funcs ameba_encoder_funcs = {
@@ -376,8 +454,8 @@ static int ameba_drm_encoder_init(struct device *dev,
 			       struct drm_device *drm_dev,
 			       struct drm_encoder *encoder)
 {
-	int ret;
-	u32 crtc_mask  ;
+	int     ret;
+	u32     crtc_mask  ;
 
 	crtc_mask = drm_of_find_possible_crtcs(drm_dev, dev->of_node);
 	if (!crtc_mask) {
@@ -399,30 +477,30 @@ static int ameba_drm_encoder_init(struct device *dev,
 }
 static int ameba_conn_get_modes(struct drm_connector *connector)
 {
-   int count;
+   struct ameba_hw_dsi      *dsi = connector_to_dsi(connector);
 
-   count = drm_add_modes_noedid(connector, ameba_drm_get_display_width(), ameba_drm_get_display_height());
-   drm_set_preferred_mode(connector, ameba_drm_get_display_width(), ameba_drm_get_display_height());
+   /* Just pass the question to the panel */
+   if (dsi->panel)
+	   return drm_panel_get_modes(dsi->panel);
 
-   return count;
+   return 0;
 }
 
 static const struct drm_connector_funcs ameba_connector_funcs = {
-   .fill_modes = drm_helper_probe_single_connector_modes,
-   .destroy = drm_connector_cleanup,
-   .reset = drm_atomic_helper_connector_reset,
-   .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-   .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+    .fill_modes              = drm_helper_probe_single_connector_modes,
+    .destroy                 = drm_connector_cleanup,
+    .reset                   = drm_atomic_helper_connector_reset,
+    .atomic_destroy_state    = drm_atomic_helper_connector_destroy_state,
+    .atomic_duplicate_state  = drm_atomic_helper_connector_duplicate_state,
 };
-static const struct drm_connector_helper_funcs ameba_conn_helper_funcs = {
+static const struct drm_connector_helper_funcs ameba_connector_helper_funcs = {
    .get_modes	 = ameba_conn_get_modes,
 };
-
 static int ameba_drm_connect_init(struct device *dev,
 				  struct drm_device *drm_dev,
 				  struct drm_connector *connector)
 {
-   int ret;
+   int  ret;
 
    //connector init
    ret = drm_connector_init(drm_dev, connector, &ameba_connector_funcs,
@@ -431,27 +509,64 @@ static int ameba_drm_connect_init(struct device *dev,
 	   DRM_DEV_ERROR(dev, "Failed to init connector\n");
 	   return 1;
    }
-   
-   drm_connector_helper_add(connector, &ameba_conn_helper_funcs);
-   
+
+   drm_connector_helper_add(connector, &ameba_connector_helper_funcs);
+
    return 0;
 }
+static int ameba_init_panel(struct device *dev, struct ameba_hw_dsi *dsi)
+{
+	struct drm_panel        *panel = NULL;
+	struct device_node      *child;
 
+	if (!of_get_available_child_count(dev->of_node)) {
+		dev_info(dev, "unused DSI interface\n");
+		return -EPERM;
+	}
+
+	/* Look for a panel as a child to this node */
+	for_each_available_child_of_node(dev->of_node, child) {
+		panel = of_drm_find_panel(child);
+		if (IS_ERR(panel)) {
+			dev_err(dev, "failed to find panel (%ld)\n",PTR_ERR(panel));
+			panel = NULL;
+		}
+		else {
+			break;
+		}
+	}
+
+	if (panel) {
+		dsi->panel = panel;
+	} else {
+		dev_err(dev, "no panel \n");
+		return -ENODEV;
+	}
+
+	drm_panel_attach(dsi->panel,&dsi->connector);
+
+	return 0;
+}
 static int mipi_dsi_bind(struct device *dev, struct device *master, void *data)
 {
-	struct ameba_hw_dsi 	*dsi = dev_get_drvdata(dev);
-	struct drm_device 		*drm_dev = data;
-	int ret;
+	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
+	struct drm_device           *drm = data;
+	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
+	int                         ret;
+	AMEBA_DRM_DEBUG
+
+	ameba_struct->dsi_dev = dev;
+	dsi->ameba_struct = ameba_struct;
 
 	//init encoder
-	ret = ameba_drm_encoder_init(dev, drm_dev, &dsi->encoder);
+	ret = ameba_drm_encoder_init(dev, drm, &dsi->encoder);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "Failed to init encoder\n");
 		goto err_encoder;
 	}
-	
+
 	//init encoder
-	ret = ameba_drm_connect_init(dev, drm_dev, &dsi->connector);
+	ret = ameba_drm_connect_init(dev, drm, &dsi->connector);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "Failed to init connector\n");
 		goto err_connector;
@@ -463,9 +578,9 @@ static int mipi_dsi_bind(struct device *dev, struct device *master, void *data)
 		goto err_attach;
 	}
 
-	ret = dsi_mipi_init(dev, dsi);
+	ret = ameba_init_panel(dev, dsi);
 	if (ret) {
-		DRM_DEV_ERROR(dev, "Failed to init mipi dsi\n");
+		DRM_DEV_ERROR(dev, "Failed to init panel \n");
 		goto err_mipi_init;
 	}
 
@@ -494,20 +609,24 @@ static const struct component_ops mipi_dsi_ops = {
 
 static int mipi_dsi_parse_dt(struct platform_device *pdev, struct ameba_hw_dsi *dsi)
 {
-	struct resource 		*res;
-	enum of_gpio_flags 		flags;
-	struct device 			*dev = &pdev->dev;
-	struct device_node 		*np = dev->of_node;
-	struct device_node 		*rcc_node;
-	struct resource 		rcc_res;
+	struct resource         *res;
+	struct device           *dev = &pdev->dev;
+	struct device_node      *rcc_node;
+	struct resource         rcc_res;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	dsi->mipi_reg = devm_ioremap_resource(&pdev->dev, res);
+	dsi->mipi_reg = devm_ioremap_resource(dev, res);
 	if (0 == dsi->mipi_reg) {
 		DRM_DEV_ERROR(dev, "failed to remap dsi io region\n");
 		return -ENODEV;
 	}
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	dsi->lsys_aip_ctrl1 = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+	if (IS_ERR(dsi->lsys_aip_ctrl1)) {
+		DRM_DEV_ERROR(dev, "failed to remap sys reg io region\n");
+		return -ENODEV;
+	}
 	//irq info
 	dsi->irq = platform_get_irq(pdev, 0);
 	if (dsi->irq < 0) {
@@ -515,23 +634,55 @@ static int mipi_dsi_parse_dt(struct platform_device *pdev, struct ameba_hw_dsi *
 		return -ENODEV;
 	}
 
-	//gpio
-	dsi->gpio = of_get_named_gpio_flags(np, "mipi-gpios", 0, &flags);
-	if (!gpio_is_valid(dsi->gpio)) {
-		pr_err("drm mipi dis node failed to get mipi-gpios\n");
-		return -ENODEV;
-	}
-
 	rcc_node = of_parse_phandle(dev->of_node, "rtk,lcdc-vo-clock", 0);
 	if ( of_address_to_resource(rcc_node, 1, &rcc_res) ) {
-		dev_err(&pdev->dev, "get resource for lcdc vo clock error\n");
+		DRM_DEV_ERROR(dev, "get resource for lcdc vo clock error\n");
 		return -ENOMEM;
 	}
 
 	dsi->sysctl_base_lp = ioremap(rcc_res.start, resource_size(&rcc_res));
 	if ( !dsi->sysctl_base_lp ) {
-			dev_err(&pdev->dev, "ioremap for lcdc vo clock  error\n");
+			DRM_DEV_ERROR(dev, "ioremap for lcdc vo clock  error\n");
 			return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int mcde_dsi_host_attach(struct mipi_dsi_host *host,
+				struct mipi_dsi_device *mdsi)
+{
+	struct ameba_hw_dsi     *dsi = host_to_dsi(host);
+
+	if (mdsi->lanes < 1 || mdsi->lanes > 2) {
+		DRM_DEV_ERROR(dsi->dsidev,"dsi device params invalid, 1 or 2 lanes supported\n");
+		return -EINVAL;
+	}
+	dsi->paneldev = mdsi;
+	return 0;
+}
+static int mcde_dsi_host_detach(struct mipi_dsi_host *host,
+				struct mipi_dsi_device *mdsi)
+{
+	AMEBA_DRM_DEBUG
+	return 0;
+}
+static const struct mipi_dsi_host_ops ameba_dsi_host_ops = {
+	.attach = mcde_dsi_host_attach,
+	.detach = mcde_dsi_host_detach,
+};
+static int ameba_host_init(struct device *dev, struct mipi_dsi_host *host)
+{
+	int     ret;
+	if(NULL == host)
+		return -EPERM ;
+
+	host->dev = dev;
+	host->ops = &ameba_dsi_host_ops;
+	ret = mipi_dsi_host_register(host);
+	if (ret < 0) {
+		dev_err(dev, "failed to register DSI host: %d\n", ret);
+		return ret;
 	}
 
 	return 0;
@@ -539,29 +690,37 @@ static int mipi_dsi_parse_dt(struct platform_device *pdev, struct ameba_hw_dsi *
 
 static int mipi_dsi_probe(struct platform_device *pdev)
 {
-	int ret;
-	struct ameba_hw_dsi		*data;
-	struct device 			*dev = &pdev->dev;
+	struct ameba_hw_dsi     *dsi;
+	struct device           *dev = &pdev->dev;
+	int                     ret;
+	AMEBA_DRM_DEBUG
 
-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-	if (!data) {
+	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
+	if (!dsi) {
 		DRM_DEV_ERROR(dev, "failed to allocate dsi data.\n");
 		return -ENOMEM;
 	}
+	dsi->dsidev = dev;
 
-	ret = mipi_dsi_parse_dt(pdev, data);
+	ret = mipi_dsi_parse_dt(pdev, dsi);
 	if (ret)
 		return ret;
 
-	data->dsi_debug = 0;
-	if ( sysfs_create_group(&pdev->dev.kobj,&dsi_debug_attr_grp) )
-		DRM_DEV_INFO(&pdev->dev, "Error creating dsi sysfs entry\n");
+	dsi->dsi_debug = 0;
+	if ( sysfs_create_group(&pdev->dev.kobj,&dsi_debug_attr_grp) ) {
+		DRM_DEV_INFO(dev, "Error creating dsi sysfs entry\n");
+	}
 
-	platform_set_drvdata(pdev, data);
+	dev_set_drvdata(dev, dsi);
 
-	drm_set_mipidsi_param(&pdev->dev);
+	ret = ameba_host_init(dev, &dsi->dsi_host);
+	if (ret) {
+		DRM_DEV_ERROR(dev, "failed to init host.\n");
+		return ret;
+	}
+	DRM_DEV_DEBUG(dev, "registered DSI host\n");
 
-	return component_add(&pdev->dev, &mipi_dsi_ops);
+	return component_add(dev, &mipi_dsi_ops);
 }
 
 static int mipi_dsi_remove(struct platform_device *pdev)
@@ -575,8 +734,9 @@ static const struct of_device_id mipi_dsi_of_match[] = {
 	{.compatible = "realtek,amebad2-dsi"},
 	{ }
 };
+MODULE_DEVICE_TABLE(of, mipi_dsi_of_match);
 
-static struct platform_driver mipi_dsi_driver = {
+static struct platform_driver mipi_dsi_driver_struct = {
 	.probe = mipi_dsi_probe,
 	.remove = mipi_dsi_remove,
 	.driver = {
@@ -585,7 +745,7 @@ static struct platform_driver mipi_dsi_driver = {
 	},
 };
 
-module_platform_driver(mipi_dsi_driver);
+module_platform_driver(mipi_dsi_driver_struct);
 
 MODULE_AUTHOR("Chunlin.Yi <chunlin.yi@realsil.com.cn>");
 MODULE_DESCRIPTION("realtek AmebaD2 SoCs' MIPI DSI Controller driver");

@@ -589,6 +589,10 @@ u32 cfg_mac_bw(struct mac_ax_adapter *adapter, struct mac_ax_cfg_bw *cfg)
 	/*Setting for CCK rate in 5G/6G Channel protection*/
 	if (cfg->pri_ch >= CHANNEL_5G) { // remove after phl setting band_type
 		chk_val8 |= BIT_CHECK_CCK_EN;
+	} else {
+		/* Setting back BIT_CHECK_CCK_EN to 0, when scan 2.4G after 5G. (or connect 2.4G after full scan.) */
+		/* To fix: FINAL_RATE > INIT_RATE. */
+		chk_val8 &= ~BIT_CHECK_CCK_EN;
 	}
 	MAC_REG_W8(REG_BCN_AMPDU_CTCL, chk_val8);
 
@@ -818,8 +822,7 @@ u32 mac_write_pwr_limit_reg(struct mac_ax_adapter *adapter,
 
 	for (i = 0; i < HAL_MAX_PATH; i++) {
 		tmp = &tpu->pwr_lmt_cck_20m[i][0];
-		tmp_1 = &tpu->pwr_lmt_cck_40m[i][0];
-		cr = REG_AX_PWR_LMT_TABLE1 + ss_ofst;
+		cr = REG_AX_PWR_LMT_TABLE0 + ss_ofst;
 		MAC_REG_W32(cr, BT_2_DW(0, 0, 0, tmp[0]));
 
 		tmp = &tpu->pwr_lmt_lgcy_20m[i][0];

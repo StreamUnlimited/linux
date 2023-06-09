@@ -246,7 +246,6 @@ rtw_hal_reset(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, u8 band_i
 		rtw_hal_bb_dfs_en(hal_info, false);
 		if (!hal_com->dbcc_en) {
 			rtw_hal_bb_tssi_cont_en(hal_info, false, RF_PATH_A);
-			rtw_hal_bb_tssi_cont_en(hal_info, false, RF_PATH_B);
 		} else {
 			if (phy_idx == HW_PHY_0) {
 				rtw_hal_bb_tssi_cont_en(hal_info, false, RF_PATH_A);
@@ -278,7 +277,6 @@ rtw_hal_reset(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, u8 band_i
 		rtw_hal_bb_dfs_en(hal_info, true);
 		if (!hal_com->dbcc_en) {
 			rtw_hal_bb_tssi_cont_en(hal_info, true, RF_PATH_A);
-			rtw_hal_bb_tssi_cont_en(hal_info, true, RF_PATH_B);
 		} else {
 			if (phy_idx == HW_PHY_0) {
 				rtw_hal_bb_tssi_cont_en(hal_info, true, RF_PATH_A);

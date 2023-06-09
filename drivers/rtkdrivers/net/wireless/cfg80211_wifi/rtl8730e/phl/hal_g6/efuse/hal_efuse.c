@@ -126,7 +126,7 @@ enum rtw_hal_status efuse_set_hw_cap(struct efuse_t *efuse)
 		PHL_WARN("%s: Get board option fail! Status(%x)\n", __FUNCTION__, status);
 	}
 
-	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_THERMAL, &phl_com->efuse_data.thermal_a,
+	status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_THERMAL_A, &phl_com->efuse_data.thermal_a,
 				    1);
 
 	if (status != RTW_HAL_STATUS_SUCCESS) {
@@ -169,7 +169,7 @@ enum rtw_hal_status efuse_set_hw_cap(struct efuse_t *efuse)
 	}
 
 	for (i = 0; i < 11; i++) {
-		status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_2G_CCK_C_TSSI_DE_1 + i, &phl_com->efuse_data.tssi_2g[i],
+		status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_2G_CCK_A_TSSI_DE_1 + i, &phl_com->efuse_data.tssi_2g[i],
 					    1);
 		if (status != RTW_HAL_STATUS_SUCCESS) {
 			PHL_WARN("%s: Get 2g tssi %d fail! Status(%x)\n", __FUNCTION__, i, status);
@@ -178,7 +178,7 @@ enum rtw_hal_status efuse_set_hw_cap(struct efuse_t *efuse)
 	}
 
 	for (i = 0; i < 14; i++) {
-		status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_5G_BW40M_C_TSSI_DE_1 + i, &phl_com->efuse_data.tssi_5g[i],
+		status = rtw_efuse_get_info(efuse, EFUSE_INFO_RF_5G_BW40M_A_TSSI_DE_1 + i, &phl_com->efuse_data.tssi_5g[i],
 					    1);
 		if (status != RTW_HAL_STATUS_SUCCESS) {
 			PHL_WARN("%s: Get 5g tssi %d fail! Status(%x)\n", __FUNCTION__, i, status);

@@ -63,6 +63,7 @@ struct sport_dai {
 	struct clk* clock;
 	struct clock_params * audio_clock_params;
 	unsigned int sport_mclk_multiplier;
+	unsigned int sport_fixed_mclk_max;
 	unsigned int sport_multi_io;
 	unsigned int sport_mode;
 	int	irq;
@@ -81,6 +82,8 @@ struct sport_dai {
 	u64 tx_sport_compare_val;
 	u64 rx_sport_compare_val;
 	u64 last_total_delay;
+
+	unsigned int dai_fmt;
 
 	spinlock_t lock;
 };
@@ -415,6 +418,34 @@ delay_end:
 	return delay;
 }
 
+static unsigned int get_sp_df_for_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+{
+	struct sport_dai *sport;
+	unsigned int sp_df = SP_DF_LEFT;
+
+	sport = snd_soc_dai_get_drvdata(dai);
+
+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK)
+	{
+	case SND_SOC_DAI_FORMAT_I2S:
+		sp_df = SP_DF_I2S;
+		break;
+	case SND_SOC_DAI_FORMAT_LEFT_J:
+		sp_df = SP_DF_LEFT;
+		break;
+	case SND_SOC_DAI_FORMAT_DSP_A:
+		sp_df = SP_DF_PCM_A;
+		break;
+	case SND_SOC_DAI_FORMAT_DSP_B:
+		sp_df = SP_DF_PCM_B;
+		break;
+	default:
+		dev_err(&sport->pdev->dev,"unsupported fmt:%d", fmt);
+		break;
+	}
+
+	return sp_df;
+}
 
 static int sport_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
@@ -431,7 +462,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
 		sport->tx_sport_compare_val = params_buffer_size(params);
-		sp_tx_init.sp_sel_data_format = SP_DF_LEFT;
+		sp_tx_init.sp_sel_data_format = get_sp_df_for_fmt(dai, sport->dai_fmt);
 		sp_tx_init.sp_sel_ch = SP_TX_CH_LR;
 		sp_tx_init.sp_sr = SP_16K;
 		sp_tx_init.sp_in_clock = sport->clock_in_from_dts;
@@ -446,12 +477,12 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 			sp_tx_init.sp_set_multi_io = SP_TX_MULTIIO_DIS;
 
 		/* this means the external codec MCLK needs to be imported by sport_mclk_multiplier*sport_MCLK */
-		if (sport->sport_mclk_multiplier != 0) {
+		if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
 			if (sport->sport_multi_io == 1) {
-				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params)!= 0)
+				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params)!= 0)
 					return -EINVAL;
 			} else {
-				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
+				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
 					return -EINVAL;
 			}
 			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
@@ -540,7 +571,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE){
 		sport->rx_sport_compare_val = params_buffer_size(params);
-		sp_rx_init.sp_sel_data_format = SP_DF_LEFT;
+		sp_rx_init.sp_sel_data_format = get_sp_df_for_fmt(dai, sport->dai_fmt);
 		sp_rx_init.sp_sel_ch = SP_RX_CH_LR;
 		sp_rx_init.sp_sr = SP_16K;
 		sp_rx_init.sp_in_clock = sport->clock_in_from_dts;
@@ -554,12 +585,12 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 		else
 			sp_rx_init.sp_set_multi_io = SP_RX_MULTIIO_DIS;
 
-		if (sport->sport_mclk_multiplier != 0) {
+		if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
 			if (sport->sport_multi_io == 1) {
-				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
+				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
 					return -EINVAL;
 			} else {
-				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->audio_clock_params) != 0)
+				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
 					return -EINVAL;
 			}
 			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
@@ -679,6 +710,9 @@ static int sport_hw_free(struct snd_pcm_substream *substream, struct snd_soc_dai
 
 static int sport_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+	sport->dai_fmt = fmt;
+
 	return 0;
 }
 
@@ -695,7 +729,7 @@ static int sport_startup(struct snd_pcm_substream *substream,
 		dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
 	}
 
-	if ((sport -> sport_debug) >= 1 && (sport->sport_mclk_multiplier != 0))
+	if ((sport -> sport_debug) >= 1 && (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0))
 		audio_clock_dump();
 
 	return 0;
@@ -710,7 +744,7 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 
 	clk_disable_unprepare(sport->clock);
 	//below to be done
-	if (sport->sport_mclk_multiplier != 0) {
+	if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
 		/* disable sport clock */
 		update_fen_cke_sport_status(sport->id, false);
 		if (sport -> sport_debug >= 1)
@@ -1073,14 +1107,18 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-mclk-multiplier", 0, &sport->sport_mclk_multiplier);
 
+	sport->sport_fixed_mclk_max = 0;
+	/* Reads the fixed mclk max value from the device tree and stores in data->sport_fixed_mclk_max */
+	of_property_read_u32_index(dev->of_node, "rtk,sport-mclk-fixed-max", 0, &sport->sport_fixed_mclk_max);
+
 	/* default sport_multi_io 0 */
 	sport->sport_multi_io = 0;
-	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
+	/* Reads the sport_multi_io value from the device tree and stores in data->sport_multi_io */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-multi-io", 0, &sport->sport_multi_io);
 
-	/* default sport_multi_io 0(master) */
+	/* default sport_mode 0(master) */
 	sport->sport_mode = 0;
-	/* Reads the mclk mutiplier value from the device tree and stores in data->sport_mclk_multiplier */
+	/* Reads the sport_mode value from the device tree and stores in data->sport_mode */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-mode", 0, &sport->sport_mode);
 
 	/* Read irq of sport */
@@ -1096,6 +1134,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sport->irq_rx_count = 0;
 	sport->tx_sport_compare_val = 6144;
 	sport->rx_sport_compare_val = 6144;
+	sport->dai_fmt = SND_SOC_DAIFMT_LEFT_J;
 
 	spin_lock_init(&sport->lock);
 
@@ -1107,7 +1146,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	}
 
 	/*for external sport2, and sport3, using rcc node to control clocks*/
-	if (sport->sport_mclk_multiplier != 0) {
+	if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
 		sport->audio_clock_params = devm_kzalloc(dev, sizeof(struct clock_params), GFP_KERNEL);
 		if (sport->audio_clock_params == NULL){
 			dev_err(&pdev->dev, "alloc audio_clock_params fail");
@@ -1139,9 +1178,6 @@ static int amebad2_sport_remove(struct platform_device *pdev)
 
 	sport = dev_get_drvdata(&pdev->dev);
 
-	clk_disable_unprepare(sport->clock);
-
-	iounmap(sport->addr);
 	release_mem_region(sport->base, sport->reg_size);
 
 	sysfs_remove_group(&pdev->dev.kobj,&sport_debug_attr_grp);

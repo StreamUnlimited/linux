@@ -137,39 +137,6 @@ void halrf_bt_ultra_low_pwr_adv(struct rf_info *rf)
 	}
 }
 
-void halrf_trigger_thermal(struct rf_info *rf)
-{
-	struct rtw_hal_com_t *hal_i = rf->hal_com;
-
-	switch (hal_i->chip_id) {
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		halrf_trigger_thermal_8852a(rf, RF_PATH_A);
-		halrf_trigger_thermal_8852a(rf, RF_PATH_B);
-		break;
-#endif
-	default:
-		break;
-	}
-}
-
-u8 halrf_only_get_thermal(struct rf_info *rf, enum rf_path path)
-{
-	struct rtw_hal_com_t *hal_i = rf->hal_com;
-
-	switch (hal_i->chip_id) {
-#ifdef RF_8852A_SUPPORT
-	case CHIP_WIFI6_8852A:
-		return halrf_only_get_thermal_8852a(rf, path);
-		break;
-#endif
-	default:
-		break;
-	}
-
-	return 0;
-}
-
 void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index)
 {
 	u32 t[2];
