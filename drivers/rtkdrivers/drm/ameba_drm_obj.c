@@ -938,6 +938,14 @@ static struct drm_driver ameba_lcdc_driver = {
 	.gem_free_object_unlocked   = ameba_drm_gem_free_object,
 	.get_vblank_timestamp       = ameba_drm_get_vblank_timestamp,
 
+	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
+	.gem_prime_get_sg_table	= drm_gem_cma_prime_get_sg_table,
+	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
+	.gem_prime_vmap		= drm_gem_cma_prime_vmap,
+	.gem_prime_vunmap	= drm_gem_cma_prime_vunmap,
+	.gem_prime_mmap		= drm_gem_cma_prime_mmap,
+
 	.name   = "amebad2",
 	.desc   = "Realtek AmebaD2 SoC DRM Driver",
 	.date   = "20210916",
