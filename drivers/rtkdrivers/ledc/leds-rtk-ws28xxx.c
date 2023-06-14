@@ -1113,6 +1113,17 @@ PATTERN_OUT:
 	return ret;
 }
 
+// Helper to set all LEDs brightness to 0
+static int rtk_ws28xxx_led_clear(struct rtk_ws28xxx_led *led)
+{
+	struct led_pattern *p;
+	p = kzalloc(sizeof(*p) * led->priv->ledc_params.led_count, GFP_KERNEL);
+	rtk_ws28xxx_led_pattern_set(&led->ldev, p, led->priv->ledc_params.led_count, 0);
+	kfree(p);
+
+	return 0;
+}
+
 static int rtk_ws28xxx_led_register(
 	struct device *dev, struct rtk_ws28xxx_led_priv *priv)
 {
@@ -1143,6 +1154,8 @@ static int rtk_ws28xxx_led_register(
 		}
 
 		rtk_ws28xxx_ledc_hw_set(led->priv);
+
+		rtk_ws28xxx_led_clear(led);
 	}
 
 	return 0;
