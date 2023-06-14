@@ -843,7 +843,7 @@ u32 ledc_irq_handler(struct rtk_ws28xxx_led_priv *priv, u32 InterruptStatus)
 {
 	if (InterruptStatus & LEDC_BIT_LED_TRANS_FINISH_INT) {
 		rtk_ledc_clear_interrupt(priv, LEDC_BIT_LED_TRANS_FINISH_INT);
-		pr_info("[LEDC] TRANS DONE.");
+		pr_debug("[LEDC] TRANS DONE.");
 
 		if (rtk_ledc_get_trans_mode(priv) == LEDC_DMA_MODE) {
 			priv->dma_params.gdma_done = 1;
@@ -894,7 +894,7 @@ u32 ledc_irq_handler(struct rtk_ws28xxx_led_priv *priv, u32 InterruptStatus)
 	}
 
 	/* The last log of interrupt will not print in this period. */
-	pr_info("\n");
+	pr_debug("\n");
 	return 0;
 }
 
