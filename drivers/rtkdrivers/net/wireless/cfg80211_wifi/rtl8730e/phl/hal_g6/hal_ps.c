@@ -338,6 +338,21 @@ rtw_hal_ps_set_32k(void *hal, bool en_32k, bool en_ack) {
 	return status;
 }
 
+enum rtw_hal_status
+rtw_hal_ps_store_axi_regs(void *hal, bool store) {
+	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+
+	status = rtw_hal_mac_ps_store_axi_regs(hal_info, store);
+	if (status != RTW_HAL_STATUS_SUCCESS)
+	{
+		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "%s: %s bus regs failed!\n",
+			 __FUNCTION__, store ? "store" : "restore");
+	}
+
+	return status;
+}
+
 /**
  * configure the legacy power save (protocol)
  * return configure lps fail or not

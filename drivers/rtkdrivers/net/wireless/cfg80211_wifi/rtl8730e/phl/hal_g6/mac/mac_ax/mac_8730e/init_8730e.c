@@ -107,7 +107,7 @@ static struct mac_ax_intf_ops mac8730e_axi_ops = {
 	NULL, /*poll_txdma_ch_idle*/
 	NULL, /*poll_rxdma_ch_idle*/
 	NULL, /*ctrl_txhci*/
-	NULL, /*ctrl_rxhci*/
+	mac_ctrl_rxhci, /*ctrl_rxhci*/
 	NULL, /*ctrl_dma_io*/
 	NULL, /* get_io_stat */
 	NULL, /*get_txagg_num*/
@@ -254,6 +254,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_sifs_chk_cca_en, /* check cca in sifs enable/disable */
 	NULL, /*for patch rate, patch_rx_rate*/
 	NULL, /* wd offload for wp_offset, called while forming metadata, get_wp_offset */
+	mac_set_ax_pkt_extension, /*set packet extension*/
 	/*frame exchange related*/
 	NULL, /* upd_ba_infotbl */
 	NULL, /* upd_mu_sta */
@@ -301,7 +302,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	NULL, /*bypass SND status*/
 	mac_deinit_mee, /*deinit_mee*/
 	mac_snd_sup, /*bf entry num and SU MU buffer num*/
-	NULL, /*VHT MU GID position setting*/
+	mac_gid_pos, /*VHT MU GID position setting*/
 	/*ps related*/
 	mac_cfg_lps, /*config LPS*/
 	mac_ps_pwr_state, /*set or check lps power state*/
@@ -310,6 +311,7 @@ static struct mac_ax_ops mac8730e_ops = {
 	mac_chk_leave_ips, /*check already leave IPS protocol*/
 	mac_ps_notify_wake, /*send RPWM to wake up HW/FW*/
 	mac_ps_set_32k, /* ps_set_32k */
+	mac_ps_store_axi_regs, /* ps_store_axi_regs */
 	mac_cfg_ps_advance_parm, /*config advance parameter for power saving*/
 	mac_periodic_wake_cfg, /*config ips periodic wake*/
 	/* Wowlan related*/
@@ -392,7 +394,6 @@ static struct mac_ax_ops mac8730e_ops = {
 	NULL, /*8730E not support xtal_si*/
 	NULL, /*8730E not support xtal_si*/
 	NULL, /*io_chk_access */
-	NULL, /* ser_ctrl */
 	NULL, /* chk_ser_status */
 	/* mcc */
 	mac_reset_mcc_group,
@@ -957,7 +958,7 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 
 	MAC_REG_W32(REG_RCR, WLAN_RCR_CFG);
 	val8 = MAC_REG_R8(REG_RXPSF_CTRL + 2);
-	val8 = (val8 & 0xF0) | 0xe;
+	val8 = (val8 & 0xF0) | 0xa;	/*set [3:1]=5 to solve macrx clk gating issue, suggested by Darren_liu*/
 	MAC_REG_W8(REG_RXPSF_CTRL + 2, val8);
 
 	MAC_REG_W8(REG_RXPKT_CTL, WLAN_RXPKT_MAX_SZ_512);
@@ -1011,6 +1012,26 @@ u32 init_wmac_cfg_8730e(struct mac_ax_adapter *adapter)
 	if (ret != MACSUCCESS) {
 		return ret;
 	}
+
+	/*To solve not update basic nav issue, https://jira.realtek.com/browse/AMEBALITE-234*/
+	val32 = MAC_REG_R32(REG_RESP_CONTROL_1);
+	val32 &= ~BIT_RESP_EARLY_START;
+	MAC_REG_W32(REG_RESP_CONTROL_1, val32);
+
+	/*To solve orig tx blocked when mu sounding, https://jira.realtek.com/browse/AMEBAD2-1382*/
+	val32 = MAC_REG_R32(REG_BEAMFORMING_CTRL);
+	val32 &= ~BIT_WMAC_CSI_BFRP_STOPTX;
+	MAC_REG_W32( REG_BEAMFORMING_CTRL, val32);
+
+	/*To solve txtb data fail cause tx resp hang issue, https://jira.realtek.com/browse/AMEBAD2-1446*/
+	val32 = MAC_REG_R32(REG_RXAI_CTRL);
+	val32 |= (BIT_RXAI_ADDR_CHKEN | BIT_RXAI_PRTCT_SEL);
+	MAC_REG_W32(REG_RXAI_CTRL, val32);
+
+	/*To solve the issue that not resp hetb when bsrp/bfrp/bqrp/murts with cs_required=1*/
+	val32 = MAC_REG_R32(REG_RESP_CONTROL);
+	val32 &= ~BIT_RESP_RXTRIG_CHK_INSIFS;
+	MAC_REG_W32(REG_RESP_CONTROL, val32);
 
 	/*gnt wlan*/
 	MAC_REG_W8(REG_BT_COEX_ENH + 1, COEX_GNT_WLAN);
@@ -1311,16 +1332,22 @@ u32 init_txq_ctrl_8730e(struct mac_ax_adapter *adapter)
 u32 init_sifs_ctrl_8730e(struct mac_ax_adapter *adapter)
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	u32 ret = MACSUCCESS;
+	u32 ret = MACSUCCESS, val32 = 0;
 
 	MAC_REG_W32(REG_RETRY_LIMIT_SIFS, WLAN_SIFS_DUR_TUNE \
 		    | BIT_SRL(WLAN_RETRY_LIMIT) \
 		    | BIT_LRL(WLAN_RETRY_LIMIT));
 	MAC_REG_W32(REG_SIFS, WLAN_SIFS_CFG);
-	MAC_REG_W16(REG_RESP_SIFS_CCK,
-		    (u16)(WLAN_SIFS_CCK_T2T | WLAN_SIFS_CCK_R2T << 11));
-	MAC_REG_W16(REG_SIFS_TIMING_CTRL_OFDM,
-		    (u16)(WLAN_SIFS_OFDM_T2T | WLAN_SIFS_OFDM_R2T << 11));
+
+	val32 = MAC_REG_R32(REG_SIFS_TIMING_CTRL_CCK);
+	val32 = BIT_SET_R2T_SIFS_CCK(val32, WLAN_SIFS_CCK_R2T);
+	val32 = BIT_SET_T2T_SIFS_CCK(val32, WLAN_SIFS_CCK_T2T);
+	MAC_REG_W32(REG_SIFS_TIMING_CTRL_CCK, val32);
+
+	val32 = MAC_REG_R32(REG_SIFS_TIMING_CTRL_OFDM);
+	val32 = BIT_SET_T2T_SIFS_OFDM(val32, WLAN_SIFS_OFDM_T2T);
+	val32 = BIT_SET_R2T_SIFS_OFDM(val32, WLAN_SIFS_OFDM_R2T);
+	MAC_REG_W32(REG_SIFS_TIMING_CTRL_OFDM, val32);
 
 	return MACSUCCESS;
 }

@@ -215,6 +215,8 @@ static void realtek_gpio_irq_enable(struct irq_data *data)
 	writel(mask, bank->reg_base + GPIO_INT_EN);
 
 	spin_unlock_irqrestore(&bank->lock, flags);
+
+	realtek_gpio_irq_unmask(data);
 }
 
 static unsigned int realtek_gpio_irq_startup(struct irq_data *data)

@@ -63,12 +63,12 @@ void init_hal_spec_8730e(struct rtw_phl_com_t *phl_com,
 	/* HE */
 	hw_proto_cap[0].he_su_bfme = 1;
 	hw_proto_cap[0].he_su_bfmr = 0;
-	hw_proto_cap[0].he_mu_bfme = 0;
+	hw_proto_cap[0].he_mu_bfme = 1;
 	hw_proto_cap[0].he_mu_bfmr = 0;
 
 	hw_proto_cap[1].he_su_bfme = 1;
 	hw_proto_cap[1].he_su_bfmr = 0;
-	hw_proto_cap[1].he_mu_bfme = 0;
+	hw_proto_cap[1].he_mu_bfme = 1;
 	hw_proto_cap[1].he_mu_bfmr = 0;
 
 	hw_proto_cap[0].trig_cqi_fb = 1;
@@ -80,12 +80,12 @@ void init_hal_spec_8730e(struct rtw_phl_com_t *phl_com,
 	hw_proto_cap[0].vht_su_bfmr = 0;
 	hw_proto_cap[0].vht_su_bfme = 1;
 	hw_proto_cap[0].vht_mu_bfmr = 0;
-	hw_proto_cap[0].vht_mu_bfme = 0;
+	hw_proto_cap[0].vht_mu_bfme = 1;
 
 	hw_proto_cap[1].vht_su_bfmr = 0;
 	hw_proto_cap[1].vht_su_bfme = 1;
 	hw_proto_cap[1].vht_mu_bfmr = 0;
-	hw_proto_cap[1].vht_mu_bfme = 0;
+	hw_proto_cap[1].vht_mu_bfme = 1;
 
 	/* HT */
 	hw_proto_cap[0].ht_su_bfmr = 0;
@@ -107,12 +107,12 @@ void init_hal_spec_8730e(struct rtw_phl_com_t *phl_com,
 	hw_proto_cap[1].stbc_tx_greater_80mhz = 0;
 
 	/* STBC Rx*/
-	hw_proto_cap[0].stbc_ht_rx = 0;
-	hw_proto_cap[1].stbc_ht_rx = 0;
-	hw_proto_cap[0].stbc_vht_rx = 0;
-	hw_proto_cap[1].stbc_vht_rx = 0;
-	hw_proto_cap[0].stbc_he_rx = 0;
-	hw_proto_cap[1].stbc_he_rx = 0;
+	hw_proto_cap[0].stbc_ht_rx = 1;
+	hw_proto_cap[1].stbc_ht_rx = 1;
+	hw_proto_cap[0].stbc_vht_rx = 1;
+	hw_proto_cap[1].stbc_vht_rx = 1;
+	hw_proto_cap[0].stbc_he_rx = 1;
+	hw_proto_cap[1].stbc_he_rx = 1;
 	hw_proto_cap[0].stbc_rx_greater_80mhz = 0;
 	hw_proto_cap[1].stbc_rx_greater_80mhz = 0;
 #endif
@@ -281,9 +281,8 @@ enum rtw_hal_status hal_start_8730e(struct rtw_phl_com_t *phl_com,
 		phl_com->append_fcs = val;
 	}
 
-#ifdef RTW_WKARD_HW_MGNT_GCMP_256_DISABLE
-	rtw_hal_mac_config_hw_mgnt_sec(hal, false);
-#endif
+	/* enable hw encypt end dencypt for mgnt unitcast */
+	rtw_hal_mac_config_hw_mgnt_sec(hal, true);
 
 	PHL_INFO("==> Default ENABLE RX_PPDU_STS for Band0\n");
 	/* Enable PPDU STS in default for BAND-0 for phy status */

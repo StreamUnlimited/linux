@@ -5010,7 +5010,7 @@ unsigned int OnAction_vht(_adapter *padapter, union recv_frame *precv_frame)
 		break;
 	case RTW_WLAN_ACTION_VHT_GROUPID_MANAGEMENT:
 #ifdef CONFIG_BEAMFORMING
-		/*rtw_beamforming_get_vht_gid_mgnt_frame(padapter, precv_frame);*/
+		rtw_bf_get_vht_gid_mgnt_packet(padapter, precv_frame);
 #endif /* CONFIG_BEAMFORMING */
 		break;
 	default:

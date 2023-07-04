@@ -711,6 +711,7 @@ static void rtk_i2c_xfer_msg(
 	/*Local Variables*/
 	u8 i2c_msg_addr_mode = I2C_ADDR_7BIT;
 	hal_status dev_status = HAL_OK;
+	int delay_count = 0;
 
 	dev_dbg(i2c_dev->dev, "%s", __FUNCTION__);
 	rtk_print_i2c_input_data(msg, msg->flags & I2C_M_RD);
@@ -777,6 +778,12 @@ static void rtk_i2c_xfer_msg(
 		while ((i2c_dev->i2c_manage.dev_status != I2C_STS_IDLE)
 			   && (i2c_dev->i2c_manage.dev_status != I2C_STS_ERROR)
 			   && (i2c_dev->i2c_manage.dev_status != I2C_STS_TIMEOUT)) {
+				/* Directly sleep here will cause runtime touchscreen not smooth(us-level i2c done). */
+				delay_count++;
+				/* No sleep here will cause audio xrun when i2c is not wired to board.(i2c cannot transfer). */
+				if (delay_count > 200) {
+					msleep(200);
+				}
 				if (rtk_i2c_is_timeout(i2c_dev) == HAL_TIMEOUT) {
 					i2c_dev->i2c_manage.dev_status = I2C_STS_TIMEOUT;
 					dev_err(i2c_dev->dev, "I2C-%d send timeout. Reason: cannot finish write.", i2c_dev->i2c_param.i2c_index);

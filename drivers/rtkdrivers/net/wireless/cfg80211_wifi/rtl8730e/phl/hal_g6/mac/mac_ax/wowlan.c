@@ -244,11 +244,6 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 	parm2.eap_wakeup = info->eap_wakeup;
 	parm2.all_data_wakeup = info->all_data_wakeup;
 	parm2.mac_id = macid;
-	ret = send_h2c_wakeup_ctrl(adapter, &parm2);
-	if (ret) {
-		PLTFM_MSG_ERR("send h2c wakeup ctrl failed\n");
-		return ret;
-	}
 
 	parm1.wow_en = info->wow_en;
 	parm1.drop_all_pkt = info->drop_all_pkt;
@@ -275,15 +270,6 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 			role->info.wol_uc = info->hw_unicast_en;
 			role->info.wol_magic = info->magic_en;
 
-			/*sec_iv_info.macid = macid;
-			if (content)
-				for (i = 0 ; i < IV_LENGTH ; i++)
-					sec_iv_info.ptktxiv[i] =
-						content->ptktxiv[i];
-
-			sec_iv_info.opcode = SEC_IV_UPD_TYPE_WRITE;
-			ret = p_ops->mac_wowlan_secinfo(adapter, &sec_iv_info);*/
-
 			ret = mac_change_role(adapter, &role->info);
 			if (ret) {
 				PLTFM_MSG_ERR("role change failed\n");
@@ -294,15 +280,6 @@ u32 mac_cfg_wow_wake(struct mac_ax_adapter *adapter,
 			return MACNOITEM;
 		}
 	} else {
-		/*sec_iv_info.macid = macid;
-		sec_iv_info.opcode = SEC_IV_UPD_TYPE_READ;
-		ret = p_ops->mac_wowlan_secinfo(adapter, &sec_iv_info);
-		if (ret) {
-			PLTFM_MSG_ERR("refresh_security_cam_info failed %d\n", ret);
-		} else {
-			PLTFM_MSG_TRACE("refresh_security_cam_info success!\n");
-		}*/
-
 		if (wow_bk_status[(macid >> 5)] & BIT(macid & 0x1F)) {
 			//restore address cam
 			role = mac_role_srch(adapter, macid);
@@ -439,14 +416,6 @@ u32 mac_cfg_arp_ofld(struct mac_ax_adapter *adapter,
 	parm.mac_id = macid;
 	parm.arp_rsp_id = info->arp_rsp_id;
 
-	//if (parp_info_content)
-	//	PLTFM_MEMCPY(&parm.ndp_info_content, parp_info_content,
-	//		     sizeof(struct _arp_info_parm_) * 2);
-
-	ret = send_h2c_arp_ofld(adapter, &parm);
-	if (ret) {
-		return ret;
-	}
 	return MACSUCCESS;
 }
 
@@ -792,19 +761,17 @@ u32 mac_get_wow_fw_status(struct mac_ax_adapter *adapter, u8 *status,
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-#if 0
 	if (func_en) {
 		func_en = 1;
 	}
 
-	*status = !!((MAC_REG_R8(R_AX_WOW_CTRL) & B_AX_WOW_WOWEN));
+	*status = !!((MAC_REG_R8(REG_WOW_NAN_CTRL) & BIT_WFMSK));
 
 	if (func_en == *status) {
 		*status = 1;
 	} else {
 		*status = 0;
 	}
-#endif
 
 	return MACSUCCESS;
 }

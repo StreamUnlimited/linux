@@ -44,6 +44,8 @@
 #define RTK_WKARD_CORE_BTC_STBC_CAP
 #endif
 
+#define CONFIG_RTW_IOCTL_SET_COUNTRY
+
 /*halbb halrf config*/
 #define DRV_BB_RUA_DISABLE
 #define DRV_BB_LA_MODE_DISABLE

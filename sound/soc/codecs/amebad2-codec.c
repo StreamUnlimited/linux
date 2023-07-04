@@ -637,12 +637,6 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 
 	}else{
 		switch(sample_rate){
-			case 192000:
-				codec_init.codec_adc_sr = SR_192K;
-				break;
-			case 176400:
-				codec_init.codec_adc_sr = SR_176P4K;
-				break;
 			case 96000:
 				codec_init.codec_adc_sr = SR_96K;
 				break;
@@ -799,8 +793,7 @@ static struct snd_soc_dai_driver amebad2_dai[] = {
 			.rate_min = 8000,
 			.rate_max = 192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-						SNDRV_PCM_FMTBIT_S24_LE |
-						SNDRV_PCM_FMTBIT_S32_LE,
+						SNDRV_PCM_FMTBIT_S24_LE,
 			.sig_bits = 24,
 		},
 		.ops = &amebad2_aif_dai_ops,
@@ -816,8 +809,7 @@ static struct snd_soc_dai_driver amebad2_dai[] = {
 			.rate_min = 8000,
 			.rate_max = 192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-						SNDRV_PCM_FMTBIT_S24_LE |
-						SNDRV_PCM_FMTBIT_S32_LE,
+						SNDRV_PCM_FMTBIT_S24_LE,
 			.sig_bits = 24,
 		},
 		.ops = &amebad2_aif_dai_ops,

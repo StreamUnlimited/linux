@@ -236,27 +236,26 @@ u32 set_hw_muedca_param(struct mac_ax_adapter *adapter,
 
 	val32 = MAC_REG_R32(reg_edca);
 	ecw = (param->ecw_max << 4) | param->ecw_min;
-
 	switch (param->ac) {
 	case MAC_AX_CMAC_AC_SEL_VO:
-		val32 = BIT_SET_MUEDCA_VO_PARAM_AIFS(val32, param->aifs_us) |
-			BIT_SET_MUEDCA_VO_PARAM_AIFS(val32, ecw) |
-			BIT_SET_MUEDCA_VO_PARAM_TIMER(val32, param->muedca_timer_32us);
+		val32 = BIT_SET_MUEDCA_VO_PARAM_AIFS(val32, param->aifs_us);
+		val32 = BIT_SET_MUEDCA_VO_PARAM_CW(val32, ecw);
+		val32 = BIT_SET_MUEDCA_VO_PARAM_TIMER(val32, param->muedca_timer_32us);
 		break;
 	case MAC_AX_CMAC_AC_SEL_VI:
-		val32 = BIT_SET_MUEDCA_VI_PARAM_AIFS(val32, param->aifs_us) |
-			BIT_SET_MUEDCA_VI_PARAM_AIFS(val32, ecw) |
-			BIT_SET_MUEDCA_VI_PARAM_TIMER(val32, param->muedca_timer_32us);
+		val32 = BIT_SET_MUEDCA_VI_PARAM_AIFS(val32, param->aifs_us);
+		val32 = BIT_SET_MUEDCA_VI_PARAM_CW(val32, ecw);
+		val32 = BIT_SET_MUEDCA_VI_PARAM_TIMER(val32, param->muedca_timer_32us);
 		break;
 	case MAC_AX_CMAC_AC_SEL_BE:
-		val32 = BIT_SET_MUEDCA_BE_PARAM_AIFS(val32, param->aifs_us) |
-			BIT_SET_MUEDCA_BE_PARAM_AIFS(val32, ecw) |
-			BIT_SET_MUEDCA_BE_PARAM_TIMER(val32, param->muedca_timer_32us);
+		val32 = BIT_SET_MUEDCA_BE_PARAM_AIFS(val32, param->aifs_us);
+		val32 = BIT_SET_MUEDCA_BE_PARAM_CW(val32, ecw);
+		val32 = BIT_SET_MUEDCA_BE_PARAM_TIMER(val32, param->muedca_timer_32us);
 		break;
 	case MAC_AX_CMAC_AC_SEL_BK:
-		val32 = BIT_SET_MUEDCA_BK_PARAM_AIFS(val32, param->aifs_us) |
-			BIT_SET_MUEDCA_BK_PARAM_AIFS(val32, ecw) |
-			BIT_SET_MUEDCA_BK_PARAM_TIMER(val32, param->muedca_timer_32us);
+		val32 = BIT_SET_MUEDCA_BK_PARAM_AIFS(val32, param->aifs_us);
+		val32 = BIT_SET_MUEDCA_BK_PARAM_CW(val32, ecw);
+		val32 = BIT_SET_MUEDCA_BK_PARAM_TIMER(val32, param->muedca_timer_32us);
 		break;
 	default:
 		return MACNOITEM;

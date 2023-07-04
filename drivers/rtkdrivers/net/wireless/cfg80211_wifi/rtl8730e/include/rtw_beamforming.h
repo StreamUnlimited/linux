@@ -41,5 +41,7 @@
 
 void rtw_core_bf_watchdog(_adapter *padapter);
 
+int rtw_bf_get_vht_gid_mgnt_packet(struct _ADAPTER *a, union recv_frame *rframe);
+
 #endif
 #endif /*__RTW_BEAMFORMING_H_*/

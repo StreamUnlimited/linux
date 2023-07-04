@@ -224,7 +224,7 @@ u32 rtl8730e_set_wowlan_ctrl_cmd(struct mac_ax_adapter *adapter, enum mac_ax_wow
 	}
 #endif
 
-	printk("%s(): enable=%d change_unit=%d\n",
+	PLTFM_MSG_TRACE("%s(): enable=%d change_unit=%d\n",
 			 __func__, enable, change_unit);
 
 	/* time = (gpio_dur/2) * gpio_unit, default:256 ms */

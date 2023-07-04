@@ -58,7 +58,7 @@ static spinlock_t g_inic_ipc_msg_lock;
  * @param  p_node[in]: the pointer for the ipc message node that need to be
  * 	pushed into the queue.
  * @param  p_queue[in]: the queue used to store the p_node.
- * @return status, always _SUCCESS.
+ * @return status, always true.
  ******************************************************************************/
 static int enqueue_ipc_msg_node(ipc_msg_q_priv_t *priv, ipc_msg_node_t *p_node)
 {
@@ -177,7 +177,7 @@ void inic_ipc_msg_q_init(struct device *pdev, void (*task_hdl)(inic_ipc_ex_msg_t
  * @brief  put the ipc message to queue.
  * @param  p_node[in]: the pointer for the ipc message that need to be
  * 	pushed into the queue.
- * @return status, always _SUCCESS.
+ * @return status, always true.
  ******************************************************************************/
 int inic_ipc_msg_enqueue(inic_ipc_ex_msg_t *p_ipc_msg)
 {

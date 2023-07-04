@@ -139,7 +139,7 @@ u32 mac_set_csi_para_reg(struct mac_ax_adapter *adapter,
 			 struct mac_reg_csi_para *csi_para)
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	u32 val32, ret;
+	u32 val32, ret, i;
 
 	ret = check_mac_en(adapter, MAC_AX_MAC_SEL);
 	if (ret != MACSUCCESS) {
@@ -155,9 +155,10 @@ u32 mac_set_csi_para_reg(struct mac_ax_adapter *adapter,
 		(csi_para->cb << 8) | (csi_para->cs << 10);
 	MAC_REG_W32(REG_SOUNDING_CFG0, val32);
 
-	val32 = MAC_REG_R32(REG_CSI_RRSR);
-	val32 |= BIT_CSI_STBC_EN | BIT_CSI_LDPC_EN;
-	MAC_REG_W32(REG_CSI_RRSR, val32);
+	/*set beamformer's mac address*/
+	for (i = 0; i < 6; i++) {
+		MAC_REG_W8(REG_ASSOCIATED_BFMER0_INFO + i, csi_para->mac_addr[i]);
+	}
 
 	return MACSUCCESS;
 
@@ -272,6 +273,22 @@ u32 mac_snd_sup(struct mac_ax_adapter *adapter, struct mac_bf_sup *bf_sup)
 	} else {
 		return MACNOTSUP;
 	}*/
+	return MACSUCCESS;
+}
+
+u32 mac_gid_pos(struct mac_ax_adapter *adapter, struct mac_gid_pos *mu_gid)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 val32, ret;
+
+	MAC_REG_W32(REG_GID_POS_EN_L, mu_gid->gid_tab[0]);
+	MAC_REG_W32(REG_GID_POS_EN_H, mu_gid->gid_tab[1]);
+
+	MAC_REG_W32(REG_GID_POS0, mu_gid->user_pos[0]);
+	MAC_REG_W32(REG_GID_POS1, mu_gid->user_pos[1]);
+	MAC_REG_W32(REG_GID_POS2, mu_gid->user_pos[2]);
+	MAC_REG_W32(REG_GID_POS3, mu_gid->user_pos[3]);
+
 	return MACSUCCESS;
 }
 

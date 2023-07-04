@@ -669,7 +669,7 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 #endif
 
 #ifdef CONFIG_80211AX_HE
-#define CONFIG_STA_MULTIPLE_BSSID
+//#define CONFIG_STA_MULTIPLE_BSSID
 #endif
 
 #ifdef CONFIG_NARROWBAND_SUPPORTING

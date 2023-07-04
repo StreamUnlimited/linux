@@ -79,8 +79,6 @@ void rtw_hal_set_default_var(void *hal, enum rtw_hal_set_def_var_rsn rsn);
 
 u32 rtw_hal_var_init(struct rtw_phl_com_t *phl_com, void *hal);
 
-enum rtw_hal_status rtw_hal_ser_ctrl(void *hal, bool en);
-
 u32
 rtw_hal_ser_get_error_status(void *hal, u32 *err);
 
@@ -122,6 +120,8 @@ enum rtw_hal_status rtw_hal_get_wow_aoac_rpt(void *hal, struct rtw_aoac_report *
 enum rtw_hal_status rtw_hal_get_wow_fw_status(void *hal, u8 *status);
 enum rtw_hal_status rtw_hal_wow_cfg_txdma(void *hal, u8 en);
 
+enum rtw_hal_status rtw_hal_check_wow_fw_ready(void *hal, u8 func_en);
+
 enum rtw_hal_status rtw_hal_wow_init(struct rtw_phl_com_t *phl_com, void *hal, struct rtw_phl_stainfo_t *sta);
 enum rtw_hal_status rtw_hal_wow_deinit(struct rtw_phl_com_t *phl_com, void *hal, struct rtw_phl_stainfo_t *sta);
 
@@ -135,7 +135,6 @@ rtw_hal_wow_func_dis(struct rtw_phl_com_t *phl_com, void *hal, u16 macid,
 enum rtw_hal_status rtw_hal_wow_func_start(struct rtw_phl_com_t *phl_com, void *hal, u16 macid, struct rtw_hal_wow_cfg *cfg);
 enum rtw_hal_status rtw_hal_wow_func_stop(struct rtw_phl_com_t *phl_com, void *hal, u16 macid);
 
-enum rtw_hal_status rtw_hal_set_wowlan(struct rtw_phl_com_t *phl_com, void *hal, u8 enter);
 enum rtw_hal_status rtw_hal_sw_gpio_ctrl(struct rtw_phl_com_t *phl_com, void *hal, u8 high, u8 gpio);
 enum rtw_hal_status rtw_hal_set_sw_gpio_mode(struct rtw_phl_com_t *phl_com, void *hal, enum rtw_gpio_mode mode, u8 gpio);
 enum rtw_hal_status rtw_hal_wow_drop_tx(void *hal, u8 band);
@@ -772,6 +771,8 @@ rtw_hal_ps_pwr_lvl_cfg(struct rtw_phl_com_t *phl_com, void *hal,
 		       u32 req_pwr_lvl);
 enum rtw_hal_status
 rtw_hal_ps_set_32k(void *hal, bool en_32k, bool en_ack);
+enum rtw_hal_status
+rtw_hal_ps_store_axi_regs(void *hal, bool store);
 enum rtw_hal_status
 rtw_hal_ps_lps_cfg(void *hal, struct rtw_hal_lps_info *lps_info);
 enum rtw_hal_status

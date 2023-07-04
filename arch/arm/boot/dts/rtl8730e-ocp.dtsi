@@ -66,6 +66,8 @@
 			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x40000000 0x80000>; // wifi register base address and length
+			pinctrl-names = "default";
+			pinctrl-0 = <&wifi_ant_sel>;
 		};
 
 		dma: dma@400E0000 {
@@ -217,11 +219,13 @@
 			clock-names = "rtk_spi_clk";
 			spi-max-frequency = <100000000>;
 			spi-deactivate-delay = <0>;
+			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <0>;
 			rtk,spi-dma-en = <0>;
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
 			rtk,max-cs-num = <2>;
+			rtk,spi-cs-gpios = <&gpiob 17 0>;
 			status = "disabled";
 		};
 
@@ -235,11 +239,13 @@
 			clock-names = "rtk_spi_clk";
 			spi-max-frequency = <100000000>;
 			spi-deactivate-delay = <0>;
+			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <1>;
 			rtk,spi-dma-en = <0>;
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
 			rtk,max-cs-num = <2>;
+			rtk,spi-cs-gpios = <&gpioa 2 0>;
 			status = "disabled";
 		};
 

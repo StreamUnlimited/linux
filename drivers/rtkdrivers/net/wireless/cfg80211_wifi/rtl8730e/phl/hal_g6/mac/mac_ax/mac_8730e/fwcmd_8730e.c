@@ -31,7 +31,7 @@ static struct mac_ax_c2hreg_offset c2hreg_offset = {
 	0, /* data0 */
 	0, /* data1 */
 	0, /* data2 */
-	0, /* data3 */
+	REG_MCUTST_II, /* data3 */
 	0, /* ctrl */
 };
 

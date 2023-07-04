@@ -2,6 +2,7 @@
 menuconfig RTK_DRIVERS
     tristate "Drivers for Realtek"
 
+
 if RTK_DRIVERS
 
 source "drivers/rtkdrivers/adc/Kconfig"
@@ -11,6 +12,7 @@ source "drivers/rtkdrivers/captouch/Kconfig"
 if NETDEVICES
 if CFG80211
 source "drivers/rtkdrivers/net/wireless/cfg80211_wifi/Kconfig"
+source "drivers/rtkdrivers/net/wireless/cfg80211_fullmac/Kconfig"
 endif
 endif
 
@@ -71,5 +73,7 @@ source "drivers/rtkdrivers/tty_serial/Kconfig"
 source "drivers/rtkdrivers/usb_phy/Kconfig"
 
 source "drivers/rtkdrivers/watchdog/Kconfig"
+
+source "drivers/rtkdrivers/net/ieee802154/Kconfig"
 
 endif

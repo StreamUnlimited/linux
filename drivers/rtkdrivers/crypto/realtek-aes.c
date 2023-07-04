@@ -22,14 +22,13 @@
 #include "realtek-crypto.h"
 #include "realtek-aes.h"
 
+
 __aligned(32) static u8 ipsec_padding[64]  = { 0x0 };
+static const u8 gcm_iv_tail[] = {0x00, 0x00, 0x00, 0x01};
 
 static struct realtek_crypto_drv realtek_aes = {
 	.dev_list = LIST_HEAD_INIT(realtek_aes.dev_list),
-	.lock = __SPIN_LOCK_UNLOCKED(realtek_aes.lock),
 };
-
-static const u8 gcm_iv_tail[] = {0x00, 0x00, 0x00, 0x01};
 
 static int realtek_aes_wait_ok(struct realtek_aes_dev *adev)
 {
@@ -357,7 +356,7 @@ static int realtek_aes_process(struct ablkcipher_request *req, struct aead_reque
 	}
 
 	if (!enl) {
-		dev_err(ctx->adev->dev, "aes message length error, msg_len != 0\n");
+		dev_err(ctx->adev->dev, "aes message length error, msg_len is 0\n");
 		return -EINVAL;
 	}
 
@@ -561,18 +560,13 @@ static struct realtek_aes_dev *realtek_aes_find_dev(struct realtek_aes_ctx *ctx)
 {
 	struct realtek_aes_dev *adev = NULL, *tmp = NULL;
 
-	spin_lock_bh(&realtek_aes.lock);
-	if (!ctx->adev) {
-		list_for_each_entry(tmp, &realtek_aes.dev_list, list) {
+	list_for_each_entry(tmp, &realtek_aes.dev_list, list) {
+		if (tmp->ctx == ctx) {
 			adev = tmp;
+			ctx->adev = adev;
 			break;
 		}
-		ctx->adev = adev;
-	} else {
-		adev = ctx->adev;
 	}
-
-	spin_unlock_bh(&realtek_aes.lock);
 
 	return adev;
 }
@@ -580,34 +574,60 @@ static struct realtek_aes_dev *realtek_aes_find_dev(struct realtek_aes_ctx *ctx)
 static int realtek_aes_ecb_encrypt(struct ablkcipher_request *req)
 {
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_ECB;
 	ctx->isDecrypt = 0;
 	ctx->ivlen = 0;
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
 static int realtek_aes_ecb_decrypt(struct ablkcipher_request *req)
 {
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_ECB;
 	ctx->isDecrypt = 1;
 	ctx->ivlen = 0;
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -615,10 +635,23 @@ static int realtek_aes_cbc_encrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_CBC;
 	ctx->isDecrypt = 0;
@@ -626,7 +659,7 @@ static int realtek_aes_cbc_encrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -634,10 +667,23 @@ static int realtek_aes_cbc_decrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_CBC;
 	ctx->isDecrypt = 1;
@@ -645,7 +691,7 @@ static int realtek_aes_cbc_decrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -653,10 +699,23 @@ static int realtek_aes_ctr_encrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_CTR;
 	ctx->isDecrypt = 0;
@@ -664,7 +723,7 @@ static int realtek_aes_ctr_encrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -672,10 +731,23 @@ static int realtek_aes_ctr_decrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_CTR;
 	ctx->isDecrypt = 1;
@@ -683,7 +755,7 @@ static int realtek_aes_ctr_decrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -691,10 +763,23 @@ static int realtek_aes_cfb_encrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_CFB;
 	ctx->isDecrypt = 0;
@@ -702,7 +787,7 @@ static int realtek_aes_cfb_encrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -710,10 +795,23 @@ static int realtek_aes_cfb_decrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_CFB;
 	ctx->isDecrypt = 1;
@@ -721,7 +819,7 @@ static int realtek_aes_cfb_decrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -729,10 +827,23 @@ static int realtek_aes_ofb_encrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_OFB;
 	ctx->isDecrypt = 0;
@@ -740,7 +851,7 @@ static int realtek_aes_ofb_encrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -748,10 +859,23 @@ static int realtek_aes_ofb_decrypt(struct ablkcipher_request *req)
 {
 	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_OFB;
 	ctx->isDecrypt = 1;
@@ -759,38 +883,74 @@ static int realtek_aes_ofb_decrypt(struct ablkcipher_request *req)
 	memcpy(ctx->iv, req->info, ctx->ivlen);
 	ret = realtek_aes_process(req, NULL);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
 static int realtek_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key, unsigned int keylen)
 {
 	struct realtek_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
-	unsigned long flags;
+	struct realtek_aes_dev *adev = NULL;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
+
 
 	if (keylen != AES_KEYSIZE_128 && keylen != AES_KEYSIZE_192 && keylen != AES_KEYSIZE_256) {
-		spin_unlock_irqrestore(&ctx->adev->lock, flags);
+		mutex_unlock(&adev->adev_mutex);
 		return -EINVAL;
 	}
 
 	memcpy(ctx->key, key, keylen);
 	ctx->keylen = keylen;
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return 0;
 }
 
 static int realtek_aes_cra_init(struct crypto_tfm *tfm)
 {
 	struct realtek_aes_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct realtek_aes_dev *adev;
+
+	/* request to allocate a new aes device instance from crypto subsystem */
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+
+		/* Allocate a new aes device for new tfm */
+		adev = devm_kzalloc(realtek_aes.dev, sizeof(*adev), GFP_KERNEL);
+		if (!adev) {
+			mutex_unlock(&realtek_aes.drv_mutex);
+			return -ENOMEM;
+		}
+		mutex_init(&adev->adev_mutex);
+	
+		/* add this adev in the global driver list */
+		list_add_tail(&adev->list, &realtek_aes.dev_list);
+	}
 
 	memset(ctx, 0, sizeof(struct realtek_aes_ctx));
 
-	if (realtek_aes_find_dev(ctx) == NULL) {
-		return -ENODEV;
-	}
+	adev->tfm = tfm;
+	adev->ctx = ctx;
+	adev->dev = realtek_aes.dev;
+	adev->io_base = realtek_aes.io_base;
+	mutex_unlock(&realtek_aes.drv_mutex);
 
 	return 0;
 }
@@ -798,19 +958,31 @@ static int realtek_aes_cra_init(struct crypto_tfm *tfm)
 static int realtek_aes_gcm_setkey(struct crypto_aead *tfm, const u8 *key, unsigned int keylen)
 {
 	struct realtek_aes_ctx *ctx = crypto_aead_ctx(tfm);
-	unsigned long flags;
+	struct realtek_aes_dev *adev = NULL;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if ( mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	if (keylen != AES_KEYSIZE_128 && keylen != AES_KEYSIZE_192 && keylen != AES_KEYSIZE_256) {
-		spin_unlock_irqrestore(&ctx->adev->lock, flags);
+		mutex_unlock(&adev->adev_mutex);
 		return -EINVAL;
 	}
 
 	memcpy(ctx->key, key, keylen);
 	ctx->keylen = keylen;
+	mutex_unlock(&adev->adev_mutex);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
 	return 0;
 }
 
@@ -823,10 +995,23 @@ static int realtek_aes_gcm_encrypt(struct aead_request *req)
 {
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_aead_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if ( mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_GCM;
 	ctx->isDecrypt = 0;
@@ -836,7 +1021,7 @@ static int realtek_aes_gcm_encrypt(struct aead_request *req)
 	ctx->ivlen += 4;
 	ret = realtek_aes_process(NULL, req);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
 
@@ -844,10 +1029,23 @@ static int realtek_aes_gcm_decrypt(struct aead_request *req)
 {
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct realtek_aes_ctx *ctx = crypto_aead_ctx(tfm);
+	struct realtek_aes_dev *adev = NULL;
 	int ret;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ctx->adev->lock, flags);
+
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+		mutex_unlock(&realtek_aes.drv_mutex);
+		dev_err(realtek_aes.dev, "Failed to find adev for requested ctx %p\n", ctx);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_aes.drv_mutex);
+
+	if (mutex_lock_interruptible(&adev->adev_mutex))
+		return -ERESTARTSYS;
 
 	ctx->cipher_type = AES_TYPE_GCM;
 	ctx->isDecrypt = 1;
@@ -857,20 +1055,40 @@ static int realtek_aes_gcm_decrypt(struct aead_request *req)
 	ctx->ivlen += 4;
 	ret = realtek_aes_process(NULL, req);
 
-	spin_unlock_irqrestore(&ctx->adev->lock, flags);
+	mutex_unlock(&adev->adev_mutex);
 	return ret;
 }
-
 
 static int realtek_aes_gcm_init(struct crypto_aead *tfm)
 {
 	struct realtek_aes_ctx *ctx = crypto_aead_ctx(tfm);
+	struct realtek_aes_dev *adev;
+
+	/* request to allocate a new aes device instance from crypto subsystem */
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+		return -ERESTARTSYS;
+
+	adev = realtek_aes_find_dev(ctx);
+	if (!adev) {
+
+		/* Allocate a new aes device for new tfm */
+		adev = devm_kzalloc(realtek_aes.dev, sizeof(*adev), GFP_KERNEL);
+		if (!adev) {
+			mutex_unlock(&realtek_aes.drv_mutex);
+			return -ENOMEM;
+		}
+		mutex_init(&adev->adev_mutex);
+	
+		/* add this adev in the global driver list */
+		list_add_tail(&adev->list, &realtek_aes.dev_list);
+	}
 
 	memset(ctx, 0, sizeof(struct realtek_aes_ctx));
 
-	if (realtek_aes_find_dev(ctx) == NULL) {
-		return -ENODEV;
-	}
+	adev->ctx = ctx;
+	adev->dev = realtek_aes.dev;
+	adev->io_base = realtek_aes.io_base;
+	mutex_unlock(&realtek_aes.drv_mutex);
 
 	return 0;
 }
@@ -928,62 +1146,48 @@ static struct aead_alg realtek_gcm_alg = {
 
 /**
   * @brief  SHA engine reset.
-  * @param  adev: Point to crypto adapter.
+  * @param  None
   * @retval None
   */
-static void realtek_aes_reset(struct realtek_aes_dev *adev)
+static void realtek_aes_reset(void)
 {
 	u32 reg_value;
 
 	// Crypto engine : Software Reset
-	writel(IPSEC_BIT_SOFT_RST, adev->io_base + RTK_RSTEACONFISR);
+	writel(IPSEC_BIT_SOFT_RST, realtek_aes.io_base + RTK_RSTEACONFISR);
 	// Crypto Engine : Set swap
 	reg_value = IPSEC_DMA_BURST_LENGTH(16);
 	reg_value |= (IPSEC_BIT_KEY_IV_SWAP | IPSEC_BIT_KEY_PAD_SWAP);
 	reg_value |= (IPSEC_BIT_DATA_IN_LITTLE_ENDIAN | IPSEC_BIT_DATA_OUT_LITTLE_ENDIAN | IPSEC_BIT_MAC_OUT_LITTLE_ENDIAN);
-	writel(reg_value, adev->io_base + RTK_SWAPABURSTR);
+	writel(reg_value, realtek_aes.io_base + RTK_SWAPABURSTR);
 	// Crypto Engine : DMA arbiter(detect fifo wasted level) , clock enable
-	writel((IPSEC_BIT_ARBITER_MODE | IPSEC_BIT_ENGINE_CLK_EN), adev->io_base + RTK_DBGR);
+	writel((IPSEC_BIT_ARBITER_MODE | IPSEC_BIT_ENGINE_CLK_EN), realtek_aes.io_base + RTK_DBGR);
 
 	// OTP key disable
-	writel(0, adev->io_base + RTK_IPSEKCR);
+	writel(0, realtek_aes.io_base + RTK_IPSEKCR);
 }
 
 static int realtek_aes_probe(struct platform_device *pdev)
 {
-	struct realtek_aes_dev *adev;
 	struct device *dev = &pdev->dev;
 	struct resource *res;
 	int ret;
 
-	adev = devm_kzalloc(dev, sizeof(*adev), GFP_KERNEL);
-	if (!adev) {
-		return -ENOMEM;
-	}
-
+	mutex_init(&realtek_aes.drv_mutex);
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	adev->io_base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(adev->io_base)) {
-		return PTR_ERR(adev->io_base);
+	realtek_aes.io_base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(realtek_aes.io_base)) {
+		return PTR_ERR(realtek_aes.io_base);
 	}
 
-	adev->dev = dev;
-
-	platform_set_drvdata(pdev, adev);
-	spin_lock_init(&adev->lock);
-	spin_lock_init(&realtek_aes.lock);
-
-	spin_lock(&realtek_aes.lock);
-	list_add_tail(&adev->list, &realtek_aes.dev_list);
-	spin_unlock(&realtek_aes.lock);
-
-	realtek_aes_reset(adev);
+	realtek_aes.dev = dev;
+	realtek_aes_reset();
 
 	/* Register algos */
 	ret = crypto_register_algs(realtek_aes_algs, ARRAY_SIZE(realtek_aes_algs));
 	if (ret) {
 		dev_err(dev, "Could not register aes algs\n");
-		goto err_algs;
+		return ret;
 	}
 
 	ret = crypto_register_aead(&realtek_gcm_alg);
@@ -996,29 +1200,18 @@ static int realtek_aes_probe(struct platform_device *pdev)
 
 err_aead_algs:
 	crypto_unregister_algs(realtek_aes_algs, ARRAY_SIZE(realtek_aes_algs));
-err_algs:
-	spin_lock(&realtek_aes.lock);
-	list_del(&adev->list);
-	spin_unlock(&realtek_aes.lock);
-
 	return ret;
 }
 
 static int realtek_aes_remove(struct platform_device *pdev)
 {
-	struct realtek_aes_dev *adev;
-
-	adev = platform_get_drvdata(pdev);
-	if (!adev) {
-		return -ENODEV;
-	}
+	struct realtek_aes_dev *adev = NULL;
 
 	crypto_unregister_aead(&realtek_gcm_alg);
 	crypto_unregister_algs(realtek_aes_algs, ARRAY_SIZE(realtek_aes_algs));
 
-	spin_lock(&realtek_aes.lock);
-	list_del(&adev->list);
-	spin_unlock(&realtek_aes.lock);
+	list_for_each_entry(adev, &realtek_aes.dev_list, list)
+		list_del(&adev->list);
 
 	return 0;
 }

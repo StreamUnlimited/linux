@@ -349,6 +349,7 @@ u32 mac_ps_notify_wake(struct mac_ax_adapter *adapter);
  */
 
 u32 mac_ps_set_32k(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack);
+u32 mac_ps_store_axi_regs(struct mac_ax_adapter *adapter, bool store);
 
 /**
  * @addtogroup PowerSaving

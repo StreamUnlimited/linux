@@ -2150,4 +2150,46 @@ void rtw_bf_update_traffic(_adapter *adapter)
 	}
 }
 #endif
+
+int rtw_bf_get_vht_gid_mgnt_packet(struct _ADAPTER *a, union recv_frame *rframe)
+{
+	struct rtw_phl_gid_pos_tbl tbl = {0};
+	u8 *data, *gid, *pos;
+	enum rtw_phl_status status;
+	int err = 0;
+
+
+	data = rframe->u.hdr.rx_data;
+	RTW_DBG(FUNC_ADPT_FMT ": GID setting for " MAC_FMT "\n",
+		FUNC_ADPT_ARG(a), MAC_ARG(get_addr2_ptr(data)));
+	/* Move to data start */
+	data += 26;
+
+	/* Membership Status Array */
+	gid = data;
+	_rtw_memcpy(tbl.gid_vld, gid, RTW_VHT_GID_MGNT_FRAME_GID_SZ);
+	RTW_DBG_DUMP("Membership Status Array: ", tbl.gid_vld, RTW_VHT_GID_MGNT_FRAME_GID_SZ);
+	/* User Position Array */
+	pos= data + RTW_VHT_GID_MGNT_FRAME_GID_SZ;
+	_rtw_memcpy(tbl.pos, pos, RTW_VHT_GID_MGNT_FRAME_POS_SZ);
+	RTW_DBG_DUMP("User Position Array: ", tbl.pos, RTW_VHT_GID_MGNT_FRAME_POS_SZ);
+
+	/* Config HW GID table */
+	status = rtw_phl_snd_cmd_set_vht_gid(GET_PHL_INFO(adapter_to_dvobj(a)),
+					      a->phl_role, &tbl);
+	if (status == RTW_PHL_STATUS_SUCCESS) {
+		RTW_DBG(FUNC_ADPT_FMT ": Add VHT GID Success\n",
+			FUNC_ADPT_ARG(a));
+	} else {
+		RTW_ERR(FUNC_ADPT_FMT ": Add VHT GID FAIL!(0x%x)\n",
+			FUNC_ADPT_ARG(a), status);
+		err = -1;
+	}
+
+	return err;
+}
+
 #endif /* CONFIG_BEAMFORMING */
+
+
+

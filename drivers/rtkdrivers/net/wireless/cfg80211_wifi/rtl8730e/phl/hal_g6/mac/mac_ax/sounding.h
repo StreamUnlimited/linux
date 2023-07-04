@@ -263,5 +263,14 @@ u32 mac_snd_sup(struct mac_ax_adapter *adapter, struct mac_bf_sup *bf_sup);
  * @{
  */
 
+/**
+ * @brief mac_gid_pos
+ *
+ * @param *adapter
+ * @param *mac_gid_pos
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_gid_pos(struct mac_ax_adapter *adapter, struct mac_gid_pos *mu_gid);
 
 #endif

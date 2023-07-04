@@ -289,5 +289,8 @@ u32 mac_resp_chk_cca(struct mac_ax_adapter *adapter,
  */
 
 u32 mac_clr_idx_all(struct mac_ax_adapter *adapter);
+void mac_set_ax_pkt_extension(struct mac_ax_adapter *adapter, struct mac_ax_pe_cfg pe_cfg);
+u32 mac_ctrl_rxhci(struct mac_ax_adapter *adapter,
+		   enum mac_ax_func_sw en);
 
 #endif

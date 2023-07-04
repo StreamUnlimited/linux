@@ -374,10 +374,6 @@
 #endif
 
 #ifdef PHL_PLATFORM_WINDOWS
-#define CONFIG_WOW_WITH_SER
-#endif
-
-#ifdef PHL_PLATFORM_WINDOWS
 #define CONFIG_DBG_H2C_TX
 #endif
 
@@ -412,7 +408,7 @@
 /* #define CONFIG_6GHZ */
 
 
-#define RTW_WKARD_BFEE_DISABLE_NG16
+//#define RTW_WKARD_BFEE_DISABLE_NG16
 
 #define RTW_WKARD_HW_WMM_ALLOCATE
 

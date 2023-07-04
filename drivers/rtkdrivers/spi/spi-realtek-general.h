@@ -455,7 +455,7 @@
 enum rtk_spi_dir {
 	RTK_SPI_READ,
 	RTK_SPI_WRITE,
-	RTK_SPI_LOOPBACK,
+	RTK_SPI_TRX,
 	RTK_SPI_INVALID,
 	RTK_SPI_END,
 };
@@ -472,7 +472,7 @@ enum rtk_spi_master_trans_status {
 	RTK_SPI_ONGOING,
 	RTK_SPI_RX_DONE,
 	RTK_SPI_TX_DONE,
-	RTK_SPI_LOOPBACK_DONE,
+	RTK_SPI_TRX_DONE,
 	RTK_SPI_DONE_WITH_ERROR,
 };
 
@@ -530,6 +530,7 @@ struct rtk_spi_hw_params {
 
 struct rtk_spi_management {
 	int				spi_index;
+	int				spi_for_kernel;
 	int				max_cs_num;
 	int				spi_default_cs;
 	int				is_slave;
@@ -538,6 +539,7 @@ struct rtk_spi_management {
 	int				spi_poll_mode;
 	u8				current_direction;
 	u8				transfer_status;
+	int				spi_cs_pin;
 	struct rtk_spi_gdma_parameters	dma_params;
 	struct spi_trans_tx_buf		tx_info;
 	struct spi_trans_rx_buf		rx_info;

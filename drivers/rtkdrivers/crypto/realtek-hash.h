@@ -135,19 +135,23 @@ struct realtek_hash_hw_context {
 };
 
 /**
- * struct realtek_hash_dev - realtek hash driver data
- * @list: hash device list
- * @dev: hash device
+ * struct realtek_hash_dev - realtek hash device data, one per tfm
+ * @dev: platform driver device
  * @io_base: control registers base cpu addr
- * @pdata: realtek hash data
- * @lock: spinlock
+ * @list: hash device list
+ * @hdev_mutex: mutex to protect multiple hash devices
+ * @tfm: tfm associated with this hash device
+ * @ctx: ctx for this tfm
+ * @rctx: rctx for this tfm
  */
 struct realtek_hash_dev {
+	struct device	*dev;
+	void __iomem	*io_base;
 	struct list_head	list;
-	struct device		*dev;
-	void __iomem		*io_base;
-	const struct realtek_hash_pdata	*pdata;
-	spinlock_t lock;
+	struct mutex	hdev_mutex;
+	struct crypto_tfm	*tfm;
+	struct realtek_hash_ctx	*ctx;
+	struct realtek_hash_request_ctx	*rctx;
 };
 
 #endif

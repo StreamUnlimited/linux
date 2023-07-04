@@ -537,12 +537,14 @@ u32 mac_ps_set_32k(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u16 rpwm_value = 0;
 	u8 toggle = 0;
-	u16 trycnt = 5000;
+	int trycnt = 10000;
 
 	if (adapter->mac_pwr_info.pwr_in_lps == 0) {
 		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): Not in power saving!\n", __func__);
 		return MACPWRSTAT;
 	}
+	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[HALPS], %s(): en_32k %d, "
+		  "en_ack %d!\n", __func__, en_32k, en_ack);
 
 	/* 8730e mp chip: BIT0(clock bit) ,BIT4(PG bit), BIT6(Ack bit), and BIT15(Toggle bit) in REG_RPWM.
 	   BIT0 value - 1: 32k, 0:40MHz.
@@ -552,16 +554,16 @@ u32 mac_ps_set_32k(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack)
 	*/
 	rpwm_value = MAC_REG_R16(REG_RPWM);
 	rpwm_value &= (BIT_RPWM_TOGGLING | PS_RPWM_ACK \
-		      | PS_RPWM_32K_EN /*| PS_RPWM_PARTIAL_OFF_EN*/);
+		      | PS_RPWM_32K_EN | PS_RPWM_PARTIAL_OFF_EN);
 
 	/* Toggle bit15 */
-	rpwm_value |= BIT_RPWM_TOGGLING;
+	rpwm_value += BIT_RPWM_TOGGLING;
 
 	/* set 32k bit */
 	if (en_32k == true) {
-		rpwm_value |= (PS_RPWM_32K_EN /*| PS_RPWM_PARTIAL_OFF_EN*/);
+		rpwm_value |= (PS_RPWM_32K_EN | PS_RPWM_PARTIAL_OFF_EN);
 	} else {
-		rpwm_value &= ~(PS_RPWM_32K_EN /*| PS_RPWM_PARTIAL_OFF_EN*/);
+		rpwm_value &= ~(PS_RPWM_32K_EN | PS_RPWM_PARTIAL_OFF_EN);
 	}
 
 	/* set ACK bit */
@@ -573,20 +575,92 @@ u32 mac_ps_set_32k(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack)
 
 	/*clear cpwm intterupt */
 	MAC_REG_W32(REG_HISR0, BIT_HCPWM_INT);
-
 	MAC_REG_W16(REG_RPWM, rpwm_value);
 
 	/*wait ack*/
-	while ((rpwm_value & PS_RPWM_ACK) && (--trycnt >= 1)) {
+	do {
 		if (MAC_REG_R32(REG_HISR0) & BIT_HCPWM_INT) {
 			break;
 		}
-		PLTFM_DELAY_US(2);
-	}
+		PLTFM_DELAY_US(1);
+	} while (en_ack && (--trycnt > 1));
 
 	if (trycnt <= 1) {
 		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): trycnt: %d\n", __func__, trycnt);
 		return MACPOLLTO;
+	}
+
+	return MACSUCCESS;
+}
+
+u32 mac_ps_store_axi_regs(struct mac_ax_adapter *adapter, bool store)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	static u32 *pdata;
+	static u16 reg300;
+	const u16 store_sniff_ranges[][2] = {{0x308, 0x344},
+					     {0x380, 0x39c},
+					     {0x3a0, 0x3d8}};
+	u16 addr;
+	u8 mem_size = 0;
+	u8 i, j;
+	u8 size;
+
+	size = sizeof(store_sniff_ranges) / sizeof(u16) / 2;
+	for (i = 0; i < size; i++) {
+		mem_size += store_sniff_ranges[i][1] - store_sniff_ranges[i][0];
+	}
+
+	if (store) {
+		//store
+		pdata = (u32 *) PLTFM_MALLOC(mem_size);
+		if (pdata == NULL) {
+			return MACNOBUF;
+		}
+
+		addr = 0x300;
+		reg300 = MAC_REG_R16(REG_AXI_CTRL);
+		for (i = 0; i < (mem_size / 4);) {
+			for (j = 0; j < size; j++) {
+				if (addr  >= store_sniff_ranges[j][0] && addr < store_sniff_ranges[j][1]) {
+					*(pdata + i) = MAC_REG_R32(addr);
+					i++;
+					break;
+				}
+			}
+			addr += 4;
+		}
+	} else {
+		//restore
+		if (pdata == NULL) {
+			return MACNOBUF;
+		}
+
+		//for sleep pg whe should restore page 3,for sleep CG,just return
+		if (MAC_REG_R16(REG_BCNQ_TXBD_DESA) != 0x00) { //compare with default value
+			PLTFM_FREE(pdata, mem_size);
+			pdata = NULL;
+			return MACSUCCESS;
+		}
+
+		//pause dma
+		MAC_REG_W16(REG_AXI_CTRL, 0xffff);
+		addr = 0x300;
+
+		for (i = 0; i < (mem_size / 4);) {
+			for (j = 0; j < size; j++) {
+				if (addr  >= store_sniff_ranges[j][0] && addr < store_sniff_ranges[j][1]) {
+					MAC_REG_W32(addr, *(pdata + i));
+					i++;
+					break;
+				}
+			}
+			addr += 4;
+		}
+
+		MAC_REG_W16(REG_AXI_CTRL, reg300);
+		PLTFM_FREE(pdata, mem_size);
+		pdata = NULL;
 	}
 
 	return MACSUCCESS;

@@ -883,7 +883,8 @@ void _run_coex(struct btc_t *btc, const char *reason)
 		goto exit;
 	}
 
-	if (wl->status.map.rf_off || wl->status.map.lps || dm->bt_only) {
+	/* keep the state of wl lps to pre state, don't use wl_off for lps */
+	if (wl->status.map.rf_off || dm->bt_only) {
 		_action_wl_off(btc);
 		btc->ctrl.igno_bt = true;
 		goto exit;

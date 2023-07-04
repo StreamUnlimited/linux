@@ -263,12 +263,18 @@ typedef struct rtl_crypto_cl_struct_s {
 
 /**
  * struct realtek_crypto_drv - crypto device list
+ * @dev: platform driver device
+ * @io_base: ioremapped base IO addr of crypto HW
  * @dev_list: crypto device list
- * @lock: List protection access
+ * @drv_mutex: driver mutex to protect global data
+ * @pdata: platform data
  */
 struct realtek_crypto_drv {
+	struct device	*dev;
+	void __iomem	*io_base;
 	struct list_head	dev_list;
-	spinlock_t		lock;
+	struct mutex	drv_mutex;
+	const struct realtek_hash_pdata	*pdata;
 };
 
 #endif

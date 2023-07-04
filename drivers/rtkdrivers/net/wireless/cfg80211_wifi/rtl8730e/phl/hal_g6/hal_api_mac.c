@@ -1986,30 +1986,6 @@ rtw_hal_mac_lv1_rcvy(struct hal_info_t *hal_info, enum rtw_phl_ser_lv1_recv_step
 	return RTW_HAL_STATUS_SUCCESS;
 }
 
-enum rtw_hal_status rtw_hal_mac_ser_ctrl(struct hal_info_t *hal_info, bool en)
-{
-	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
-	u32 mac_err = 0;
-	enum mac_ax_func_sw cfg = (en == true) ? MAC_AX_FUNC_EN : MAC_AX_FUNC_DIS;
-	u32 start_t = 0;
-
-	start_t = _os_get_cur_time_us();
-
-	PHL_INFO("%s\n", __func__);
-
-	mac_err = mac->ops->ser_ctrl(mac, cfg);
-
-	if (mac_err != MACSUCCESS) {
-		PHL_ERR("%s : mac status %d.\n", __func__, mac_err);
-		return RTW_HAL_STATUS_FAILURE;
-	}
-
-	PHL_INFO("%s : %s ser success with %d us.\n", __func__,
-		 (en ? "start" : "stop"), phl_get_passing_time_us(start_t));
-
-	return RTW_HAL_STATUS_SUCCESS;
-}
-
 enum rtw_hal_status
 rtw_hal_mac_poll_hw_tx_done(struct hal_info_t *hal_info) {
 	PHL_TRACE(COMP_PHL_MAC, _PHL_WARNING_, "poll hw tx done is not supported now!\n");
@@ -3740,6 +3716,9 @@ rtw_hal_mac_ax_bfee_para_reg(void *mac, struct rtw_phl_stainfo_t *sta) {
 
 	csi_para.bf_en = 0;
 
+	/*Ameba need bfer's mac address*/
+	_os_mem_cpy(hal_com->drv_priv, csi_para.mac_addr, sta->mac_addr , 6);
+
 	hal_status = mac_info->ops->set_csi_para_reg(mac_info, &csi_para);
 
 	return hal_status;
@@ -4386,7 +4365,7 @@ enum rtw_hal_status rtw_hal_mac_config_hw_mgnt_sec(struct hal_info_t *hal_info, 
 	struct mac_ax_ops *hal_mac_ops = mac->ops;
 
 	hal_mac_ops->sta_hw_security_support(mac, SEC_UC_MGNT_ENC, en);
-	hal_mac_ops->sta_hw_security_support(mac, SEC_BMC_MGNT_ENC, en);
+	hal_mac_ops->sta_hw_security_support(mac, SEC_UC_MGNT_DEC, en);
 
 	return RTW_HAL_STATUS_SUCCESS;
 }
@@ -5296,7 +5275,7 @@ rtw_hal_mac_ps_set_32k(struct hal_info_t *hal_info, bool en_32k, bool en_ack) {
 	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
 
 #ifdef CONFIG_PM
-	if (pm_suspend_target_state < PM_SUSPEND_PG) {
+	if (pm_suspend_target_state < PM_SUSPEND_CG) {
 		return RTW_HAL_STATUS_SUCCESS;
 	}
 #endif
@@ -5307,6 +5286,27 @@ rtw_hal_mac_ps_set_32k(struct hal_info_t *hal_info, bool en_32k, bool en_ack) {
 	} else
 	{
 		PHL_WARN("%s: set 32k fail!\n", __FUNCTION__);
+		return RTW_HAL_STATUS_FAILURE;
+	}
+}
+
+enum rtw_hal_status
+rtw_hal_mac_ps_store_axi_regs(struct hal_info_t *hal_info, bool store) {
+	struct mac_ax_adapter *mac = hal_to_mac(hal_info);
+
+#ifdef CONFIG_PM
+	if (pm_suspend_target_state < PM_SUSPEND_CG) {
+		return RTW_HAL_STATUS_SUCCESS;
+	}
+#endif
+
+	if (mac->ops->ps_store_axi_regs(mac, store) == MACSUCCESS)
+	{
+		return RTW_HAL_STATUS_SUCCESS;
+	} else
+	{
+		PHL_WARN("%s: %s bus regs failed!\n",
+			 __FUNCTION__, store ? "store" : "restore");
 		return RTW_HAL_STATUS_FAILURE;
 	}
 }
@@ -8547,3 +8547,14 @@ rtw_hal_mac_init_txagg_num(struct hal_info_t *hal_info)
 	hal_com->phy_hw_cap[0].txagg_num = 0;
 #endif
 }
+
+void
+rtw_hal_mac_set_pkt_externsion(struct hal_info_t *hal_info,
+			struct mac_ax_pe_cfg pe_cfg) {
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
+	struct mac_ax_adapter *mac = (struct mac_ax_adapter *)hal_info->mac;
+
+	mac->ops->set_ax_pkt_extension(mac, pe_cfg);
+}
+
+

@@ -1041,6 +1041,7 @@ struct protocol_cap_t {
 	u8 trig_mu_bfm_fb: 1;
 	u8 trig_cqi_fb: 1;
 	u8 partial_bw_su_er: 1;
+	u8 partial_bw_mu_mimo_rx: 1;
 	u8 pkt_padding: 2;
 	u8 ppe_thr[8][4];
 	u8 pwr_bst_factor: 1;

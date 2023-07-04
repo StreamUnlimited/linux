@@ -40,6 +40,7 @@ static const char *const _proto_cap_str[] = {
 	/* BIT1 */"g",
 	/* BIT2 */"n",
 	/* BIT3 */"ac",
+	/* BIT4 */"ax",
 };
 
 static const char *const _wl_func_str[] = {

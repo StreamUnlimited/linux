@@ -290,6 +290,11 @@ rtw_hal_wow_cfg_nlo_chnl_list(void *hal, struct rtw_nlo_info *cfg) {
 	return hstatus;
 }
 
+enum rtw_hal_status rtw_hal_check_wow_fw_ready(void *hal, u8 func_en)
+{
+	return _hal_check_wow_fw_ready(hal, func_en);
+}
+
 enum rtw_hal_status rtw_hal_wow_init(struct rtw_phl_com_t *phl_com, void *hal,
 				     struct rtw_phl_stainfo_t *sta)
 {
@@ -517,15 +522,23 @@ enum rtw_hal_status rtw_hal_wow_func_start(struct rtw_phl_com_t *phl_com, void *
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
 
 	do {
-		hstatus = rtw_hal_mac_cfg_wow_wake(hal_info, macid, true, cfg->wow_wake_cfg);
+		hstatus = rtw_hal_mac_set_wowlan(hal_info, true);
 		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+			PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] rtw_hal_mac_set_wowlan failed \n");
 			break;
 		}
-		///* poll fw status */
-		//hstatus = _hal_check_wow_fw_ready(hal_info, 1);
-		//if (RTW_HAL_STATUS_SUCCESS != hstatus) {
-		//	break;
-		//}
+
+		hstatus = rtw_hal_mac_cfg_wow_wake(hal_info, macid, true, cfg->wow_wake_cfg);
+		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+			PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] rtw_hal_mac_cfg_wow_wake failed \n");
+			break;
+		}
+		/* poll fw status */
+		hstatus = _hal_check_wow_fw_ready(hal_info, 1);
+		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+			PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] _hal_poll_wow_fw_status failed \n");
+			break;
+		}
 	} while (0);
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s status(%u).\n", __func__, hstatus);
@@ -538,31 +551,24 @@ enum rtw_hal_status rtw_hal_wow_func_stop(struct rtw_phl_com_t *phl_com, void *h
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
 
+	hstatus = rtw_hal_mac_set_wowlan(hal_info, false);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] rtw_hal_mac_set_wowlan failed \n");
+	}
 	/* config wow ctrl */
 	hstatus = rtw_hal_mac_cfg_wow_wake(hal_info, macid, false, NULL);
 	if (RTW_HAL_STATUS_SUCCESS != hstatus) {
 		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] rtw_hal_mac_cfg_wow_wake failed \n");
 	}
 
-	//hstatus = _hal_check_wow_fw_ready(hal_info, 0);
-	//if (RTW_HAL_STATUS_SUCCESS != hstatus) {
-	//	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] _hal_poll_wow_fw_status failed \n");
-	//}
+	hstatus = _hal_check_wow_fw_ready(hal_info, 0);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] _hal_poll_wow_fw_status failed \n");
+	}
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s status(%u).\n", __func__, hstatus);
 
 	return hstatus;
-}
-
-enum rtw_hal_status rtw_hal_set_wowlan(struct rtw_phl_com_t *phl_com, void *hal, u8 enter)
-{
-	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
-	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-	hal_status = rtw_hal_mac_set_wowlan(hal_info, enter);
-
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s : status(%u).\n", __func__, hal_status);
-
-	return hal_status;
 }
 
 static enum rtw_hal_status _wow_chk_txq_empty(struct hal_info_t *hal_info, u8 *empty)

@@ -14,34 +14,9 @@
  ******************************************************************************/
 #include "security_cam.h"
 
-#define ADDR_CAM_SECINFO_OFFSET 0x1C
-#define HW_SUPPORT_ENC_TYPE_NUM 0x0A
-#define OUTRANGE_KEY_INDEX	0xFF
-#define NO_MACID_ROLE		0xFF
 #define VALID			0x01
 #define INVALID			0x00
 
-struct addr_sec_only_info {
-	u32 dword0;
-	u32 dword1;
-	u32 dword2;
-};
-/*
-enum HW_SUPPORT_ENC_TYPE {
-	HW_SUPPORT_ENC_TYPE_NONE = 0x0,
-	HW_SUPPORT_ENC_TYPE_WEP40  = 0x1,
-	HW_SUPPORT_ENC_TYPE_WEP104  = 0x2,
-	HW_SUPPORT_ENC_TYPE_TKIP = 0x3,
-	HW_SUPPORT_ENC_TYPE_WAPI = 0x4,
-	HW_SUPPORT_ENC_TYPE_GCMSMS4 = 0x5,
-	HW_SUPPORT_ENC_TYPE_CCMP128 = 0x6,
-	HW_SUPPORT_ENC_TYPE_CCMP256 = 0x7,
-	HW_SUPPORT_ENC_TYPE_GCMP128 = 0x8,
-	HW_SUPPORT_ENC_TYPE_GCMP256 = 0x9,
-	HW_SUPPORT_ENC_TYPE_BIP128 = 0xA,
-};
-*/
-#if 1
 u32 sec_info_tbl_init(struct mac_ax_adapter *adapter)
 {
 	u8 i = 0;
@@ -68,10 +43,18 @@ u32 sec_info_tbl_init(struct mac_ax_adapter *adapter)
 
 			/* initial value*/
 			(*sec_cam_table)->sec_cam_entry[i]->valid = INVALID;
+			(*sec_cam_table)->sec_cam_entry[i]->macid = 0;
 			(*sec_cam_table)->sec_cam_entry[i]->key_id = 0;
+			(*sec_cam_table)->sec_cam_entry[i]->key_type = 0;
+			PLTFM_MEMSET((*sec_cam_table)->sec_cam_entry[i]->mac_addr, 0x00, 6);
+			(*sec_cam_table)->sec_cam_entry[i]->sec_type = 0;
+			(*sec_cam_table)->sec_cam_entry[i]->mic = 0;
+			(*sec_cam_table)->sec_cam_entry[i]->grp_bit = 0;
+			(*sec_cam_table)->sec_cam_entry[i]->mgnt = 0;
+			(*sec_cam_table)->sec_cam_entry[i]->ext_key = 0;
 		}
-		(*sec_cam_table)->invalid_cam_idx = 4;
 	}
+
 	return MACSUCCESS;
 }
 
@@ -94,10 +77,11 @@ u32 free_sec_info_tbl(struct mac_ax_adapter *adapter)
 	adapter->hw_info->sec_cam_table = NULL;
 	return MACSUCCESS;
 }
-#endif
 
-
-u8 decide_sec_cam_index(struct mac_ax_adapter *adapter, u8 *sec_cam_idx)
+static u8 decide_sec_cam_index(struct mac_ax_adapter *adapter, u8 *sec_cam_idx,
+			u8 mac_id, u8 key_id, u8 key_type, u8 *addr,
+			u8 sec_type, u8 mic, u8 grp_bit, u8 mgnt,
+			u8 ext_key)
 {
 	u8 sec_idx = 0, i = 0;
 	u8 cam_entry_num = SEC_CAM_ENTRY_NUM - 4 - SEC_CAM_AP_BMC_NUM;
@@ -107,52 +91,25 @@ u8 decide_sec_cam_index(struct mac_ax_adapter *adapter, u8 *sec_cam_idx)
 			&adapter->hw_info->sec_cam_table;
 
 	/*First time access sec cam , initial sec cam table INVALID  */
-	if ((*sec_cam_table) == NULL) {
-		(*sec_cam_table) = (struct sec_cam_table_t *)PLTFM_MALLOC
-				   (sizeof(struct sec_cam_table_t));
-
-		if (!(*sec_cam_table)) {
-			return MACNOBUF;
-		}
-
-		for (i = 0; i < SEC_CAM_ENTRY_NUM; i++) {
-			(*sec_cam_table)->sec_cam_entry[i] =
-				(struct sec_cam_entry_t *)PLTFM_MALLOC
-				(sizeof(struct sec_cam_entry_t));
-
-			if (!(*sec_cam_table)->sec_cam_entry[i]) {
-				return MACNOBUF;
-			}
-
-			/* initial value*/
-			(*sec_cam_table)->sec_cam_entry[i]->valid = INVALID;
-			(*sec_cam_table)->sec_cam_entry[i]->macid = 0;
-			(*sec_cam_table)->sec_cam_entry[i]->key_id = 0;
-			(*sec_cam_table)->sec_cam_entry[i]->key_type = 0;
-		}
-		(*sec_cam_table)->invalid_cam_idx = 4;
-	}
-
-	if ((*sec_cam_table)->invalid_cam_idx != 4) {
-		sec_idx = 4;
-		for (i = 4; i < (*sec_cam_table)->invalid_cam_idx; i++) {
-			if ((*sec_cam_table)->sec_cam_entry[sec_idx]->valid ==
-			    INVALID) {
-				(*sec_cam_table)->invalid_cam_idx = i;
-				break;
-			}
-		}
-	}
+	sec_info_tbl_init(adapter);
 
 	/*If table has been initialize, assgin the sec cam storge idx */
-	sec_idx = (*sec_cam_table)->invalid_cam_idx;
+	sec_idx = 4;
 	for (i = 0; i < cam_entry_num; i++) {
-		if ((*sec_cam_table)->sec_cam_entry[sec_idx]->valid ==
-		    INVALID) {
-			(*sec_cam_table)->invalid_cam_idx = (sec_idx + 1);
-			if ((*sec_cam_table)->invalid_cam_idx > max_entry_num) {
-				(*sec_cam_table)->invalid_cam_idx = 4;
-			}
+		if (((*sec_cam_table)->sec_cam_entry[sec_idx]->macid == mac_id) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->key_id == key_id) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->key_type == key_type) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->sec_type == sec_type) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->mic == mic) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->grp_bit == grp_bit) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->mgnt == mgnt) &&
+		   ((*sec_cam_table)->sec_cam_entry[sec_idx]->ext_key == ext_key) &&
+		   !PLTFM_MEMCMP((*sec_cam_table)->sec_cam_entry[sec_idx]->mac_addr, addr, 6)
+		   ) {
+			*sec_cam_idx = sec_idx;
+			return MACSUCCESS;
+		} else if ((*sec_cam_table)->sec_cam_entry[sec_idx]->valid ==
+			   INVALID) {
 			*sec_cam_idx = sec_idx;
 			return MACSUCCESS;
 		}
@@ -166,7 +123,9 @@ u8 decide_sec_cam_index(struct mac_ax_adapter *adapter, u8 *sec_cam_idx)
 }
 
 static u32 add_sec_cam_index(struct mac_ax_adapter *adapter, u8 sec_cam_idx,
-			    u8 mac_id, u8 key_id, u8 key_type)
+			    u8 mac_id, u8 key_id, u8 key_type, u8 *addr,
+			    u8 sec_type, u8 mic, u8 grp_bit, u8 mgnt,
+			    u8 ext_key)
 {
 	u8 sec_idx = 0, i = 0;
 	/* call by pointer */
@@ -174,37 +133,22 @@ static u32 add_sec_cam_index(struct mac_ax_adapter *adapter, u8 sec_cam_idx,
 			&adapter->hw_info->sec_cam_table;
 
 	/*First time access sec cam , initial sec cam table INVALID  */
-	if ((*sec_cam_table) == NULL) {
-		(*sec_cam_table) = (struct sec_cam_table_t *)PLTFM_MALLOC
-				   (sizeof(struct sec_cam_table_t));
-
-		if (!(*sec_cam_table)) {
-			return MACNOBUF;
-		}
-
-		for (i = 0; i < SEC_CAM_ENTRY_NUM; i++) {
-			(*sec_cam_table)->sec_cam_entry[i] =
-				(struct sec_cam_entry_t *)PLTFM_MALLOC
-				(sizeof(struct sec_cam_entry_t));
-
-			if (!(*sec_cam_table)->sec_cam_entry[i]) {
-				return MACNOBUF;
-			}
-
-			/* initial value*/
-			(*sec_cam_table)->sec_cam_entry[i]->valid = INVALID;
-			(*sec_cam_table)->sec_cam_entry[i]->macid = 0;
-			(*sec_cam_table)->sec_cam_entry[i]->key_id = 0;
-			(*sec_cam_table)->sec_cam_entry[i]->key_type = 0;
-		}
-		(*sec_cam_table)->invalid_cam_idx = 4;
-	}
+	sec_info_tbl_init(adapter);
 
 	/*If table has been initialize, assgin the sec cam storge idx */
 	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->key_id = key_id;
 	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->macid = mac_id;
 	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->key_type = key_type;
 	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->valid = VALID;
+	PLTFM_MEMCPY((*sec_cam_table)->sec_cam_entry[sec_cam_idx]->mac_addr, addr, 6);
+	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->sec_type = sec_type;
+	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->mic = mic;
+	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->grp_bit = grp_bit;
+	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->mgnt = mgnt;
+	(*sec_cam_table)->sec_cam_entry[sec_cam_idx]->ext_key = ext_key;
+
+	PLTFM_MSG_ALWAYS("(macid %d) add key: idx %d, type %d.",
+			 mac_id, sec_cam_idx, key_type);
 
 	return MACSUCCESS;
 }
@@ -478,8 +422,14 @@ u32 mac_sta_add_key(struct mac_ax_adapter *adapter,
 			fixed_camidx = false;
 		}
 	}
+
+	sec_cam_info->grp_bit = (key_type == KEY_TYPE_GROUP) ? 1 : 0;
 	if (!fixed_camidx) {
-		ret = decide_sec_cam_index(adapter, &idx);
+		ret = decide_sec_cam_index(adapter, &idx, role->info.macid,
+					   key_id, key_type, sec_cam_info->addr,
+					   sec_cam_info->type, sec_cam_info->mic,
+					   sec_cam_info->grp_bit, sec_cam_info->mgnt,
+					   sec_cam_info->ext_key);
 		if (ret != MACSUCCESS) {
 			PLTFM_MSG_ERR("find keycam index failed, ret (%d).\n",
 			      ret);
@@ -487,8 +437,6 @@ u32 mac_sta_add_key(struct mac_ax_adapter *adapter,
 		}
 		sec_cam_info->sec_cam_idx = idx;
 	}
-
-	sec_cam_info->grp_bit = (key_type == KEY_TYPE_GROUP) ? 1 : 0;
 
 	PLTFM_MSG_ALWAYS("(macid %d, mac: "MAC_FMT")add key: idx %d, type %d, key_id %d, "
 			 "grp_bit %d, mgnt %d, mic %d.",
@@ -517,7 +465,10 @@ u32 mac_sta_add_key(struct mac_ax_adapter *adapter,
 	if (ret == MACSUCCESS) {
 		PLTFM_MEMCPY(&role->info.s_info, sec_cam_info, sizeof(struct mac_ax_sec_cam_info));
 		ret = add_sec_cam_index(adapter, sec_cam_info->sec_cam_idx,
-					mac_id, key_id, key_type);
+					mac_id, key_id, key_type,
+					sec_cam_info->addr, sec_cam_info->type,
+					sec_cam_info->mic, sec_cam_info->grp_bit,
+					sec_cam_info->mgnt, sec_cam_info->ext_key);
 	}
 
 	return ret;
@@ -571,11 +522,15 @@ u32 mac_sta_del_key(struct mac_ax_adapter *adapter,
 	ret = mac_write_security_cam(adapter, sec_cam_idx, &info);
 	if (ret == MACSUCCESS) {
 		sec_cam_table->sec_cam_entry[sec_cam_idx]->valid = INVALID;
-		if ((sec_cam_idx >= 4)
-		    && (sec_cam_idx <= SEC_CAM_ENTRY_NUM - SEC_CAM_AP_BMC_NUM)) {
-			sec_cam_table->invalid_cam_idx = sec_cam_idx;
-		}
-
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->macid = 0;
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->key_id = 0;
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->key_type = 0;
+		PLTFM_MEMSET(sec_cam_table->sec_cam_entry[sec_cam_idx]->mac_addr, 0x00, 6);
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->sec_type = 0;
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->mic = 0;
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->grp_bit = 0;
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->mgnt = 0;
+		sec_cam_table->sec_cam_entry[sec_cam_idx]->ext_key = 0;
 		PLTFM_MSG_ALWAYS("(macid %d) delete key: idx %d, type %d.",
 			 mac_id, sec_cam_idx, key_type);
 	} else {

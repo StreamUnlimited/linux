@@ -23,14 +23,12 @@
 #include "realtek-crypto.h"
 #include "realtek-hash.h"
 
+
 __aligned(32) static u8 ipsec_padding[64]  = { 0x0 };
 
 static struct realtek_crypto_drv realtek_hash = {
 	.dev_list = LIST_HEAD_INIT(realtek_hash.dev_list),
-	.lock = __SPIN_LOCK_UNLOCKED(realtek_hash.lock),
 };
-
-//struct mutex process_mutex;
 
 static int realtek_hash_wait_ok(struct realtek_hash_dev *hdev)
 {
@@ -48,7 +46,6 @@ static int realtek_hash_wait_ok(struct realtek_hash_dev *hdev)
 		dev_err(hdev->dev, "ips 0x1C err = 0x%08x\r\n", ips_err);
 		ret = -ETIMEDOUT;
 	}
-
 	return ret;
 }
 
@@ -537,23 +534,16 @@ static int realtek_hash_send_seqbuf(struct ahash_request *req, u8 *pDigest)
 	return ret;
 }
 
-static struct realtek_hash_dev *realtek_hash_find_dev(struct ahash_request *req)
+static struct realtek_hash_dev *realtek_hash_find_dev(struct realtek_hash_ctx *ctx)
 {
 	struct realtek_hash_dev *hdev = NULL, *tmp = NULL;
-	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
 
-	spin_lock_bh(&realtek_hash.lock);
-	if (!rctx->hdev) {
-		list_for_each_entry(tmp, &realtek_hash.dev_list, list) {
+	list_for_each_entry(tmp, &realtek_hash.dev_list, list) {
+		if (tmp->ctx == ctx) {
 			hdev = tmp;
 			break;
 		}
-		rctx->hdev = hdev;
-	} else {
-		hdev = rctx->hdev;
 	}
-
-	spin_unlock_bh(&realtek_hash.lock);
 
 	return hdev;
 }
@@ -570,22 +560,29 @@ static void realtek_hash_prepare_msg(struct ahash_request *req, u8 *message)
 
 static int realtek_hash_init(struct ahash_request *req)
 {
+	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
 	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
-	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
-	struct realtek_hash_dev *hdev;
-	unsigned long flags;
+	struct realtek_hash_dev *hdev = NULL;
 
-	//mutex_lock(&process_mutex);
 	memset(rctx, 0, sizeof(struct realtek_hash_request_ctx));
-	hdev = realtek_hash_find_dev(req);
+
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
-		//mutex_unlock(&process_mutex);
+		mutex_unlock(&realtek_hash.drv_mutex);
+		dev_err(realtek_hash.dev, "Failed to find hash dev for requested tfm %p\n", tfm);
 		return -ENODEV;
 	}
+	mutex_unlock(&realtek_hash.drv_mutex);
 
-	spin_lock_irqsave(&hdev->lock, flags);
+	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+		return -ERESTARTSYS;
 
+	rctx->hdev = hdev;
+	hdev->rctx = rctx;
 	rctx->digcnt = crypto_ahash_digestsize(tfm);
 
 	switch (rctx->digcnt) {
@@ -665,8 +662,8 @@ static int realtek_hash_init(struct ahash_request *req)
 		rctx->state[14] = 0x5BE0CD19;
 		break;
 	default:
-		spin_unlock_irqrestore(&hdev->lock, flags);
-		//mutex_unlock(&process_mutex);
+		mutex_unlock(&hdev->hdev_mutex);
+		dev_err(hdev->dev, "Unsupported algo\n");
 		return -EINVAL;
 	}
 
@@ -684,32 +681,46 @@ static int realtek_hash_init(struct ahash_request *req)
 	rctx->hash_digest_result = (u8 *)dma_alloc_coherent(hdev->dev, rctx->digcnt, &rctx->dma_handle_dig, GFP_KERNEL);
 	if (!rctx->hash_digest_result) {
 		dev_err(hdev->dev, "Can't allocate digest buffer\n");
-		spin_unlock_irqrestore(&hdev->lock, flags);
-		//mutex_unlock(&process_mutex);
+		mutex_unlock(&hdev->hdev_mutex);
 		return -EFAULT;
 	}
 
-	spin_unlock_irqrestore(&hdev->lock, flags);
+	mutex_unlock(&hdev->hdev_mutex);
 	return 0;
 }
 
 static int realtek_hash_update(struct ahash_request *req)
 {
-	int ret = 0;
 	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
-	unsigned long flags;
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
+	struct realtek_hash_dev *hdev = NULL;
 	u8 *message;
+	int ret = 0;
 
-	spin_lock_irqsave(&rctx->hdev->lock, flags);
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
+	if (!hdev) {
+		mutex_unlock(&realtek_hash.drv_mutex);
+		dev_err(realtek_hash.dev, "Failed to find hash dev for requested tfm %p\n", tfm);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_hash.drv_mutex);
+
+	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+		return -ERESTARTSYS;
 
 	if (!req->nbytes) {
-		spin_unlock_irqrestore(&rctx->hdev->lock, flags);
+		mutex_unlock(&hdev->hdev_mutex);
+		dev_dbg(hdev->dev, "update called with 0 data\n");
 		return 0;
 	}
 
-	message = devm_kzalloc(rctx->hdev->dev, req->nbytes, GFP_KERNEL);
+	message = devm_kzalloc(hdev->dev, req->nbytes, GFP_KERNEL);
 	if (!message) {
-		dev_err(rctx->hdev->dev, "Can't allocate message buffer\n");
+		dev_err(hdev->dev, "Can't allocate message buffer\n");
 		ret = -EFAULT;
 		goto fail;
 	}
@@ -723,37 +734,49 @@ static int realtek_hash_update(struct ahash_request *req)
 		goto fail;
 	}
 
-	spin_unlock_irqrestore(&rctx->hdev->lock, flags);
+	mutex_unlock(&hdev->hdev_mutex);
 	return ret;
 
 fail:
 	if (rctx->hash_digest_result) {
-		dma_free_coherent(rctx->hdev->dev, rctx->digcnt, rctx->hash_digest_result, rctx->dma_handle_dig);
+		dma_free_coherent(hdev->dev, rctx->digcnt, rctx->hash_digest_result, rctx->dma_handle_dig);
 	}
-
-	spin_unlock_irqrestore(&rctx->hdev->lock, flags);
-
+	mutex_unlock(&hdev->hdev_mutex);
 	return ret;
 }
 
 static int realtek_hash_final(struct ahash_request *req)
 {
 	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
+	struct realtek_hash_dev *hdev = NULL;
 	int ret = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&rctx->hdev->lock, flags);
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
+	if (!hdev) {
+		mutex_unlock(&realtek_hash.drv_mutex);
+		dev_err(realtek_hash.dev, "Failed to find hash dev for requested tfm %p\n", tfm);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_hash.drv_mutex);
+
+	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+		return -ERESTARTSYS;
+
 	rctx->lasthash = 1;
 	ret = realtek_hash_process(req, (u8 *)(&rctx->hmac_seq_buf[0]), rctx->hmac_seq_buf_is_used_bytes, rctx->hash_digest_result);
 	memcpy(req->result, rctx->hash_digest_result, rctx->digcnt);
-	realtek_hash_mem_dump(rctx->hdev->dev, req->result, rctx->digcnt, "Final digest: ");
+	realtek_hash_mem_dump(hdev->dev, req->result, rctx->digcnt, "Final digest: ");
 
 	if (rctx->hash_digest_result) {
-		dma_free_coherent(rctx->hdev->dev, rctx->digcnt, rctx->hash_digest_result, rctx->dma_handle_dig);
+		dma_free_coherent(hdev->dev, rctx->digcnt, rctx->hash_digest_result, rctx->dma_handle_dig);
 	}
+	mutex_unlock(&hdev->hdev_mutex);
 
-	spin_unlock_irqrestore(&rctx->hdev->lock, flags);
-	//mutex_unlock(&process_mutex);
 	return ret;
 }
 
@@ -784,10 +807,24 @@ static int realtek_hash_digest(struct ahash_request *req)
 static int realtek_hash_export(struct ahash_request *req, void *out)
 {
 	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct realtek_hash_hw_context *octx = out;
-	unsigned long flags;
+	struct realtek_hash_dev *hdev = NULL;
 
-	spin_lock_irqsave(&rctx->hdev->lock, flags);
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
+	if (!hdev) {
+		mutex_unlock(&realtek_hash.drv_mutex);
+		dev_err(realtek_hash.dev, "Failed to find hash dev for requested tfm %p\n", tfm);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_hash.drv_mutex);
+
+	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+		return -ERESTARTSYS;
 
 	octx->hdev = rctx->hdev;
 	octx->flags = rctx->flags;
@@ -804,7 +841,7 @@ static int realtek_hash_export(struct ahash_request *req, void *out)
 	memcpy(octx->buffer, rctx->hmac_seq_buf, 128);	
 	memcpy(octx->state, rctx->state, 64);
 
-	spin_unlock_irqrestore(&rctx->hdev->lock, flags);
+	mutex_unlock(&hdev->hdev_mutex);
 	return 0;
 }
 
@@ -812,9 +849,23 @@ static int realtek_hash_import(struct ahash_request *req, const void *in)
 {
 	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
 	const struct realtek_hash_hw_context *ictx = in;
-	unsigned long flags;
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
+	struct realtek_hash_dev *hdev = NULL;
 
-	spin_lock_irqsave(&ictx->hdev->lock, flags);
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
+	if (!hdev) {
+		mutex_unlock(&realtek_hash.drv_mutex);
+		dev_err(realtek_hash.dev, "Failed to find hash dev for requested tfm %p\n", tfm);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_hash.drv_mutex);
+
+	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+		return -ERESTARTSYS;
 
 	rctx->hdev = ictx->hdev;
 	rctx->flags = ictx->flags;
@@ -831,11 +882,11 @@ static int realtek_hash_import(struct ahash_request *req, const void *in)
 	memcpy(rctx->hmac_seq_buf, ictx->buffer, 128);
 	memcpy(rctx->state, ictx->state, 64);
 
-	spin_unlock_irqrestore(&ictx->hdev->lock, flags);
+	mutex_unlock(&hdev->hdev_mutex);
 	return 0;
 }
 
-static int realtek_hash_key_process(struct crypto_ahash *tfm, u8 *message, u32 msglen, u8 *pDigest)
+static int realtek_hash_key_process(struct realtek_hash_dev *hdev, struct crypto_ahash *tfm, u8 *message, u32 msglen, u8 *pDigest)
 {
 	rtl_crypto_srcdesc_t srcdesc;
 	rtl_crypto_dstdesc_t dst_desc;
@@ -848,16 +899,7 @@ static int realtek_hash_key_process(struct crypto_ahash *tfm, u8 *message, u32 m
 	dma_addr_t dma_handle_dig;
 	dma_addr_t dma_handle_msg;
 	dma_addr_t dma_handle_cl, dma_handle_pad;
-	struct realtek_hash_dev *hdev = NULL, *tmp = NULL;
 
-	list_for_each_entry(tmp, &realtek_hash.dev_list, list) {
-		hdev = tmp;
-		break;
-	}
-
-	if (!hdev) {
-		return -EINVAL;
-	}
 
 	// Use only one scatter
 	enl = msglen;
@@ -1024,10 +1066,22 @@ static int realtek_hash_setkey(struct crypto_ahash *tfm, const u8 *key, unsigned
 	int ret = 0;
 	u32 digestlen = crypto_ahash_digestsize(tfm);
 	unsigned int padsize = crypto_ahash_blocksize(tfm); //padding size = block size, sha384/512=128, others=64
-	unsigned long flags;
 	u8 hash_digest_result[SHA512_DIGEST_SIZE];
+	struct realtek_hash_dev *hdev = NULL;
 
-	spin_lock_irqsave(&realtek_hash.lock, flags);
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
+	if (!hdev) {
+		mutex_unlock(&realtek_hash.drv_mutex);
+		dev_err(realtek_hash.dev, "Failed to find hash dev for requested tfm %p\n", tfm);
+		return -ENODEV;
+	}
+	mutex_unlock(&realtek_hash.drv_mutex);
+
+	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+		return -ERESTARTSYS;
 
 	if (keylen <= HASH_HMAC_MAX_KLEN) {
 		ctx->ipad = (u8 *)(&(ctx->g_IOPAD[0]));
@@ -1035,9 +1089,9 @@ static int realtek_hash_setkey(struct crypto_ahash *tfm, const u8 *key, unsigned
 		memset(ctx->ipad, 0x36, padsize);
 		memset(ctx->opad, 0x5c, padsize);
 		if (keylen > padsize) {
-			ret = realtek_hash_key_process(tfm, (u8 *)key, keylen, hash_digest_result);
+			ret = realtek_hash_key_process(hdev, tfm, (u8 *)key, keylen, hash_digest_result);
 			if (ret != 0) {
-				spin_unlock_irqrestore(&realtek_hash.lock, flags);
+				mutex_unlock(&hdev->hdev_mutex);
 				return ret;
 			}
 			keylen = digestlen;
@@ -1052,11 +1106,11 @@ static int realtek_hash_setkey(struct crypto_ahash *tfm, const u8 *key, unsigned
 			}
 		}
 	} else {
-		spin_unlock_irqrestore(&realtek_hash.lock, flags);
+		mutex_unlock(&hdev->hdev_mutex);
 		return -ENOMEM;
 	}
 
-	spin_unlock_irqrestore(&realtek_hash.lock, flags);
+	mutex_unlock(&hdev->hdev_mutex);
 	return ret;
 }
 
@@ -1064,14 +1118,40 @@ static int realtek_hash_cra_init_algs(struct crypto_tfm *tfm,
 									  const char *algs_hmac_name)
 {
 	struct realtek_hash_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct realtek_hash_dev *hdev;
+
+	/* request to allocate a new hash device instance from crypto subsystem */
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+		return -ERESTARTSYS;
+
+	hdev = realtek_hash_find_dev(ctx);
+	if (!hdev) {
+		/* Allocate a new hash device for new tfm */
+		hdev = devm_kzalloc(realtek_hash.dev, sizeof(*hdev), GFP_KERNEL);
+		if (!hdev) {
+			mutex_unlock(&realtek_hash.drv_mutex);
+			return -ENOMEM;
+		}
+		mutex_init(&hdev->hdev_mutex);
+
+		/* add this hdev in the global driver list */
+		list_add_tail(&hdev->list, &realtek_hash.dev_list);
+	}
 
 	memset(ctx, 0, sizeof(struct realtek_hash_ctx));
 
-	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm), sizeof(struct realtek_hash_request_ctx));
+	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
+							 sizeof(struct realtek_hash_request_ctx));
 
 	if (algs_hmac_name) {
 		ctx->flags |= HASH_FLAGS_HMAC;
 	}
+
+	hdev->tfm = tfm;
+	hdev->ctx = ctx;
+	hdev->dev = realtek_hash.dev;
+	hdev->io_base = realtek_hash.io_base;
+	mutex_unlock(&realtek_hash.drv_mutex);
 
 	return 0;
 }
@@ -1166,34 +1246,34 @@ static int realtek_hash_cra_sha512_init(struct crypto_tfm *tfm)
 
 /**
   * @brief  SHA engine reset.
-  * @param  hdev: Point to crypto adapter.
+  * @param  None
   * @retval None
   */
-static void realtek_hash_reset(struct realtek_hash_dev *hdev)
+static void realtek_hash_reset(void)
 {
 	u32 reg_value;
 
 	// Crypto engine : Software Reset
-	writel(IPSEC_BIT_SOFT_RST, hdev->io_base + RTK_RSTEACONFISR);
+	writel(IPSEC_BIT_SOFT_RST,  realtek_hash.io_base + RTK_RSTEACONFISR);
 	// Crypto Engine : Set swap
 	reg_value = IPSEC_DMA_BURST_LENGTH(16);
 	reg_value |= (IPSEC_BIT_KEY_IV_SWAP | IPSEC_BIT_KEY_PAD_SWAP);
 	reg_value |= (IPSEC_BIT_DATA_IN_LITTLE_ENDIAN | IPSEC_BIT_DATA_OUT_LITTLE_ENDIAN | IPSEC_BIT_MAC_OUT_LITTLE_ENDIAN);
-	writel(reg_value, hdev->io_base + RTK_SWAPABURSTR);
+	writel(reg_value, realtek_hash.io_base + RTK_SWAPABURSTR);
 	// Crypto Engine : DMA arbiter(detect fifo wasted level) , clock enable
-	writel((IPSEC_BIT_ARBITER_MODE | IPSEC_BIT_ENGINE_CLK_EN), hdev->io_base + RTK_DBGR);
+	writel((IPSEC_BIT_ARBITER_MODE | IPSEC_BIT_ENGINE_CLK_EN), realtek_hash.io_base + RTK_DBGR);
 
 	// OTP key disable
-	writel(0, hdev->io_base + RTK_IPSEKCR);
+	writel(0, realtek_hash.io_base + RTK_IPSEKCR);
 }
 
-static int realtek_hash_register_algs(struct realtek_hash_dev *hdev)
+static int realtek_hash_register_algs(void)
 {
 	unsigned int i;
 	int err;
 
-	for (i = 0; i < hdev->pdata->algs_list_size; i++) {
-		err = crypto_register_ahash(&hdev->pdata->algs_list[i]);
+	for (i = 0; i < realtek_hash.pdata->algs_list_size; i++) {
+		err = crypto_register_ahash(&realtek_hash.pdata->algs_list[i]);
 		if (err) {
 			goto err_algs;
 		}
@@ -1202,20 +1282,20 @@ static int realtek_hash_register_algs(struct realtek_hash_dev *hdev)
 	return 0;
 
 err_algs:
-	dev_err(hdev->dev, "Algo %d failed\n", i);
+	dev_err(realtek_hash.dev, "Algo %d failed\n", i);
 	for (; i--;) {
-		crypto_unregister_ahash(&hdev->pdata->algs_list[i]);
+		crypto_unregister_ahash(&realtek_hash.pdata->algs_list[i]);
 	}
 
 	return err;
 }
 
-static int realtek_hash_unregister_algs(struct realtek_hash_dev *hdev)
+static int realtek_hash_unregister_algs(void)
 {
 	unsigned int i;
 
-	for (i = 0; i < hdev->pdata->algs_list_size; i++) {
-		crypto_unregister_ahash(&hdev->pdata->algs_list[i]);
+	for (i = 0; i < realtek_hash.pdata->algs_list_size; i++) {
+		crypto_unregister_ahash(&realtek_hash.pdata->algs_list[i]);
 	}
 
 	return 0;
@@ -1223,72 +1303,39 @@ static int realtek_hash_unregister_algs(struct realtek_hash_dev *hdev)
 
 static int realtek_hash_probe(struct platform_device *pdev)
 {
-	struct realtek_hash_dev *hdev;
 	struct device *dev = &pdev->dev;
 	struct resource *res;
-	int ret;
 
-	hdev = devm_kzalloc(dev, sizeof(*hdev), GFP_KERNEL);
-	if (!hdev) {
-		return -ENOMEM;
-	}
-
+	mutex_init(&realtek_hash.drv_mutex);
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	hdev->io_base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(hdev->io_base)) {
-		return PTR_ERR(hdev->io_base);
+	realtek_hash.io_base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(realtek_hash.io_base)) {
+		return PTR_ERR(realtek_hash.io_base);
 	}
 
-	hdev->pdata = of_device_get_match_data(dev);
-	if (!hdev->pdata) {
+	realtek_hash.pdata = of_device_get_match_data(dev);
+	if (!realtek_hash.pdata) {
 		dev_err(dev, "no compatible OF match\n");
 		return -EINVAL;
 	}
 
-	hdev->dev = dev;
-
-	platform_set_drvdata(pdev, hdev);
-
-	spin_lock_init(&hdev->lock);
-	spin_lock_init(&realtek_hash.lock);
-	//mutex_init(&process_mutex);
-
-	spin_lock(&realtek_hash.lock);
-	list_add_tail(&hdev->list, &realtek_hash.dev_list);
-	spin_unlock(&realtek_hash.lock);
-
-	realtek_hash_reset(hdev);
+	realtek_hash.dev = dev;
+	realtek_hash_reset();
 
 	/* Register algos */
-	ret = realtek_hash_register_algs(hdev);
-	if (ret) {
-		goto err_algs;
-	}
-
+	if (realtek_hash_register_algs())
+		return -EIO;
+		
 	return 0;
-
-err_algs:
-	spin_lock(&realtek_hash.lock);
-	list_del(&hdev->list);
-	spin_unlock(&realtek_hash.lock);
-
-	return ret;
 }
 
 static int realtek_hash_remove(struct platform_device *pdev)
 {
-	struct realtek_hash_dev *hdev;
+	struct realtek_hash_dev *hdev = NULL;
 
-	hdev = platform_get_drvdata(pdev);
-	if (!hdev) {
-		return -ENODEV;
-	}
-
-	realtek_hash_unregister_algs(hdev);
-
-	spin_lock(&realtek_hash.lock);
-	list_del(&hdev->list);
-	spin_unlock(&realtek_hash.lock);
+	realtek_hash_unregister_algs();
+	list_for_each_entry(hdev, &realtek_hash.dev_list, list)
+		list_del(&hdev->list);
 
 	return 0;
 }

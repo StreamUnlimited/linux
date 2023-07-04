@@ -311,9 +311,9 @@ int rtw_stbc_cap = 0x000;
 * BIT8: Enable HE MU Beamformer
 * BIT9: Enable HE MU Beamformee
 */
-int rtw_beamform_cap = BIT(1) | BIT(7);  /* For sw role BF cap. */
-int rtw_sw_proto_bf_cap_phy0 = BIT(1) | BIT(7);
-int rtw_sw_proto_bf_cap_phy1 = BIT(1) | BIT(7);
+int rtw_beamform_cap = BIT(1) | BIT(7) | BIT(3) | BIT(9) | BIT(11); /* For sw role BF cap. */
+int rtw_sw_proto_bf_cap_phy0 = BIT(1) | BIT(7) | BIT(3) | BIT(9) | BIT(11);
+int rtw_sw_proto_bf_cap_phy1 = BIT(1) | BIT(7) | BIT(3) | BIT(9) | BIT(11);
 int rtw_dyn_txbf = 1;
 int rtw_bfer_rf_number = 0; /*BeamformerCapRfNum Rf path number, 0 for auto, others for manual*/
 int rtw_bfee_rf_number = 0; /*BeamformeeCapRfNum  Rf path number, 0 for auto, others for manual*/
@@ -1367,6 +1367,7 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 	phl_com->role_sw_cap.bf_cap |= (rtw_beamform_cap & BIT7) ? HW_CAP_BFEE_HE_SU : 0;
 	phl_com->role_sw_cap.bf_cap |= (rtw_beamform_cap & BIT8) ? HW_CAP_BFER_HE_MU : 0;
 	phl_com->role_sw_cap.bf_cap |= (rtw_beamform_cap & BIT9) ? HW_CAP_BFEE_HE_MU : 0;
+	phl_com->role_sw_cap.bf_cap |= (rtw_beamform_cap & BIT11) ? HW_CAP_HE_TB_CQI : 0;
 
 	/*Band0*/
 	phl_com->proto_sw_cap[0].vht_su_bfmr = (rtw_sw_proto_bf_cap_phy0 & BIT0) ? 1 : 0;
@@ -1379,6 +1380,7 @@ void rtw_core_update_default_setting(struct dvobj_priv *dvobj)
 	phl_com->proto_sw_cap[0].he_su_bfme = (rtw_sw_proto_bf_cap_phy0 & BIT7) ? 1 : 0;
 	phl_com->proto_sw_cap[0].he_mu_bfmr = (rtw_sw_proto_bf_cap_phy0 & BIT8) ? 1 : 0;
 	phl_com->proto_sw_cap[0].he_mu_bfme = (rtw_sw_proto_bf_cap_phy0 & BIT9) ? 1 : 0;
+	phl_com->proto_sw_cap[0].trig_cqi_fb = (rtw_sw_proto_bf_cap_phy0 & BIT11) ? 1 : 0;
 
 #endif
 

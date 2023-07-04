@@ -34,6 +34,10 @@
 #define TX_PKTBUF_LEN (0x8000)
 
 #define SYSTEM_CTRL_BASE_LP  0x42008000
+
+#define OSC4M_FORCE5_CLOCK BIT(29)
+#define REG_AON_CLK 0x000C
+
 #define REG_LSYS_FEN_GRP0  0x208
 #define FEN_WLAFE_CTRL  BIT(24)
 #define FEN_WLON  BIT(7)
@@ -53,6 +57,9 @@
 #define HW_EN_WLRF_2REGU  BIT(6)
 #define HW_EN_WLAFE  BIT(8)
 #define HW_EN_LAFE_2REGU  BIT(9)
+
+#define CONTROL_INFO_OFFSET            	0x40000
+#define CONTROL_INFO_ENTRY_SIZE            0x28
 
 #define WIFI_REG_BASE  0x40000000
 #define XTAL_REG_BASE  (0x42008800 - SYSTEM_CTRL_BASE_LP)
@@ -275,7 +282,6 @@
 	ops->sys_reg_write16(adapter, base, addr, val)
 #define SYS_REG_W32(base, addr, val)                                       \
 	ops->sys_reg_write32(adapter, base, addr, val)
-
 
 #define HALMAC_REG_W8_CLR(offset, mask)                                        \
 	do {                                                                   \
@@ -11059,6 +11065,7 @@ struct mac_reg_csi_para {
 	u32 ldpc_en: 1;
 	u32 stbc_en: 1;
 	u32 bf_en: 1;
+	u8 mac_addr[6];
 };
 
 /**
@@ -12892,6 +12899,20 @@ struct mac_ax_muedca_cfg {
 	enum mac_ax_cmac_wmm_sel wmm_sel;
 	u8 countdown_en;
 	u8 tb_update_en;
+};
+
+/**
+ * @struct mac_ax_muedca_cfg
+ * @brief mac_ax_muedca_cfg
+ *
+ * @var mac_ax_muedca_cfg::macid
+ * macid.
+ * @var mac_ax_muedca_cfg::pe_20m
+ * nominal_pkt_padding for 20MHz.
+ */
+struct mac_ax_pe_cfg {
+	u8 macid;
+	u8 pe_20m;/**/
 };
 
 /**
@@ -16799,6 +16820,8 @@ struct mac_ax_ops {
 			    struct rtw_r_meta_data *info);
 	u32(*get_wp_offset)(struct mac_ax_adapter *adapter,
 			    struct mac_txd_ofld_wp_offset *ofld_conf, u16 *val);
+	void(*set_ax_pkt_extension)(struct mac_ax_adapter *adapter,
+				struct mac_ax_pe_cfg);
 	/*frame exchange related*/
 	u32(*upd_mudecision_para)(struct mac_ax_adapter *adapter,
 				  struct mac_ax_mudecision_para *info);
@@ -16907,6 +16930,7 @@ struct mac_ax_ops {
 	u32(*chk_leave_ips)(struct mac_ax_adapter *adapter, u8 macid);
 	u32(*ps_notify_wake)(struct mac_ax_adapter *adapter);
 	u32(*ps_set_32k)(struct mac_ax_adapter *adapter, bool en_32k, bool en_ack);
+	u32(*ps_store_axi_regs)(struct mac_ax_adapter *adapter, bool store);
 	u32(*cfg_ps_advance_parm)(struct mac_ax_adapter *adapter,
 				  struct mac_ax_ps_adv_parm *parm);
 	u32(*periodic_wake_cfg)(struct mac_ax_adapter *adapter,
@@ -17073,7 +17097,6 @@ struct mac_ax_ops {
 	u32(*write_xtal_si)(struct mac_ax_adapter *adapter, u8 offset, u8 val,
 			    u8 bitmask);
 	u32(*io_chk_access)(struct mac_ax_adapter *adapter, u32 offset);
-	u32(*ser_ctrl)(struct mac_ax_adapter *adapter, enum mac_ax_func_sw sw);
 	u32(*chk_err_status)(struct mac_ax_adapter *adapter, u8 *ser_status);
 	/* mcc */
 	u32(*reset_mcc_group)(struct mac_ax_adapter *adapter, u8 group);

@@ -815,7 +815,6 @@ void HE_mu_edca_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE, u8 fi
 	}
 
 	phl_sta = psta->phl_sta;
-
 	pre_cnt = phepriv->pre_he_muedca_cnt;
 	cur_cnt = GET_HE_MU_EDCA_QOS_INFO_UPDATE_CNT(ele_start);
 	if (cur_cnt != pre_cnt || first == _TRUE) {
@@ -965,7 +964,7 @@ static int rtw_build_he_phy_caps(struct protocol_cap_t *proto_cap, u8 *pbuf)
 	int info_len = HE_CAP_ELE_PHY_CAP_LEN;
 
 #if 1
-	SET_HE_PHY_CAP_SUPPORT_CHAN_WIDTH_SET(pbuf, (BIT(0) | BIT(1)));
+	SET_HE_PHY_CAP_SUPPORT_CHAN_WIDTH_SET(pbuf, (BIT(4) | BIT(5)));
 #else
 	u8 bw_cap = 0;
 
@@ -1100,6 +1099,8 @@ static int rtw_build_he_phy_caps(struct protocol_cap_t *proto_cap, u8 *pbuf)
 		SET_HE_PHY_CAP_PARTIAL_BW_EXT_RANGE(pbuf, 1);
 	}
 
+	SET_HE_PHY_CAP_PARTIAL_BW_DL_MU_MIMO(pbuf, 0);
+
 	if (proto_cap->pwr_bst_factor) {
 		SET_HE_PHY_CAP_PWR_BOOST_FACTOR_SUPPORT(pbuf, 1);
 	}
@@ -1120,6 +1121,8 @@ static int rtw_build_he_phy_caps(struct protocol_cap_t *proto_cap, u8 *pbuf)
 
 	SET_HE_PHY_CAP_ERSU_PPDU_4X_LTF_0_POINT_8_GI(pbuf, 1);
 	SET_HE_PHY_CAP_ERSU_PPDU_1X_LTF_0_POINT_8_GI(pbuf, 1);
+	SET_HE_PHY_CAP_20M_IN_40M_HE_PPDU_IN_2G4(pbuf, 1);
+	SET_HE_PHY_CAP_20M_IN_160C_160NC_HE_PPDU(pbuf, 1);
 
 	if (proto_cap->dcm_max_ru) {
 		SET_HE_PHY_CAP_DCM_MAX_RU(pbuf, proto_cap->dcm_max_ru);
@@ -1378,6 +1381,7 @@ u32	rtw_build_he_operation_ie(_adapter *padapter, u8 *pbuf)
 	he_oper_total_len = (poper - poper_start);
 
 	pbuf = rtw_set_ie(pbuf, WLAN_EID_EXTENSION, he_oper_total_len, poper_start, &len);
+
 
 	return len;
 }

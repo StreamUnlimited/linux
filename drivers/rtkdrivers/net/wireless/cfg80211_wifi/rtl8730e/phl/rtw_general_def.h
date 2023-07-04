@@ -284,7 +284,7 @@ enum rf_path {
 #define PROTO_CAP_11N		BIT2
 #define PROTO_CAP_11AC		BIT3
 #define PROTO_CAP_11AX		BIT4
-#define PROTO_CAP_BIT_NUM	4
+#define PROTO_CAP_BIT_NUM	5
 
 enum wlan_mode {
 	WLAN_MD_INVALID = 0,

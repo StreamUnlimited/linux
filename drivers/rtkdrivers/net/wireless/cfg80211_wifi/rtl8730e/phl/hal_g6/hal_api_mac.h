@@ -297,8 +297,6 @@ rtw_hal_mac_trigger_dmac_err(struct hal_info_t *hal_info);
 enum rtw_hal_status
 rtw_hal_mac_lv1_rcvy(struct hal_info_t *hal_info, enum rtw_phl_ser_lv1_recv_step step);
 
-enum rtw_hal_status rtw_hal_mac_ser_ctrl(struct hal_info_t *hal_info, bool en);
-
 enum rtw_hal_status
 rtw_hal_mac_dump_fw_rsvd_ple(struct hal_info_t *hal_info);
 
@@ -469,6 +467,8 @@ enum rtw_hal_status
 rtw_hal_mac_ps_notify_wake(struct hal_info_t *hal_info);
 enum rtw_hal_status
 rtw_hal_mac_ps_set_32k(struct hal_info_t *hal_info, bool en_32k, bool en_ack);
+enum rtw_hal_status
+rtw_hal_mac_ps_store_axi_regs(struct hal_info_t *hal_info, bool store);
 enum rtw_hal_status
 rtw_hal_mac_req_pwr_state(struct hal_info_t *hal_info, u8 pwr_state);
 enum rtw_hal_status
@@ -660,5 +660,8 @@ enum rtw_hal_status
 rtw_hal_mac_stop_tx_duty(struct hal_info_t *hal_info);
 
 void rtw_hal_mac_init_txagg_num(struct hal_info_t *hal_info);
+
+void rtw_hal_mac_set_pkt_externsion(struct hal_info_t *hal_info,
+			struct mac_ax_pe_cfg pe_cfg);
 
 #endif /*_HAL_API_MAC_H_*/

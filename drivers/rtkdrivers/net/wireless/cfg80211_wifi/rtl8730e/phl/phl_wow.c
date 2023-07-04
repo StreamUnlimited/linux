@@ -963,7 +963,7 @@ enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
 {
 	/* stop tx/rx hci */
 	//rtw_hal_cfg_txhci(phl_info->hal, false);
-	//rtw_hal_cfg_rxhci(phl_info->hal, false);
+	rtw_hal_cfg_rxhci(phl_info->hal, false);
 
 	rtw_hal_poll_txdma_idle(phl_info->hal);
 
@@ -1239,7 +1239,7 @@ enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
 #endif
 
 	//rtw_hal_cfg_txhci(phl_info->hal, true);
-	//rtw_hal_cfg_rxhci(phl_info->hal, true);
+	rtw_hal_cfg_rxhci(phl_info->hal, true);
 
 	/* start tx dma */
 	rtw_hal_wow_cfg_txdma(phl_info->hal, true);
@@ -1276,14 +1276,14 @@ enum rtw_phl_status phl_wow_deinit_precfg(struct phl_wow_info *wow_info)
 
 	_phl_get_nlo_rpt(wow_info);
 
-	_phl_handle_aoac_rpt_action(wow_info, false);
+	//_phl_handle_aoac_rpt_action(wow_info, false);
 
 	/* resume sw rx */
 	trx_ops->trx_resume(phl_info, PHL_CTRL_RX);
 
 	_deinit_precfg_set_intr(phl_info);
 
-	_phl_handle_aoac_rpt_action(wow_info, true);
+	//_phl_handle_aoac_rpt_action(wow_info, true);
 
 	return phl_status;
 }

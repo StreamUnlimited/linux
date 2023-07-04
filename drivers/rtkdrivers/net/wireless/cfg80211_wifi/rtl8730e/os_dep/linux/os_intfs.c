@@ -3374,17 +3374,6 @@ int rtw_resume_process_wow(_adapter *padapter)
 
 	pwrpriv->wowlan_mode = _FALSE;
 
-	/* Power On LED */
-#ifdef CONFIG_RTW_SW_LED
-
-	if (pwrpriv->wowlan_wake_reason == RX_DISASSOC ||
-	    pwrpriv->wowlan_wake_reason == RX_DEAUTH ||
-	    pwrpriv->wowlan_wake_reason == FW_DECISION_DISCONNECT) {
-		rtw_led_control(padapter, LED_CTL_NO_LINK);
-	} else {
-		rtw_led_control(padapter, LED_CTL_LINK);
-	}
-#endif
 	/* clean driver side wake up reason. */
 	pwrpriv->wowlan_last_wake_reason = pwrpriv->wowlan_wake_reason;
 	pwrpriv->wowlan_wake_reason = 0;

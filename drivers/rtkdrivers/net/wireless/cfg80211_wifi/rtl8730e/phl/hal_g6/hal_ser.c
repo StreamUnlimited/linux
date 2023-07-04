@@ -15,16 +15,6 @@
 #define _HAL_SER_C_
 #include "hal_headers.h"
 
-enum rtw_hal_status rtw_hal_ser_ctrl(void *hal, bool en)
-{
-	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
-	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
-
-	hstatus = rtw_hal_mac_ser_ctrl(hal_info, en);
-
-	return hstatus;
-}
-
 u32
 rtw_hal_ser_get_error_status(void *hal, u32 *err)
 {

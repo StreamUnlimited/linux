@@ -496,7 +496,7 @@ void rtw_vht_get_real_setting(_adapter *padapter)
 
 	/* We don't support these features, and PHL doesn't define */
 	pvhtpriv->txop_ps = 0;
-	pvhtpriv->htc_vht = 1;
+	pvhtpriv->htc_vht = 0;
 	pvhtpriv->link_adap_cap = 0;
 	pvhtpriv->tx_ant_pattern = 0;
 	pvhtpriv->rx_ant_pattern = 0;

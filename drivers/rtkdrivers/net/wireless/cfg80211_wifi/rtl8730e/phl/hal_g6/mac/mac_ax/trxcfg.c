@@ -272,6 +272,61 @@ u32 mac_clr_idx_all(struct mac_ax_adapter *adapter)
 
 	return MACSUCCESS;
 }
+
+void mac_set_ax_pkt_extension(struct mac_ax_adapter *adapter, struct mac_ax_pe_cfg pe_cfg)
+{
+	u32 value32 = 0;
+	u32 offset = 0;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	/* config NOMI_PAD to ctrl info for original tx pe*/
+	offset = pe_cfg.macid * CONTROL_INFO_ENTRY_SIZE + 0xC;
+	value32 = MAC_REG_R32((CONTROL_INFO_OFFSET + offset));
+	value32 |= (((pe_cfg.pe_20m) & 0x3) << 14);  /* 2'd0: 0us; 2'd1: 8us; 2'd2 & 2'd3: 16us */
+	MAC_REG_W32((CONTROL_INFO_OFFSET + offset), value32);
+
+	/* config NOMI_PAD to mac cr for response tx pe*/
+	value32 = MAC_REG_R32(REG_RESP_CONTROL_1);
+	value32 &= ~BIT_MASK_RESP_NOMINAL_PAD;
+	value32 |= BIT_RESP_NOMINAL_PAD(pe_cfg.pe_20m);
+	MAC_REG_W32(REG_RESP_CONTROL_1, value32);
+}
+
+u32 mac_ctrl_rxhci(struct mac_ax_adapter *adapter,
+		   enum mac_ax_func_sw en)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 val32 = 0;
+	u16 trycnt = 500;
+	u32 lx_ctrl_store;
+
+	if (en) {
+		val32 = MAC_REG_R32(REG_RXPKT_NUM);
+		MAC_REG_W32(REG_RXPKT_NUM, (val32 & (~BIT_FW_RELEASE_EN)));
+	} else {
+		//pause DMA suggest by larry
+		lx_ctrl_store = MAC_REG_R32(REG_AXI_CTRL);
+		MAC_REG_W16(REG_AXI_CTRL, 0xffff);
+
+		//RX DMA stop
+		MAC_REG_W32(REG_RXPKT_NUM, (MAC_REG_R32(REG_RXPKT_NUM) | BIT_FW_RELEASE_EN));
+		do {
+			if ((MAC_REG_R32(REG_RXPKT_NUM) & BIT_RXDMA_IDLE)) {
+				break;
+			}
+			PLTFM_DELAY_US(10);
+		} while (--trycnt);
+
+		if (trycnt < 1) {
+			MAC_REG_W32(REG_RXPKT_NUM, (MAC_REG_R32(REG_RXPKT_NUM) & (~BIT_FW_RELEASE_EN)));
+			return MACPOLLTO;
+		}
+
+		MAC_REG_W32(REG_AXI_CTRL, lx_ctrl_store);
+	}
+
+	return MACSUCCESS;
+}
 #endif
 
 

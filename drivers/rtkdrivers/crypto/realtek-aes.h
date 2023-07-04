@@ -76,16 +76,20 @@ struct realtek_aes_ctx {
 
 /**
  * struct realtek_aes_dev - realtek aes driver data
- * @list: aes device list
- * @dev: aes device
+ * @dev: platform driver device
  * @io_base: control registers base cpu addr
- * @lock: spinlock
+ * @list: aes device list
+ * @adev_mutex: mutex to protect multiple aes devices
+ * @tfm: tfm associated with this hash device
+ * @ctx: ctx for this tfm
  */
 struct realtek_aes_dev {
+	struct device	*dev;
+	void __iomem	*io_base;
 	struct list_head	list;
-	struct device		*dev;
-	void __iomem		*io_base;
-	spinlock_t lock;
+	struct mutex	adev_mutex;
+	struct crypto_tfm	*tfm;
+	struct realtek_aes_ctx	*ctx;
 };
 
 #endif

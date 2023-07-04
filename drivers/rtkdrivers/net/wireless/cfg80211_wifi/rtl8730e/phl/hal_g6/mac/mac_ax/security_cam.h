@@ -80,6 +80,12 @@ struct sec_cam_entry_t {
 	u8 key_id;
 	u8 macid;
 	u8 key_type;
+	u8 mac_addr[6];
+	u8 sec_type;
+	u8 mic;
+	u8 grp_bit;
+	u8 mgnt;
+	u8 ext_key;
 };
 
 struct dctl_secinfo_entry_t {
@@ -102,7 +108,6 @@ struct dctl_secinfo_entry_t {
  */
 struct sec_cam_table_t {
 	struct sec_cam_entry_t *sec_cam_entry[SEC_CAM_ENTRY_NUM];
-	u8 invalid_cam_idx;
 };
 
 struct dctl_sec_info_t {

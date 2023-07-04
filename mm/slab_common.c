@@ -1767,6 +1767,23 @@ void kzfree(const void *p)
 EXPORT_SYMBOL(kzfree);
 
 /**
+ * kfree_sensitive - Clear sensitive information in memory before freeing
+ * @p: object to free memory of
+ *
+ * The memory of the object @p points to is zeroed before freed.
+ * If @p is %NULL, kfree_sensitive() does nothing.
+ *
+ * Note: this function zeroes the whole allocated buffer which can be a good
+ * deal bigger than the requested buffer size passed to kmalloc(). So be
+ * careful when using this function in performance sensitive code.
+ */
+void kfree_sensitive(const void *p)
+{
+	kzfree(p);
+}
+EXPORT_SYMBOL(kfree_sensitive);
+
+/**
  * ksize - get the actual amount of memory allocated for a given object
  * @objp: Pointer to the object
  *

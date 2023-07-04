@@ -393,6 +393,35 @@ _hal_update_ba_cam(struct hal_info_t *hal_info, u8 valid, u16 macid,
 	return hal_status;
 }
 
+static void _hal_update_sta_pkt_extension(struct hal_info_t *hal_info, struct rtw_phl_stainfo_t *psta)
+{
+	u8 nominal_pkt_padding20 = 0;
+	struct mac_ax_pe_cfg pe_cfg;
+
+	if (psta->asoc_cap.pkt_padding == 3) {
+		/* follow PPE threshold */
+		u8 ppe16 = 0, ppe8 = 0;
+		u8 nss = psta->asoc_cap.nss_rx;
+
+		/* bw = 20MHz */
+		ppe16 = (psta->asoc_cap.ppe_thr[nss - 1][CHANNEL_WIDTH_20]) & 0x7;
+		ppe8 = (psta->asoc_cap.ppe_thr[nss - 1][CHANNEL_WIDTH_20] >> 3) & 0x7;
+
+		if ((ppe16 != 7) && (ppe8 == 7)) {
+			pe_cfg.pe_20m = 2;
+		} else if (ppe8 != 7) {
+			pe_cfg.pe_20m = 1;
+		} else {
+			pe_cfg.pe_20m = 0;
+		}
+	} else {
+		pe_cfg.pe_20m = psta->asoc_cap.pkt_padding;
+	}
+
+	pe_cfg.macid = psta->macid;
+	rtw_hal_mac_set_pkt_externsion(hal_info, pe_cfg);
+}
+
 enum rtw_hal_status
 rtw_hal_start_ba_session(void *hal, struct rtw_phl_stainfo_t *sta,
 			 u8 dialog_token, u16 timeout, u16 start_seq_num,
@@ -681,6 +710,7 @@ rtw_hal_update_sta_entry(void *hal, struct rtw_phl_stainfo_t *sta,
 			rtw_hal_bb_set_bss_color(hal_info, sta->asoc_cap.bsscolor,
 						 sta->wrole->hw_band);
 			rtw_hal_bb_set_tb_pwr_ofst(hal_info, 0, sta->wrole->hw_band);
+			_hal_update_sta_pkt_extension(hal_info, sta);
 		}
 		/* reset rssi stat value */
 		sta->hal_sta->rssi_stat.ma_rssi_mgnt = 0;

@@ -105,10 +105,10 @@
 #define WLAN_SIFS_OFDM_CONT_TX	0x10
 #define WLAN_SIFS_CCK_TRX	0x0A
 #define WLAN_SIFS_OFDM_TRX	0x10
-#define WLAN_SIFS_CCK_T2T	0x46
-#define WLAN_SIFS_CCK_R2T	0x46
-#define WLAN_SIFS_OFDM_T2T	0x46
-#define WLAN_SIFS_OFDM_R2T	0x46
+#define WLAN_SIFS_CCK_T2T	0x50
+#define WLAN_SIFS_CCK_R2T	0x50
+#define WLAN_SIFS_OFDM_T2T	0x75
+#define WLAN_SIFS_OFDM_R2T	0x75		/*HE_TRIG meets spec timing requirements, https://jira.realtek.com/browse/AMEBALITE-230*/
 #define WLAN_DATA_RATE_FB_CNT_1_4	0x01000000
 #define WLAN_DATA_RATE_FB_CNT_5_8	0x08070504
 #define WLAN_RTS_RATE_FB_CNT_5_8	0x08070605
@@ -146,7 +146,7 @@
 #define WLAN_ACK_TO_CCK			0x41
 #define WLAN_EIFS_DUR_TUNE	0x13A
 #define WLAN_NAV_MAX		0xeb
-#define WLAN_RX_FILTER0		0x0400FFFF
+#define WLAN_RX_FILTER0		0x0404FFFF/*RX BC trigger is for ul ofdma cfo tracking, udp tx may only rx beacon and trigger but need cfo < 370Hz */
 #define WLAN_RX_FILTER2		0xFFFF
 #define WLAN_RCR_CFG		0x741c40ce
 #define WLAN_RXPKT_MAX_SZ	11460

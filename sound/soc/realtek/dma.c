@@ -214,6 +214,9 @@ static int gdma_open(struct snd_pcm_substream *substream)
 
 	snd_soc_set_runtime_hwparams(substream, &gdma_hardware);
 
+	/* Ensure that buffer size is a multiple of period size */
+	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
+
 	dma_private = devm_kzalloc(dev, sizeof(*dma_private), GFP_KERNEL);
 
 	if (!dma_private)

@@ -498,9 +498,9 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 			break;
 		case 1:
 			proto_role_cap->ht_rx_mcs[0] = 0xff;
-			proto_role_cap->vht_rx_mcs[0] = 0xfe;
+			proto_role_cap->vht_rx_mcs[0] = 0xfd;
 			proto_role_cap->vht_rx_mcs[1] = 0xff;
-			proto_role_cap->he_rx_mcs[0] = 0xfe;
+			proto_role_cap->he_rx_mcs[0] = 0xfd;
 			proto_role_cap->he_rx_mcs[1] = 0xff;
 			break;
 		case 2:
@@ -517,9 +517,9 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 			break;
 		case 1:
 			proto_role_cap->ht_tx_mcs[0] = 0xff;
-			proto_role_cap->vht_tx_mcs[0] = 0xfe;
+			proto_role_cap->vht_tx_mcs[0] = 0xfd;
 			proto_role_cap->vht_tx_mcs[1] = 0xff;
-			proto_role_cap->he_tx_mcs[0] = 0xfe;
+			proto_role_cap->he_tx_mcs[0] = 0xfd;
 			proto_role_cap->he_tx_mcs[1] = 0xff;
 			break;
 		case 2:
@@ -533,9 +533,9 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		}
 
 		proto_role_cap->ltf_gi = 0x3f;	// bit-x
-		proto_role_cap->doppler_tx = 1;
+		proto_role_cap->doppler_tx = 0;
 		proto_role_cap->doppler_rx = 0;
-		proto_role_cap->dcm_max_const_tx = 0;
+		proto_role_cap->dcm_max_const_tx = 3;
 		proto_role_cap->dcm_max_nss_tx = 0;
 		proto_role_cap->dcm_max_const_rx = 3;
 		proto_role_cap->dcm_max_nss_rx = 0;
@@ -553,7 +553,7 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		    (1 == proto_role_cap->trig_cqi_fb)) {
 			proto_role_cap->bfme_sts = 3;
 			proto_role_cap->bfme_sts_greater_80mhz = 0;
-			proto_role_cap->max_nc = 1;
+			proto_role_cap->max_nc = 3;
 		} else {
 			proto_role_cap->bfme_sts = 0;
 			proto_role_cap->bfme_sts_greater_80mhz = 0;
@@ -572,7 +572,7 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		if ((1 == proto_role_cap->he_su_bfme) ||
 		    (1 == proto_role_cap->he_mu_bfme)) {
 			proto_role_cap->ng_16_su_fb = 1;
-			proto_role_cap->ng_16_mu_fb = 1;
+			proto_role_cap->ng_16_mu_fb = 0;
 			proto_role_cap->cb_sz_su_fb = 1;
 			proto_role_cap->cb_sz_mu_fb = 1;
 			proto_role_cap->he_rx_ndp_4x32 = 1;
@@ -624,10 +624,10 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		proto_role_cap->num_ampdu = 128;
 		proto_role_cap->ampdu_density = 0;
 		proto_role_cap->ampdu_len_exp = 0xff;
-		proto_role_cap->amsdu_in_ampdu = 1;
+		proto_role_cap->amsdu_in_ampdu = 0;
 		proto_role_cap->max_amsdu_len =
 			phl_com->proto_sw_cap[hw_band].max_amsdu_len;
-		proto_role_cap->htc_rx = 1;
+		proto_role_cap->htc_rx = 0;
 		proto_role_cap->sm_ps = 3;
 		proto_role_cap->trig_padding = 2;
 #ifdef CONFIG_PHL_TWT
@@ -637,8 +637,8 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		proto_role_cap->twt = 0;
 #endif /* CONFIG_PHL_TWT */
 		proto_role_cap->all_ack = 1;
-		proto_role_cap->a_ctrl = 0x6;
-		proto_role_cap->ops = 1;
+		proto_role_cap->a_ctrl = 0x2;
+		proto_role_cap->ops = 0;
 		proto_role_cap->ht_vht_trig_rx = 1;
 		proto_role_cap->edca[RTW_AC_BE].ac = RTW_AC_BE;
 		proto_role_cap->edca[RTW_AC_BE].param = 0xA42B;
@@ -648,12 +648,12 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		proto_role_cap->edca[RTW_AC_VI].param = 0x5E4326;
 		proto_role_cap->edca[RTW_AC_VO].ac = RTW_AC_VO;
 		proto_role_cap->edca[RTW_AC_VO].param = 0x2F3224;
-		proto_role_cap->ht_ldpc = 1;
-		proto_role_cap->vht_ldpc = 1;
-		proto_role_cap->he_ldpc = 1;
+		proto_role_cap->ht_ldpc = 0;
+		proto_role_cap->vht_ldpc = 0;
+		proto_role_cap->he_ldpc = 0;
 		proto_role_cap->sgi_20 = 1;
-		proto_role_cap->sgi_40 = 1;
-		proto_role_cap->sgi_80 = 1;
+		proto_role_cap->sgi_40 = 0;
+		proto_role_cap->sgi_80 = 0;
 		proto_role_cap->sgi_160 = 0;
 
 		switch (phl_com->phy_cap[hw_band].rxss) {
@@ -661,9 +661,9 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 			break;
 		case 1:
 			proto_role_cap->ht_rx_mcs[0] = 0xff;
-			proto_role_cap->vht_rx_mcs[0] = 0xfe;
+			proto_role_cap->vht_rx_mcs[0] = 0xfd;
 			proto_role_cap->vht_rx_mcs[1] = 0xff;
-			proto_role_cap->he_rx_mcs[0] = 0xfe;
+			proto_role_cap->he_rx_mcs[0] = 0xfd;
 			proto_role_cap->he_rx_mcs[1] = 0xff;
 			break;
 		case 2:
@@ -680,9 +680,9 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 			break;
 		case 1:
 			proto_role_cap->ht_tx_mcs[0] = 0xff;
-			proto_role_cap->vht_tx_mcs[0] = 0xfe;
+			proto_role_cap->vht_tx_mcs[0] = 0xfd;
 			proto_role_cap->vht_tx_mcs[1] = 0xff;
-			proto_role_cap->he_tx_mcs[0] = 0xfe;
+			proto_role_cap->he_tx_mcs[0] = 0xfd;
 			proto_role_cap->he_tx_mcs[1] = 0xff;
 			break;
 		case 2:
@@ -696,10 +696,10 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		}
 
 		proto_role_cap->ltf_gi = 0x3f;	// bit-x
-		proto_role_cap->doppler_tx = 1;
+		proto_role_cap->doppler_tx = 0;
 		proto_role_cap->doppler_rx = 0;
 		proto_role_cap->dcm_max_const_tx = 3;
-		proto_role_cap->dcm_max_nss_tx = 1;
+		proto_role_cap->dcm_max_nss_tx = 0;
 		proto_role_cap->dcm_max_const_rx = 3;
 		proto_role_cap->dcm_max_nss_rx = 0;
 
@@ -716,7 +716,7 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		    (1 == proto_role_cap->trig_cqi_fb)) {
 			proto_role_cap->bfme_sts = 3;
 			proto_role_cap->bfme_sts_greater_80mhz = 0;
-			proto_role_cap->max_nc = 1;
+			proto_role_cap->max_nc = 0;
 		} else {
 			proto_role_cap->bfme_sts = 0;
 			proto_role_cap->bfme_sts_greater_80mhz = 0;
@@ -773,14 +773,15 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 			proto_role_cap->ht_vht_ng = 0; /* vht ng = 1 */
 			proto_role_cap->ht_vht_cb = 1; /* vht_mu{9,7}/vht_su{6,4}/ht{4,2} */
 		}
-		proto_role_cap->partial_bw_su_in_mu = 0;
-		proto_role_cap->partial_bw_su_er = 1;
+		proto_role_cap->partial_bw_su_in_mu = 1;
+		proto_role_cap->partial_bw_su_er = 0;
+		proto_role_cap->partial_bw_mu_mimo_rx = 0;
 		proto_role_cap->pkt_padding = 2;
-		proto_role_cap->pwr_bst_factor = 1;
-		proto_role_cap->dcm_max_ru = 2;
-		proto_role_cap->long_sigb_symbol = 1;
-		proto_role_cap->tx_1024q_ru = 1;
-		proto_role_cap->rx_1024q_ru = 1;
+		proto_role_cap->pwr_bst_factor = 0;
+		proto_role_cap->dcm_max_ru = 0;
+		proto_role_cap->long_sigb_symbol = 0;
+		proto_role_cap->tx_1024q_ru = 0;
+		proto_role_cap->rx_1024q_ru = 0;
 		proto_role_cap->fbw_su_using_mu_cmprs_sigb = 1;
 		proto_role_cap->fbw_su_using_mu_non_cmprs_sigb = 1;
 		proto_role_cap->nss_tx =
@@ -828,9 +829,9 @@ _phl_init_role_cap(struct phl_info_t *phl_info,
 	role_cap->tx_ht_ldpc = 1;
 	role_cap->tx_vht_ldpc = 1;
 	role_cap->tx_he_ldpc = 1;
-	role_cap->tx_ht_stbc = 1;
-	role_cap->tx_vht_stbc = 1;
-	role_cap->tx_he_stbc = 1;
+	role_cap->tx_ht_stbc = 0;
+	role_cap->tx_vht_stbc = 0;
+	role_cap->tx_he_stbc = 0;
 #endif
 	return RTW_PHL_STATUS_SUCCESS;
 }

@@ -1018,7 +1018,7 @@ u8 rtw_joinbss_cmd(_adapter *padapter, struct wlan_network *pnetwork)
 
 #ifdef CONFIG_80211AX_HE
 	phepriv->he_option = _FALSE;
-	if (((phtpriv->ht_option && pnetwork->network.Configuration.DSConfig <= 14)
+	if (((phtpriv->ht_option)
 #ifdef CONFIG_80211AC_VHT
 	     || (pvhtpriv->vht_option && pnetwork->network.Configuration.DSConfig > 14)
 #endif

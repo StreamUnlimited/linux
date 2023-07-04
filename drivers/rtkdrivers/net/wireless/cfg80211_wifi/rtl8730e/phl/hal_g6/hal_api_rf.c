@@ -297,7 +297,6 @@ enum rtw_hal_status rtw_hal_rf_chl_rfk_trigger(void *hal,
 
 	PHL_INFO("[DBG_RFK]%s: phy_idx(%d), force(%d)\n", __func__,
 		 phy_idx, force);
-	//rtw_hal_mac_ser_ctrl(hal_info, false);
 
 	hal_status = halrf_chl_rfk_trigger(hal_info->rf, phy_idx, force);
 
@@ -308,8 +307,6 @@ enum rtw_hal_status rtw_hal_rf_chl_rfk_trigger(void *hal,
 	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
 		PHL_ERR("[MP HAL API] %s failed status(%d)\n", __FUNCTION__, hal_status);
 	}
-
-	//rtw_hal_mac_ser_ctrl(hal_info, true);
 
 	return hal_status;
 }
