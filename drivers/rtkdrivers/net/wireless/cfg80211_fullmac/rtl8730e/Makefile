@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
+
+ccflags-y += -I $(srctree)/drivers/rtkdrivers/net/wireless/cfg80211_fullmac/rtl8730e
+
 CONFIG_NAN = n
 ccflags-$(CONFIG_NAN) += -DCONFIG_NAN
 
