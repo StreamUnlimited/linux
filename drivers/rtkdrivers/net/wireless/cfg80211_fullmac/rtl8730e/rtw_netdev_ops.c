@@ -434,7 +434,7 @@ int rtw_ndev_register(void)
 {
 	int i, ret = false;
 	/* TODO: Customer names, get them from dts instead. */
-	char *wlan_name[TOTAL_IFACE_NUM] = {"wlan0", "wlan1"};
+	char *wlan_name[TOTAL_IFACE_NUM] = {"wlan0", "uap0"};
 	struct net_device *ndev = NULL;
 	struct wireless_dev *wdev;
 
