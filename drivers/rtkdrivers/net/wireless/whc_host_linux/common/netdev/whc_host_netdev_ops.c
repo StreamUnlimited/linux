@@ -609,12 +609,12 @@ fail:
 int rtw_ndev_register(void)
 {
 	int i, ret = false;
-	char *wlan_name = WHC_HOST_PORT_NAME;
+	char *wlan_name[TOTAL_IFACE_NUM] = {"wlan0", "uap0"};
 
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
 		rtw_ethtool_ops_init();
 		netdev_set_default_ethtool_ops(global_idev.pndev[i], &global_idev.rtw_ethtool_ops);
-		if (dev_alloc_name(global_idev.pndev[i], wlan_name) < 0) {
+		if (dev_alloc_name(global_idev.pndev[i], wlan_name[i]) < 0) {
 			dev_err(global_idev.fullmac_dev, "dev_alloc_name, fail!\n");
 		}
 		netif_carrier_off(global_idev.pndev[i]);
