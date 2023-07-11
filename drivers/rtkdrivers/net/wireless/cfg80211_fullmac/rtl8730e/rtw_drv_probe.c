@@ -86,6 +86,24 @@ static void platform_device_init(struct platform_device *pdev)
 	pr_info("Memory mapped sys space start: 0x%08lx len:%08lx, after map:0x%08lx\n",
 			(unsigned long)res_sys.start, pmem_len, axi_data->axi_sys_mem_start);
 
+
+	// Also memory map the KM4 RAM region so that it's accessible from the driver
+	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res_mem) {
+		pr_err("Can't get KM4 mem\n");
+		goto exit;
+	}
+
+	axi_data->km4_mem_start = devm_ioremap_nocache(&pdev->dev, res_mem->start, resource_size(res_mem));
+	if (!axi_data->km4_mem_start) {
+		pr_err("Failed to map KM4 mem\n");
+		goto exit;
+	}
+	axi_data->km4_mem_end = axi_data->km4_mem_start + resource_size(res_mem);
+
+	pr_info("Memory mapped KM4 space start: 0x%08lx len:%08x, after map:0x%08lx\n",
+			 (unsigned long)res_mem->start, resource_size(res_mem), (unsigned long)axi_data->km4_mem_start);
+
 	status = true;
 
 free_dvobj:
@@ -191,7 +209,7 @@ static int rtw_dev_probe(struct platform_device *pdev)
 		goto os_ndevs_deinit;
 	}
 
-	ret = llhw_ipc_init();
+	ret = llhw_ipc_init(paxi_data_global->km4_mem_start);
 	if (ret < 0) {
 		dev_err(global_idev.fullmac_dev, "ipc init fail");
 		goto free_dvobj;

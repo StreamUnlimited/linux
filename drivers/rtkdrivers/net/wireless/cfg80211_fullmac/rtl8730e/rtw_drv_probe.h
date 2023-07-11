@@ -12,6 +12,9 @@ typedef struct axi_data {
 	unsigned long		axi_sys_mem_end; /* shared mem end */
 	unsigned long		axi_sys_mem_start; /* shared mem start */
 
+	void __iomem		*km4_mem_end;
+	void __iomem		*km4_mem_start;
+
 	u8			bdma64;
 } AXI_DATA, *PAXI_DATA;
 

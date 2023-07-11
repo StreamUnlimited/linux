@@ -3,13 +3,11 @@
 static void llhw_ipc_event_scan_report_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
-	dma_addr_t dma_addr = 0;
-	dma_addr_t dma_ie = 0;
 	u32 channel = p_ipc_msg->param_buf[0];
 	u32 frame_is_bcn = p_ipc_msg->param_buf[1];
 	s32 rssi = (s32)p_ipc_msg->param_buf[2];
-	unsigned char *mac_addr = phys_to_virt(p_ipc_msg->param_buf[3]);
-	unsigned char *IEs = phys_to_virt(p_ipc_msg->param_buf[4]);
+	unsigned char *mac_addr = km4_phys_to_virt(p_ipc_msg->param_buf[3]);
+	unsigned char *IEs = km4_phys_to_virt(p_ipc_msg->param_buf[4]);
 	u32 ie_len = p_ipc_msg->param_buf[5];
 
 	if (!global_idev.event_ch) {
@@ -23,22 +21,7 @@ static void llhw_ipc_event_scan_report_indicate(struct event_priv_t *event_priv,
 		goto func_exit;
 	}
 
-	dma_addr = dma_map_single(pdev, mac_addr, ETH_ALEN, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_addr)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		goto func_exit;
-	}
-
-	dma_ie = dma_map_single(pdev, IEs, ie_len, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_ie)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		goto func_exit;
-	}
-
 	cfg80211_rtw_inform_bss(channel, frame_is_bcn, rssi, mac_addr, IEs, ie_len);
-
-	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
-	dma_unmap_single(pdev, dma_ie, ie_len, DMA_FROM_DEVICE);
 
 func_exit:
 	return;
@@ -47,11 +30,10 @@ func_exit:
 static void llhw_ipc_event_join_status_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	rtw_event_indicate_t event = (rtw_event_indicate_t)p_ipc_msg->param_buf[0];
-	char *buf = phys_to_virt(p_ipc_msg->param_buf[1]);
+	char *buf = km4_phys_to_virt(p_ipc_msg->param_buf[1]);
 	int buf_len = (int)p_ipc_msg->param_buf[2];
 	int flags = (int)p_ipc_msg->param_buf[3];
 	struct device *pdev = NULL;
-	dma_addr_t dma_buf = 0;
 	u16 disassoc_reason;
 
 	if (!global_idev.event_ch) {
@@ -63,14 +45,6 @@ static void llhw_ipc_event_join_status_indicate(struct event_priv_t *event_priv,
 	if (!pdev) {
 		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
 		goto func_exit;
-	}
-
-	if (buf_len > 0) {
-		dma_buf = dma_map_single(pdev, buf, buf_len, DMA_FROM_DEVICE);
-		if (dma_mapping_error(pdev, dma_buf)) {
-			dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-			goto func_exit;
-		}
 	}
 
 	if (event == WIFI_EVENT_JOIN_STATUS) {
@@ -112,10 +86,6 @@ static void llhw_ipc_event_join_status_indicate(struct event_priv_t *event_priv,
 		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[1]), 6, 0, buf, buf_len, 0);
 	}
 
-	if (buf_len > 0) {
-		dma_unmap_single(pdev, dma_buf, buf_len, DMA_FROM_DEVICE);
-	}
-
 func_exit:
 	return;
 }
@@ -123,9 +93,8 @@ func_exit:
 static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
-	dma_addr_t dma_addr = 0;
 	int idx = (u32)p_ipc_msg->param_buf[0];
-	unsigned char *dev_addr = phys_to_virt(p_ipc_msg->param_buf[1]);
+	unsigned char *dev_addr = km4_phys_to_virt(p_ipc_msg->param_buf[1]);
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: set netif info.");
 
@@ -150,12 +119,6 @@ static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_
 		goto func_exit;
 	}
 
-	dma_addr = dma_map_single(pdev, dev_addr, ETH_ALEN, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_addr)) {
-		dev_err(global_idev.fullmac_dev, "%s,%s: mapping dma error!\n", "event", __func__);
-		goto func_exit;
-	}
-
 	memcpy(global_idev.pndev[idx]->dev_addr, dev_addr, ETH_ALEN);
 	dev_dbg(global_idev.fullmac_dev, "MAC ADDR [%02x:%02x:%02x:%02x:%02x:%02x]", *global_idev.pndev[idx]->dev_addr,
 			*(global_idev.pndev[idx]->dev_addr + 1), *(global_idev.pndev[idx]->dev_addr + 2),
@@ -165,8 +128,6 @@ static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_
 	/*set ap port mac address*/
 	memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
 	global_idev.pndev[1]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] = global_idev.pndev[0]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] + 1;
-
-	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
 
 func_exit:
 	return;
@@ -236,13 +197,11 @@ func_exit:
 static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
-	dma_addr_t dma_addr = 0;
-	dma_addr_t dma_ie = 0;
 	u8 type = p_ipc_msg->param_buf[0];
 	u8 inst_id = p_ipc_msg->param_buf[1];
 	u8 peer_inst_id = p_ipc_msg->param_buf[2];
-	unsigned char *mac_addr = phys_to_virt(p_ipc_msg->param_buf[3]);
-	unsigned char *IEs = phys_to_virt(p_ipc_msg->param_buf[4]);
+	unsigned char *mac_addr = km4_phys_to_virt(p_ipc_msg->param_buf[3]);
+	unsigned char *IEs = km4_phys_to_virt(p_ipc_msg->param_buf[4]);
 	u32 info_len = p_ipc_msg->param_buf[5];
 	u64 cookie = p_ipc_msg->param_buf[7] << 32 | p_ipc_msg->param_buf[6];
 
@@ -252,22 +211,7 @@ static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, i
 		goto func_exit;
 	}
 
-	dma_addr = dma_map_single(pdev, mac_addr, ETH_ALEN, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_addr)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		goto func_exit;
-	}
-
-	dma_ie = dma_map_single(pdev, IEs, info_len, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_ie)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		goto func_exit;
-	}
-
 	cfg80211_rtw_nan_handle_sdf(type, inst_id, peer_inst_id, mac_addr, info_len, dma_ie, cookie);
-
-	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
-	dma_unmap_single(pdev, dma_ie, info_len, DMA_FROM_DEVICE);
 
 func_exit:
 	return;
@@ -276,9 +220,8 @@ func_exit:
 static void llhw_ipc_event_nan_cfgvendor_event_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
-	dma_addr_t dma_event = 0;
 	u8 event_id = p_ipc_msg->param_buf[0];
-	unsigned char *event_addr = phys_to_virt(p_ipc_msg->param_buf[1]);
+	unsigned char *event_addr = km4_phys_to_virt(p_ipc_msg->param_buf[1]);
 	u32 size = p_ipc_msg->param_buf[2];
 
 	pdev = global_idev.ipc_dev;
@@ -287,15 +230,7 @@ static void llhw_ipc_event_nan_cfgvendor_event_indicate(struct event_priv_t *eve
 		goto func_exit;
 	}
 
-	dma_event = dma_map_single(pdev, event_addr, size, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_event)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		goto func_exit;
-	}
-
 	rtw_cfgvendor_nan_event_indication(event_id, event_addr, size);
-
-	dma_unmap_single(pdev, dma_event, size, DMA_FROM_DEVICE);
 
 func_exit:
 	return;
@@ -304,8 +239,7 @@ func_exit:
 static void llhw_ipc_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
-	dma_addr_t dma_data = 0;
-	unsigned char *data_addr = phys_to_virt(p_ipc_msg->param_buf[0]);
+	unsigned char *data_addr = km4_phys_to_virt(p_ipc_msg->param_buf[0]);
 	u32 size = p_ipc_msg->param_buf[1];
 
 	pdev = global_idev.ipc_dev;
@@ -314,15 +248,7 @@ static void llhw_ipc_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_pr
 		goto func_exit;
 	}
 
-	dma_data = dma_map_single(pdev, data_addr, size, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_data)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		goto func_exit;
-	}
-
 	rtw_cfgvendor_send_cmd_reply(dma_data, size);
-
-	dma_unmap_single(pdev, dma_data, size, DMA_FROM_DEVICE);
 
 func_exit:
 	return;
@@ -332,7 +258,6 @@ func_exit:
 
 void llhw_ipc_event_task(unsigned long data)
 {
-	dma_addr_t dma_addr = 0;
 	struct event_priv_t *event_priv = &global_idev.event_priv;
 	struct device *pdev = NULL;
 	inic_ipc_dev_req_t *p_recv_msg = NULL;
@@ -354,12 +279,8 @@ void llhw_ipc_event_task(unsigned long data)
 		dev_err(global_idev.fullmac_dev, "%s: Invalid device message!\n", "event");
 		goto func_exit;
 	}
-	p_recv_msg = phys_to_virt(event_priv->recv_ipc_msg.msg);
-	dma_addr = dma_map_single(pdev, p_recv_msg, sizeof(inic_ipc_dev_req_t), DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, dma_addr)) {
-		dev_err(global_idev.fullmac_dev, "%s: device is NULL!\n", "event");
-		goto func_exit;
-	}
+
+	p_recv_msg = km4_phys_to_virt(event_priv->recv_ipc_msg.msg);
 
 	switch (p_recv_msg->enevt_id) {
 	/* receive callback indication */
@@ -415,8 +336,6 @@ void llhw_ipc_event_task(unsigned long data)
 
 	/*set enevt_id to 0 to notify NP that event is finished*/
 	p_recv_msg->enevt_id = IPC_WIFI_EVT_PROCESS_DONE;
-	dma_sync_single_for_device(pdev, dma_addr, sizeof(inic_ipc_dev_req_t), DMA_TO_DEVICE);
-	dma_unmap_single(pdev, dma_addr, sizeof(inic_ipc_dev_req_t), DMA_TO_DEVICE);
 
 func_exit:
 	return;

@@ -23,7 +23,7 @@ int llhw_ipc_wifi_connect(rtw_network_info_t *connect_param, unsigned char block
 int llhw_ipc_wifi_disconnect(void);
 int llhw_ipc_wifi_is_connected_to_ap(void);
 int llhw_ipc_wifi_get_channel(u32 wlan_idx, u8 *ch);
-int llhw_ipc_init(void);
+int llhw_ipc_init(void __iomem *km4_map_start);
 int llhw_ipc_wifi_del_sta(u8 wlan_idx, u8 *mac);
 int llhw_ipc_wifi_init_ap(void);
 int llhw_ipc_wifi_deinit_ap(void);
