@@ -11,7 +11,7 @@
 #include "core.h"
 
 /* LSYS BG registers */
-#define REG_LSYS_AIP_CTRL1                              0UL // 0x025C
+#define REG_LSYS_AIP_CTRL1                              0x025C
 #define LSYS_BIT_BG_PWR                                 ((u32)0x00000001 << 8)          /* 1: power on ddrphy bandgap 0: shutdown bg */
 #define LSYS_BIT_BG_ON_USB2                             ((u32)0x00000001 << 5)          /* 1: Bandgap USB2 current enable */
 #define LSYS_MASK_BG_ALL                                ((u32)0x00000003 << 0)          /* 0x3  Bandgap enable mode */

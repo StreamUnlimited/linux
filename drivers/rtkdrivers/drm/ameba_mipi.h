@@ -34,7 +34,7 @@
 /* Registers Definitions --------------------------------------------------------*/
 
 /* LSYS BG registers */
-#define REG_LSYS_AIP_CTRL1                              0UL // 0x025C
+#define REG_LSYS_AIP_CTRL1                              0x025C
 #define LSYS_BIT_BG_PWR                                 ((u32)0x00000001 << 8)          /* 1: power on ddrphy bandgap 0: shutdown bg */
 #define LSYS_BIT_BG_ON_MIPI                             ((u32)0x00000001 << 4)          /*!<R/W 1  Bandgap MIPI current enable */
 #define LSYS_BG_ON_MIPI(x)                              ((u32)(((x) & 0x00000001) << 4))
