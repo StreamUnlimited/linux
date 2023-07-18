@@ -1249,5 +1249,5 @@ static int __init realtek_amebad2_pinctrl_init(void)
 {
 	return platform_driver_register(&realtek_amebad2_pinctrl_driver);
 }
-arch_initcall(realtek_amebad2_pinctrl_init);
+postcore_initcall(realtek_amebad2_pinctrl_init);
 
