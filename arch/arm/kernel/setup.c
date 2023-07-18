@@ -28,6 +28,7 @@
 #include <linux/compiler.h>
 #include <linux/sort.h>
 #include <linux/psci.h>
+#include <linux/random.h>
 
 #include <asm/unified.h>
 #include <asm/cp15.h>
@@ -938,6 +939,28 @@ static int __init customize_machine(void)
 }
 arch_initcall(customize_machine);
 
+#define RETENTION_RAM_BASE	0x23020000
+#define UNIQUE_ID_ADDR		(RETENTION_RAM_BASE + 0x170)
+#define UNIQUE_ID_SIZE 16
+
+static int ameba_init_machine_late(void)
+{
+	u8 unique_id[UNIQUE_ID_SIZE];
+	u8 *id_ptr = NULL;
+
+	id_ptr = ioremap(UNIQUE_ID_ADDR, UNIQUE_ID_SIZE);
+	if (id_ptr) {
+		memcpy(unique_id, id_ptr, sizeof(unique_id));
+		iounmap(id_ptr);
+	} else {
+		pr_warn("Failed to map UNIQUE ID, will use a random serial number\n");
+		get_random_bytes(unique_id, sizeof(unique_id));
+	}
+
+	system_serial = kasprintf(GFP_KERNEL, "%*phN", sizeof(unique_id), unique_id);
+	return 0;
+}
+
 static int __init init_machine_late(void)
 {
 	struct device_node *root;
@@ -945,6 +968,10 @@ static int __init init_machine_late(void)
 
 	if (machine_desc->init_late)
 		machine_desc->init_late();
+
+	// Call the Realtek Ameba specific function to set system_serial
+	// and return early.
+	return ameba_init_machine_late();
 
 	root = of_find_node_by_path("/");
 	if (root) {
