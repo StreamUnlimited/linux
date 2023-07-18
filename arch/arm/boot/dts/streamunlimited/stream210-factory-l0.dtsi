@@ -1,0 +1,62 @@
+
+&pinctrl {
+	pinctrl-names = "default";
+	pinctrl-0 = <&gpio_factory_pins>, <&gpio_factory_pins_swd_disable>, <&gpio_factory_pins_audioshare>;
+
+	gpio_factory_pins: factory_gpios {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 6, GPIO)>,
+			<REALTEK_PINMUX('A', 7, GPIO)>,
+			<REALTEK_PINMUX('A', 8, GPIO)>,
+			<REALTEK_PINMUX('A', 9, GPIO)>,
+			<REALTEK_PINMUX('A', 10, GPIO)>,
+			<REALTEK_PINMUX('A', 11, GPIO)>,
+			<REALTEK_PINMUX('A', 12, GPIO)>,
+			<REALTEK_PINMUX('A', 15, GPIO)>,
+			<REALTEK_PINMUX('A', 16, GPIO)>,
+			<REALTEK_PINMUX('B', 8, GPIO)>,
+			<REALTEK_PINMUX('B', 9, GPIO)>,
+			<REALTEK_PINMUX('B', 10, GPIO)>,
+			<REALTEK_PINMUX('B', 11, GPIO)>,
+			<REALTEK_PINMUX('B', 14, GPIO)>,
+			<REALTEK_PINMUX('B', 15, GPIO)>,
+			<REALTEK_PINMUX('B', 16, GPIO)>,
+			<REALTEK_PINMUX('B', 17, GPIO)>,
+			<REALTEK_PINMUX('B', 18, GPIO)>,
+			<REALTEK_PINMUX('B', 19, GPIO)>,
+			<REALTEK_PINMUX('B', 20, GPIO)>,
+			<REALTEK_PINMUX('B', 25, GPIO)>,
+			<REALTEK_PINMUX('B', 26, GPIO)>,
+			<REALTEK_PINMUX('B', 27, GPIO)>,
+			<REALTEK_PINMUX('B', 29, GPIO)>;
+		};
+	};
+
+	gpio_factory_pins_swd_disable: factory_gpios_swd_disable {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 13, GPIO)>,
+			<REALTEK_PINMUX('A', 14, GPIO)>;
+
+			swd-disable;
+		};
+	};
+
+	gpio_factory_pins_audioshare: factory_gpios_audioshare {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 20, GPIO)>,
+			<REALTEK_PINMUX('A', 21, GPIO)>,
+			<REALTEK_PINMUX('A', 22, GPIO)>,
+			<REALTEK_PINMUX('A', 23, GPIO)>,
+			<REALTEK_PINMUX('A', 26, GPIO)>,
+			<REALTEK_PINMUX('A', 27, GPIO)>,
+			<REALTEK_PINMUX('A', 28, GPIO)>,
+			<REALTEK_PINMUX('A', 29, GPIO)>,
+			<REALTEK_PINMUX('B', 3, GPIO)>,
+			<REALTEK_PINMUX('B', 4, GPIO)>,
+			<REALTEK_PINMUX('B', 5, GPIO)>,
+			<REALTEK_PINMUX('B', 6, GPIO)>;
+
+			audio-share-enable;
+		};
+	};
+};
