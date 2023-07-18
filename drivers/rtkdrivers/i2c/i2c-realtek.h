@@ -38,6 +38,7 @@
 #include <linux/signal.h>
 #include <linux/time.h>
 #include <linux/timer.h>
+#include <linux/completion.h>
 
 #ifndef RTK_I2C_DEFINE
 #define RTK_I2C_DEFINE
@@ -934,6 +935,7 @@ struct rtk_i2c_dev {
 
 	int				nr_slaves;
 	struct rtk_i2c_slave_dev	*slave_dev;
+	struct completion	xfer_completion;
 };
 
 #ifndef ENABLE

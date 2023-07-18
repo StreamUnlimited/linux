@@ -6116,8 +6116,8 @@ static struct hci_conn *check_pending_le_conn(struct hci_dev *hdev,
 	/* Most controller will fail if we try to create new connections
 	 * while we have an existing one in peripheral role.
 	 */
-	if (hdev->conn_hash.le_num_peripheral > 0 &&
-	    (!test_bit(HCI_QUIRK_VALID_LE_STATES, &hdev->quirks) ||
+	if (hdev->conn_hash.le_num_peripheral > 3 &&                   //Solve the problem that scatternet does peripheral first and then central, and the
+	    (!test_bit(HCI_QUIRK_VALID_LE_STATES, &hdev->quirks) ||    //central connection fails. The number of peripheral connections is set to 3. (modified by michael_kong)
 	     !(hdev->le_states[3] & 0x10)))
 		return NULL;
 

@@ -11,7 +11,6 @@ source "drivers/rtkdrivers/captouch/Kconfig"
 
 if NETDEVICES
 if CFG80211
-source "drivers/rtkdrivers/net/wireless/cfg80211_wifi/Kconfig"
 source "drivers/rtkdrivers/net/wireless/cfg80211_fullmac/Kconfig"
 endif
 endif
@@ -31,10 +30,6 @@ source "drivers/rtkdrivers/drm/Kconfig"
 source "drivers/rtkdrivers/gpio/Kconfig"
 
 source "drivers/rtkdrivers/ipc/Kconfig"
-
-if NETDEVICES
-source "drivers/rtkdrivers/net/wireless/inic/Kconfig"
-endif
 
 source "drivers/rtkdrivers/ir/Kconfig"
 

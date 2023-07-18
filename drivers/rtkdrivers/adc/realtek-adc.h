@@ -186,6 +186,10 @@
 #define ADC_TIM_TRI_MODE				(0x02)	/*!< ADC timer-trigger mode */
 #define ADC_COMP_ASSIST_MODE			(0x03)	/*!< ADC comparator-assist mode */
 
+/* ADC calibration data addresses in OTP */
+#define ADC_NORMAL_CH_CAL_OTPADDR   0x704
+#define ADC_VBAT_CH_CAL_OTPADDR     0x70A
+
 /**
  * struct realtek_adc_info - ADC config data
  * @clk_div: ADC clock divider
@@ -226,6 +230,11 @@ struct realtek_adc_diff_channel {
  * @num_conv: expected number of scan conversions
  * @adc_clk: adc clock
  * @ctc_clk: captouch clock
+ * @k_coeff_normal: quadritic fitting A, B, C calibration params for normal channels
+ * @k_coeff_vbat: quadritic fitting A, B, C calibration params for VBAT channel
+ * @cal_offset: calibration offsets for all 7 channels
+ * @is_calibdata_read: bool flag to indicate if calibdata for both normal & VBAT
+ *  channels is read out from OTP or not.
  */
 struct realtek_adc_data {
 	void __iomem *base;
@@ -239,6 +248,10 @@ struct realtek_adc_data {
 	u32 num_conv;
 	struct clk *adc_clk;
 	struct clk *ctc_clk;
+    int k_coeff_normal[3];
+    int k_coeff_vbat[3];
+    int cal_offset[7];
+    bool is_calibdata_read;
 };
 
 extern void realtek_adc_cmd(struct realtek_adc_data *adc, bool state);

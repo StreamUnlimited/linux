@@ -151,6 +151,7 @@ void rtk_i2c_isr_master_handle_tx_empty(struct rtk_i2c_dev *i2c_dev)
 		rtk_i2c_clear_all_interrupts(&i2c_dev->i2c_param);
 		/* Update I2C device status */
 		i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
+		complete(&i2c_dev->xfer_completion);
 	}
 
 	if (i2c_dev->i2c_manage.tx_info.data_len > 0) {
@@ -711,7 +712,6 @@ static void rtk_i2c_xfer_msg(
 	/*Local Variables*/
 	u8 i2c_msg_addr_mode = I2C_ADDR_7BIT;
 	hal_status dev_status = HAL_OK;
-	int delay_count = 0;
 
 	dev_dbg(i2c_dev->dev, "%s", __FUNCTION__);
 	rtk_print_i2c_input_data(msg, msg->flags & I2C_M_RD);
@@ -763,6 +763,7 @@ static void rtk_i2c_xfer_msg(
 	} else {
 		/* i2c write */
 		dev_dbg(i2c_dev->dev, "Master Write Start!!!\n");
+		reinit_completion(&i2c_dev->xfer_completion);
 		i2c_dev->i2c_manage.tx_info.target_addr = msg->addr;
 		i2c_dev->i2c_manage.tx_info.p_data_buf = msg->buf;
 		i2c_dev->i2c_manage.tx_info.data_len = msg->len;
@@ -779,11 +780,13 @@ static void rtk_i2c_xfer_msg(
 			   && (i2c_dev->i2c_manage.dev_status != I2C_STS_ERROR)
 			   && (i2c_dev->i2c_manage.dev_status != I2C_STS_TIMEOUT)) {
 				/* Directly sleep here will cause runtime touchscreen not smooth(us-level i2c done). */
-				delay_count++;
-				/* No sleep here will cause audio xrun when i2c is not wired to board.(i2c cannot transfer). */
-				if (delay_count > 200) {
-					msleep(200);
+				// /* No sleep here will cause audio xrun when i2c is not wired to board.(i2c cannot transfer). */
+				if (wait_for_completion_timeout(&i2c_dev->xfer_completion, msecs_to_jiffies(3000)) == 0) {
+					dev_err(i2c_dev->dev, "I2C wait for completion timeout");
+					i2c_dev->i2c_manage.dev_status = I2C_STS_TIMEOUT;
+					break;
 				}
+
 				if (rtk_i2c_is_timeout(i2c_dev) == HAL_TIMEOUT) {
 					i2c_dev->i2c_manage.dev_status = I2C_STS_TIMEOUT;
 					dev_err(i2c_dev->dev, "I2C-%d send timeout. Reason: cannot finish write.", i2c_dev->i2c_param.i2c_index);
@@ -892,5 +895,6 @@ int rtk_i2c_master_probe(
 	i2c_dev->i2c_manage.tx_info.p_data_buf = devm_kzalloc(&pdev->dev, RTK_I2C_T_RX_FIFO_MAX, GFP_KERNEL);
 
 	rtk_i2c_init_hw(&i2c_dev->i2c_param);
+	init_completion(&i2c_dev->xfer_completion);
     return 0;
 }

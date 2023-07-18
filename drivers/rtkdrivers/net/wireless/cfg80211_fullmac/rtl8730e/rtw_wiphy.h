@@ -29,7 +29,7 @@
 
 #define ASSOC_IE_MAX_LEN		500
 #define WLAN_HDR_A3_LEN			24
-#define RSNXE_MAX_LEN (16)
+#define RSNXE_MAX_LEN (18)
 #define WLAN_EID_RSNX 244
 
 #define rtw_a_rates			(rtw_rates + 4)

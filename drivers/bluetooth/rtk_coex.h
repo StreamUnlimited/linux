@@ -51,7 +51,7 @@
 
 //vendor cmd to fw
 #define HCI_VENDOR_ENABLE_PROFILE_REPORT_COMMAND        0xfc18
-#define HCI_VENDOR_SET_PROFILE_REPORT_COMMAND           0xfc19
+#define HCI_VENDOR_SET_PROFILE_REPORT_COMMAND           0xfc1b
 #define HCI_VENDOR_MAILBOX_CMD                          0xfc8f
 #define HCI_VENDOR_SET_BITPOOL				0xfc51
 
@@ -150,7 +150,8 @@ enum {
 	profile_hogp = 5,
 	profile_voice = 6,
 	profile_sink = 7,
-	profile_max = 8
+	profile_le_audio = 8,
+	profile_max = 9
 };
 
 #define A2DP_SIGNAL	0x01
