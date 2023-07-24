@@ -1003,8 +1003,8 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	codec_priv->amic_tdm_num = 4;
 	codec_priv->tdm_amic_numbers[0] = (u8)AMIC1;
 	codec_priv->tdm_amic_numbers[1] = (u8)AMIC2;
-	codec_priv->tdm_amic_numbers[2] = (u8)AMIC3;
-	codec_priv->tdm_amic_numbers[3] = (u8)AMIC3;
+	codec_priv->tdm_amic_numbers[2] = (u8)AMIC4;
+	codec_priv->tdm_amic_numbers[3] = (u8)AMIC5;
 	codec_priv->tdm_amic_numbers[4] = (u8)AMIC3;
 	codec_priv->tdm_amic_numbers[5] = (u8)AMIC3;
 	codec_priv->tdm_amic_numbers[6] = (u8)AMIC3;
