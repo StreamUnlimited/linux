@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 //
-// ASoC simple sound card support
+// Stream Unlimited Stream195x ASoC driver
+// Based on simple-card.c
 //
 // Copyright (C) 2012 Renesas Solutions Corp.
 // Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+// Copyright (C) 2020 StreamUnlimited Engineering GmbH
+// Quentin Schulz <quentin.schulz@streamunlimited.com>
 
 #include <linux/cleanup.h>
 #include <linux/clk.h>
@@ -17,26 +20,228 @@
 #include <sound/soc-dai.h>
 #include <sound/soc.h>
 
-#define DPCM_SELECTABLE 1
+/* START SUE addition */
+#include <linux/gpio/consumer.h>
+#include "../fsl/fsl_sai.h"
+struct snd_soc_stream195x_dai_link_data {
+	struct gpio_desc *mute_gpio;
+};
+
+/* All instances of asoc_simple_priv have been replcaed with stream195x_simple_priv */
+/* Stolen from asoc_simple_priv struct */
+struct stream195x_simple_priv {
+	struct snd_soc_card snd_card;
+	struct simple_dai_props *dai_props;
+	struct simple_util_jack hp_jack;
+	struct simple_util_jack mic_jack;
+	struct snd_soc_jack *aux_jacks;
+	struct snd_soc_dai_link *dai_link;
+	struct simple_util_dai *dais;
+	struct snd_soc_dai_link_component *dlcs;
+	struct snd_soc_codec_conf *codec_conf;
+	struct gpio_desc *pa_gpio;
+	const struct snd_soc_ops *ops;
+	unsigned int dpcm_selectable:1;
+	unsigned int force_dpcm:1;
+	/* START SUE addition 2 */
+	struct clk *pll8k_clk;
+	struct clk *pll11k_clk;
+	int cur_ppm;
+	struct gpio_desc *powerdown_gpio;
+	struct snd_soc_stream195x_dai_link_data *dai_link_data;
+	/* END SUE addition 2 */
+};
+
+#define MCLK_RATE_48k	(24576000UL)
+#define MCLK_RATE_44k1	(22579200UL)
+
+#define PLL_NOMINAL_RATE_48k	(786432000UL)
+#define PLL_NOMINAL_RATE_44k1	(722534400UL)
+
+static int snd_soc_stream195x_ppm_info(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->value.integer.min = -500;
+	uinfo->value.integer.max = 500;
+	uinfo->count = 1;
+
+	return 0;
+}
+
+static int snd_soc_stream195x_ppm_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = priv->cur_ppm;
+
+	return 0;
+}
+
+static int snd_soc_stream195x_ppm_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
+
+	int ret;
+	unsigned int comp;
+	unsigned int clk_rate;
+	int ppm = ucontrol->value.integer.value[0];
+
+	comp = DIV_ROUND_CLOSEST_ULL((u64)PLL_NOMINAL_RATE_48k * abs(ppm), 1000000UL);
+	clk_rate = PLL_NOMINAL_RATE_48k;
+	if (ppm > 0)
+		clk_rate += comp;
+	else
+		clk_rate -= comp;
+
+	ret = clk_set_rate(priv->pll8k_clk, clk_rate);
+	if (ret)
+		dev_warn(card->dev, "failed to set pll8k rate %d\n", ret);
+
+
+	comp = DIV_ROUND_CLOSEST_ULL((u64)PLL_NOMINAL_RATE_44k1 * abs(ppm), 1000000UL);
+	clk_rate = PLL_NOMINAL_RATE_44k1;
+	if (ppm > 0)
+		clk_rate += comp;
+	else
+		clk_rate -= comp;
+
+	ret = clk_set_rate(priv->pll11k_clk, clk_rate);
+	if (ret)
+		dev_warn(card->dev, "failed to set pll11k rate %d\n", ret);
+
+	priv->cur_ppm = ppm;
+
+	return 1;
+}
+
+static const struct snd_kcontrol_new snd_soc_stream195x_controls[] = {
+	{
+		.name = "Drift compensator",
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.info = snd_soc_stream195x_ppm_info,
+		.get = snd_soc_stream195x_ppm_get,
+		.put = snd_soc_stream195x_ppm_put,
+	},
+};
+
+static void snd_soc_stream195x_set_powerdown(struct stream195x_simple_priv *priv, int value)
+{
+	if (priv->powerdown_gpio)
+		gpiod_set_value(priv->powerdown_gpio, value);
+}
+
+static void snd_soc_stream195x_set_all_links_mute(struct stream195x_simple_priv *priv, int value)
+{
+	int i;
+	struct snd_soc_card *card = simple_priv_to_card(priv);
+
+	for (i = 0; i < card->num_links; i++) {
+		struct snd_soc_stream195x_dai_link_data *dai_link_data = priv->dai_link_data + i;
+		if (dai_link_data->mute_gpio)
+			gpiod_set_value_cansleep(dai_link_data->mute_gpio, value);
+	}
+}
+
+static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, struct snd_pcm_hw_params *params)
+{
+	int ret;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
+	struct simple_dai_props *dai_props = runtime_simple_priv_to_props(priv, rtd);
+
+	unsigned int rate = params_rate(params);
+	unsigned int mclk_rate, pll_rate;
+	struct clk *pll;
+
+	if ((rate % 8000) == 0) {
+		pll_rate = PLL_NOMINAL_RATE_48k;
+		pll = priv->pll8k_clk;
+		mclk_rate = MCLK_RATE_48k;
+	} else {
+		pll_rate = PLL_NOMINAL_RATE_44k1;
+		pll = priv->pll11k_clk;
+		mclk_rate = MCLK_RATE_44k1;
+	}
+
+	/*
+	 * We could have done the tdm slot setup only once, and not in every hw_params()
+	 * call, however sooner or later we will support DSD where the tdm slot setup
+	 * will change at runtime, so let's just add it here.
+	 */
+	ret = snd_soc_dai_set_tdm_slot(codec_dai, BIT(params_channels(params)) - 1, BIT(params_channels(params)) - 1, dai_props->codec_dai->slots, dai_props->codec_dai->slot_width);
+	if (ret && ret != -ENOTSUPP)
+		return ret;
+
+	ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0, 0, dai_props->cpu_dai->slots, dai_props->cpu_dai->slot_width);
+	if (ret && ret != -ENOTSUPP)
+		return ret;
+
+
+	/*
+	 * First we reset the PLL rate to the nominal value, otherwise, when
+	 * the PLL is in a state where the frequency is skewed, the
+	 * calculations inside snd_soc_dai_set_sysclk() might fail, because
+	 * the skewed PLL value cannot be cleanly divided down anymore.
+	 */
+	priv->cur_ppm = 0;
+	ret = clk_set_rate(pll, pll_rate);
+	if (ret)
+		return ret;
+
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk_rate, SND_SOC_CLOCK_IN);
+	if (ret && ret != -ENOTSUPP)
+		return ret;
+
+	/* TODO: make the id parameter configurable via the device-tree */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, FSL_SAI_CLK_MAST1, mclk_rate, SND_SOC_CLOCK_OUT);
+	if (ret && ret != -ENOTSUPP)
+		return ret;
+
+
+	return 0;
+}
+
+/*
+ * This is a wrapper around devm_fwnode_gpiod_get_index() to assemble
+ * a nice gpio label based on dai_link->codecs->dai_name.
+ */
+static struct gpio_desc *devm_dailink_gpiod_get_from_of_node(struct device *dev, struct snd_soc_dai_link *dai_link,
+								struct device_node *np, const char *name, enum gpiod_flags flags)
+{
+	char buf[32], *gpio_label;
+
+	snprintf(buf, sizeof(buf), "%s-%s", dai_link->codecs->dai_name, name);
+	gpio_label = devm_kstrdup(dev, buf, GFP_KERNEL);
+
+	return devm_fwnode_gpiod_get_index(dev, of_fwnode_handle(np), name, 0, flags, gpio_label);
+}
+/* END SUE addition */
 
 #define DAI	"sound-dai"
 #define CELL	"#sound-dai-cells"
-#define PREFIX	"simple-audio-card,"
+#define PREFIX	"sue-card,"
 
 static const struct snd_soc_ops simple_ops = {
 	.startup	= simple_util_startup,
 	.shutdown	= simple_util_shutdown,
-	.hw_params	= simple_util_hw_params,
+	/* START SUE changes */
+	/* .hw_params	= asoc_simple_hw_params, */
+	.hw_params	= snd_soc_stream195x_hw_params,
+	/* END SUE changes */
 };
 
 #define simple_ret(priv, ret) _simple_ret(priv, __func__, ret)
-static inline int _simple_ret(struct simple_util_priv *priv,
+static inline int _simple_ret(struct stream195x_simple_priv *priv,
 			      const char *func, int ret)
 {
 	return snd_soc_ret(simple_priv_to_dev(priv), ret, "at %s()\n", func);
 }
 
-static int simple_parse_platform(struct simple_util_priv *priv,
+static int simple_parse_platform(struct stream195x_simple_priv *priv,
 				 struct device_node *node,
 				 struct snd_soc_dai_link_component *dlc)
 {
@@ -61,7 +266,7 @@ static int simple_parse_platform(struct simple_util_priv *priv,
 	return 0;
 }
 
-static int simple_parse_dai(struct simple_util_priv *priv,
+static int simple_parse_dai(struct stream195x_simple_priv *priv,
 			    struct device_node *node,
 			    struct snd_soc_dai_link_component *dlc,
 			    int *is_single_link)
@@ -140,7 +345,7 @@ static void simple_parse_convert(struct device *dev,
 	simple_util_parse_convert(np,   NULL,   adata);
 }
 
-static int simple_parse_node(struct simple_util_priv *priv,
+static int simple_parse_node(struct stream195x_simple_priv *priv,
 			     struct device_node *np,
 			     struct link_info *li,
 			     char *prefix,
@@ -174,7 +379,7 @@ end:
 	return simple_ret(priv, ret);
 }
 
-static int simple_link_init(struct simple_util_priv *priv,
+static int simple_link_init(struct stream195x_simple_priv *priv,
 			    struct device_node *cpu,
 			    struct device_node *codec,
 			    struct link_info *li,
@@ -209,10 +414,10 @@ static int simple_link_init(struct simple_util_priv *priv,
 	of_property_read_u32(codec,		"mclk-fs", &dai_props->mclk_fs);
 	of_property_read_u32(codec,	PREFIX	"mclk-fs", &dai_props->mclk_fs);
 
-	graph_util_parse_trigger_order(priv, top,	&trigger_start, &trigger_stop);
-	graph_util_parse_trigger_order(priv, node,	&trigger_start, &trigger_stop);
-	graph_util_parse_trigger_order(priv, cpu,	&trigger_start, &trigger_stop);
-	graph_util_parse_trigger_order(priv, codec,	&trigger_start, &trigger_stop);
+	graph_util_parse_trigger_order((struct simple_util_priv*)priv, top,	&trigger_start, &trigger_stop);
+	graph_util_parse_trigger_order((struct simple_util_priv*)priv, node,	&trigger_start, &trigger_stop);
+	graph_util_parse_trigger_order((struct simple_util_priv*)priv, cpu,	&trigger_start, &trigger_stop);
+	graph_util_parse_trigger_order((struct simple_util_priv*)priv, codec,	&trigger_start, &trigger_stop);
 
 	dai_link->playback_only		= playback_only;
 	dai_link->capture_only		= capture_only;
@@ -223,12 +428,12 @@ static int simple_link_init(struct simple_util_priv *priv,
 	dai_link->init			= simple_util_dai_init;
 	dai_link->ops			= &simple_ops;
 
-	ret = simple_util_set_dailink_name(priv, dai_link, name);
+	ret = simple_util_set_dailink_name((struct simple_util_priv*)priv, dai_link, name);
 end:
 	return simple_ret(priv, ret);
 }
 
-static int simple_dai_link_of_dpcm(struct simple_util_priv *priv,
+static int simple_dai_link_of_dpcm(struct stream195x_simple_priv *priv,
 				   struct device_node *np,
 				   struct device_node *codec,
 				   struct link_info *li,
@@ -239,11 +444,20 @@ static int simple_dai_link_of_dpcm(struct simple_util_priv *priv,
 	struct simple_dai_props *dai_props = simple_priv_to_props(priv, li->link);
 	struct device_node *top = dev->of_node;
 	struct device_node *node __free(device_node) = of_get_parent(np);
+	/* START SUE addition */
+	struct snd_soc_stream195x_dai_link_data *dai_link_data = priv->dai_link_data + li->link;
+	/* END SUE addition */
 	char *prefix = "";
 	char dai_name[64];
 	int ret;
 
 	dev_dbg(dev, "link_of DPCM (%pOF)\n", np);
+
+	/* START SUE additions */
+	dai_link_data->mute_gpio = devm_dailink_gpiod_get_from_of_node(dev, dai_link, np, "mute-gpios", GPIOD_OUT_HIGH);
+	if (IS_ERR(dai_link_data->mute_gpio))
+		dai_link_data->mute_gpio = NULL;
+	/* END SUE additions */
 
 	/* For single DAI link & old style of DT node */
 	if (is_top)
@@ -305,7 +519,7 @@ out_put_node:
 	return simple_ret(priv, ret);
 }
 
-static int simple_dai_link_of(struct simple_util_priv *priv,
+static int simple_dai_link_of(struct stream195x_simple_priv *priv,
 			      struct device_node *np,
 			      struct device_node *codec,
 			      struct link_info *li,
@@ -317,6 +531,9 @@ static int simple_dai_link_of(struct simple_util_priv *priv,
 	struct snd_soc_dai_link_component *codecs = snd_soc_link_to_codec(dai_link, 0);
 	struct snd_soc_dai_link_component *platforms = snd_soc_link_to_platform(dai_link, 0);
 	struct device_node *cpu = NULL;
+	/* START SUE addition */
+	struct snd_soc_stream195x_dai_link_data *dai_link_data = priv->dai_link_data + li->link;
+	/* END SUE addition */
 	char dai_name[64];
 	char prop[128];
 	char *prefix = "";
@@ -324,6 +541,12 @@ static int simple_dai_link_of(struct simple_util_priv *priv,
 
 	cpu  = np;
 	struct device_node *node __free(device_node) = of_get_parent(np);
+
+	/* START SUE additions */
+	dai_link_data->mute_gpio = devm_dailink_gpiod_get_from_of_node(dev, dai_link, node, "mute-gpios", GPIOD_OUT_HIGH);
+	if (IS_ERR(dai_link_data->mute_gpio))
+		dai_link_data->mute_gpio = NULL;
+	/* END SUE additions */
 
 	dev_dbg(dev, "link_of (%pOF)\n", node);
 
@@ -360,13 +583,13 @@ dai_link_of_err:
 	return simple_ret(priv, ret);
 }
 
-static int __simple_for_each_link(struct simple_util_priv *priv,
+static int __simple_for_each_link(struct stream195x_simple_priv *priv,
 			struct link_info *li,
-			int (*func_noml)(struct simple_util_priv *priv,
+			int (*func_noml)(struct stream195x_simple_priv *priv,
 					 struct device_node *np,
 					 struct device_node *codec,
 					 struct link_info *li, bool is_top),
-			int (*func_dpcm)(struct simple_util_priv *priv,
+			int (*func_dpcm)(struct stream195x_simple_priv *priv,
 					 struct device_node *np,
 					 struct device_node *codec,
 					 struct link_info *li, bool is_top))
@@ -461,13 +684,13 @@ error:
 	return simple_ret(priv, ret);
 }
 
-static int simple_for_each_link(struct simple_util_priv *priv,
+static int simple_for_each_link(struct stream195x_simple_priv *priv,
 				struct link_info *li,
-				int (*func_noml)(struct simple_util_priv *priv,
+				int (*func_noml)(struct stream195x_simple_priv *priv,
 						 struct device_node *np,
 						 struct device_node *codec,
 						 struct link_info *li, bool is_top),
-				int (*func_dpcm)(struct simple_util_priv *priv,
+				int (*func_dpcm)(struct stream195x_simple_priv *priv,
 						 struct device_node *np,
 						 struct device_node *codec,
 						 struct link_info *li, bool is_top))
@@ -496,12 +719,12 @@ static int simple_for_each_link(struct simple_util_priv *priv,
 
 static void simple_depopulate_aux(void *data)
 {
-	struct simple_util_priv *priv = data;
+	struct stream195x_simple_priv *priv = data;
 
 	of_platform_depopulate(simple_priv_to_dev(priv));
 }
 
-static int simple_populate_aux(struct simple_util_priv *priv)
+static int simple_populate_aux(struct stream195x_simple_priv *priv)
 {
 	struct device *dev = simple_priv_to_dev(priv);
 	struct device_node *node __free(device_node) = of_get_child_by_name(dev->of_node, PREFIX "additional-devs");
@@ -519,7 +742,7 @@ end:
 	return simple_ret(priv, ret);
 }
 
-static int simple_parse_of(struct simple_util_priv *priv, struct link_info *li)
+static int simple_parse_of(struct stream195x_simple_priv *priv, struct link_info *li)
 {
 	struct snd_soc_card *card = simple_priv_to_card(priv);
 	int ret;
@@ -544,7 +767,7 @@ static int simple_parse_of(struct simple_util_priv *priv, struct link_info *li)
 	if (ret < 0)
 		goto end;
 
-	ret = simple_util_parse_card_name(priv, PREFIX);
+	ret = simple_util_parse_card_name((struct simple_util_priv*)priv, PREFIX);
 	if (ret < 0)
 		goto end;
 
@@ -557,7 +780,7 @@ end:
 	return simple_ret(priv, ret);
 }
 
-static int simple_count_noml(struct simple_util_priv *priv,
+static int simple_count_noml(struct stream195x_simple_priv *priv,
 			     struct device_node *np,
 			     struct device_node *codec,
 			     struct link_info *li, bool is_top)
@@ -592,7 +815,7 @@ end:
 	return simple_ret(priv, ret);
 }
 
-static int simple_count_dpcm(struct simple_util_priv *priv,
+static int simple_count_dpcm(struct stream195x_simple_priv *priv,
 			     struct device_node *np,
 			     struct device_node *codec,
 			     struct link_info *li, bool is_top)
@@ -622,7 +845,7 @@ end:
 	return simple_ret(priv, ret);
 }
 
-static int simple_get_dais_count(struct simple_util_priv *priv,
+static int simple_get_dais_count(struct stream195x_simple_priv *priv,
 				 struct link_info *li)
 {
 	struct device *dev = simple_priv_to_dev(priv);
@@ -690,7 +913,7 @@ static int simple_get_dais_count(struct simple_util_priv *priv,
 
 static int simple_soc_probe(struct snd_soc_card *card)
 {
-	struct simple_util_priv *priv = snd_soc_card_get_drvdata(card);
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
 	int ret;
 
 	ret = simple_util_init_hp(card, &priv->hp_jack, PREFIX);
@@ -701,14 +924,14 @@ static int simple_soc_probe(struct snd_soc_card *card)
 	if (ret < 0)
 		goto end;
 
-	ret = simple_util_init_aux_jacks(priv, PREFIX);
+	ret = simple_util_init_aux_jacks((struct simple_util_priv*)priv, PREFIX);
 end:
 	return simple_ret(priv, ret);
 }
 
 static int simple_probe(struct platform_device *pdev)
 {
-	struct simple_util_priv *priv;
+	struct stream195x_simple_priv *priv;
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct snd_soc_card *card;
@@ -738,9 +961,18 @@ static int simple_probe(struct platform_device *pdev)
 	if (!li->link)
 		goto end;
 
-	ret = simple_util_init_priv(priv, li);
+	/* START SUE modifications */
+	/* ret = simple_util_init_priv(priv, li); */
+	ret = simple_util_init_priv((struct simple_util_priv *)priv, li);
+	/* END SUE modifications */
 	if (ret < 0)
 		goto end;
+
+	/* START SUE addition */
+	priv->dai_link_data = devm_kcalloc(dev, li->link, sizeof(*priv->dai_link_data), GFP_KERNEL);
+	if (!priv->dai_link_data)
+		return -ENOMEM;
+	/* END SUE addition */
 
 	if (np && of_device_is_available(np)) {
 
@@ -798,40 +1030,85 @@ static int simple_probe(struct platform_device *pdev)
 
 	snd_soc_card_set_drvdata(card, priv);
 
+	/* START SUE additions */
+	/* TODO: should we return an error if no clock is specified? */
+	priv->pll8k_clk = devm_clk_get(dev, "pll8k");
+	if (IS_ERR(priv->pll8k_clk))
+		priv->pll8k_clk = NULL;
+
+	priv->pll11k_clk = devm_clk_get(dev, "pll11k");
+	if (IS_ERR(priv->pll11k_clk))
+		priv->pll11k_clk = NULL;
+
+	priv->powerdown_gpio = devm_gpiod_get_optional(dev, "powerdown", GPIOD_OUT_HIGH);
+
+	card->controls = snd_soc_stream195x_controls;
+	card->num_controls = ARRAY_SIZE(snd_soc_stream195x_controls);
+
+	/*
+	 * Power up the card before calling register. There might be cases
+	 * when the registing and probing of the components will fail if the
+	 * powerdown is enabled
+	 */
+	snd_soc_stream195x_set_powerdown(priv, 0);
+	/* END SUE additions */
+
 	simple_util_debug_info(priv);
 
 	ret = devm_snd_soc_register_card(dev, card);
 	if (ret < 0)
 		goto err;
 
+	/* START SUE additions */
+	/* Unmute all links */
+	snd_soc_stream195x_set_all_links_mute(priv, 0);
+	/* END SUE additions */
+
 	return 0;
 err:
+	/* START SUE additions */
+	snd_soc_stream195x_set_all_links_mute(priv, 1);
+	snd_soc_stream195x_set_powerdown(priv, 1);
+	/* END SUE additions */
 	simple_util_clean_reference(card);
 end:
 	return dev_err_probe(dev, ret, "parse error\n");
 }
 
+
+static void asoc_simple_remove_sue(struct platform_device *pdev)
+{
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+	/* START SUE additions */
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
+
+	snd_soc_stream195x_set_all_links_mute(priv, 1);
+	snd_soc_stream195x_set_powerdown(priv, 1);
+	/* STOP SUE additions */
+
+	simple_util_clean_reference(card);
+}
+
 static const struct of_device_id simple_of_match[] = {
-	{ .compatible = "simple-audio-card", },
-	{ .compatible = "simple-scu-audio-card",
-	  .data = (void *)DPCM_SELECTABLE },
+	{ .compatible = "sue,stream195x-audio", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, simple_of_match);
 
-static struct platform_driver simple_card = {
+static struct platform_driver stream195x_simple_card = {
 	.driver = {
-		.name = "asoc-simple-card",
+		.name = "snd-soc-stream195x",
 		.pm = &snd_soc_pm_ops,
 		.of_match_table = simple_of_match,
 	},
 	.probe = simple_probe,
-	.remove = simple_util_remove,
+	.remove = asoc_simple_remove_sue,
 };
 
-module_platform_driver(simple_card);
+module_platform_driver(stream195x_simple_card);
 
-MODULE_ALIAS("platform:asoc-simple-card");
+MODULE_ALIAS("platform:snd-soc-stream195x");
 MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("ASoC Simple Sound Card");
+MODULE_DESCRIPTION("Stream Unlimited Stream195x ASoC driver");
 MODULE_AUTHOR("Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>");
+MODULE_AUTHOR("Quentin Schulz <quentin.schulz@streamunlimited.com>");
