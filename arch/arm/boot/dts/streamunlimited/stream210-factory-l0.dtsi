@@ -60,3 +60,22 @@
 		};
 	};
 };
+
+// We will use a fixed MCLK of 6.144 MHz to calibrate the interal
+// load capacitors.
+&sport3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2s3_mclk>;
+	rtk,sport-mclk-fixed-max = <6144000>;
+};
+
+&pinctrl {
+	i2s3_mclk: i2s3mclk@0 {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 7, I2S3)>;
+			bias-disable;
+			slew-rate = <0>;
+			drive-strength = <0>;
+		};
+	};
+};
