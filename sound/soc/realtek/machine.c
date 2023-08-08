@@ -63,7 +63,7 @@ static struct snd_soc_dai_link amebad2_dai[] = {
 	},
 	{
 		.name = "codec AIF3",
-		.stream_name = "SPORT2_I2s_Dai",
+		.stream_name = "SPORT2_I2S_Dai",
 		.ops = &amebad2_ops,
 		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif3),
