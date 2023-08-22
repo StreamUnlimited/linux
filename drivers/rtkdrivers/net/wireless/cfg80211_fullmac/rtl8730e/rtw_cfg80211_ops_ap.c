@@ -1,7 +1,7 @@
 #include <rtw_cfg80211_fullmac.h>
 
 static struct wireless_dev *cfg80211_rtw_add_virtual_intf(struct wiphy *wiphy, const char *name,
-	unsigned char name_assign_type, enum nl80211_iftype type, struct vif_params *params)
+		unsigned char name_assign_type, enum nl80211_iftype type, struct vif_params *params)
 {
 	return 0;
 }
@@ -30,19 +30,19 @@ static int cfg80211_rtw_del_station(struct wiphy *wiphy, struct net_device *ndev
 	u8 *mac_vir = NULL;
 	dma_addr_t mac_phy;
 
-	if(!params->mac){
+	if (!params->mac) {
 		/*null means delete all sta, not implement right now*/
 		return ret;
 	}
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]:%s %x:%x:%x:%x:%x:%x", __func__,
-		params->mac[0],params->mac[1],params->mac[2],params->mac[3],params->mac[4],params->mac[5]);
+			params->mac[0], params->mac[1], params->mac[2], params->mac[3], params->mac[4], params->mac[5]);
 	mac_vir = dmam_alloc_coherent(global_idev.fullmac_dev, 6, &mac_phy, GFP_KERNEL);
 	if (!mac_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
 	}
 	memcpy(mac_vir, params->mac, 6);
-	ret = llhw_ipc_wifi_del_sta(wlan_idx,(u8 *) mac_phy);
+	ret = llhw_ipc_wifi_del_sta(wlan_idx, (u8 *) mac_phy);
 
 	if (mac_vir) {
 		dma_free_coherent(global_idev.fullmac_dev, 6, mac_vir, mac_phy);
@@ -81,7 +81,7 @@ static int cfg80211_rtw_set_txq_params(struct wiphy *wiphy, struct net_device *n
 	u8 aifsn, aci = 0, ECWMin, ECWMax;
 	u16 TXOP;
 
-	switch(params->ac) {
+	switch (params->ac) {
 	case NL80211_AC_VO:
 		aci = 3;
 		break;
@@ -123,7 +123,7 @@ static int cfg80211_rtw_set_txq_params(struct wiphy *wiphy, struct net_device *n
 	AC_param = (aifsn & 0xf) | ((aci & 0x3) << 5) | ((ECWMin & 0xf) << 8) | ((ECWMax & 0xf) << 12) | ((TXOP & 0xffff) << 16);
 
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Set TXQ params: aifsn=%d aci=%d ECWmin=%d, ECWmax=%d, TXOP=%d, AC_param=0x%x\n",
-		FUNC_NDEV_ARG(ndev),aifsn, aci, ECWMin, ECWMax, TXOP, AC_param);
+			FUNC_NDEV_ARG(ndev), aifsn, aci, ECWMin, ECWMax, TXOP, AC_param);
 
 	ret = llhw_ipc_wifi_set_EDCA_params(&AC_param);
 
@@ -170,7 +170,7 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	int ret = 0;
 	rtw_softap_info_t softAP_config = {0};
 	char fake_pwd[] = "12345678";
-	u8* pwd_vir = NULL;
+	u8 *pwd_vir = NULL;
 	dma_addr_t pwd_phy;
 
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Start Softap\n", FUNC_NDEV_ARG(ndev));
@@ -188,21 +188,21 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	dev_dbg(global_idev.fullmac_dev, "wep_tx_key=%d\n", settings->crypto.wep_tx_key);
 	dev_dbg(global_idev.fullmac_dev, "sae_pwd_len=%d\n", settings->crypto.sae_pwd_len);
 
-	if(settings->privacy){
-		if(settings->crypto.n_ciphers_pairwise>1 || settings->crypto.n_akm_suites>1){
+	if (settings->privacy) {
+		if (settings->crypto.n_ciphers_pairwise > 1 || settings->crypto.n_akm_suites > 1) {
 			dev_dbg(global_idev.fullmac_dev, "wpa mixed mode, not support right now!\n");
 			return -EPERM;
 		}
-		if((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.akm_suites[0] == 0x08)) {
+		if ((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.akm_suites[0] == 0x08)) {
 			softAP_config.security_type = RTW_SECURITY_WPA3_AES_PSK;
-		} else if((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.ciphers_pairwise[0] == 0x04)) {
+		} else if ((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.ciphers_pairwise[0] == 0x04)) {
 			softAP_config.security_type = RTW_SECURITY_WPA2_AES_PSK;
-		} else if((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.ciphers_pairwise[0] == 0x02)) {
+		} else if ((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.ciphers_pairwise[0] == 0x02)) {
 			softAP_config.security_type = RTW_SECURITY_WPA2_TKIP_PSK;
-		} else if(settings->crypto.wpa_versions == 1){
+		} else if (settings->crypto.wpa_versions == 1) {
 			dev_dbg(global_idev.fullmac_dev, "wpa_versions=1, not support right now!\n");
 			return -EPERM;
-		} else{
+		} else {
 			softAP_config.security_type = RTW_SECURITY_WEP_PSK;
 			dev_err(global_idev.fullmac_dev, "ERR: AP in WEP security mode is not supported!!");
 			return -EPERM;
@@ -218,7 +218,7 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 		softAP_config.password = (unsigned char *)pwd_phy;
 		softAP_config.password_len = strlen(fake_pwd);
 		//dev_dbg(global_idev.fullmac_dev, "security_type=0x%x, password=%s, len=%d \n", softAP_config.security_type, softAP_config.password, softAP_config.password_len);
-	} else{
+	} else {
 		softAP_config.security_type = RTW_SECURITY_OPEN;
 	}
 

@@ -795,9 +795,12 @@ static ssize_t gdma_write(struct snd_pcm_substream *substream,
 	unsigned int first_channels = 4;
 	/*channel count for second hardware dma transfer*/
 	unsigned int last_channels = substream->runtime->channels - first_channels;
-
+	int format_width = snd_pcm_format_width(substream->runtime->format);
 	snd_pcm_sframes_t frames_to_write = bytes_to_frames(substream->runtime, bytes);
-	format_bytes = snd_pcm_format_width(substream->runtime->format) / bits_per_byte;
+
+	format_bytes = format_width / bits_per_byte;
+	if (format_bytes == 3)
+		format_bytes = 4;
 
 	/*write first 4 channel data to DMA buf*/
 	for (; frame_num < frames_to_write; ++frame_num) {
@@ -839,9 +842,14 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 	unsigned int first_channels = 4;
 	/*channel count for second hardware dma transfer*/
 	unsigned int last_channels = runtime->channels - first_channels;
-
+	int format_width = snd_pcm_format_width(runtime->format);
 	snd_pcm_sframes_t frames_to_read = bytes_to_frames(runtime, bytes);
-	format_bytes = snd_pcm_format_width(runtime->format) / bits_per_byte;
+
+	format_bytes = format_width / bits_per_byte;
+	//for 24bit, we need to read 8+24bits.
+	if (format_bytes == 3)
+		format_bytes = 4;
+
 	dma_info(1, component->dev,"bytes_to_read:%ld, last_channels:%d runtime->channels:%d format_bytes:%d, frames_to_read:%ld\n", bytes, last_channels, runtime->channels, format_bytes, frames_to_read);
 
 	/*read first 4 channel data to user buf*/

@@ -1,6 +1,0 @@
-# SPDX-License-Identifier: GPL-2.0
-config NIC_RTK_RTL8730A
-	tristate "RTL8730A"
-	---help---
-	  Realtek RTL8730A driver, no support AX.
-	  802.11b/g/n AXI wireless network adapter

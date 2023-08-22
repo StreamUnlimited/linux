@@ -30,6 +30,8 @@
 #define   DISABLE   0
 #endif
 
+#define LCDC_MAX_REMOTE_DEV 				(2)
+
 //dsi default value
 #define LCDC_KG_COLOR                       0xFFFFFFFF
 #define LCDC_UNDFLOW_COLOR                  0xFFFFFFFF
@@ -46,6 +48,5 @@
 
 #define assert_param(expr)                  ((expr) ? (void)0 : printk("[DRM]assert issue:%s,%d",__func__,__LINE__))
 #define AMEBA_DRM_DEBUG                     //DRM_INFO("%s Enter %d\n", __func__, __LINE__);
-
 
 #endif  /*_AMEBAD2_DRM_BASE_H_*/

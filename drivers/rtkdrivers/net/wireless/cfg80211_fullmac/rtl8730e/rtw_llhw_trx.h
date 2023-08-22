@@ -58,9 +58,9 @@ struct dev_sk_buff {
 };
 
 struct skb_data {
-       struct list_head        list;
-       unsigned char           buf[MAX_SKB_BUF_SIZE] SKB_ALIGNMENT;
-       atomic_t ref;
+	struct list_head        list;
+	unsigned char           buf[MAX_SKB_BUF_SIZE] SKB_ALIGNMENT;
+	atomic_t ref;
 };
 
 struct skb_info {

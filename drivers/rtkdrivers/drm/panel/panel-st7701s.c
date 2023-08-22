@@ -16,18 +16,17 @@
 #include <linux/module.h>
 
 #include "ameba_panel_base.h"
+#include "ameba_panel_priv.h"
 
 struct st7701s {
 	int                     gpio;
-	struct device           *dev;
-	struct drm_panel        panel;
 };
 
 /*
  * The timings are not very helpful as the display is used in
  * command mode.
  */
-static const struct drm_display_mode st7701s_mode = {
+static struct drm_display_mode st7701s_mode = {
 	/* HS clock, (htotal*vtotal*vrefresh)/1000 */
 	.clock = 30720,
 	.hdisplay = 480,
@@ -42,7 +41,7 @@ static const struct drm_display_mode st7701s_mode = {
 	.vrefresh = 60,
 };
 
-static LCM_setting_table_t lcm_initialization_setting[] = {/* DCS Write Long */
+static LCM_setting_table_t st7701s_initialization[] = {/* DCS Write Long */
 	/* ST7701S Reset Sequence */
 	/* LCD_Nreset (1); Delayms (1); */
 	/* LCD_Nreset (0); Delayms (1); */
@@ -107,10 +106,6 @@ static LCM_setting_table_t lcm_initialization_setting[] = {/* DCS Write Long */
 	{REGFLAG_END_OF_TABLE, 0x00, {}},
 } ;
 
-static inline struct st7701s *panel_to_st7701s(struct drm_panel *panel)
-{
-	return container_of(panel, struct st7701s, panel);
-}
 
 static inline void dsi_gpio_set_pin(int gpio_index,u8 Newstatus)
 {
@@ -149,8 +144,9 @@ static int dsi_gpio_reset(int iod)
 
 static int st7701s_enable(struct drm_panel *panel)
 {
-	struct st7701s      *handle = panel_to_st7701s(panel);
-	struct device       *dev = handle->dev;
+	struct ameba_panel_desc *desc = panel_to_desc(panel);
+	struct st7701s      *handle = desc->priv;
+	struct device       *dev = desc->dev;
 	int ret;
 
 	ret = dsi_gpio_reset(handle->gpio);
@@ -188,96 +184,55 @@ static int st7701s_get_modes(struct drm_panel *panel)
 	return 1; /* Number of modes */
 }
 
-static const struct drm_panel_funcs st7701s_drm_funcs = {
+static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
+{
+	struct device_node              *np = dev->of_node;
+	enum of_gpio_flags              flags;
+	struct st7701s                  *st7701s_data;
+	int                             ret;
+
+	st7701s_data = devm_kzalloc(dev, sizeof(struct st7701s), GFP_KERNEL);
+	if (!st7701s_data)
+		return -ENOMEM;
+
+	priv_data->priv = st7701s_data ;
+
+	//gpio
+	st7701s_data->gpio = of_get_named_gpio_flags(np, "mipi-gpios", 0, &flags);
+	if (!gpio_is_valid(st7701s_data->gpio)) {
+		DRM_DEV_ERROR(dev, "drm mipi dis node failed to get mipi-gpios\n");
+		return -ENODEV;
+	}
+
+	return ret;
+}
+
+static int st7701s_remove(struct device *dev,struct ameba_panel_desc *priv_data)
+{
+	struct st7701s      *handle = priv_data->priv;
+	AMEBA_DRM_DEBUG
+
+	//disable gpio 
+	gpio_free(handle->gpio);
+	//devm_kfree
+	return 0;
+}
+static struct drm_panel_funcs st7701s_panel_funcs = {
 	.disable = st7701s_disable,
 	.enable = st7701s_enable,
 	.get_modes = st7701s_get_modes,
 };
 
-static int st7701s_probe(struct mipi_dsi_device *dsi)
-{
-	struct device                   *dev = &dsi->dev;
-	struct device_node              *np = dev->of_node;
-	enum of_gpio_flags              flags;
-	struct ameba_drm_panel_struct   *ameba_panel;
-	struct st7701s                  *priv_data;
-	int                             ret;
+struct ameba_panel_desc panel_st7701s_desc = {
+	.dev = NULL,
+	.init_table = st7701s_initialization,
+	.panel_module = &st7701s_mode,
+	.priv = NULL,
+	.rtk_panel_funcs = &st7701s_panel_funcs,
 
-	ameba_panel = devm_kzalloc(dev, sizeof(struct ameba_drm_panel_struct), GFP_KERNEL);
-	if (!ameba_panel)
-		return -ENOMEM;
-
-	priv_data = devm_kzalloc(dev, sizeof(struct st7701s), GFP_KERNEL);
-	if (!priv_data)
-		return -ENOMEM;
-
-	ameba_panel->panel_priv = priv_data;
-	ameba_panel->init_table = lcm_initialization_setting;
-
-	mipi_dsi_set_drvdata(dsi, ameba_panel);
-	priv_data->dev = dev;
-
-	dsi->lanes = 2;
-	dsi->format = MIPI_DSI_FMT_RGB888;
-
-	//gpio
-	priv_data->gpio = of_get_named_gpio_flags(np, "mipi-gpios", 0, &flags);
-	if (!gpio_is_valid(priv_data->gpio)) {
-		DRM_DEV_ERROR(dev, "drm mipi dis node failed to get mipi-gpios\n");
-		return -ENODEV;
-	}
-
-	/*
-	 * This display uses command mode so no MIPI_DSI_MODE_VIDEO
-	 * or MIPI_DSI_MODE_VIDEO_SYNC_PULSE
-	 *
-	 * As we only send commands we do not need to be continuously
-	 * clocked.
-	 */
-	dsi->mode_flags = MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_EOT_PACKET;
-
-	drm_panel_init(&priv_data->panel);
-	priv_data->panel.dev = dev;
-	priv_data->panel.funcs = &st7701s_drm_funcs;
-
-	ret = drm_panel_add(&priv_data->panel);
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_attach(dsi);
-	if (ret < 0)
-		drm_panel_remove(&priv_data->panel);
-
-	return ret;
-}
-
-static int st7701s_remove(struct mipi_dsi_device *dsi)
-{
-	struct ameba_drm_panel_struct       *ameba_panel = mipi_dsi_get_drvdata(dsi);
-	struct st7701s                      *handle = ameba_panel->panel_priv;
-
-	mipi_dsi_detach(dsi);
-	drm_panel_remove(&handle->panel);
-
-	return 0;
-}
-
-static const struct of_device_id st7701s_of_match[] = {
-	{ .compatible = "realtek,st7701s" },
-	{ }
+	.init = st7701s_probe,
+	.deinit = st7701s_remove,
 };
-MODULE_DEVICE_TABLE(of, st7701s_of_match);
+EXPORT_SYMBOL(panel_st7701s_desc);
 
-static struct mipi_dsi_driver st7701s_driver = {
-	.probe = st7701s_probe,
-	.remove = st7701s_remove,
-	.driver = {
-		.name = "panel-st7701s",
-		.of_match_table = st7701s_of_match,
-	},
-};
-module_mipi_dsi_driver(st7701s_driver);
 
-MODULE_AUTHOR("Chunlin.Yi <chunlin.yi@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek AmebaD2 SoCs' Panel driver");
-MODULE_LICENSE("GPL v2");

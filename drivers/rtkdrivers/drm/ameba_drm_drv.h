@@ -28,6 +28,7 @@ struct ameba_drm_struct {
 
 	void                    *ameba_drm_priv;
 	struct drm_crtc         *crtc;
+	//struct drm_atomic_state *state;
 
 	//struct drm_panel *panel;
 	//struct mipi_dsi_device *mdsi;

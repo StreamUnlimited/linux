@@ -35,4 +35,3 @@ obj-$(CONFIG_RTK_MRDUMP)				+= mrdump/
 obj-$(CONFIG_MISC_RTK_AMEBA)			+= misc/
 obj-$(CONFIG_KM4_CONSOLE_AMEBA)			+= km4_console/
 obj-$(CONFIG_FULLMAC_RTK_RTL8730E)		+= net/wireless/cfg80211_fullmac/rtl8730e/
-obj-$(CONFIG_DW3000)				+= net/ieee802154/

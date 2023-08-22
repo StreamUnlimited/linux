@@ -63,7 +63,7 @@ struct ameba_hw_dsi {
 
 	struct drm_encoder encoder;
 	struct drm_connector connector;
-	struct mipi_dsi_device *paneldev;
+	struct device *paneldev;
 
 	//panel driver issue
 	struct drm_panel *panel;
@@ -288,7 +288,7 @@ static void dsi_mipi_init_pre(struct device *dev, struct ameba_hw_dsi *dsi)
 }
 static int dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
 {
-	struct mipi_dsi_device          *paneldev;
+	struct device          			*paneldev;
 	struct ameba_drm_panel_struct   *handle;
 	LCM_setting_table_t             *table;
 	MIPI_InitTypeDef                *pdsi_ctx = &(dsi->dsi_ctx);
@@ -305,7 +305,7 @@ static int dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
 	//enable_irq(dsi->irq);
 	//set command to dsi
 	paneldev = dsi->paneldev;
-	handle = mipi_dsi_get_drvdata(paneldev);
+	handle = dev_get_drvdata(paneldev);
 	table = handle->init_table;
 	MipiDsi_Do_Init(pmipi_reg,pdsi_ctx,&(dsi->dsi_tx_done),&(dsi->dsi_rx_cmd),table);
 	//disable_irq(dsi->irq);
@@ -514,16 +514,51 @@ static int ameba_drm_connect_init(struct device *dev,
 
    return 0;
 }
+static int rtk_drm_of_find_panel(const struct device_node *np,
+				struct drm_panel **panel)
+{
+	int ret = -EPROBE_DEFER;
+	struct device_node *remote,*drm;
+
+	if (!panel)
+		return -EINVAL;
+	if (panel)
+		*panel = NULL;
+
+	drm = of_graph_get_remote_node(np, 0, 0);  //drm
+	if (!drm) {
+		return -ENODEV;
+	}
+
+	remote = of_graph_get_remote_node(drm,0,1);  //panel
+	if (!of_device_is_available(remote)) {
+		of_node_put(remote);
+		return -ENODEV;
+	}
+
+	if (panel) {
+		*panel = of_drm_find_panel(remote);
+		if (!IS_ERR(*panel)) {
+			ret = 0;
+		}
+		else {
+			*panel = NULL;
+		}
+	}
+
+	of_node_put(remote);
+	return 0;
+}
 static int ameba_init_panel(struct device *dev, struct ameba_hw_dsi *dsi)
 {
 	struct drm_panel        *panel = NULL;
-	struct device_node      *child;
+//	struct device_node      *child;
 
 	if (!of_get_available_child_count(dev->of_node)) {
 		dev_info(dev, "unused DSI interface\n");
 		return -EPERM;
 	}
-
+#if 0
 	/* Look for a panel as a child to this node */
 	for_each_available_child_of_node(dev->of_node, child) {
 		panel = of_drm_find_panel(child);
@@ -535,13 +570,20 @@ static int ameba_init_panel(struct device *dev, struct ameba_hw_dsi *dsi)
 			break;
 		}
 	}
-
+#else
+	if( rtk_drm_of_find_panel(dev->of_node,&panel) < 0) {
+		dev_err(dev, "failed to find panel !\n");
+		return -ENODEV;
+	}
+#endif
 	if (panel) {
 		dsi->panel = panel;
 	} else {
 		dev_err(dev, "no panel \n");
 		return -ENODEV;
 	}
+
+	dsi->paneldev = panel->dev;
 
 	drm_panel_attach(dsi->panel,&dsi->connector);
 
@@ -600,6 +642,12 @@ err_encoder:
 
 static void mipi_dsi_unbind(struct device *dev, struct device *master, void *data)
 {
+	struct ameba_hw_dsi 		*dsi = dev_get_drvdata(dev);
+	AMEBA_DRM_DEBUG
+	if (dsi->panel) {
+		drm_panel_detach(dsi->panel);
+		dsi->panel = NULL;
+	}
 }
 
 static const struct component_ops mipi_dsi_ops = {
@@ -652,13 +700,7 @@ static int mipi_dsi_parse_dt(struct platform_device *pdev, struct ameba_hw_dsi *
 static int mcde_dsi_host_attach(struct mipi_dsi_host *host,
 				struct mipi_dsi_device *mdsi)
 {
-	struct ameba_hw_dsi     *dsi = host_to_dsi(host);
-
-	if (mdsi->lanes < 1 || mdsi->lanes > 2) {
-		DRM_DEV_ERROR(dsi->dsidev,"dsi device params invalid, 1 or 2 lanes supported\n");
-		return -EINVAL;
-	}
-	dsi->paneldev = mdsi;
+	AMEBA_DRM_DEBUG
 	return 0;
 }
 static int mcde_dsi_host_detach(struct mipi_dsi_host *host,
@@ -725,6 +767,26 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 
 static int mipi_dsi_remove(struct platform_device *pdev)
 {
+	AMEBA_DRM_DEBUG
+	struct device				*dev = &pdev->dev;
+	struct ameba_hw_dsi 		*dsi = dev_get_drvdata(dev);
+	void __iomem				*lsys_aip_ctrl1 = dsi->lsys_aip_ctrl1;
+
+	//close irq
+	if( dsi && dsi->enable) {
+		devm_free_irq(dev, dsi->irq, dsi);
+		dsi->enable = false ;
+	}
+	iounmap(dsi->sysctl_base_lp);
+
+	sysfs_remove_group(&pdev->dev.kobj, &dsi_debug_attr_grp);
+
+	//host deinit
+	mipi_dsi_host_unregister(&(dsi->dsi_host));
+	dsi->dsi_host.dev = NULL;
+	dsi->dsi_host.ops = NULL;
+
+	MIPI_BG_CMD(lsys_aip_ctrl1, DISABLE);//bandgap issue	
 	component_del(&pdev->dev, &mipi_dsi_ops);
 
 	return 0;

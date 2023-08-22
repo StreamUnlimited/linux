@@ -826,23 +826,25 @@ int rtk_spi_poll_receive(
 	int cnt_to_rx;
 	u32 data_frame_size = rtk_spi_get_data_frame_size(rtk_spi);
 
-	while ((rtk_spi_get_status(rtk_spi)) & SPI_BIT_RFNE) {
-		cnt_to_rx = rtk_spi_get_rx_cnt(rtk_spi);
-		while (cnt_to_rx--) {
-			if (data_frame_size > 8) {
-				/*  16~9 bits mode */
-				*((u16 *)(prx_data)) = (u16)rtk_spi_read_data(rtk_spi);
-				prx_data = (void *)(((u16 *)prx_data) + 1);
-			} else {
-				/*  8~4 bits mode */
-				*((u8 *)(prx_data)) = (u8)rtk_spi_read_data(rtk_spi);
-				prx_data = (void *)(((u8 *)prx_data) + 1);
-			}
-			length--;
-			if (length == 0) {
-				rtk_spi_status_switch(rtk_spi, RTK_SPI_RX_DONE);
-				spi_finalize_current_transfer(rtk_spi->controller);
-				return 0;
+	while (length) {
+		if ((rtk_spi_get_status(rtk_spi)) & SPI_BIT_RFNE) {
+			cnt_to_rx = rtk_spi_get_rx_cnt(rtk_spi);
+			while (cnt_to_rx--) {
+				if (data_frame_size > 8) {
+					/*  16~9 bits mode */
+					*((u16 *)(prx_data)) = (u16)rtk_spi_read_data(rtk_spi);
+					prx_data = (void *)(((u16 *)prx_data) + 1);
+				} else {
+					/*  8~4 bits mode */
+					*((u8 *)(prx_data)) = (u8)rtk_spi_read_data(rtk_spi);
+					prx_data = (void *)(((u8 *)prx_data) + 1);
+				}
+				length--;
+				if (length == 0) {
+					rtk_spi_status_switch(rtk_spi, RTK_SPI_RX_DONE);
+					spi_finalize_current_transfer(rtk_spi->controller);
+					return 0;
+				}
 			}
 		}
 	}

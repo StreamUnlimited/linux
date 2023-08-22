@@ -248,6 +248,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 			sport_info(1, &sport->pdev->dev,"%s start done\n",__func__);
 		}
 
+		dumpSportRegs(&sport->pdev->dev, sport->addr);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
@@ -526,7 +527,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
 				break;
 			case 1:
-				sport->dma_playback.datawidth = 2;
+				sport->dma_playback.datawidth = 4;
 				sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_MONO;
 				sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_MONO;
 				break;
@@ -634,7 +635,7 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
 				break;
 			case 1:
-				sport->dma_capture.datawidth = 2;
+				sport->dma_capture.datawidth = 4;
 				sp_rx_init.sp_sel_i2s0_mono_stereo = SP_CH_MONO;
 				sp_rx_init.sp_sel_i2s1_mono_stereo = SP_CH_MONO;
 				break;
@@ -685,8 +686,6 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 		audio_sp_rx_init(sport->addr, &sp_rx_init);
 
 	audio_sp_set_i2s_mode(sport->addr, sport->sport_mode);
-
-	dumpSportRegs(&sport->pdev->dev, sport->addr);
 
 	return 0;
 }

@@ -66,7 +66,7 @@ static void platform_device_init(struct platform_device *pdev)
 	axi_data->axi_mem_end = axi_data->axi_mem_start + pmem_len;
 
 	pr_info("Memory mapped space start: 0x%08lx len:%08lx, after map:0x%08lx\n",
-			 (unsigned long)res_mem->start, pmem_len, axi_data->axi_mem_start);
+			(unsigned long)res_mem->start, pmem_len, axi_data->axi_mem_start);
 
 	if (of_address_to_resource(sys_node, 0, &res_sys)) {
 		pr_err("Can't get sys IORESOURCE_MEM\n");
@@ -84,7 +84,7 @@ static void platform_device_init(struct platform_device *pdev)
 	axi_data->axi_sys_mem_end = axi_data->axi_sys_mem_start + pmem_len;
 
 	pr_info("Memory mapped sys space start: 0x%08lx len:%08lx, after map:0x%08lx\n",
-			 (unsigned long)res_sys.start, pmem_len, axi_data->axi_sys_mem_start);
+			(unsigned long)res_sys.start, pmem_len, axi_data->axi_sys_mem_start);
 
 	status = true;
 
@@ -119,7 +119,7 @@ static void platform_device_deinit(struct platform_device *pdev)
 
 /* IPv4, IPv6 IP addr notifier */
 static int rtw_inetaddr_notifier_call(struct notifier_block *nb,
-				      unsigned long action, void *data)
+									  unsigned long action, void *data)
 {
 	struct in_ifaddr *ifa = (struct in_ifaddr *)data;
 	struct net_device *ndev;

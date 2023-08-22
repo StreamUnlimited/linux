@@ -3,7 +3,7 @@
 
 struct netdev_priv_t {
 	u32				wlan_idx;
-	u32				priv_is_on;
+	bool				priv_is_on;
 };
 
 #define rtw_netdev_priv_is_on(netdev)	(((struct netdev_priv_t *)netdev_priv(netdev))->priv_is_on)

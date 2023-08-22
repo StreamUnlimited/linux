@@ -37,7 +37,9 @@
 		gpio-test {
 			compatible = "realtek,amebad2-gpio-test";
 			device_type = "gpio-dev";
-			test-gpios = <&gpiob 7 0>,<&gpiob 8 0>;
+			rtk,test-gpios = <&gpiob 7 0>,<&gpiob 8 0>;
+			rtk,db_enable = "disable";
+			rtk,db_div_cnt = <0>;// de-bounce time = (db_div_cnt +1) * 2*30us.
 		};
 
 		dma-test {
@@ -102,14 +104,14 @@
 
 &dsi {
 	status = "okay";
+};
 
-	panel {
-		compatible = "realtek,st7701s";
-		pinctrl-names="default";
-		pinctrl-0 = <&drm_disable_swd_pins>;
-		mipi-gpios = <&gpioa 14 0>;
-		status = "okay";
-	};
+&rtkpanel {
+	compatible = "realtek,st7701s";
+	pinctrl-names="default";
+	pinctrl-0 = <&drm_disable_swd_pins>;
+	mipi-gpios = <&gpioa 14 0>;
+	status = "okay";
 };
 
 &hash {

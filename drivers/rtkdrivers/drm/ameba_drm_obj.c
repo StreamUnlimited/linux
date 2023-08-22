@@ -197,6 +197,7 @@ static int ameba_crtc_enable_vblank(struct drm_crtc *crtc)
 {
 	struct lcdc_hw_ctx_type 	*lcdc_ctx ;
 	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc) ;
+	AMEBA_DRM_DEBUG
 
 #ifdef ENABLE_LCDC_CTL
 	if( CHECK_IS_NULL(kcrtc) 
@@ -216,6 +217,7 @@ static void ameba_crtc_disable_vblank(struct drm_crtc *crtc)
 {
 	struct lcdc_hw_ctx_type 	*lcdc_ctx ;
 	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
+	AMEBA_DRM_DEBUG
 
 #ifdef ENABLE_LCDC_CTL
 	if( CHECK_IS_NULL(kcrtc) 
@@ -270,6 +272,7 @@ static irqreturn_t ameba_irq_handler(int irq, void *data)
 static void ameba_display_enable(struct lcdc_hw_ctx_type *ctx)
 {
 	void __iomem *base ;
+	AMEBA_DRM_DEBUG
 
 #ifdef ENABLE_LCDC_CTL
 	if( CHECK_IS_NULL(ctx) 
@@ -289,6 +292,8 @@ static void ameba_display_disable(struct lcdc_hw_ctx_type *ctx)
 		should disable mipi first , then disable lcdc
 	*/
 	void __iomem *base ;
+	AMEBA_DRM_DEBUG
+
 	if( CHECK_IS_NULL(ctx) 
 		|| CHECK_IS_NULL(ctx->reg_base_addr))
 		return ;
@@ -340,6 +345,7 @@ static void ameba_crtc_atomic_disable(struct drm_crtc *crtc,
 {
 	struct lcdc_hw_ctx_type 	*ctx;
 	struct ameba_crtc 			*kcrtc = to_ameba_crtc(crtc);
+	AMEBA_DRM_DEBUG
 
 	if( CHECK_IS_NULL(kcrtc) 
 		|| !kcrtc->enable )
@@ -743,7 +749,7 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
 	struct lcdc_hw_ctx_type     *lcdc_ctx = NULL;
 	int                         ret;
-
+	AMEBA_DRM_DEBUG
 	lcdc_ctx = devm_kzalloc(dev, sizeof(*lcdc_ctx), GFP_KERNEL);
 	if (!lcdc_ctx) {
 		DRM_DEV_ERROR(dev, "failed to alloc lcdc_hw_ctx\n");
@@ -880,9 +886,11 @@ static void ameba_hw_ctx_cleanup(struct platform_device *pdev, void *hw_ctx)
 	int                         ret; 
 	struct device               *dev = &pdev->dev;
 	struct lcdc_hw_ctx_type     *lcdc_ctx = (struct lcdc_hw_ctx_type *)hw_ctx ;
+	struct drm_device           *drm = dev_get_drvdata(dev);
+	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
 
 	//release all resource
-	devm_free_irq(dev, lcdc_ctx->irq, lcdc_ctx->crtc);
+	devm_free_irq(dev, lcdc_ctx->irq, ameba_struct);
 
 	clk_disable_unprepare(lcdc_ctx->clock);
 
@@ -918,6 +926,9 @@ static int ameba_drm_atomic_helper_commit(struct drm_device *dev,
 										struct drm_atomic_state *state,
 										bool nonblock)
 {
+	//struct ameba_drm_struct     *ameba_struct = dev->dev_private;
+	//ameba_struct->state = state;
+	//AMEBA_DRM_DEBUG
 	return drm_atomic_helper_commit(dev, state, nonblock);
 }
 

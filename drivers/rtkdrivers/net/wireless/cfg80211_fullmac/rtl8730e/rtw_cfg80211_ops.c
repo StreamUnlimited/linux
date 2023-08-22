@@ -42,6 +42,11 @@ int cfg80211_rtw_scan_done_indicate(unsigned int scanned_AP_num, void *user_data
 	//LINUX_TODO: aborted need to be realized
 	struct cfg80211_scan_info info;
 
+	if (!rtw_netdev_priv_is_on(global_idev.pndev[0])) {
+		dev_dbg(global_idev.fullmac_dev, "sta is down, finish scan.");
+		return -1;
+	}
+
 	if (!global_idev.mlme_priv.pscan_req_global) {
 		dev_dbg(global_idev.fullmac_dev, "Last scan req has been finished. Wait for next. ");
 		return -1;
@@ -86,8 +91,9 @@ void cfg80211_rtw_inform_bss(u32 channel, u32 frame_is_bcn, s32 rssi, u8 *mac_ad
 
 	for (i = 0; i < 2; i++) {
 		sband = wiphy->bands[i];
-		if (!sband)
+		if (!sband) {
 			continue;
+		}
 
 		for (j = 0; j < sband->n_channels; j++) {
 			if (sband->channels[j].hw_value == channel) {
@@ -111,7 +117,7 @@ void cfg80211_rtw_inform_bss(u32 channel, u32 frame_is_bcn, s32 rssi, u8 *mac_ad
 		set_frame_sub_type(pbuf, BIT(7));
 	} else {
 		memcpy(pwlanhdr->addr1, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-		set_frame_sub_type(pbuf, BIT(6)|BIT(4));
+		set_frame_sub_type(pbuf, BIT(6) | BIT(4));
 	}
 
 	memcpy(pwlanhdr->addr2, mac_addr, ETH_ALEN);
@@ -129,7 +135,7 @@ void cfg80211_rtw_inform_bss(u32 channel, u32 frame_is_bcn, s32 rssi, u8 *mac_ad
 
 	cfg80211_put_bss(wiphy, bss);
 
-	exit:
+exit:
 	if (pbuf) {
 		kfree(pbuf);
 	}
@@ -191,8 +197,9 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 	}
 
 	/* no ssid entry, set the scan type as passive */
-	if (request->n_ssids == 0)
+	if (request->n_ssids == 0) {
 		scan_param.options = RTW_SCAN_PASSIVE;
+	}
 
 	if (request->n_channels) {
 		channel_list_vir = dmam_alloc_coherent(global_idev.fullmac_dev, request->n_channels, &channel_list_phy, GFP_KERNEL);
@@ -300,7 +307,7 @@ void cfg80211_rtw_connect_indicate(fullmac_join_status join_status, void *user_d
 		return;
 	}
 
-	if(join_status == RTW_JOINSTATUS_ASSOCIATED) {
+	if (join_status == RTW_JOINSTATUS_ASSOCIATED) {
 		if (user_data_len > 0) {
 			memcpy(mlme_priv->assoc_rsp_ie, (u8 *)user_data, user_data_len);
 			mlme_priv->assoc_rsp_ie_len = user_data_len;
@@ -309,9 +316,9 @@ void cfg80211_rtw_connect_indicate(fullmac_join_status join_status, void *user_d
 			/* Different between cfg80211_connect_result and cfg80211_connect_bss are described in net/cfg80211.h. */
 			/* if connect_result warning, that means get_bss fail (need check), one reason is WPA_S calls disconnect ops, which resulting in wdev->ssid_len = 0 */
 			cfg80211_connect_result(global_idev.pndev[0], mlme_priv->assoc_rsp_ie + 16,
-				mlme_priv->assoc_req_ie + WLAN_HDR_A3_LEN + 2, mlme_priv->assoc_req_ie_len - WLAN_HDR_A3_LEN - 2,
-				mlme_priv->assoc_rsp_ie + WLAN_HDR_A3_LEN + 6, mlme_priv->assoc_rsp_ie_len -  WLAN_HDR_A3_LEN - 6,
-				WLAN_STATUS_SUCCESS, GFP_ATOMIC);
+									mlme_priv->assoc_req_ie + WLAN_HDR_A3_LEN + 2, mlme_priv->assoc_req_ie_len - WLAN_HDR_A3_LEN - 2,
+									mlme_priv->assoc_rsp_ie + WLAN_HDR_A3_LEN + 6, mlme_priv->assoc_rsp_ie_len -  WLAN_HDR_A3_LEN - 6,
+									WLAN_STATUS_SUCCESS, GFP_ATOMIC);
 			netif_carrier_on(global_idev.pndev[0]);
 		}
 		return;
@@ -370,12 +377,13 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	}
 
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Start to Connection\n", FUNC_NDEV_ARG(ndev));
-	dev_dbg(global_idev.fullmac_dev, "ssid=%s, ssid_len=%d, freq=%d, bssid=[0x%x:0x%x:0x%x:0x%x:0x%x:0x%x], privacy=%d, key=%p, key_len=%d, key_idx=%d, auth_type=%d\n",
-		sme->ssid, sme->ssid_len, sme->channel->center_freq,
-		sme->bssid[0],sme->bssid[1],sme->bssid[2],sme->bssid[3],sme->bssid[4],sme->bssid[5],
-		sme->privacy, sme->key, sme->key_len, sme->key_idx, sme->auth_type);
+	dev_dbg(global_idev.fullmac_dev,
+			"ssid=%s, ssid_len=%d, freq=%d, bssid=[0x%x:0x%x:0x%x:0x%x:0x%x:0x%x], privacy=%d, key=%p, key_len=%d, key_idx=%d, auth_type=%d\n",
+			sme->ssid, sme->ssid_len, sme->channel->center_freq,
+			sme->bssid[0], sme->bssid[1], sme->bssid[2], sme->bssid[3], sme->bssid[4], sme->bssid[5],
+			sme->privacy, sme->key, sme->key_len, sme->key_idx, sme->auth_type);
 	dev_dbg(global_idev.fullmac_dev, " ciphers_pairwise=0x%x, cipher_group=0x%x,, akm_suites=0x%x\n",
-		sme->crypto.ciphers_pairwise[0], sme->crypto.cipher_group,sme->crypto.akm_suites[0]);
+			sme->crypto.ciphers_pairwise[0], sme->crypto.cipher_group, sme->crypto.akm_suites[0]);
 
 	memset(&connect_param, 0, sizeof(rtw_network_info_t));
 
@@ -394,7 +402,7 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 		connect_param.password = NULL;
 	}
 
-	if(sme->crypto.akm_suites[0] ==  WIFI_AKM_SUITE_SAE){
+	if (sme->crypto.akm_suites[0] ==  WIFI_AKM_SUITE_SAE) {
 		/*SAE need request wpa_suppilcant to do auth*/
 		memcpy(auth_ext_para->ssid.ssid, (u8 *)sme->ssid, sme->ssid_len);
 		auth_ext_para->ssid.ssid_len = sme->ssid_len;
@@ -416,13 +424,13 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	}
 
 	/* set rsnxe*/
-	prsnx = rtw_get_ie( (u8 *)sme->ie, WLAN_EID_RSNX, &rsnx_ielen, sme->ie_len);
+	prsnx = rtw_get_ie((u8 *)sme->ie, WLAN_EID_RSNX, &rsnx_ielen, sme->ie_len);
 	if (prsnx && (rsnx_ielen > 0)) {
 		if ((rsnx_ielen + 2) <= RSNXE_MAX_LEN) {
-			connect_param.wpa_supp.rsnxe_len = rsnx_ielen + 2;
-			memcpy(connect_param.wpa_supp.rsnxe_ie, prsnx, connect_param.wpa_supp.rsnxe_len);
-		} else
+			memcpy(connect_param.wpa_supp.rsnxe_ie, prsnx, rsnx_ielen + 2);
+		} else {
 			printk("%s:no more buf to save RSNX Cap!rsnx_ielen=%d\n", __func__, rsnx_ielen + 2);
+		}
 	}
 
 	connect_param.joinstatus_user_callback = NULL;
@@ -515,8 +523,9 @@ static int cfg80211_rtw_get_channel(struct wiphy *wiphy, struct wireless_dev *wd
 
 	for (i = 0; i < 2; i++) {
 		sband = wiphy->bands[i];
-		if (!sband)
+		if (!sband) {
 			continue;
+		}
 
 		for (j = 0; j < sband->n_channels; j++) {
 			if (sband->channels[j].hw_value == ch) {
@@ -629,15 +638,15 @@ static int cfg80211_rtw_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev, 
 	cfg80211_mgmt_tx_status(wdev, *cookie, buf, len, ack, GFP_KERNEL);
 	frame_styp = le16_to_cpu(((struct rtw_ieee80211_hdr_3addr *)buf)->frame_ctl) & IEEE80211_FCTL_STYPE;
 
-	 if (frame_styp == IEEE80211_STYPE_AUTH) {
-	 	dev_dbg(global_idev.fullmac_dev, "wpa_s tx auth\n");
+	if (frame_styp == IEEE80211_STYPE_AUTH) {
+		dev_dbg(global_idev.fullmac_dev, "wpa_s tx auth\n");
 		//dev_dbg(global_idev.fullmac_dev, "tx_ch=%d, no_cck=%u, da="MAC_FMT"\n", tx_ch, no_cck, MAC_ARG(GetAddr1Ptr(buf)));
 		/*LINUX_TODO, AP mode needs queue confirm frame until external auth status update*/
 		goto dump;
-	} else{
+	} else {
 		dev_dbg(global_idev.fullmac_dev, "mgmt tx todo, frame_type:0x%x\n", frame_styp);
 		return ret;
-        }
+	}
 
 	/*LINUX_TODO, action frame, probe response*/
 

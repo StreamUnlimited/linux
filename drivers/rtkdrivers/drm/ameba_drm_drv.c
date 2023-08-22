@@ -29,6 +29,7 @@
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
 
+#include "ameba_drm_base.h"
 #include "ameba_lcdc.h"
 #include "ameba_drm_drv.h"
 
@@ -270,16 +271,6 @@ static int compare_of(struct device *dev, void *data)
 	return dev->of_node == data;
 }
 
-static int ameba_drm_kms_cleanup(struct drm_device *dev)
-{
-	drm_kms_helper_poll_fini(dev);
-
-	ameba_drm_private_cleanup(dev);
-
-	drm_mode_config_cleanup(dev);
-
-	return 0;
-}
 
 static int ameba_drm_bind(struct device *dev)
 {
@@ -300,7 +291,7 @@ static int ameba_drm_bind(struct device *dev)
 		return PTR_ERR(drm);
 	}
 
-	ameba_struct = kzalloc(sizeof(*ameba_struct), GFP_KERNEL);
+	ameba_struct = devm_kzalloc(dev, sizeof(*ameba_struct), GFP_KERNEL);
 	if (!ameba_struct)
 		return -ENOMEM;
 
@@ -325,27 +316,72 @@ static int ameba_drm_bind(struct device *dev)
 	return 0;
 
 err_kms_cleanup:
-	ameba_drm_kms_cleanup(drm);
+	component_unbind_all(drm->dev, drm);
+	ameba_drm_private_cleanup(drm);
+	drm_mode_config_cleanup(drm);
 err_drm_dev_put:
+	drm->dev_private = NULL;
+	dev_set_drvdata(dev, NULL);
 	drm_dev_put(drm);
 
 	return ret;
+}
+static void ameba_destroy_crtc(struct drm_device *drm_dev)
+{
+	struct ameba_drm_struct             *ameba_struct = drm_dev->dev_private;
+	struct ameba_drm_private            *ameba_priv = ameba_struct->ameba_drm_priv;
+
+	struct drm_crtc *crtc = &(ameba_priv->crtc.base);
+	struct drm_plane *plane, *tmp;
+
+	drm_crtc_vblank_off(crtc);
+
+	//drm_self_refresh_helper_cleanup(crtc);
+	of_node_put(crtc->port);
+
+	/*
+	 * We need to cleanup the planes now.  Why?
+	 *
+	 * The planes are "&vop->win[i].base".  That means the memory is
+	 * all part of the big "struct vop" chunk of memory.  That memory
+	 * was devm allocated and associated with this component.  We need to
+	 * free it ourselves before vop_unbind() finishes.
+	 */
+	list_for_each_entry_safe(plane, tmp, &drm_dev->mode_config.plane_list, head) 
+	{
+		drm_plane_cleanup(plane);
+	}
+
+	/*
+	 * Destroy CRTC after vop_plane_destroy() since vop_disable_plane()
+	 * references the CRTC.
+	 */
+	drm_crtc_cleanup(crtc);
 }
 
 static void ameba_drm_unbind(struct device *dev)
 {
 	struct drm_device           *drm = dev_get_drvdata(dev);
-	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
+	AMEBA_DRM_DEBUG
 
 	drm_dev_unregister(drm);
+	ameba_destroy_crtc(drm);
 
-	ameba_drm_kms_cleanup(drm);
+	//if(ameba_struct->state) {
+		//drm_atomic_helper_commit_modeset_disables(drm,ameba_struct->state);
+	//	ameba_struct->state = NULL ;
+	//}
+
+	drm_kms_helper_poll_fini(drm);
+	drm_atomic_helper_shutdown(drm);
+	ameba_drm_private_cleanup(drm);
+	drm_mode_config_cleanup(drm);
 
 	component_unbind_all(drm->dev, drm);
 
+	drm->dev_private = NULL;
+	dev_set_drvdata(dev, NULL);
 	drm_dev_put(drm);
-
-	kfree(ameba_struct);
 }
 
 static const struct component_master_ops ameba_drm_ops = {
@@ -353,28 +389,48 @@ static const struct component_master_ops ameba_drm_ops = {
 	.unbind = ameba_drm_unbind,
 };
 
-static int ameba_drm_platform_probe(struct platform_device *pdev)
+static int ameba_drm_probe(struct platform_device *pdev)
 {
 	struct device_node      *remote;
 	struct component_match  *match = NULL;
 	struct device           *dev = &pdev->dev;
 	struct device_node      *np = dev->of_node;
+	int i;
 	AMEBA_DRM_DEBUG
-	remote = of_graph_get_remote_node(np, 0, 0);
-	if (!remote) {
+
+	for (i = 0; i<LCDC_MAX_REMOTE_DEV; i++) {
+		remote = of_graph_get_remote_node(np,0,i);
+
+		if (!remote){
+			break;
+		}
+
+		if (!of_device_is_available(remote)) {
+			continue;
+		}
+
+		component_match_add(dev, &match, compare_of, remote);
+		of_node_put(remote);
+	}
+
+	if (i == 0) {
+		dev_err(dev, "missing 'ports' property\n");
 		return -ENODEV;
 	}
 
-	drm_of_component_match_add(dev, &match, compare_of, remote);
-	of_node_put(remote);
+	if (!match) {
+		dev_err(dev, "No available vop found for component-subsystem.\n");
+		return -ENODEV;
+	}
 
 	return component_master_add_with_match(dev, &ameba_drm_ops, match);
 }
 
-static int ameba_drm_platform_remove(struct platform_device *pdev)
+static int ameba_drm_remove(struct platform_device *pdev)
 {
+	AMEBA_DRM_DEBUG
 	component_master_del(&pdev->dev, &ameba_drm_ops);
-
+	
 	return 0;
 }
 
@@ -388,8 +444,8 @@ static const struct of_device_id ameba_drm_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, ameba_drm_dt_ids);
 
 static struct platform_driver ameba_drm_platform_driver = {
-	.probe = ameba_drm_platform_probe,
-	.remove = ameba_drm_platform_remove,
+	.probe = ameba_drm_probe,
+	.remove = ameba_drm_remove,
 	.driver = {
 		.name = "amebad2-drm",
 		.of_match_table = ameba_drm_dt_ids,

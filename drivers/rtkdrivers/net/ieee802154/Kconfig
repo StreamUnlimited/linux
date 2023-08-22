@@ -1,6 +1,0 @@
-config DW3000
-	tristate "DW3000 driver"
-	select HAS_IOMEM
-	select SPI
-	help
-	  This is the driver for DW3000.

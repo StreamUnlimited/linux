@@ -174,7 +174,8 @@
 #define RTK_ADC_PWR_CTRL				0xA8 /*!< ADC POWER CONTROL REGISTER */
 
 /* Definitions for ADC */
-#define RTK_ADC_CH_NUM					(10)
+#define RTK_ADC_CH_NUM					(7)
+#define RTK_ADC_MAX_DIFF_CHAN_PAIRS		(3)
 #define RTK_ADC_BUF_SIZE					(32)
 #define ADC_DIFFERENTIAL_CH(x)				((u32)0x00000001 << (x))
 #define ADC_MASK_CHSW                     			(0xF)
@@ -233,6 +234,9 @@ struct realtek_adc_diff_channel {
  * @k_coeff_normal: quadritic fitting A, B, C calibration params for normal channels
  * @k_coeff_vbat: quadritic fitting A, B, C calibration params for VBAT channel
  * @cal_offset: calibration offsets for all 7 channels
+ * @diff_ch_offset: offset for differential channel which corresponds to 0V
+ * input. To be read from OTP once calibration OTP params are added for
+ * differential channel mode as well. For now, fixing it to 1650.
  * @is_calibdata_read: bool flag to indicate if calibdata for both normal & VBAT
  *  channels is read out from OTP or not.
  */
@@ -251,6 +255,7 @@ struct realtek_adc_data {
     int k_coeff_normal[3];
     int k_coeff_vbat[3];
     int cal_offset[7];
+    int diff_ch_offset;
     bool is_calibdata_read;
 };
 

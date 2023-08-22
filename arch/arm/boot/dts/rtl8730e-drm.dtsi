@@ -25,8 +25,15 @@
 			status = "disabled";
 
 			port {
-				lcdc_out: endpoint {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				dsi_out: endpoint@0 {
+					reg = <0>;
 					remote-endpoint = <&dsi_in>;
+				};
+				panel_out: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&panel_in>;
 				};
 			};
 		};
@@ -39,17 +46,25 @@
 			rtk,lcdc-vo-clock = <&rcc>;
 			status = "disabled";
 
-			#address-cells = <1>;
-			#size-cells = <0>;
-			panel {
-				reg = <0>;
-				status = "disabled";
-			};
-
 			// 0 for input port
 			port {
-					dsi_in: endpoint {
-						remote-endpoint = <&lcdc_out>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				dsi_in: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&dsi_out>;
+				};
+			};			
+		};
+
+		rtkpanel: rtkpanel {
+			status = "okay";
+			port {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				panel_in: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&panel_out>;
 				};
 			};
 		};

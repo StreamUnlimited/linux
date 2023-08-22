@@ -1,6 +1,15 @@
 #include <rtw_cfg80211_fullmac.h>
 
-#define DRIVERVERSION	"v1.15.12-27-g7f6d5a49a.20220627"
+#define DRIVERVERSION "v1.15.12-27-g7f6d5a49a.20220627"
+
+#define RTW_PRIV_DGB_CMD (SIOCDEVPRIVATE)
+#define RTW_PRIV_MP_CMD (SIOCDEVPRIVATE + 1)
+#define WIFI_MP_MSG_BUF_SIZE (4096)
+
+typedef struct rtw_priv_ioctl {
+	unsigned char __user *data;
+	unsigned short len;
+} rtw_priv_ioctl;
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
@@ -101,6 +110,86 @@ static u16 rtw_ndev_select_queue(struct net_device *pnetdev, struct sk_buff *skb
 	return rtw_1d_to_queue[skb->priority];
 }
 
+int rtw_ndev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd_id)
+{
+	rtw_priv_ioctl *wrq_data = (rtw_priv_ioctl *)rq->ifr_data;
+	rtw_priv_ioctl cmd = {0};
+	unsigned char *cmd_buf = NULL, *user_buf = NULL;
+	static dma_addr_t cmd_buf_phy = 0, user_buf_phy = 0;
+	int ret = 0;
+
+	if (copy_from_user(&cmd, wrq_data, sizeof(cmd))) {
+		dev_err(global_idev.fullmac_dev, "[fullmac]: %s copy_from_user failed\n", __func__);
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (!cmd.data || !cmd.len) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	cmd_buf = dmam_alloc_coherent(global_idev.fullmac_dev, cmd.len, &cmd_buf_phy, GFP_KERNEL);
+	if (!cmd_buf) {
+		dev_err(global_idev.fullmac_dev, "%s: allloc cmd buffer failed.\n", __func__);
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	user_buf = dmam_alloc_coherent(global_idev.fullmac_dev, WIFI_MP_MSG_BUF_SIZE, &user_buf_phy, GFP_KERNEL);
+	if (!user_buf) {
+		dev_err(global_idev.fullmac_dev, "%s: allloc user buffer failed.\n", __func__);
+		ret = -ENOMEM;
+		goto free_cmd_buf;
+	}
+
+	if (copy_from_user(cmd_buf, cmd.data, cmd.len)) {
+		dev_err(global_idev.fullmac_dev, "[fullmac]: %s copy_from_user failed\n", __func__);
+		ret = -EFAULT;
+		goto free_user_buf;
+	}
+
+	switch (cmd_id) {
+	case RTW_PRIV_DGB_CMD:
+		ret = llhw_ipc_wifi_iwpriv_cmd(cmd_buf_phy, cmd.len, user_buf_phy);
+		break;
+	case RTW_PRIV_MP_CMD:
+		ret = llhw_ipc_wifi_mp_cmd(cmd_buf_phy, cmd.len, user_buf_phy);
+		break;
+	default:
+		ret = -EOPNOTSUPP;
+		break;
+	}
+
+	cmd.len = strlen(user_buf);
+	if (cmd.len > 0) {
+		if (copy_to_user(&wrq_data->len, &cmd.len, sizeof(unsigned short))) {
+			ret = -EFAULT;
+			goto free_user_buf;
+		}
+
+		if (copy_to_user(cmd.data, user_buf, cmd.len)) {
+			ret = -EFAULT;
+		}
+	}
+
+free_user_buf:
+	if (user_buf) {
+		dma_free_coherent(global_idev.fullmac_dev, WIFI_MP_MSG_BUF_SIZE, user_buf, user_buf_phy);
+		cmd_buf = NULL;
+	}
+
+
+free_cmd_buf:
+	if (cmd_buf) {
+		dma_free_coherent(global_idev.fullmac_dev, cmd.len, cmd_buf, cmd_buf_phy);
+		cmd_buf = NULL;
+	}
+out:
+	return ret;
+}
+
+
 int rtw_ndev_init(struct net_device *pnetdev)
 {
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
@@ -114,25 +203,33 @@ void rtw_ndev_uninit(struct net_device *pnetdev)
 
 int rtw_ndev_open(struct net_device *pnetdev)
 {
-	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
+	struct event_priv_t *event_priv = &global_idev.event_priv;
 
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 	rtw_netdev_priv_is_on(pnetdev) = true;
 	netif_tx_start_all_queues(pnetdev);
 	netif_tx_wake_all_queues(pnetdev);
+
 	return 0;
 }
 
 static int rtw_ndev_close(struct net_device *pnetdev)
 {
+	struct event_priv_t *event_priv = &global_idev.event_priv;
+
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
+	spin_lock_bh(&event_priv->event_lock);
 	netif_tx_stop_all_queues(pnetdev);
 	netif_carrier_off(pnetdev);
 	rtw_netdev_priv_is_on(pnetdev) = false;
+	spin_unlock_bh(&event_priv->event_lock);
+
 	return 0;
 }
 
 int rtw_ndev_open_ap(struct net_device *pnetdev)
 {
+	struct event_priv_t *event_priv = &global_idev.event_priv;
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 
 	/* if2 init(SW + part of HW) */
@@ -140,17 +237,22 @@ int rtw_ndev_open_ap(struct net_device *pnetdev)
 
 	netif_tx_start_all_queues(pnetdev);
 	netif_tx_wake_all_queues(pnetdev);
+
 	return 0;
 }
 
 static int rtw_ndev_close_ap(struct net_device *pnetdev)
 {
+	struct event_priv_t *event_priv = &global_idev.event_priv;
+
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
+
 	netif_tx_stop_all_queues(pnetdev);
 	netif_carrier_off(pnetdev);
 
 	/* if2 deinit (SW) */
 	llhw_ipc_wifi_deinit_ap();
+
 	return 0;
 }
 
@@ -166,11 +268,7 @@ static enum netdev_tx rtw_xmit_entry(struct sk_buff *skb, struct net_device *pne
 		goto func_exit;
 	}
 
-	if (llhw_ipc_xmit_entry(wlan_idx, skb) == 0) {
-		ret = NETDEV_TX_OK;
-	} else {
-		ret = NETDEV_TX_BUSY;
-	}
+	ret = llhw_ipc_xmit_entry(wlan_idx, skb);
 
 func_exit:
 	return ret;
@@ -185,7 +283,7 @@ static const struct net_device_ops rtw_ndev_ops = {
 	.ndo_select_queue = rtw_ndev_select_queue,
 	.ndo_set_mac_address = rtw_ndev_set_mac_address,
 	.ndo_get_stats = rtw_ndev_get_stats,
-	.ndo_do_ioctl = NULL,
+	.ndo_do_ioctl = rtw_ndev_ioctl,
 };
 
 static const struct net_device_ops rtw_ndev_ops_ap = {

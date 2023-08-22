@@ -16,22 +16,20 @@
 #include <linux/module.h>
 
 #include "ameba_panel_base.h"
+#include "ameba_panel_priv.h"
 
 struct r63353 {
 	int                     gpio_reset; //pa 14
 	int                     gpio_v01;   //v01 pb 25
 	int                     gpio_v02;   //v02 pb 26
 	int                     gpio_pwm;   //v03 pa 13
-
-	struct device           *dev;
-	struct drm_panel        panel;
 };
 
 /*
  * The timings are not very helpful as the display is used in
  * command mode.
  */
-static const struct drm_display_mode r63353_mode = {
+static struct drm_display_mode r63353_mode = {
 	/* HS clock, (htotal*vtotal*vrefresh)/1000 */
 	.clock = 70000,
 	.hdisplay = 720,
@@ -45,7 +43,7 @@ static const struct drm_display_mode r63353_mode = {
 	.vrefresh = 60,
 };
 
-static LCM_setting_table_t lcm_initialization_setting[] = {/* DCS Write Long */
+static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
 
 	//# Manufacture Command Access Protect write 0xb0 0x00
 	{ MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM, 2, {0xb0, 0x00}},
@@ -188,12 +186,6 @@ static LCM_setting_table_t lcm_initialization_setting[] = {/* DCS Write Long */
 	{ REGFLAG_END_OF_TABLE, 0x00, {}},
 } ;
 
-
-static inline struct r63353 *panel_to_r63353(struct drm_panel *panel)
-{
-	return container_of(panel, struct r63353, panel);
-}
-
 static int dsi_gpio_reset(int iod,int value,int flag)
 {	
 	int req_status;
@@ -223,8 +215,9 @@ static int dsi_gpio_reset(int iod,int value,int flag)
 
 static int r63353_enable(struct drm_panel *panel)
 {
-	struct r63353      *handle = panel_to_r63353(panel);
-	struct device       *dev = handle->dev;
+	struct ameba_panel_desc *desc = panel_to_desc(panel);
+	struct r63353      	*handle = desc->priv;
+	struct device       *dev = desc->dev;
 	int ret;
 
 //	dsi_gpio_reset(dsi->gpio_reset,1,0));
@@ -277,113 +270,76 @@ static int r63353_get_modes(struct drm_panel *panel)
 	return 1; /* Number of modes */
 }
 
-static const struct drm_panel_funcs r63353_drm_funcs = {
+static int r63353_probe(struct device *dev,struct ameba_panel_desc *priv_data)
+{
+	struct device_node              *np = dev->of_node;
+	enum of_gpio_flags              flags;
+	struct r63353                   *r63353_data;
+	int                             ret;
+
+	r63353_data = devm_kzalloc(dev, sizeof(struct r63353), GFP_KERNEL);
+	if (!r63353_data)
+		return -ENOMEM;
+
+	priv_data->priv = r63353_data ;
+
+	//gpio
+	r63353_data->gpio_reset = of_get_named_gpio_flags(np, "mipi-reset", 0, &flags);
+	if (!gpio_is_valid(r63353_data->gpio_reset)) {
+		pr_err("drm mipi dsi node failed to get mipi-reset\n");
+		return -ENODEV;
+	}
+
+	r63353_data->gpio_v01 = of_get_named_gpio_flags(np, "mipi-v01", 0, &flags);
+	if (!gpio_is_valid(r63353_data->gpio_v01)) {
+		pr_err("drm mipi dsi node failed to get mipi-v01\n");
+		return -ENODEV;
+	}
+	r63353_data->gpio_v02 = of_get_named_gpio_flags(np, "mipi-v02", 0, &flags);
+	if (!gpio_is_valid(r63353_data->gpio_v02)) {
+		pr_err("drm mipi dsi node failed to get mipi-v02\n");
+		return -ENODEV;
+	}
+
+	r63353_data->gpio_pwm = of_get_named_gpio_flags(np, "mipi-pwm", 0, &flags);
+	if (!gpio_is_valid(r63353_data->gpio_pwm)) {
+		pr_err("drm mipi dsi node failed to get mipi-pwm\n");
+		return -ENODEV;
+	}
+
+	return ret;
+}
+
+static int r63353_remove(struct device *dev,struct ameba_panel_desc *priv_data)
+{
+	struct r63353      *handle = priv_data->priv;
+	AMEBA_DRM_DEBUG
+
+	//disable gpio 
+	gpio_free(handle->gpio_reset);
+	gpio_free(handle->gpio_v01);
+	gpio_free(handle->gpio_v02);
+	gpio_free(handle->gpio_pwm);
+
+	//devm_kfree
+	return 0;
+}
+
+static struct drm_panel_funcs r63353_panel_funcs = {
 	.disable = r63353_disable,
 	.enable = r63353_enable,
 	.get_modes = r63353_get_modes,
 };
 
-static int r63353_probe(struct mipi_dsi_device *dsi)
-{
-	struct device                   *dev = &dsi->dev;
-	struct device_node              *np = dev->of_node;
-	enum of_gpio_flags              flags;
-	struct ameba_drm_panel_struct   *ameba_panel;
-	struct r63353                  *priv_data;
-	int                             ret;
+struct ameba_panel_desc panel_r63353_desc = {
+	.dev = NULL,
+	.init_table = r63353_initialization,
+	.panel_module = &r63353_mode,
+	.priv = NULL,
+	.rtk_panel_funcs = &r63353_panel_funcs,
 
-	ameba_panel = devm_kzalloc(dev, sizeof(struct ameba_drm_panel_struct), GFP_KERNEL);
-	if (!ameba_panel)
-		return -ENOMEM;
-
-	priv_data = devm_kzalloc(dev, sizeof(struct r63353), GFP_KERNEL);
-	if (!priv_data)
-		return -ENOMEM;
-
-	ameba_panel->panel_priv = priv_data;
-	ameba_panel->init_table = lcm_initialization_setting;
-
-	mipi_dsi_set_drvdata(dsi, ameba_panel);
-	priv_data->dev = dev;
-
-	dsi->lanes = 2;
-	dsi->format = MIPI_DSI_FMT_RGB888;
-
-	//gpio
-	priv_data->gpio_reset = of_get_named_gpio_flags(np, "mipi-reset", 0, &flags);
-	if (!gpio_is_valid(priv_data->gpio_reset)) {
-		pr_err("drm mipi dsi node failed to get mipi-reset\n");
-		return -ENODEV;
-	}
-
-	priv_data->gpio_v01 = of_get_named_gpio_flags(np, "mipi-v01", 0, &flags);
-	if (!gpio_is_valid(priv_data->gpio_v01)) {
-		pr_err("drm mipi dsi node failed to get mipi-v01\n");
-		return -ENODEV;
-	}
-	priv_data->gpio_v02 = of_get_named_gpio_flags(np, "mipi-v02", 0, &flags);
-	if (!gpio_is_valid(priv_data->gpio_v02)) {
-		pr_err("drm mipi dsi node failed to get mipi-v02\n");
-		return -ENODEV;
-	}
-
-	priv_data->gpio_pwm = of_get_named_gpio_flags(np, "mipi-pwm", 0, &flags);
-	if (!gpio_is_valid(priv_data->gpio_pwm)) {
-		pr_err("drm mipi dsi node failed to get mipi-pwm\n");
-		return -ENODEV;
-	}
-
-	/*
-	 * This display uses command mode so no MIPI_DSI_MODE_VIDEO
-	 * or MIPI_DSI_MODE_VIDEO_SYNC_PULSE
-	 *
-	 * As we only send commands we do not need to be continuously
-	 * clocked.
-	 */
-	dsi->mode_flags = MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_EOT_PACKET;
-
-	drm_panel_init(&priv_data->panel);
-	priv_data->panel.dev = dev;
-	priv_data->panel.funcs = &r63353_drm_funcs;
-
-	ret = drm_panel_add(&priv_data->panel);
-	if (ret < 0)
-		return ret;
-
-	ret = mipi_dsi_attach(dsi);
-	if (ret < 0)
-		drm_panel_remove(&priv_data->panel);
-
-	return ret;
-}
-
-static int r63353_remove(struct mipi_dsi_device *dsi)
-{
-	struct ameba_drm_panel_struct       *ameba_panel = mipi_dsi_get_drvdata(dsi);
-	struct r63353                      *handle = ameba_panel->panel_priv;
-
-	mipi_dsi_detach(dsi);
-	drm_panel_remove(&handle->panel);
-
-	return 0;
-}
-
-static const struct of_device_id r63353_of_match[] = {
-	{ .compatible = "realtek,r63353" },
-	{ }
+	.init = r63353_probe,
+	.deinit = r63353_remove,
 };
-MODULE_DEVICE_TABLE(of, r63353_of_match);
+EXPORT_SYMBOL(panel_r63353_desc);
 
-static struct mipi_dsi_driver r63353_driver = {
-	.probe = r63353_probe,
-	.remove = r63353_remove,
-	.driver = {
-		.name = "panel-r63353",
-		.of_match_table = r63353_of_match,
-	},
-};
-module_mipi_dsi_driver(r63353_driver);
-
-MODULE_AUTHOR("Chunlin.Yi <chunlin.yi@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek AmebaD2 SoCs' Panel driver");
-MODULE_LICENSE("GPL v2");

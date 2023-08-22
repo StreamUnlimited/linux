@@ -425,6 +425,13 @@ void audio_sp_rx_init(void __iomem * sportx, sport_init_params *SP_RXInitStruct)
 		tmp &= ~SP_BIT_MULTI_IO_EN_RX;
 		writel(tmp, sportx + REG_SP_CTRL1);
 	}
+
+	/*set DMA burstsize: 8*/
+	tmp = readl(sportx + REG_SP_TX_LRCLK);
+	tmp &= ~(SP_MASK_RXDMA_BUSRTSIZE);
+	tmp |= SP_RXDMA_BUSRTSIZE(8);
+	writel(tmp, sportx + REG_SP_TX_LRCLK);
+
 }
 
 
@@ -572,6 +579,12 @@ void audio_sp_tx_init(void __iomem * sportx, sport_init_params *SP_TXInitStruct)
 		tmp &= ~SP_BIT_MULTI_IO_EN_TX;
 		writel(tmp, sportx + REG_SP_CTRL1);
 	}
+
+	/*set DMA burstsize: 8*/
+	tmp = readl(sportx + REG_SP_TX_LRCLK);
+	tmp &= ~(SP_MASK_TXDMA_BURSTSIZE);
+	tmp |= SP_TXDMA_BURSTSIZE(8);
+	writel(tmp, sportx + REG_SP_TX_LRCLK);
 
 }
 

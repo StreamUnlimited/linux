@@ -47,7 +47,9 @@ func_exit:
 void llhw_ipc_wifi_on(void)
 {
 	u32 param_buf[1];
+
 	param_buf[0] = 0;
+
 	llhw_ipc_send_msg(IPC_API_WIFI_ON, param_buf, 1);
 }
 
@@ -219,7 +221,7 @@ int llhw_ipc_wifi_deinit_ap(void)
 	return ret;
 }
 
-int llhw_ipc_wifi_del_sta(u8 wlan_idx, u8* mac)
+int llhw_ipc_wifi_del_sta(u8 wlan_idx, u8 *mac)
 {
 	int ret = 0;
 	u32 param_buf[2];
@@ -343,7 +345,7 @@ int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 	u32 param_buf[1];
 	dma_addr_t dma_addr_buf = 0;
 	dma_addr_t dma_addr_desc = 0;
-	raw_data_desc_t raw_data_desc= {0};
+	raw_data_desc_t raw_data_desc = {0};
 
 	struct device *pdev = global_idev.ipc_dev;
 
@@ -453,6 +455,29 @@ int llhw_ipc_wifi_get_statistics(u32 statistic_phy)
 	return ret;
 }
 
+int llhw_ipc_wifi_mp_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy)
+{
+	u32 param_buf[4];
+
+	param_buf[0] = (u32)cmd_phy;
+	param_buf[1] = (u32)cmd_len;
+	param_buf[2] = (u32)1;
+	param_buf[3] = (u32)user_phy;
+
+	return llhw_ipc_send_msg(IPC_API_WIFI_MP_CMD, param_buf, 4);
+}
+
+int llhw_ipc_wifi_iwpriv_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy)
+{
+	u32 param_buf[3];
+
+	param_buf[0] = (u32)cmd_phy;
+	param_buf[1] = (u32)cmd_len;
+	param_buf[2] = (u32)1;
+
+	return llhw_ipc_send_msg(IPC_API_WIFI_IWPRIV_INFO, param_buf, 3);
+}
+
 void llhw_ipc_send_packet(struct inic_ipc_ex_msg *p_ipc_msg)
 {
 	struct ipc_msg_q_priv *msg_priv = &global_idev.msg_priv;
@@ -493,3 +518,28 @@ void llhw_ipc_send_packet(struct inic_ipc_ex_msg *p_ipc_msg)
 	ameba_ipc_channel_send(global_idev.data_ch, &ipc_msg);
 	spin_unlock_bh(&msg_priv->ipc_send_msg_lock);
 }
+
+u64 llhw_wifi_get_tsft(u8 iface_type)
+{
+	u8 *wifi_base_vir = NULL;
+	u32 *tsf_base_vir = NULL;
+	u32 reg_tsf_low = 0, reg_tsf_high = 0;
+	u64 tsft_val = 0;
+
+	wifi_base_vir = (u8 *)paxi_data_global->axi_mem_start;
+	tsf_base_vir = (u32 *)(wifi_base_vir + 0x560);
+
+	if (iface_type == 0) {
+		reg_tsf_low = tsf_base_vir[0];
+		reg_tsf_high = tsf_base_vir[1];
+	} else if (iface_type == 1) {
+		reg_tsf_low = tsf_base_vir[2];
+		reg_tsf_high = tsf_base_vir[3];
+	} else {
+		dev_warn(global_idev.fullmac_dev, "[AP] unknown port(%d)!\n", iface_type);
+	}
+
+	tsft_val = ((u64)reg_tsf_high << 32) | reg_tsf_low;
+	return tsft_val;
+}
+

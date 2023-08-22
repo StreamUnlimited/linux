@@ -62,6 +62,7 @@ struct event_priv_t {
 	struct tasklet_struct		api_tasklet; /* event_priv task to haddle event_priv msg */
 	ipc_msg_struct_t		api_ipc_msg; /* to store ipc msg for event_priv */
 	struct mutex			iiha_send_mutex; /* mutex to protect send host event_priv message */
+	spinlock_t			event_lock; /* lock to protect indicate event */
 	struct inic_ipc_host_req_msg	*preq_msg;/* host event_priv message to send to device */
 	dma_addr_t			req_msg_phy_addr;/* host event_priv message to send to device */
 	uint32_t			*dev_req_network_info;
@@ -74,7 +75,7 @@ struct ipc_msg_q_priv {
 	spinlock_t			lock; /* queue lock */
 	struct work_struct		msg_work; /* message task in linux */
 	struct mutex			msg_work_lock; /* tx lock lock */
-	void				(*task_hdl)(struct inic_ipc_ex_msg *); /* the haddle function of task */
+	void	(*task_hdl)(struct inic_ipc_ex_msg *);    /* the haddle function of task */
 	bool				b_queue_working; /* flag to notice the queue is working */
 	struct ipc_msg_node		ipc_msg_pool[IPC_MSG_QUEUE_DEPTH]; /* static pool for queue node */
 	int				queue_free; /* the free size of queue */
@@ -88,8 +89,9 @@ struct xmit_priv_t {
 	dma_addr_t			host_skb_info_phy;
 	struct skb_data			*host_skb_data;
 	dma_addr_t			host_skb_data_phy;
-	u32				skb_free_num;
-	u32				skb_used_num;
+	atomic_t				skb_free_num;
+	u32				skb_idx;
+	spinlock_t			skb_lock;
 };
 
 /* Scan and Join related parameters. */

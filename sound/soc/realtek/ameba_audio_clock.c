@@ -48,8 +48,8 @@ static bool is_sport_ni_mi_supported(unsigned int clock, unsigned int sr, unsign
 {
 	int ni = 1;
 	int mi = 1;
-	int max_ni = 65535;
-	int max_mi = 131071;
+	int max_ni = 32767;
+	int max_mi = 65535;
 	bool ni_mi_found = false;
 
 	for (; ni <= max_ni ; ni++) {
@@ -111,7 +111,7 @@ int choose_pll_clock(unsigned int channel_count, unsigned int channel_len, unsig
 	if (sport_mclk_fixed_max) {
 		if (!(rate % 4000)) {
 			for (; pll_clock_index < PLL_CLOCK_MAX_NUM; pll_clock_index++) {
-				for (pll_div = 1; pll_div < MAX_PLL_DIV; pll_div++) {
+				for (pll_div = 1; pll_div < MAX_PLL_DIV + 1; pll_div++) {
 					for (; sport_mclk_div_index < SPORT_MCLK_DIV_MAX_NUM; sport_mclk_div_index++) {
 						if (acc->pll_clock[pll_clock_index] / pll_div / acc->sport_mclk_div[sport_mclk_div_index] <= sport_mclk_fixed_max) {
 							if (is_sport_ni_mi_supported((acc->pll_clock[pll_clock_index]/pll_div), rate, channel_count, channel_len)) {
@@ -125,10 +125,11 @@ int choose_pll_clock(unsigned int channel_count, unsigned int channel_len, unsig
 							continue;
 						}
 					}
+					sport_mclk_div_index = 0;
 				}
 			}
 		} else if (!(rate % 11025)) {
-			for (pll_div = 1; pll_div < MAX_PLL_DIV; pll_div++) {
+			for (pll_div = 1; pll_div < MAX_PLL_DIV + 1; pll_div++) {
 				for (; sport_mclk_div_index < SPORT_MCLK_DIV_MAX_NUM; sport_mclk_div_index++) {
 					if (PLL_CLOCK_45P1584M / pll_div / acc->sport_mclk_div[sport_mclk_div_index] <= sport_mclk_fixed_max) {
 						if (is_sport_ni_mi_supported((PLL_CLOCK_45P1584M), rate, channel_count, channel_len)) {
@@ -143,6 +144,7 @@ int choose_pll_clock(unsigned int channel_count, unsigned int channel_len, unsig
 						continue;
 					}
 				}
+				sport_mclk_div_index = 0;
 			}
 		}
 	}

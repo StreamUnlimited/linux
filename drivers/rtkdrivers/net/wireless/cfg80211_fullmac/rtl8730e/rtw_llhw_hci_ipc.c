@@ -133,6 +133,7 @@ int llhw_ipc_init(void)
 
 	/* tell KM4 to do wifi on? wifi on when insmod ? */
 	llhw_ipc_wifi_on();
+
 	return 0;
 
 ipc_deinit:

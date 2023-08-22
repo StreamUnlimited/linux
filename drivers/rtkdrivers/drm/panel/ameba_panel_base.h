@@ -16,6 +16,8 @@
 #ifndef _AMEBAD2_DRM_PANEL_BASE_H_
 #define _AMEBAD2_DRM_PANEL_BASE_H_
 
+#include "../ameba_drm_base.h"
+
 typedef struct LCM_setting_table {
 	u8                      cmd;
 	u8                      count;

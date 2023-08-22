@@ -20,4 +20,5 @@ struct axi_drv_priv {
 	int			drv_registered;
 };
 
+extern PAXI_DATA paxi_data_global;
 #endif // __RTW_DRV_PROBE_H__

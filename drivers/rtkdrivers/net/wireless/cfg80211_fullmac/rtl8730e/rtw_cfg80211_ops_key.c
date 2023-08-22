@@ -46,9 +46,10 @@ static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: key_index = %d", key_index);
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: pairwise= %d", pairwise);
 	if (pairwise) {
-		dev_dbg(global_idev.fullmac_dev, "[fullmac]: mac addr = %x %x %x %x %x %x", *mac_addr, *(mac_addr + 1), *(mac_addr + 2), *(mac_addr + 3), *(mac_addr + 4), *(mac_addr + 5));
+		dev_dbg(global_idev.fullmac_dev, "[fullmac]: mac addr = %x %x %x %x %x %x", *mac_addr, *(mac_addr + 1), *(mac_addr + 2), *(mac_addr + 3), *(mac_addr + 4),
+				*(mac_addr + 5));
 	}
-	dev_dbg(global_idev.fullmac_dev, "[fullmac]: key material. key len = %d.\n",params->key_len);
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: key material. key len = %d.\n", params->key_len);
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: cipher suite = %08x", params->cipher);
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: key mode = %d", params->mode);
 
@@ -65,7 +66,7 @@ static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
 	crypt.pairwise = pairwise;
 	crypt.key_idx = key_index;
 	crypt.cipher = params->cipher;
-	if(pairwise && mac_addr){
+	if (pairwise && mac_addr) {
 		memcpy(crypt.mac_addr, mac_addr, 6);
 	}
 
@@ -103,7 +104,7 @@ static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *
 #ifdef CONFIG_MLD_KERNEL_PATCH
 										, int link_id
 #endif
-										, u8 key_index , bool unicast, bool multicast)
+										, u8 key_index, bool unicast, bool multicast)
 {
 	dev_dbg(global_idev.fullmac_dev, "--- %s ---", __func__);
 	return 0;
@@ -111,9 +112,9 @@ static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *
 
 static int cfg80211_rtw_set_default_mgmt_key(struct wiphy *wiphy, struct net_device *ndev
 #ifdef CONFIG_MLD_KERNEL_PATCH
-									  , int link_id
+		, int link_id
 #endif
-									  , u8 key_index)
+		, u8 key_index)
 {
 	dev_dbg(global_idev.fullmac_dev, "--- %s ---", __func__);
 	return 0;

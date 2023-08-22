@@ -103,13 +103,13 @@ static void llhw_ipc_event_join_status_indicate(struct event_priv_t *event_priv,
 	if (event == WIFI_EVENT_RX_MGNT) {
 		dev_dbg(global_idev.fullmac_dev, "%s: rx mgnt \n", __func__);
 		/*channel need get, force 6 seems ok temporary*/
-		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[0]) , 6 , 0 , buf , buf_len , 0);
+		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[0]), 6, 0, buf, buf_len, 0);
 	}
 
 	if (event == WIFI_EVENT_RX_MGNT_AP) {
 		dev_dbg(global_idev.fullmac_dev, "%s: rx mgnt \n", __func__);
 		/*channel need get, force 6 seems ok temporary*/
-		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[1]) , 6 , 0 , buf , buf_len , 0);
+		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[1]), 6, 0, buf, buf_len, 0);
 	}
 
 	if (buf_len > 0) {
@@ -158,9 +158,9 @@ static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_
 
 	memcpy(global_idev.pndev[idx]->dev_addr, dev_addr, ETH_ALEN);
 	dev_dbg(global_idev.fullmac_dev, "MAC ADDR [%02x:%02x:%02x:%02x:%02x:%02x]", *global_idev.pndev[idx]->dev_addr,
-		*(global_idev.pndev[idx]->dev_addr + 1), *(global_idev.pndev[idx]->dev_addr + 2),
-		*(global_idev.pndev[idx]->dev_addr + 3), *(global_idev.pndev[idx]->dev_addr + 4),
-		*(global_idev.pndev[idx]->dev_addr + 5));
+			*(global_idev.pndev[idx]->dev_addr + 1), *(global_idev.pndev[idx]->dev_addr + 2),
+			*(global_idev.pndev[idx]->dev_addr + 3), *(global_idev.pndev[idx]->dev_addr + 4),
+			*(global_idev.pndev[idx]->dev_addr + 5));
 
 	/*set ap port mac address*/
 	memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
@@ -267,7 +267,10 @@ void llhw_ipc_event_task(unsigned long data)
 	/* receive callback indication */
 	case IPC_WIFI_EVT_SCAN_USER_CALLBACK:
 		/* If user callback provided as NULL, param_buf[1] appears NULL here. Do not make ptr. */
+		spin_lock_bh(&event_priv->event_lock);
+		/* https://jira.realtek.com/browse/AMEBAD2-1543 */
 		cfg80211_rtw_scan_done_indicate(p_recv_msg->param_buf[0], NULL);
+		spin_unlock_bh(&event_priv->event_lock);
 		break;
 	case IPC_WIFI_EVT_SCAN_EACH_REPORT_USER_CALLBACK:
 		//iiha_scan_each_report_cb_hdl(event_priv, p_recv_msg);
@@ -318,7 +321,7 @@ static u32 llhw_ipc_event_interrupt(aipc_ch_t *ch, ipc_msg_struct_t *pmsg)
 	}
 
 	/* copy ipc_msg from temp memory in ipc interrupt. */
-	memcpy((u8 *) &(event_priv->recv_ipc_msg), (u8 *)pmsg, sizeof(ipc_msg_struct_t));
+	memcpy((u8 *) & (event_priv->recv_ipc_msg), (u8 *)pmsg, sizeof(ipc_msg_struct_t));
 	tasklet_schedule(&(event_priv->api_tasklet));
 
 func_exit:
@@ -332,6 +335,7 @@ int llhw_ipc_event_init(struct inic_device *idev)
 
 	/* initialize the mutex to send event_priv message. */
 	mutex_init(&(event_priv->iiha_send_mutex));
+	spin_lock_init(&event_priv->event_lock);
 
 	event_priv->preq_msg = dmam_alloc_coherent(event_ch->pdev, sizeof(struct inic_ipc_host_req_msg), &event_priv->req_msg_phy_addr, GFP_KERNEL);
 	if (!event_priv->preq_msg) {
@@ -360,7 +364,7 @@ void llhw_ipc_event_deinit(void)
 	tasklet_kill(&(event_priv->api_tasklet));
 
 	dma_free_coherent(global_idev.ipc_dev, DEV_REQ_NETWORK_INFO_MAX_LEN,
-		event_priv->dev_req_network_info, event_priv->dev_req_network_info_phy);
+					  event_priv->dev_req_network_info, event_priv->dev_req_network_info_phy);
 	dma_free_coherent(global_idev.ipc_dev, sizeof(struct inic_ipc_host_req_msg), event_priv->preq_msg, event_priv->req_msg_phy_addr);
 
 	/* deinitialize the mutex to send event_priv message. */

@@ -37,7 +37,7 @@ enum {
 	RTW_SECURITY_WPA3_AES_PSK	= (WPA3_SECURITY | AES_ENABLED),			/**< WPA3-SAE with AES security              */
 	RTW_SECURITY_WPA2_WPA3_MIXED	= (WPA2_SECURITY | WPA3_SECURITY | AES_ENABLED),	/**< WPA3-SAE/WPA2 with AES security         */
 
-	RTW_SECURITY_UNKNOWN		= (unsigned long)-1,					/**< May be returned by scan function if security is unknown. Do not pass this to the join function! */
+	RTW_SECURITY_UNKNOWN		= (unsigned long) -1,					/**< May be returned by scan function if security is unknown. Do not pass this to the join function! */
 
 	RTW_SECURITY_FORCE_32_BIT	= 0x7fffffff						/**< Exists only to force rtw_security_t type to 32 bits */
 };
@@ -79,6 +79,10 @@ enum _WIFI_EVENT_INDICATE {
 	WIFI_EVENT_WPA_WPS_FINISH,
 	WIFI_EVENT_WPA_EAPOL_START,
 	WIFI_EVENT_WPA_EAPOL_RECVD,
+	WIFI_EVENT_WPA_STA_4WAY_START,
+	WIFI_EVENT_WPA_AP_4WAY_START,
+	WIFI_EVENT_WPA_STA_4WAY_RECV,
+	WIFI_EVENT_WPA_AP_4WAY_RECV,
 
 	/* csi rx done event */
 	WIFI_EVENT_CSI_DONE,
@@ -142,8 +146,7 @@ typedef struct {
   */
 typedef struct rtw_wpa_supp_connect {
 	u8 rsnxe_ie[RSNXE_MAX_LEN];
-	u8 rsnxe_len;
-}rtw_wpa_supp_connect_t;
+} rtw_wpa_supp_connect_t;
 
 /**
   * @brief  The structure is used to describe the setting about SSID,
@@ -225,7 +228,7 @@ typedef struct raw_data_desc {
 	unsigned int		tx_power;
 } raw_data_desc_t;
 
-struct rtw_crypt_info{
+struct rtw_crypt_info {
 	u8			pairwise;
 	u8			mac_addr[6];
 	u8			wlan_idx;
@@ -233,6 +236,8 @@ struct rtw_crypt_info{
 	u8			key[32];
 	u8			key_idx;
 	u32			cipher;
+	u8			transition_disable_exist;
+	u8			transition_disable_bitmap;
 };
 
 /**

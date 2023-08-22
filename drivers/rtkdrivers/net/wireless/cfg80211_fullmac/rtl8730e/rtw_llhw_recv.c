@@ -41,7 +41,7 @@ void llhw_ipc_recv_task_from_msg_recv_pkts(int idx_wlan, struct dev_sk_buff *skb
 	pskb = netdev_alloc_skb(idev->pndev[idx_wlan], skb->len);
 	if (pskb == NULL) {
 		dev_err(global_idev.fullmac_dev, "%s: Alloc skb rx buf Err, alloc_sz %d!!\n\r",
-			   __func__, skb->len);
+				__func__, skb->len);
 		dma_unmap_single(pdev, dma_skb, sizeof(struct dev_sk_buff), DMA_FROM_DEVICE);
 		dma_unmap_single(pdev, dma_data_addr, skb->len, DMA_FROM_DEVICE);
 		goto recv_done;
