@@ -123,25 +123,7 @@ static struct platform_driver ameba_panel_driver = {
 		.of_match_table = ameba_panel_match,
 	},
 };
-
-//module_platform_driver(ameba_drm_panel_platform_driver);
-static int __init rtk_panel_init(void)
-{
-	int err;
-	AMEBA_DRM_DEBUG
-	err = platform_driver_register(&ameba_panel_driver);
-	if (err < 0)
-		return err;
-
-	return 0;
-}
-postcore_initcall(rtk_panel_init);//init 2
-static void __exit rtk_panel_exit(void)
-{
-	AMEBA_DRM_DEBUG
-	platform_driver_unregister(&ameba_panel_driver);
-}
-module_exit(rtk_panel_exit);
+module_platform_driver(ameba_panel_driver);
 
 MODULE_DESCRIPTION("Realtek Ameba Panel driver");
 MODULE_LICENSE("GPL v2");
