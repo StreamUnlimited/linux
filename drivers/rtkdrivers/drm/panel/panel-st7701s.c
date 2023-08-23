@@ -110,6 +110,85 @@ static LCM_setting_table_t st7701s_initialization[] = {/* DCS Write Long */
 	{REGFLAG_END_OF_TABLE, 0x00, {}},
 } ;
 
+// Kingtech PV04005TD25E
+static struct drm_display_mode kt_pv04005td25e_mode = {
+	.clock		= 20000,
+
+	.hdisplay	= 480,
+	.hsync_start	= 480 + 22,
+	.hsync_end	= 480 + 22 + 20,
+	.htotal		= 480 + 22 + 20 + 22,
+
+	.vdisplay	= 800,
+	.vsync_start	= 800 + 40,
+	.vsync_end	= 800 + 40 + 5,
+	.vtotal		= 800 + 40 + 5 + 40,
+
+	.width_mm	= 52,
+	.height_mm	= 86,
+
+	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+};
+
+static LCM_setting_table_t kt_pv04005td25e_init[] = {
+	{MIPI_DSI_DCS_SHORT_WRITE, 1, {0x11, 0x00}},
+	{REGFLAG_DELAY, 120, {}},/* Delayms (120) */
+
+	/* Bank0 Setting */
+	/* Display Control setting */
+	{MIPI_DSI_DCS_LONG_WRITE, 6, {0xFF, 0x77, 0x01, 0x00, 0x00, 0x10}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC0, 0x63, 0x00}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC1, 0x0C, 0x02}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC2, 0x31, 0x08}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xCC, 0x10}},
+
+	/* Gamma Cluster Setting */
+	{MIPI_DSI_DCS_LONG_WRITE, 17, {0xB0, 0x40, 0x01, 0x46, 0x0D, 0x13, 0x09, 0x05, 0x09, 0x09, 0x1B, 0x07, 0x15, 0x12, 0x4C, 0x10, 0xC8}},
+	{MIPI_DSI_DCS_LONG_WRITE, 17, {0xB1, 0x40, 0x02, 0x86, 0x0D, 0x13, 0x09, 0x05, 0x09, 0x09, 0x1F, 0x07, 0x15, 0x12, 0x15, 0x19, 0x08}},
+	/* End Gamma Setting */
+	/* End Display Control setting */
+	/* End Bank0 Setting */
+
+	/* Bank1 Setting */
+	/* Power Control Registers Initial */
+	{MIPI_DSI_DCS_LONG_WRITE, 6, {0xFF, 0x77, 0x01, 0x00, 0x00, 0x11}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB0, 0x50}},
+
+	/* Vcom Setting */
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB1, 0x68}},
+	/* End End Vcom Setting */
+
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB2, 0x07}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB3, 0x80}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB5, 0x47}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB7, 0x85}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB8, 0x21}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xB9, 0x10}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xC1, 0x78}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xC2, 0x78}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xD0, 0x88}},
+	/* End Power Control Registers Initial */
+	{REGFLAG_DELAY, 100, {}},/* Delayms (100) */
+	/* GIP Setting */
+	{MIPI_DSI_DCS_LONG_WRITE, 4, {0xE0, 0x00, 0x00, 0x02}},
+	{MIPI_DSI_DCS_LONG_WRITE, 12, {0xE1, 0x08, 0x00, 0x0A, 0x00, 0x07, 0x00, 0x09, 0x00, 0x00, 0x33, 0x33}},
+	{MIPI_DSI_DCS_LONG_WRITE, 14, {0xE2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+	{MIPI_DSI_DCS_LONG_WRITE, 5, {0xE3, 0x00, 0x00, 0x33, 0x33}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xE4, 0x44, 0x44}},
+	{MIPI_DSI_DCS_LONG_WRITE, 17, {0xE5, 0x0E, 0x2D, 0xA0, 0xA0, 0x10, 0x2D, 0xA0, 0xA0, 0x0A, 0x2D, 0xA0, 0xA0, 0x0C, 0x2D, 0xA0, 0xA0}},
+	{MIPI_DSI_DCS_LONG_WRITE, 5, {0xE6, 0x00, 0x00, 0x33, 0x33}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xE7, 0x44, 0x44}},
+	{MIPI_DSI_DCS_LONG_WRITE, 17, {0xE8, 0x0D, 0x2D, 0xA0, 0xA0, 0x0F, 0x2D, 0xA0, 0xA0, 0x09, 0x2D, 0xA0, 0xA0, 0x0B, 0x2D, 0xA0, 0xA0}},
+	{MIPI_DSI_DCS_LONG_WRITE, 8, {0xEB, 0x02, 0x01, 0xE4, 0xE4, 0x44, 0x00, 0x40}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xEC, 0x02, 0x01}},
+	{MIPI_DSI_DCS_LONG_WRITE, 17, {0xED, 0xAB, 0x89, 0x76, 0x54, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x10, 0x45, 0x67, 0x98, 0xBA}},
+	/* End GIP Setting */
+
+	{MIPI_DSI_DCS_LONG_WRITE, 6, {0xFF, 0x77, 0x01, 0x00, 0x00, 0x00}},
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 1, {0x29, 0x00}},
+	{REGFLAG_END_OF_TABLE, 0x00, {}},
+};
+
 
 static inline void dsi_gpio_set_pin(int gpio_index,u8 Newstatus)
 {
@@ -170,10 +249,11 @@ static int st7701s_disable(struct drm_panel *panel)
 
 static int st7701s_get_modes(struct drm_panel *panel)
 {
+	struct ameba_panel_desc *desc = panel_to_desc(panel);
 	struct drm_connector        *connector = panel->connector;
 	struct drm_display_mode     *mode;
 
-	mode = drm_mode_duplicate(panel->drm, &st7701s_mode);
+	mode = drm_mode_duplicate(panel->drm, desc->panel_module);
 	if (!mode) {
 		DRM_ERROR("bad mode or failed to add mode\n");
 		return -EINVAL;
@@ -239,4 +319,15 @@ struct ameba_panel_desc panel_st7701s_desc = {
 };
 EXPORT_SYMBOL(panel_st7701s_desc);
 
+struct ameba_panel_desc panel_kt_pv04005td25e_desc = {
+	.dev = NULL,
+	.init_table = kt_pv04005td25e_init,
+	.panel_module = &kt_pv04005td25e_mode,
+	.priv = NULL,
+	.rtk_panel_funcs = &st7701s_panel_funcs,
+
+	.init = st7701s_probe,
+	.deinit = st7701s_remove,
+};
+EXPORT_SYMBOL(panel_kt_pv04005td25e_desc);
 

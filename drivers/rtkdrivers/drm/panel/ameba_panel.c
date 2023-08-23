@@ -41,11 +41,15 @@ static const struct component_ops panel_ops = {
 
 //st7701s
 extern struct ameba_panel_desc panel_st7701s_desc;
+extern struct ameba_panel_desc panel_kt_pv04005td25e_desc;
 extern struct ameba_panel_desc panel_r63353_desc;
 static const struct of_device_id ameba_panel_match[] = {
 	{ 
 		.compatible = "realtek,st7701s",
 		.data = &panel_st7701s_desc,
+	}, {
+		.compatible = "kingtech,pv04005td25e",
+		.data = &panel_kt_pv04005td25e_desc,
 	}, {
 		.compatible = "realtek,r63353",
 		.data = &panel_r63353_desc,
