@@ -51,13 +51,6 @@
 	/delete-property/pinctrl-0;
 };
 
-&codec {
-	pinctrl-names = "default";
-	pinctrl-0 = <&dmic_pins_stream210>;
-
-	enable-dac-asrc;
-};
-
 &gpiob {
 	pinctrl-names = "default";
 	pinctrl-0 = <&usb_drvvbus_pin>;
