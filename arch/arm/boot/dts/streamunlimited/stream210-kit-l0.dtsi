@@ -129,6 +129,10 @@
 
 &codec {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&dmic_pins_stream210>;
+
+	enable-dac-asrc;
 };
 
 &gpioa {
