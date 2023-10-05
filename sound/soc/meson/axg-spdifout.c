@@ -218,14 +218,28 @@ static int axg_spdifout_hw_params(struct snd_pcm_substream *substream,
 {
 	struct axg_spdifout *priv = snd_soc_dai_get_drvdata(dai);
 	unsigned int rate = params_rate(params);
+	unsigned long ppm, actual_rate, requested_rate;
 	int ret;
 
 	/* 2 * 32bits per subframe * 2 channels = 128 */
-	ret = clk_set_rate(priv->mclk, rate * 128);
+	requested_rate = rate * 128;
+	ret = clk_set_rate(priv->mclk, requested_rate);
 	if (ret) {
 		dev_err(dai->dev, "failed to set spdif clock\n");
 		return ret;
 	}
+	/*
+	* TDM interface controls the hifi_pll and the drift compensator so rates can be mismatched
+	* Kernel can still find a rate within 500ppm even when parent_clk is configured for an unsuitable base freq
+	* (For example playing 44.1KHz when hifi_pll is configured for 48KHz)
+	* But we check for any obvious misconfigurations with best effort
+	*/
+	ppm = DIV_ROUND_UP_ULL(requested_rate*500, 1000000UL);
+	actual_rate = clk_get_rate(priv->mclk);
+	if (actual_rate < requested_rate - ppm || actual_rate > requested_rate + ppm)
+		dev_warn(dai->dev,
+			      "SPDIF clock rate %ld doesn't match requested rate %lu within 500ppm\n",
+			      clk_get_rate(priv->mclk), requested_rate);
 
 	ret = axg_spdifout_sample_fmt(params, dai);
 	if (ret) {
