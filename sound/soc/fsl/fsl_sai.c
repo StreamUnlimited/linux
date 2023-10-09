@@ -417,35 +417,34 @@ static int fsl_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 	sai->dai_fmt = fmt;
 
 	/*
-	 * Continuous MCLK is already enabled or not requested, so we are done here.
+	 * Enable continuous MCLK if it is requested by SND_SOC_DAIFMT_CONT flag
+	 * and was not already done.
 	 *
 	 * NOTE: It is *not* a supported use case that `fsl_sai_set_dai_fmt()` will
 	 * be called with different settings for `SND_SOC_DAIFMT_CONT` multiple times.
 	 */
-	if (sai->cont_mclks_prepared || !(sai->dai_fmt & SND_SOC_DAIFMT_CONT))
-		return ret;
-
-
-	/*
-	 * Since we do not want to change the `mclk_streams` handling too much
-	 * we just `enable` (incrementing refcount) all possible MCLKs here
-	 * so they will always be enabled.
-	 */
-	for (i = 0; i < FSL_SAI_MCLK_MAX; i++) {
-		ret = clk_prepare_enable(sai->mclk_clk[i]);
-		if (ret) {
-			dev_err(cpu_dai->dev, "failed to enable MCLK %pC: %d\n", sai->mclk_clk[i], ret);
-			break;
+	if (sai->dai_fmt & SND_SOC_DAIFMT_CONT && !sai->cont_mclks_prepared) {
+		/*
+		 * Since we do not want to change the `mclk_streams` handling too much
+		 * we just `enable` (incrementing refcount) all possible MCLKs here
+		 * so they will always be enabled.
+		 */
+		for (i = 0; i < FSL_SAI_MCLK_MAX; i++) {
+			ret = clk_prepare_enable(sai->mclk_clk[i]);
+			if (ret) {
+				dev_err(cpu_dai->dev, "failed to enable MCLK %s: %d\n", __clk_get_name(sai->mclk_clk[i]), ret);
+				break;
+			}
 		}
-	}
 
-	/*
-	 * Even in the case of an error we want to set this flag just so that on any further
-	 * invocations of `fsl_sai_set_dai_fmt()` we do not try to enable the MCLKs again. In
-	 * any case failure to enable the MCLKs is an issue which is most likely not really
-	 * recoverable at runtime.
-	 */
-	sai->cont_mclks_prepared = true;
+		/*
+		 * Even in the case of an error we want to set this flag just so that on any further
+		 * invocations of `fsl_sai_set_dai_fmt()` we do not try to enable the MCLKs again. In
+		 * any case failure to enable the MCLKs is an issue which is most likely not really
+		 * recoverable at runtime.
+		 */
+		sai->cont_mclks_prepared = true;
+	}
 
 
 	return ret;
