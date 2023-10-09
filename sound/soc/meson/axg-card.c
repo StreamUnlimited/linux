@@ -49,6 +49,50 @@ static int axg_card_tdm_be_hw_params(struct snd_pcm_substream *substream,
 	return meson_card_i2s_set_sysclk(substream, params, be->mclk_fs);
 }
 
+bool continuous_clk_requested(struct snd_soc_pcm_runtime *rtd)
+{
+	return !!(rtd->dai_link->dai_fmt & SND_SOC_DAIFMT_CONT);
+}
+
+static int axg_card_tdm_dai_set_ignore_suspend(struct snd_soc_pcm_runtime *rtd, bool ignore_suspend)
+{
+	struct snd_soc_dai *cpu_dai;
+	int ret, i;
+	for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
+		struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+		ret = axg_tdm_iface_set_ignore_suspend(iface, ignore_suspend);
+		if (ret) {
+			dev_err(cpu_dai->dev, "set ignore suspend to %d failed, probably could not enable clk\n", ignore_suspend);
+			return ret;
+		}
+	}
+	return 0;
+}
+
+static int axg_card_tdm_dai_init_clk(struct snd_soc_pcm_runtime *rtd)
+{
+	struct meson_card *priv = snd_soc_card_get_drvdata(rtd->card);
+	struct axg_dai_link_tdm_data *be =
+		(struct axg_dai_link_tdm_data *)priv->link_data[rtd->num];
+	struct snd_soc_dai *cpu_dai;
+	int ret = 0, i = 0;
+	for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
+		struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+		int rate = be->system_clock_frequency;
+		ret = cpu_dai->driver->ops->set_sysclk(cpu_dai, 0, rate, SND_SOC_CLOCK_OUT);
+		if (ret) {
+			dev_err(cpu_dai->dev, "failed to set sysclk to rate: %d\n", rate);
+			return ret;
+		}
+		ret = axg_tdm_iface_init_clk(iface);
+		if (ret) {
+			dev_err(cpu_dai->dev, "enabling of continuous clocks failed\n");
+			return ret;
+		}
+	}
+	return 0;
+}
+
 static const struct snd_soc_ops axg_card_tdm_be_ops = {
 	.hw_params = axg_card_tdm_be_hw_params,
 };
@@ -59,8 +103,6 @@ static int axg_card_tdm_dai_init(struct snd_soc_pcm_runtime *rtd)
 	struct axg_dai_link_tdm_data *be =
 		(struct axg_dai_link_tdm_data *)priv->link_data[rtd->num];
 	struct snd_soc_dai *codec_dai;
-	struct snd_soc_dai *cpu_dai;
-	bool idle_clk = false;
 	int ret, i;
 
 	for_each_rtd_codec_dais(rtd, i, codec_dai) {
@@ -83,27 +125,17 @@ static int axg_card_tdm_dai_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	/* enable dai-link mclk when CONTINUOUS clk is set */
-	idle_clk = !!(rtd->dai_link->dai_fmt & SND_SOC_DAIFMT_CONT);
-	if (idle_clk) {
-		for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
-			struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
-			int rate = be->system_clock_frequency;
-			ret = cpu_dai->driver->ops->set_sysclk(cpu_dai, 0, rate, SND_SOC_CLOCK_OUT);
-			/*
-			* Always set the BCLK to MCLK/8 and the WCLK to BCLK/64 for the
-			* early clocks.
-			*/
-			ret |= clk_set_rate(iface->sclk, rate/8);
-			ret |= clk_set_rate(iface->lrclk, rate/(64*8));
-			ret |= clk_set_duty_cycle(iface->lrclk, 1, 2);
-
-			ret |= clk_prepare_enable(iface->mclk);
-			ret |= clk_prepare_enable(iface->sclk);
-			ret |= clk_prepare_enable(iface->lrclk);
-
-			if (ret != 0)
-				dev_err(cpu_dai->dev, "enabling of continuous clocks failed\n");
-			}
+	if (continuous_clk_requested(rtd)) {
+		ret = axg_card_tdm_dai_init_clk(rtd);
+		if (ret)
+			return ret;
+		ret = axg_card_tdm_dai_set_ignore_suspend(rtd, true);
+		if (ret)
+			return ret;
+	} else {
+		ret = axg_card_tdm_dai_set_ignore_suspend(rtd, false);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -111,20 +143,8 @@ static int axg_card_tdm_dai_init(struct snd_soc_pcm_runtime *rtd)
 
 static void axg_card_tdm_dai_exit(struct snd_soc_pcm_runtime *rtd)
 {
-	struct snd_soc_dai *cpu_dai;
-	bool idle_clk = false;
-	int i;
-
-	idle_clk = !!(rtd->dai_link->dai_fmt & SND_SOC_DAIFMT_CONT);
-	if(idle_clk) {
-		for_each_rtd_cpu_dais(rtd, i, cpu_dai) {
-			struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
-
-			clk_disable_unprepare(iface->lrclk);
-			clk_disable_unprepare(iface->sclk);
-			clk_disable_unprepare(iface->mclk);
-		}
-	}
+	if (continuous_clk_requested(rtd))
+		axg_card_tdm_dai_set_ignore_suspend(rtd, false);
 }
 
 static int axg_card_tdm_dai_lb_init(struct snd_soc_pcm_runtime *rtd)

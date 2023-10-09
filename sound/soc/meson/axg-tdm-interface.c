@@ -97,6 +97,67 @@ int axg_tdm_set_tdm_slots(struct snd_soc_dai *dai, u32 *tx_mask,
 }
 EXPORT_SYMBOL_GPL(axg_tdm_set_tdm_slots);
 
+static int axg_tdm_iface_enable_clk(struct axg_tdm_iface *iface)
+{
+	int ret = 0;
+	ret = clk_prepare_enable(iface->mclk);
+	if (ret)
+		goto err_mclk;
+	ret = clk_prepare_enable(iface->sclk);
+	if (ret)
+		goto err_sclk;
+	ret = clk_prepare_enable(iface->lrclk);
+	if (ret)
+		goto err_lrclk;
+
+	return 0;
+
+err_lrclk:
+	clk_disable_unprepare(iface->sclk);
+err_sclk:
+	clk_disable_unprepare(iface->mclk);
+err_mclk:
+	return ret;
+}
+
+static int axg_tdm_iface_disable_clk(struct axg_tdm_iface *iface)
+{
+	clk_disable_unprepare(iface->lrclk);
+	clk_disable_unprepare(iface->sclk);
+	clk_disable_unprepare(iface->mclk);
+	return 0;
+}
+
+int axg_tdm_iface_init_clk(struct axg_tdm_iface *iface)
+{
+	int ret = 0;
+	/*
+	* Always set the BCLK to MCLK/8 and the WCLK to BCLK/64 for the
+	* early clocks.
+	*/
+	ret = clk_set_rate(iface->sclk, iface->mclk_rate/8);
+	if (ret)
+		return ret;
+	ret = clk_set_rate(iface->lrclk, iface->mclk_rate/(64*8));
+	if (ret)
+		return ret;
+	return clk_set_duty_cycle(iface->lrclk, 1, 2);
+}
+EXPORT_SYMBOL_GPL(axg_tdm_iface_init_clk);
+
+int axg_tdm_iface_set_ignore_suspend(struct axg_tdm_iface *iface, bool ignore_suspend)
+{
+	if (iface->ignore_suspend == ignore_suspend)
+		return 0;
+	iface->ignore_suspend = ignore_suspend;
+
+	if(iface->ignore_suspend)
+		return axg_tdm_iface_enable_clk(iface);
+	else
+		return axg_tdm_iface_disable_clk(iface);
+}
+EXPORT_SYMBOL_GPL(axg_tdm_iface_set_ignore_suspend);
+
 static int axg_tdm_iface_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 				    unsigned int freq, int dir)
 {
@@ -184,6 +245,7 @@ static int axg_tdm_iface_startup(struct snd_pcm_substream *substream,
 						   SNDRV_PCM_HW_PARAM_RATE,
 						   0, max_rate);
 	}
+	axg_tdm_iface_enable_clk(iface);
 
 	/*
 	* Make sure, that the buffer size is always even (aligned to 2 bytes)
@@ -198,6 +260,13 @@ static int axg_tdm_iface_startup(struct snd_pcm_substream *substream,
 		ret = 0;
 
 	return ret;
+}
+
+static void axg_tdm_iface_shutdown(struct snd_pcm_substream *substream,
+				 struct snd_soc_dai *dai)
+{
+	struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(dai);
+	axg_tdm_iface_disable_clk(iface);
 }
 
 static int axg_tdm_iface_set_stream(struct snd_pcm_substream *substream,
@@ -489,6 +558,7 @@ static const struct snd_soc_dai_ops axg_tdm_iface_ops = {
 	.set_sysclk	= axg_tdm_iface_set_sysclk,
 	.set_fmt	= axg_tdm_iface_set_fmt,
 	.startup	= axg_tdm_iface_startup,
+	.shutdown	= axg_tdm_iface_shutdown,
 	.hw_params	= axg_tdm_iface_hw_params,
 	.trigger	= axg_tdm_iface_trigger,
 };

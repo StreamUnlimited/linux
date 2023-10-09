@@ -32,6 +32,9 @@ struct axg_tdm_iface {
 	struct clk *mclk;
 	unsigned long mclk_rate;
 
+	/* continuous-clock (SND_SOC_DAIFMT_CONT) is set */
+	bool ignore_suspend;
+
 	/* format is common to all the DAIs of the iface */
 	unsigned int fmt;
 	unsigned int slots;
@@ -82,5 +85,8 @@ static inline int axg_tdm_stream_reset(struct axg_tdm_stream *ts)
 int axg_tdm_set_tdm_slots(struct snd_soc_dai *dai, u32 *tx_mask,
 			  u32 *rx_mask, unsigned int slots,
 			  unsigned int slot_width);
+
+int axg_tdm_iface_init_clk(struct axg_tdm_iface *iface);
+int axg_tdm_iface_set_ignore_suspend(struct axg_tdm_iface *iface, bool ignore_suspend);
 
 #endif /* _MESON_AXG_TDM_H */
