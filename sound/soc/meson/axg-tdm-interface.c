@@ -145,6 +145,14 @@ int axg_tdm_iface_init_clk(struct axg_tdm_iface *iface)
 }
 EXPORT_SYMBOL_GPL(axg_tdm_iface_init_clk);
 
+static ssize_t axg_tdm_iface_ignore_suspend_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct axg_tdm_iface *iface = dev_get_drvdata(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", iface->ignore_suspend);
+}
+
 int axg_tdm_iface_set_ignore_suspend(struct axg_tdm_iface *iface, bool ignore_suspend)
 {
 	if (iface->ignore_suspend == ignore_suspend)
@@ -157,6 +165,38 @@ int axg_tdm_iface_set_ignore_suspend(struct axg_tdm_iface *iface, bool ignore_su
 		return axg_tdm_iface_disable_clk(iface);
 }
 EXPORT_SYMBOL_GPL(axg_tdm_iface_set_ignore_suspend);
+
+static ssize_t axg_tdm_iface_ignore_suspend_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct axg_tdm_iface *iface = dev_get_drvdata(dev);
+	int ret;
+	bool ignore_suspend;
+
+	ret = strtobool(buf, &ignore_suspend);
+	if (ret < 0)
+		return ret;
+
+	if (iface->ignore_suspend == ignore_suspend)
+		return count;
+
+	ret = axg_tdm_iface_set_ignore_suspend(iface, ignore_suspend);
+	if (ret < 0) {
+		dev_err(dev, "failed to set ignore_suspend state: %d\n", ret);
+		return ret;
+	}
+
+	if (ignore_suspend)
+		dev_info(dev, "ignoring suspend, runtime acquiring components\n");
+	else
+		dev_info(dev, "not ignoring suspend, runtime releasing components\n");
+
+	iface->ignore_suspend = ignore_suspend;
+
+	return count;
+}
+static DEVICE_ATTR(ignore_suspend, 0644, axg_tdm_iface_ignore_suspend_show, axg_tdm_iface_ignore_suspend_store);
 
 static int axg_tdm_iface_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 				    unsigned int freq, int dir)
@@ -694,6 +734,9 @@ static int axg_tdm_iface_probe(struct platform_device *pdev)
 	iface->mclk = devm_clk_get_optional(dev, "mclk");
 	if (IS_ERR(iface->mclk))
 		return dev_err_probe(dev, PTR_ERR(iface->mclk), "failed to get mclk\n");
+
+	if (device_create_file(dev, &dev_attr_ignore_suspend) < 0)
+		dev_err(dev, "failed to create ignore_suspend sysfs file\n");
 
 	return devm_snd_soc_register_component(dev,
 					&axg_tdm_iface_component_drv, dai_drv,
