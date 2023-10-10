@@ -5,6 +5,7 @@
 // Copyright 2012-2015 Freescale Semiconductor, Inc.
 
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/delay.h>
 #include <linux/dmaengine.h>
 #include <linux/module.h>
@@ -385,11 +386,40 @@ static int fsl_sai_set_dai_fmt_tr(struct snd_soc_dai *cpu_dai,
 	return 0;
 }
 
+static int fsl_sai_enable_continuous_mclk(struct device *dev)
+{
+	struct fsl_sai *sai = dev_get_drvdata(dev);
+	int i, ret;
+
+	/*
+	 * Since we do not want to change the `mclk_streams` handling too much
+	 * we just `enable` (incrementing refcount) all possible MCLKs here
+	 * so they will always be enabled.
+	 */
+	for (i = 0; i < FSL_SAI_MCLK_MAX; i++) {
+		ret = clk_prepare_enable(sai->mclk_clk[i]);
+		if (ret) {
+			dev_err(dev, "failed to enable MCLK %s: %d\n", __clk_get_name(sai->mclk_clk[i]), ret);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static void fsl_sai_disable_continuous_mclk(struct device *dev)
+{
+	struct fsl_sai *sai = dev_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < FSL_SAI_MCLK_MAX; i++)
+		clk_disable_unprepare(sai->mclk_clk[i]);
+}
+
 static int fsl_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 {
 	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
 	int ret;
-	int i;
 
 	if (sai->masterflag[FSL_FMT_TRANSMITTER])
 		fmt = (fmt & (~SND_SOC_DAIFMT_MASTER_MASK)) |
@@ -424,18 +454,15 @@ static int fsl_sai_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 	 * be called with different settings for `SND_SOC_DAIFMT_CONT` multiple times.
 	 */
 	if (sai->dai_fmt & SND_SOC_DAIFMT_CONT && !sai->cont_mclks_prepared) {
-		/*
-		 * Since we do not want to change the `mclk_streams` handling too much
-		 * we just `enable` (incrementing refcount) all possible MCLKs here
-		 * so they will always be enabled.
-		 */
-		for (i = 0; i < FSL_SAI_MCLK_MAX; i++) {
-			ret = clk_prepare_enable(sai->mclk_clk[i]);
-			if (ret) {
-				dev_err(cpu_dai->dev, "failed to enable MCLK %s: %d\n", __clk_get_name(sai->mclk_clk[i]), ret);
-				break;
-			}
-		}
+
+#ifndef CONFIG_PM
+		// Only enable the continuous clocks here if CONFIG_PM is not enabled,
+		// in most cases CONFIG_PM will be enabled, so the continuous clocks will
+		// initially be enabled in the `fsl_sai_runtime_resume()` callback.
+		ret = fsl_sai_enable_continuous_mclk(cpu_dai->dev);
+		if (ret)
+			dev_err(cpu_dai->dev, "Failed to enable continuous MCLK: %d", ret);
+#endif
 
 		/*
 		 * Even in the case of an error we want to set this flag just so that on any further
@@ -1826,6 +1853,9 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 	if (sai->mclk_streams & BIT(SNDRV_PCM_STREAM_PLAYBACK))
 		clk_disable_unprepare(sai->mclk_clk[sai->mclk_id[1]]);
 
+	if (sai->cont_mclks_prepared)
+		fsl_sai_disable_continuous_mclk(dev);
+
 	clk_disable_unprepare(sai->bus_clk);
 
 	if (sai->soc_data->flags & PMQOS_CPU_LATENCY)
@@ -1848,6 +1878,12 @@ static int fsl_sai_runtime_resume(struct device *dev)
 	if (ret) {
 		dev_err(dev, "failed to enable bus clock: %d\n", ret);
 		return ret;
+	}
+
+	if (sai->cont_mclks_prepared) {
+		ret = fsl_sai_enable_continuous_mclk(dev);
+		if (ret)
+			goto disable_bus_clk;
 	}
 
 	if (sai->mclk_streams & BIT(SNDRV_PCM_STREAM_PLAYBACK)) {
