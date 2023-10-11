@@ -120,7 +120,9 @@
 &tdmif_b {
 	pinctrl-0 = <&tdmb_sclk_pins>, <&tdmb_fs_pins>,
 		    <&tdmb_din0_pins>;
-	pinctrl-names = "default";
+	pinctrl-1 = <&tdmb_sclk_gpio_pins>, <&tdmb_fs_gpio_pins>,
+		    <&tdmb_din0_gpio_pins>;
+	pinctrl-names = "default", "suspend";
 	status = "okay";
 
 	assigned-clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK_SEL>;
@@ -131,7 +133,10 @@
 	pinctrl-0 = <&tdmc_sclk_pins>, <&tdmc_fs_pins>,
 		    <&tdmc_dout0_pins>, <&tdmc_din1_pins>,
 		    <&mclk_c_pins>;
-	pinctrl-names = "default";
+	pinctrl-1 = <&tdmc_sclk_gpio_pins>, <&tdmc_fs_gpio_pins>,
+		    <&tdmc_dout0_gpio_pins>, <&tdmc_din1_gpio_pins>,
+		    <&mclk_c_gpio_pins>;
+	pinctrl-names = "default", "suspend";
 	status = "okay";
 	enable-drift-compensator;
 
@@ -183,5 +188,65 @@
 		reset-gpios = <&gpio GPIOA_18 GPIO_ACTIVE_LOW>;
 		debug = <0>;
 		xtal-frequency = <10000000>;
+	};
+};
+
+&pinctrl_periphs {
+	tdmb_sclk_gpio_pins: tdmb_gpio_sclk {
+		mux {
+			groups = "GPIOA_8";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+	tdmb_fs_gpio_pins: tdmb_gpio_fs {
+		mux {
+			groups = "GPIOA_9";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+	tdmb_din0_gpio_pins: tdmb_gpio_dout0 {
+		mux {
+			groups = "GPIOA_10";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+
+	mclk_c_gpio_pins: mclk_gpio_c {
+		mux {
+			groups = "GPIOA_0";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+	tdmc_sclk_gpio_pins: tdmc_gpio_sclk {
+		mux {
+			groups = "GPIOA_2";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+	tdmc_fs_gpio_pins: tdmc_gpio_fs {
+		mux {
+			groups = "GPIOA_3";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+	tdmc_dout0_gpio_pins: tdmc_gpio_dout0 {
+		mux {
+			groups = "GPIOA_4";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
+	};
+	tdmc_din1_gpio_pins: tdmc_gpio_din1 {
+		mux {
+			groups = "GPIOA_5";
+			function = "gpio_periphs";
+			bias-pull-down;
+		};
 	};
 };
