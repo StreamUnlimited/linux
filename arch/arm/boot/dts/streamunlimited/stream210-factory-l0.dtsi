@@ -87,6 +87,25 @@
 			drive-strength = <0>;
 		};
 	};
+
+	adc_factory_pins: factory_adcs {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 0, GPIO)>,
+					 <REALTEK_PINMUX('A', 1, GPIO)>,
+					 <REALTEK_PINMUX('A', 2, GPIO)>,
+					 <REALTEK_PINMUX('A', 3, GPIO)>,
+					 <REALTEK_PINMUX('A', 4, GPIO)>,
+					 <REALTEK_PINMUX('A', 5, GPIO)>;
+			bias-disable;
+		};
+	};
+};
+
+&adc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&adc_factory_pins>;
+	status = "okay";
+	rtk,adc-channels = <0>, <1>, <2>, <3>, <4>, <5>, <6>;
 };
 
 &i2c1_gpio {
