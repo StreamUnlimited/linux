@@ -496,6 +496,16 @@ config VCNL4035
 	  To compile this driver as a module, choose M here: the
 	  module will be called vcnl4035.
 
+config VEML3328
+	tristate "VEML3328 RGBCIR Color Sensor"
+	depends on I2C
+	help
+	  Say Y here if you want to build a driver for the Vishay VEML3328
+	  RGBCIR Color Sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called veml3328.
+
 config VEML6070
 	tristate "VEML6070 UV A light sensor"
 	depends on I2C
