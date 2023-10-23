@@ -151,18 +151,7 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	struct snd_kcontrol *kcontrol;
 
 	unsigned int rate = params_rate(params);
-	unsigned int mclk_rate, pll_rate;
-	struct clk *pll;
-
-	if ((rate % 8000) == 0) {
-		pll_rate = PLL_NOMINAL_RATE_48k;
-		pll = priv->pll8k_clk;
-		mclk_rate = MCLK_RATE_48k;
-	} else {
-		pll_rate = PLL_NOMINAL_RATE_44k1;
-		pll = priv->pll11k_clk;
-		mclk_rate = MCLK_RATE_44k1;
-	}
+	unsigned int mclk_rate = (rate % 8000) == 0 ? MCLK_RATE_48k : MCLK_RATE_44k1;
 
 	/*
 	 * We could have done the tdm slot setup only once, and not in every hw_params()
@@ -177,15 +166,18 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	if (ret && ret != -ENOTSUPP)
 		return ret;
 
-
 	/*
-	 * First we reset the PLL rate to the nominal value, otherwise, when
-	 * the PLL is in a state where the frequency is skewed, the
-	 * calculations inside snd_soc_dai_set_sysclk() might fail, because
-	 * the skewed PLL value cannot be cleanly divided down anymore.
+	 * Reset the PLLs to the nominal value, otherwise when the PLL is
+	 * not at the nomial value, the calulations inside snd_soc_dai_set_sysclk()
+	 * might fail because the frequency cannot be cleanly divided down
+	 * anymore.
 	 */
 	priv->cur_ppm = 0;
-	ret = clk_set_rate(pll, pll_rate);
+	ret = clk_set_rate(priv->pll8k_clk, PLL_NOMINAL_RATE_48k);
+	if (ret)
+		return ret;
+
+	ret = clk_set_rate(priv->pll11k_clk, PLL_NOMINAL_RATE_44k1);
 	if (ret)
 		return ret;
 
