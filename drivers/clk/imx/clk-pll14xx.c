@@ -363,7 +363,7 @@ static unsigned long clk_pll14xx_recalc_rate(struct clk_hw *hw,
 	pdiv = FIELD_GET(PDIV_MASK, pll_div_ctl0);
 	sdiv = FIELD_GET(SDIV_MASK, pll_div_ctl0);
 
-	if (pll->type == PLL_1443X) {
+	if (pll->type == PLL_1443X || pll->type == PLL_1443X_SKEWABLE) {
 		pll_div_ctl1 = readl_relaxed(pll->base + DIV_CTL1);
 		kdiv = FIELD_GET(KDIV_MASK, pll_div_ctl1);
 	} else {
