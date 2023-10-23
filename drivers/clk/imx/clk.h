@@ -492,11 +492,11 @@ struct clk_hw *__imx8m_clk_hw_composite(const char *name,
 
 #define imx8m_clk_hw_composite(name, parent_names, reg) \
 	_imx8m_clk_hw_composite(name, parent_names, reg, \
-			IMX_COMPOSITE_SAI, IMX_COMPOSITE_CLK_FLAGS_DEFAULT)
+			0, IMX_COMPOSITE_CLK_FLAGS_DEFAULT)
 
 #define imx8m_clk_hw_composite_sai(name, parent_names, reg) \
 	_imx8m_clk_hw_composite(name, parent_names, reg, \
-			0, IMX_COMPOSITE_CLK_FLAGS_DEFAULT)
+			IMX_COMPOSITE_SAI, IMX_COMPOSITE_CLK_FLAGS_DEFAULT)
 
 #define imx8m_clk_hw_composite_critical(name, parent_names, reg) \
 	_imx8m_clk_hw_composite(name, parent_names, reg, \
