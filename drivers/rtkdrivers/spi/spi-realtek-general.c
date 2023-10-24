@@ -976,6 +976,13 @@ static bool rtk_spi_can_dma(struct spi_controller *controller,
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 
+	// TODO: The Realtek DMA seems to be still broken, and the logic below
+	// does not seem to make sense anyway for this callback. However this
+	// would require a deeper investigation and/or support from Realtek side,
+	// so for now just return the dma_enabled status that is taken from the
+	// device-tree.
+	return rtk_spi->spi_manage.dma_enabled;
+
 	if (transfer->len > RTK_SPI_FIFO_ALL) {
 		rtk_spi->spi_manage.dma_enabled = 1;
 		return true;
