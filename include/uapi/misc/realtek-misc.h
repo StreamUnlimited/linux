@@ -17,6 +17,7 @@
 /* RTK_CMD_GET_RL_INFO */
 #define RTK_CUT_VERSION_A           0
 #define RTK_CUT_VERSION_B           1
+#define RTK_CUT_VERSION_C           2
 
 /* Add customize affairs here. */
 /* RTK_CMD_AAAAAA_AAAAAA_AA */

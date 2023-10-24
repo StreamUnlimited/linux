@@ -12,6 +12,9 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/mfd/rtk-timer.h>
+#include <linux/clk.h>
+#include <linux/pm_wakeirq.h>
+#include <linux/suspend.h>
 
 #include "realtek-comparator.h"
 
@@ -267,6 +270,11 @@ static int realtek_comp_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		device_init_wakeup(&pdev->dev, true);
+		dev_pm_set_wake_irq(&pdev->dev, comparator->irq);
+	}
+
 	realtek_comp_hw_init(comparator);
 	realtek_comp_start(comparator);
 
@@ -277,10 +285,41 @@ static int realtek_comp_remove(struct platform_device *pdev)
 {
 	struct realtek_comp_data *comparator = platform_get_drvdata(pdev);
 
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		dev_pm_clear_wake_irq(&pdev->dev);
+		device_init_wakeup(&pdev->dev, false);
+	}
+
 	realtek_comp_hw_deinit(comparator);
 
 	return 0;
 }
+
+extern suspend_state_t pm_suspend_target_state;
+static int realtek_comp_suspend(struct device *dev)
+{
+	struct realtek_adc_data *comp_adc = dev_get_drvdata(dev->parent);
+
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		clk_set_parent(comp_adc->clk_sl, comp_adc->adc_parent_osc_2m);
+	}
+	return 0;
+}
+
+static int realtek_comp_resume(struct device *dev)
+{
+	struct realtek_adc_data *comp_adc = dev_get_drvdata(dev->parent);
+
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		clk_set_parent(comp_adc->clk_sl, comp_adc->adc_parent_ls_apb);
+	}
+	return 0;
+}
+
+static const struct dev_pm_ops realtek_amebad2_comp_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(realtek_comp_suspend, realtek_comp_resume)
+};
+
 
 static const struct of_device_id realtek_comp_match[] = {
 	{.compatible = "realtek,amebad2-comparator",},
@@ -294,6 +333,7 @@ static struct platform_driver realtek_comp_driver = {
 	.driver = {
 		.name = "realtek-amebad2-comparator",
 		.of_match_table = of_match_ptr(realtek_comp_match),
+		.pm = &realtek_amebad2_comp_pm_ops,
 	},
 };
 

@@ -37,6 +37,13 @@
 			clock-output-names = "OSC_4M";
 		};
 		
+		clk_osc_2mhz: oscillator_2mhz {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <2000000>;
+			clock-output-names = "OSC_2M";
+		};
+
 		clk_osc_131khz: oscillator_131khz {
 			#clock-cells = <0>;
 			compatible = "fixed-clock";

@@ -311,12 +311,14 @@ void cfg80211_rtw_connect_indicate(fullmac_join_status join_status, void *user_d
 		if (user_data_len > 0) {
 			memcpy(mlme_priv->assoc_rsp_ie, (u8 *)user_data, user_data_len);
 			mlme_priv->assoc_rsp_ie_len = user_data_len;
-			dev_dbg(global_idev.fullmac_dev, "[fullmac] --- %s --- join associated", __func__);
+			dev_dbg(global_idev.fullmac_dev, "[fullmac] --- %s --- %s success.", __func__, (*(u8 *)mlme_priv->assoc_req_ie == 0 ? "association" : "re-association"));
 			/* Inform connect information. */
 			/* Different between cfg80211_connect_result and cfg80211_connect_bss are described in net/cfg80211.h. */
 			/* if connect_result warning, that means get_bss fail (need check), one reason is WPA_S calls disconnect ops, which resulting in wdev->ssid_len = 0 */
 			cfg80211_connect_result(global_idev.pndev[0], mlme_priv->assoc_rsp_ie + 16,
-									mlme_priv->assoc_req_ie + WLAN_HDR_A3_LEN + 2, mlme_priv->assoc_req_ie_len - WLAN_HDR_A3_LEN - 2,
+									mlme_priv->assoc_req_ie + WLAN_HDR_A3_LEN + 4/* fixed parameters */
+									+ (*(u8 *)mlme_priv->assoc_req_ie == 0 ? 0 : 6)/* re-assoc: current ap */,
+									mlme_priv->assoc_req_ie_len - WLAN_HDR_A3_LEN - 4 - (*(u8 *)mlme_priv->assoc_req_ie == 0 ? 0 : 6),
 									mlme_priv->assoc_rsp_ie + WLAN_HDR_A3_LEN + 6, mlme_priv->assoc_rsp_ie_len -  WLAN_HDR_A3_LEN - 6,
 									WLAN_STATUS_SUCCESS, GFP_ATOMIC);
 			netif_carrier_on(global_idev.pndev[0]);
@@ -347,9 +349,10 @@ void cfg80211_rtw_disconnect_indicate(u16 reason, u8 locally_generated)
 void cfg80211_rtw_external_auth_request(char *buf, int buf_len)
 {
 	struct cfg80211_external_auth_params *auth_ext_para = &global_idev.mlme_priv.auth_ext_para;
+	struct wpa_sae_param_t *wpa_sae_param = (struct wpa_sae_param_t *)buf;
 
 	auth_ext_para->action = NL80211_EXTERNAL_AUTH_START;
-	memcpy(auth_ext_para->bssid, buf, ETH_ALEN);
+	memcpy(auth_ext_para->bssid, wpa_sae_param->peer_mac, ETH_ALEN);
 	auth_ext_para->key_mgmt_suite = 0x8ac0f00;
 
 	/*ap mode doesn't need call this ops, sta will trigger auth*/
@@ -364,6 +367,7 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	u32 wlan_idx = 0;
 	/* coherent alloc: revise vir addr will be mapped to phy addr. Send phy addr to rtos by ipc. */
 	u8 *vir_pwd = NULL;
+	u8 pwd[] = "12345678";
 	dma_addr_t phy_pwd;
 	int rsnx_ielen = 0;
 	u8 *prsnx;
@@ -386,9 +390,56 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 			sme->crypto.ciphers_pairwise[0], sme->crypto.cipher_group, sme->crypto.akm_suites[0]);
 
 	memset(&connect_param, 0, sizeof(rtw_network_info_t));
+	connect_param.security_type = 0;
+	if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_3) {
+		connect_param.security_type |= WPA3_SECURITY;
+	}
+	if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2) {
+		connect_param.security_type |= WPA2_SECURITY;
+	}
+	if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_1) {
+		connect_param.security_type |= WPA_SECURITY;
+	}
+
+	if (sme->auth_type == NL80211_AUTHTYPE_SHARED_KEY) {
+		connect_param.security_type |= SHARED_ENABLED;
+	}
+
+	if ((sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_WEP40)
+		|| (sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_WEP104)) {
+		connect_param.security_type |= WEP_ENABLED;
+	} else if ((sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_CCMP)
+			   || (sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_CCMP_256)) {
+		connect_param.security_type |= AES_ENABLED;
+	} else if (sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_TKIP) {
+		connect_param.security_type |= TKIP_ENABLED;
+	} else if (sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_AES_CMAC) {
+		connect_param.security_type |= AES_CMAC_ENABLED;
+	}
+
+	if (sme->want_1x || (sme->auth_type == NL80211_AUTHTYPE_NETWORK_EAP)) {
+		connect_param.security_type |= ENTERPRISE_ENABLED;
+	}
+
+	/* Do not change open and WEP password from upper layer. */
+	if (connect_param.security_type && !(connect_param.security_type & WEP_ENABLED)) {
+		sme->key_len = 8;
+		sme->key = pwd;
+	}
 
 	memcpy(connect_param.ssid.val, (u8 *)sme->ssid, sme->ssid_len);
 	connect_param.ssid.len = sme->ssid_len;
+
+	memset(connect_param.prev_bssid.octet, 0, ETH_ALEN);
+	if (sme->prev_bssid) {
+		dev_dbg(global_idev.fullmac_dev,
+				"Former AP [0x%x:0x%x:0x%x:0x%x:0x%x:0x%x], Re-Association Request to [0x%x:0x%x:0x%x:0x%x:0x%x:0x%x].\n",
+				sme->prev_bssid[0], sme->prev_bssid[1], sme->prev_bssid[2], sme->prev_bssid[3], sme->prev_bssid[4], sme->prev_bssid[5],
+				sme->bssid[0], sme->bssid[1], sme->bssid[2], sme->bssid[3], sme->bssid[4], sme->bssid[5]);
+		memcpy(connect_param.prev_bssid.octet, sme->prev_bssid, ETH_ALEN);
+		/* Stop upper-layer-data-queue because of re-association. */
+		netif_carrier_off(global_idev.pndev[0]);
+	}
 
 	if (sme->key_len) {
 		vir_pwd = dmam_alloc_coherent(global_idev.fullmac_dev, sme->key_len, &phy_pwd, GFP_KERNEL);
@@ -410,9 +461,6 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 
 	connect_param.password_len = sme->key_len;
 	connect_param.key_id = sme->key_idx;
-	/* Set security type as open in linux. RTOS will check saved scan list and find the actually security type. */
-	connect_param.security_type = RTW_SECURITY_OPEN;
-
 	/* set channel to let low level do scan on specific channel */
 	connect_param.channel = rtw_freq2ch(sme->channel->center_freq);
 	connect_param.pscan_option = 0x2;
@@ -482,10 +530,11 @@ static int cfg80211_rtw_get_txpower(struct wiphy *wiphy, struct wireless_dev *wd
 
 static int cfg80211_rtw_set_power_mgmt(struct wiphy *wiphy, struct net_device *ndev, bool enabled, int timeout)
 {
-	dev_dbg(global_idev.fullmac_dev, "%s enable = %d", __func__, enabled);
+	dev_dbg(global_idev.fullmac_dev, "%s: enable = %d, timeout = %d", __func__, enabled, timeout);
 
-	/* Operation not permitted */
-	return -EPERM;
+	/* A timeout value of -1 allows the driver to adjust the dynamic ps timeout value. Power save 2s timeout. */
+	llhw_ipc_wifi_set_lps_enable(enabled);
+	return 0;
 }
 
 #ifdef FULLMAC_TODO
@@ -561,11 +610,12 @@ static int cfg80211_rtw_external_auth_status(struct wiphy *wiphy, struct net_dev
 		dev_dbg(global_idev.fullmac_dev, "[STA]: %s: auth_status=%d\n", __func__, params->status);
 		/* interface change later. */
 		if (params->status == WLAN_STATUS_SUCCESS) {
-			llhw_ipc_wifi_sae_succ_start_assoc();
+			llhw_ipc_wifi_sae_status_indicate(rtw_netdev_idx(dev), params->status, NULL);
 		}
 	} else {
 		dev_dbg(global_idev.fullmac_dev, "[SoftAP]: %s: auth_status=%d\n", __func__, params->status);
 		/* SoftAP is supposed to go into this interface instead of private one. */
+		llhw_ipc_wifi_sae_status_indicate(rtw_netdev_idx(dev), params->status, params->bssid);
 	}
 
 	return 0;
@@ -642,6 +692,9 @@ static int cfg80211_rtw_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev, 
 		dev_dbg(global_idev.fullmac_dev, "wpa_s tx auth\n");
 		//dev_dbg(global_idev.fullmac_dev, "tx_ch=%d, no_cck=%u, da="MAC_FMT"\n", tx_ch, no_cck, MAC_ARG(GetAddr1Ptr(buf)));
 		/*LINUX_TODO, AP mode needs queue confirm frame until external auth status update*/
+		goto dump;
+	} else if (frame_styp == IEEE80211_STYPE_ACTION) {
+		dev_dbg(global_idev.fullmac_dev, "issue action.\n");
 		goto dump;
 	} else {
 		dev_dbg(global_idev.fullmac_dev, "mgmt tx todo, frame_type:0x%x\n", frame_styp);

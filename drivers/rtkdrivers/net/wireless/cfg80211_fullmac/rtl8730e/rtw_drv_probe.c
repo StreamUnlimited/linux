@@ -246,14 +246,23 @@ static int rtw_dev_suspend(struct platform_device *pdev, pm_message_t state)
 
 	dev_dbg(global_idev.fullmac_dev, "%s", __func__);
 
-	ret = llhw_ipc_wifi_update_ip_addr_in_wowlan();
-	if (ret == 0) {
-		/* update ip address success, to suspend */
-		/* set wowlan_state, to not schedule rx work */
-		global_idev.wowlan_state = 1;
-		netif_tx_stop_all_queues(global_idev.pndev[0]);
-	} else {
-		/* not suspend */
+	if (rtw_netdev_priv_is_on(global_idev.pndev[1])) {
+		/* AP is up, stop to suspend */
+		return -EPERM;
+	}
+
+	/* staion mode */
+	if (llhw_ipc_wifi_is_connected_to_ap() == 0) {
+		/* wowlan */
+		ret = llhw_ipc_wifi_update_ip_addr_in_wowlan();
+		if (ret == 0) {
+			/* update ip address success, to suspend */
+			/* set wowlan_state, to not schedule rx work */
+			global_idev.wowlan_state = 1;
+			netif_tx_stop_all_queues(global_idev.pndev[0]);
+		} else {
+			/* not suspend */
+		}
 	}
 
 	return ret;

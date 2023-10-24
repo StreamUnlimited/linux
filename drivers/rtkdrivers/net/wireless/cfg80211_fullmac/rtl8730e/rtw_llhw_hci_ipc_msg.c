@@ -41,18 +41,21 @@ static void inic_ipc_msg_q_task(struct work_struct *data)
 	mutex_lock(&(priv->msg_work_lock));
 	if (priv->b_queue_working) {
 		/* get the data from tx queue. */
-		p_node = dequeue_ipc_msg_node(priv);
-		while (p_node) {
+		while (1) {
+			p_node = dequeue_ipc_msg_node(priv);
+			if (p_node == NULL) {
+				break;
+			}
 			/* haddle the message */
 			if (priv->task_hdl) {
 				priv->task_hdl(&(p_node->ipc_msg));
 			}
 
+			spin_lock_irq(&(priv->lock));
 			/* release the memory for this ipc message. */
 			p_node->is_used = 0;
 			priv->queue_free++;
-
-			p_node = dequeue_ipc_msg_node(priv);
+			spin_unlock_irq(&(priv->lock));
 		}
 	}
 	mutex_unlock(&(priv->msg_work_lock));
@@ -99,14 +102,17 @@ int inic_ipc_msg_enqueue(struct inic_ipc_ex_msg *p_ipc_msg)
 	int ret = 0, i = 0;
 
 	/* allocate memory for message node */
+	spin_lock(&(priv->lock));
 	for (i = 0; i < IPC_MSG_QUEUE_DEPTH; i++) {
 		if (priv->ipc_msg_pool[i].is_used == 0) {
 			p_node = &(priv->ipc_msg_pool[i]);
 			/* a node is used, the free node will decrease */
+			p_node->is_used = 1;
 			priv->queue_free--;
 			break;
 		}
 	}
+	spin_unlock(&(priv->lock));
 
 	if (p_node == NULL) {
 		ret = -ENOMEM;
@@ -119,7 +125,6 @@ int inic_ipc_msg_enqueue(struct inic_ipc_ex_msg *p_ipc_msg)
 	p_node->ipc_msg.msg_addr = p_ipc_msg->msg_addr;
 	p_node->ipc_msg.msg_queue_status = p_ipc_msg->msg_queue_status;
 	p_node->ipc_msg.wlan_idx = p_ipc_msg->wlan_idx;
-	p_node->is_used = 1;
 
 	/* put the ipc message to the queue */
 	ret = enqueue_ipc_msg_node(priv, p_node);

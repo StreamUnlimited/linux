@@ -16,10 +16,35 @@ MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
 MODULE_AUTHOR("Realtek Semiconductor Corp.");
 MODULE_VERSION(DRIVERVERSION);
 
-static int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *addr)
+/*
+ * Set wlan0 mac address: 1) ip link set dev wlan0 down, 2) ip link set dev wlan0 address 86:EF:EB:92:A2:FF, 3) ip link set dev wlan0 up
+ * Set wlan1 mac address: 1) ifconfig wlan1 up, 2) ip link set dev wlan0 address 86:EF:EB:92:A2:F0, 3) hostapd /etc/hostapd.conf -B -i wlan1
+ * NOTE for Soft AP: when wlan1 down, cannot set mac address. but if mac address changed, need restart hostapd. Recomment to change bssid inside hostapd.conf.
+*/
+static int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *p)
 {
-	dev_dbg(global_idev.fullmac_dev, "[netdev]: %s", __func__);
-	return 0;
+	int ret = 0;
+	struct sockaddr *addr = p;
+
+	if (rtw_netdev_idx(pnetdev) > 1) {
+		dev_err(global_idev.fullmac_dev, "Netdevice index err.");
+		return -1;
+	}
+
+	dev_dbg(global_idev.fullmac_dev,
+			"[netdev] %s: set wlan-%d mac addr to [%02x:%02x:%02x:%02x:%02x:%02x]", __func__, rtw_netdev_idx(pnetdev),
+			*(u8 *)(addr->sa_data), *(u8 *)(addr->sa_data + 1), *(u8 *)(addr->sa_data + 2), *(u8 *)(addr->sa_data + 3), *(u8 *)(addr->sa_data + 4),
+			*(u8 *)(addr->sa_data + 5));
+
+	ret = llhw_ipc_wifi_set_mac_addr(rtw_netdev_idx(pnetdev), addr->sa_data);
+
+	if (ret == 0) {
+		/* Set mac address success, then change the dev_addr inside net_device. */
+		memset(global_idev.pndev[rtw_netdev_idx(pnetdev)]->dev_addr, 0, ETH_ALEN);
+		memcpy(global_idev.pndev[rtw_netdev_idx(pnetdev)]->dev_addr, addr->sa_data, ETH_ALEN);
+	}
+
+	return ret;
 }
 
 static struct net_device_stats *rtw_ndev_get_stats(struct net_device *pnetdev)
@@ -203,13 +228,10 @@ void rtw_ndev_uninit(struct net_device *pnetdev)
 
 int rtw_ndev_open(struct net_device *pnetdev)
 {
-	struct event_priv_t *event_priv = &global_idev.event_priv;
-
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 	rtw_netdev_priv_is_on(pnetdev) = true;
 	netif_tx_start_all_queues(pnetdev);
 	netif_tx_wake_all_queues(pnetdev);
-
 	return 0;
 }
 
@@ -229,9 +251,9 @@ static int rtw_ndev_close(struct net_device *pnetdev)
 
 int rtw_ndev_open_ap(struct net_device *pnetdev)
 {
-	struct event_priv_t *event_priv = &global_idev.event_priv;
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 
+	rtw_netdev_priv_is_on(pnetdev) = true;
 	/* if2 init(SW + part of HW) */
 	llhw_ipc_wifi_init_ap();
 
@@ -243,8 +265,6 @@ int rtw_ndev_open_ap(struct net_device *pnetdev)
 
 static int rtw_ndev_close_ap(struct net_device *pnetdev)
 {
-	struct event_priv_t *event_priv = &global_idev.event_priv;
-
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 
 	netif_tx_stop_all_queues(pnetdev);
@@ -252,6 +272,7 @@ static int rtw_ndev_close_ap(struct net_device *pnetdev)
 
 	/* if2 deinit (SW) */
 	llhw_ipc_wifi_deinit_ap();
+	rtw_netdev_priv_is_on(pnetdev) = false;
 
 	return 0;
 }
@@ -308,7 +329,7 @@ int rtw_ndev_register(void)
 
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
 		/* alloc and init netdev */
-		ndev = alloc_etherdev_mq(sizeof(struct netdev_priv_t), 4);
+		ndev = alloc_etherdev_mq(sizeof(struct netdev_priv_t), 1);
 		if (!ndev) {
 			goto dev_fail;
 		}

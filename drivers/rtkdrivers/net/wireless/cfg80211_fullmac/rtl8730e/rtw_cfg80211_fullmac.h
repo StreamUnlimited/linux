@@ -171,4 +171,56 @@ static inline u8 *rtw_get_ie(const u8 *pbuf, int index, int *len, int limit)
 	return NULL;
 }
 
+static inline void rtw_dump_buf(u8 *_titlestring, const u8 *_hexdata, int _hexdatalen)
+{
+	int __i;
+	u8 *ptr = (u8 *)_hexdata;
+
+	if (_titlestring) {
+		printk("");
+		printk("%s", _titlestring);
+		if (_hexdatalen >= 16) {
+			printk("\n");
+		}
+	}
+
+	for (__i = 0; __i < _hexdatalen; __i++) {
+		if (((__i % 16) == 0) && (_hexdatalen >= 16)) {
+			printk("0x%03X: ", __i);
+		}
+		printk("%02X%s", ptr[__i], (((__i + 1) % 4) == 0) ? "  " : " ");
+		if ((__i + 1 < _hexdatalen) && ((__i + 1) % 16) == 0) {
+			printk("\n");
+		}
+	}
+	printk("\n");
+}
+
+static inline u8 rtw_80211_cipher_suite_to_driver(const u32 _80211_suite)
+{
+	switch (_80211_suite) {
+	case WIFI_CIPHER_SUITE_WEP_40:
+		return _WEP40_;
+	case WIFI_CIPHER_SUITE_TKIP:
+		return _TKIP_;
+	case WIFI_CIPHER_SUITE_CCMP_128:
+		return _AES_;
+	case WIFI_CIPHER_SUITE_WEP_104:
+		return _WEP104_;
+	case WIFI_CIPHER_SUITE_BIP_CMAC_128:
+	case WIFI_CIPHER_SUITE_BIP_CMAC_256:
+	case WIFI_CIPHER_SUITE_BIP_GMAC_128:
+	case WIFI_CIPHER_SUITE_BIP_GMAC_256:
+		return _BIP_;
+	case WIFI_CIPHER_SUITE_GCMP:
+		return _GCMP_;
+	case WIFI_CIPHER_SUITE_GCMP_256:
+		return _GCMP_256_;
+	case WIFI_CIPHER_SUITE_CCMP_256:
+		return _CCMP_256_;
+	}
+	return _NO_PRIVACY_;
+}
+
+
 #endif // _RTW_TOP_HEADER_

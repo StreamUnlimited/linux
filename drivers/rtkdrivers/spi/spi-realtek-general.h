@@ -39,21 +39,14 @@
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
 #include <linux/spi/spi.h>
+#include <linux/completion.h>
 
 #include <dt-bindings/realtek/dmac/realtek-amebad2-dmac.h>
 
-#define RTK_SPI_TODO				0
-
-/* Help user level initiate dma spi transfer. */
-/* Kernel level should give dma_addr_t by itself. */
-#define RTK_SPI_DMA_HELP			0
-
-#define RTK_SPI_DEBUG_DETAILS			0
-#define RTK_SPI_REG_DUMP			0
+#define RTK_SPI_TODO                        0
+#define RTK_SPI_DEBUG_DETAILS			    0
+#define RTK_SPI_REG_DUMP			        0
 #define RTK_SPI_HW_CONTROL_FOR_FUTURE_USE	0
-#define RTK_LINUX_SPI_DMA_ENTRY			0
-
-#define SPI_SLAVE_TXERR_WORK_AROUND		0
 
 /**************************************************************************//**
  * @defgroup AMEBAD2_SPI
@@ -437,10 +430,13 @@
 #define MAX_DMA_LENGTH			8192
 #define MAX_SSI_CLOCK			50000000
 
-#define USE_SPI_CORE_WAIT		1
+#define SPI_SHIFT_WAIT_MSECS		8000LL
+#define SPI_WAIT_TOLERANCE			200
+#define SPI_DMASHIFT_WAIT_MSECS		12
+#define SPI_DMAWAIT_TOLERANCE		2
+#define SPI_BUSBUSY_WAIT_TIMESLICE	10
 
-#define SPI_SETUP_DONE			1
-#define SPI_NOT_SETUP			0
+#define SPI_BITS_PER_WORD_MAX		16
 
 #define SPI_RX_MODE			0
 #define SPI_TX_MODE			1
@@ -455,16 +451,9 @@
 enum rtk_spi_dir {
 	RTK_SPI_READ,
 	RTK_SPI_WRITE,
-	RTK_SPI_TRX,
+	RTK_SPI_FULL_DUPLEX,
 	RTK_SPI_INVALID,
 	RTK_SPI_END,
-};
-
-enum rtk_spi_slave_trans_status {
-	RTK_SPI_SLAVE_ON,
-	RTK_SPI_SLAVE_OFF,
-	RTK_SPI_ON_WITH_ERROR,
-	RTK_SPI_OFF_WITH_ERROR,
 };
 
 enum rtk_spi_master_trans_status {
@@ -472,7 +461,7 @@ enum rtk_spi_master_trans_status {
 	RTK_SPI_ONGOING,
 	RTK_SPI_RX_DONE,
 	RTK_SPI_TX_DONE,
-	RTK_SPI_TRX_DONE,
+	RTK_SPI_FULL_DUPLEX_DONE,
 	RTK_SPI_DONE_WITH_ERROR,
 };
 
@@ -486,26 +475,31 @@ enum rtk_spi_gdma_status {
 struct spi_trans_rx_buf {
 	u16				data_len;
 	u32				reg_addr;
-	void				*p_data_buf;
+	void			*p_data_buf;
 };
 
 struct spi_trans_tx_buf {
 	u16				data_len;
 	u32				reg_addr;
-	const void			*p_data_buf;
+	const void		*p_data_buf;
 };
 
 struct rtk_spi_gdma_parameters {
-	struct dma_slave_config		*config;
-	struct dma_chan			*chan;
+	struct dma_slave_config		*rx_config;
+	struct dma_slave_config		*tx_config;
+	struct dma_chan			*rx_chan;
+	struct dma_chan			*tx_chan;
+	struct dma_async_tx_descriptor	*rxdesc;
 	struct dma_async_tx_descriptor	*txdesc;
 	u32				spi_phy_addr;
-	u32				dma_length;
-	u8				gdma_status;
-	struct mutex			dma_lock;
-#if RTK_SPI_DMA_HELP
-	dma_addr_t			help_dma_addr;
-#endif // RTK_SPI_DMA_HELP
+	u32				rx_dma_length;
+	u32				tx_dma_length;
+	u8				rx_gdma_status;
+	u8				tx_gdma_status;
+	dma_addr_t			rx_dma_addr;
+	dma_addr_t			tx_dma_addr;
+	struct completion dma_rx_completion;
+	struct completion dma_tx_completion;
 };
 
 /**
@@ -534,13 +528,13 @@ struct rtk_spi_management {
 	int				max_cs_num;
 	int				spi_default_cs;
 	int				is_slave;
-	bool				spi_prepared;
 	int				dma_enabled;
 	int				spi_poll_mode;
 	u8				current_direction;
 	u8				transfer_status;
 	int				spi_cs_pin;
 	struct rtk_spi_gdma_parameters	dma_params;
+	struct completion txrx_completion;
 	struct spi_trans_tx_buf		tx_info;
 	struct spi_trans_rx_buf		rx_info;
 };
@@ -554,6 +548,4 @@ struct rtk_spi_controller {
 	struct spi_board_info 		rtk_spi_chip;
 	struct rtk_spi_hw_params	spi_param;
 	struct rtk_spi_management	spi_manage;
-	struct spi_transfer 		*current_trans;
 };
-

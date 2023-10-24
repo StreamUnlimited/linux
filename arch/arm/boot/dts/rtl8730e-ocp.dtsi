@@ -222,6 +222,8 @@
 			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <0>;
 			rtk,spi-dma-en = <0>;
+			dmas = <&dma 0>,<&dma 1>;
+			dma-names = "spi0-tx","spi0-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
 			rtk,max-cs-num = <2>;
@@ -242,6 +244,8 @@
 			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <1>;
 			rtk,spi-dma-en = <0>;
+			dmas = <&dma 2>,<&dma 3>;
+			dma-names = "spi1-tx","spi1-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
 			rtk,max-cs-num = <2>;

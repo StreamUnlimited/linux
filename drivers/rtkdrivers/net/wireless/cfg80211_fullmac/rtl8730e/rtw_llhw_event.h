@@ -83,6 +83,7 @@ enum _WIFI_EVENT_INDICATE {
 	WIFI_EVENT_WPA_AP_4WAY_START,
 	WIFI_EVENT_WPA_STA_4WAY_RECV,
 	WIFI_EVENT_WPA_AP_4WAY_RECV,
+	WIFI_EVENT_WPA_SET_PSK_INFO,
 
 	/* csi rx done event */
 	WIFI_EVENT_CSI_DONE,
@@ -178,16 +179,18 @@ typedef void (*rtw_joinstatus_callback_t)(unsigned int join_status, void *user_d
   *        set to 0 means do normal scan on the specified channel or full channel.
   */
 typedef struct rtw_network_info {
-	rtw_ssid_t 		ssid;
+	rtw_ssid_t		ssid;
 	rtw_mac_t		bssid;
 	rtw_security_t		security_type;
-	unsigned char 		*password;
-	int 			password_len;
+	unsigned char		*password;
+	int			password_len;
 	int			key_id;
 	unsigned char		channel;        /**< set to 0 means full channel scan, set to other value means only scan on the specified channel */
 	unsigned char		pscan_option;   /**< used when the specified channel is set, set to 0 for normal partial scan, set to PSCAN_FAST_SURVEY for fast survey*/
+	unsigned char		is_wps_trigger; /**< connection triggered by WPS process**/
 	rtw_joinstatus_callback_t joinstatus_user_callback;   /**< user callback for processing joinstatus, please set to NULL if not use it */
 	rtw_wpa_supp_connect_t	wpa_supp;
+	rtw_mac_t		prev_bssid;
 } rtw_network_info_t;
 
 typedef struct {
@@ -223,9 +226,6 @@ typedef struct raw_data_desc {
 	unsigned char		*buf;          /**< poninter of buf where raw data is stored*/
 	unsigned short		buf_len;      /**< the length of raw data*/
 	unsigned short		flags;        /**< send options*/
-	unsigned char		tx_rate;        /**< specific tx rate, please refer to enum MGN_RATE in wifi_constants.h*/
-	unsigned char		retry_limit;   /**< retry limit configure, when set to 0, will use default retry limit 12*/
-	unsigned int		tx_power;
 } raw_data_desc_t;
 
 struct rtw_crypt_info {
@@ -235,9 +235,35 @@ struct rtw_crypt_info {
 	u16			key_len;
 	u8			key[32];
 	u8			key_idx;
-	u32			cipher;
+	u8			driver_cipher;
 	u8			transition_disable_exist;
 	u8			transition_disable_bitmap;
+};
+
+/**
+ * @brief The enumeration lists the type of pmksa operations.
+ */
+enum  {
+	PMKSA_SET = 0,
+	PMKSA_DEL = 1,
+	PMKSA_FLUSH = 2,
+};
+
+/**
+ * @brief  The structure is pmksa ops.
+ */
+struct rtw_pmksa_ops_t {
+	u8 ops_id;
+	u8 wlan_idx;
+	u8 pmkid[16];
+	u8 mac_addr[6];
+	u8 pmk[32];/*pmksa is maintained in NP when use wpa_lite*/
+};
+
+struct wpa_sae_param_t {
+	unsigned char 		peer_mac[6];
+	unsigned char 		self_mac[6];
+	u8					h2e;
 };
 
 /**
@@ -255,5 +281,34 @@ typedef struct {
 	unsigned int		rx_drop;
 	unsigned int		supported_max_rate;
 } rtw_phy_statistics_t;
+
+#ifdef CONFIG_NAN
+typedef struct {
+	u8 type;
+	u8 service_id[NL80211_NAN_FUNC_SERVICE_ID_LEN];
+	u8 publish_type;
+	bool close_range;
+	bool publish_bcast;
+	bool subscribe_active;
+	u8 followup_id;
+	u8 followup_reqid;
+	struct mac_address followup_dest;
+	u32 ttl;
+	const u8 *serv_spec_info;
+	u8 serv_spec_info_len;
+	bool srf_include;
+	const u8 *srf_bf;
+	u8 srf_bf_len;
+	u8 srf_bf_idx;
+	struct mac_address *srf_macs;
+	int srf_num_macs;
+	struct cfg80211_nan_func_filter *rx_filters;
+	struct cfg80211_nan_func_filter *tx_filters;
+	u8 num_tx_filters;
+	u8 num_rx_filters;
+	u8 instance_id;
+	u64 cookie;
+} rtw_nan_func_info_t;
+#endif
 
 #endif //__RTW_LLHW_EVENT_H__

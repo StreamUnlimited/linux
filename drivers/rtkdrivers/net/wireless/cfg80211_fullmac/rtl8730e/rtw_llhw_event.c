@@ -231,6 +231,52 @@ static void llhw_ipc_event_get_network_info(struct event_priv_t *event_priv, ini
 func_exit:
 	return;
 }
+#ifdef CONFIG_NAN
+static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+{
+	struct device *pdev = NULL;
+	dma_addr_t dma_addr = 0;
+	dma_addr_t dma_ie = 0;
+	u8 type = p_ipc_msg->param_buf[0];
+	u8 inst_id = p_ipc_msg->param_buf[1];
+	u8 peer_inst_id = p_ipc_msg->param_buf[2];
+	unsigned char *mac_addr = phys_to_virt(p_ipc_msg->param_buf[3]);
+	unsigned char *IEs = phys_to_virt(p_ipc_msg->param_buf[4]);
+	u32 info_len = p_ipc_msg->param_buf[5];
+	u64 cookie = p_ipc_msg->param_buf[7] << 32 | p_ipc_msg->param_buf[6];
+
+	if (!global_idev.event_ch) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: event_priv_t is NULL in!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	pdev = global_idev.ipc_dev;
+	if (!pdev) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	dma_addr = dma_map_single(pdev, mac_addr, ETH_ALEN, DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, dma_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		goto func_exit;
+	}
+
+	dma_ie = dma_map_single(pdev, IEs, info_len, DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, dma_ie)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		goto func_exit;
+	}
+
+	cfg80211_nan_handle_sdf(type, inst_id, peer_inst_id, addr, info_len, info, cookie);
+
+	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, dma_ie, info_len, DMA_FROM_DEVICE);
+
+func_exit:
+	return;
+}
+#endif
 
 void llhw_ipc_event_task(unsigned long data)
 {
@@ -296,6 +342,11 @@ void llhw_ipc_event_task(unsigned long data)
 	case IPC_WIFI_EVT_CFG80211_SCAN_REPORT:
 		llhw_ipc_event_scan_report_indicate(event_priv, p_recv_msg);
 		break;
+#ifdef CONFIG_NAN
+	case IPC_WIFI_EVT_CFG80211_NAN_REPORT_MATCH_EVENT:
+		llhw_ipc_event_nan_match_indicate(event_priv, p_recv_msg);
+		break;
+#endif
 	default:
 		dev_err(global_idev.fullmac_dev, "%s: Unknown Device event(%d)!\n\r", "event", p_recv_msg->enevt_id);
 		break;

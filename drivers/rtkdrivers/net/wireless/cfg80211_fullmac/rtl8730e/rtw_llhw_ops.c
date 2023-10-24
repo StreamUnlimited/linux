@@ -53,6 +53,30 @@ void llhw_ipc_wifi_on(void)
 	llhw_ipc_send_msg(IPC_API_WIFI_ON, param_buf, 1);
 }
 
+int llhw_ipc_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
+{
+	dma_addr_t phy_addr;
+	u32 param_buf[3];
+	int ret = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	phy_addr = dma_map_single(pdev, addr, ETH_ALEN, DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, phy_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		return -1;
+	}
+
+	param_buf[0] = wlan_idx;
+	param_buf[1] = (u32)phy_addr;
+	/* Set mac address to ram . */
+	param_buf[2] = 0;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_MAC_ADDR, param_buf, 3);
+	dma_unmap_single(pdev, phy_addr, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
+
+	return ret;
+}
+
 int llhw_ipc_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 {
 	int ret = 0;
@@ -374,13 +398,33 @@ int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 	return ret;
 }
 
-int llhw_ipc_wifi_sae_succ_start_assoc(void)
+int llhw_ipc_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr)
 {
 	int ret = 0;
-	u32 param_buf[1];
+	u32 param_buf[3];
+	dma_addr_t dma_addr_mac_addr = 0;
+	struct device *pdev = global_idev.ipc_dev;
 
-	param_buf[0] = 0;
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SAE_STATUS, param_buf, 1);
+	param_buf[0] = (u32)wlan_idx;
+	param_buf[1] = (u32)status;
+
+	if (mac_addr) {
+		dma_addr_mac_addr = dma_map_single(pdev, mac_addr, 6, DMA_TO_DEVICE);
+		if (dma_mapping_error(pdev, dma_addr_mac_addr)) {
+			dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+			return -1;
+		}
+		param_buf[2] = (u32)dma_addr_mac_addr;
+	} else {
+		param_buf[2] = NULL;
+	}
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_SAE_STATUS, param_buf, 3);
+
+	if (mac_addr) {
+		dma_unmap_single(pdev, dma_addr_mac_addr, 6, DMA_TO_DEVICE);
+	}
+
 	return ret;
 }
 
@@ -452,6 +496,29 @@ int llhw_ipc_wifi_get_statistics(u32 statistic_phy)
 
 	ret = llhw_ipc_send_msg(IPC_API_WIFI_GET_PHY_STATISTIC, param_buf, 1);
 
+	return ret;
+}
+
+int llhw_ipc_wifi_pmksa_ops(u32 pmksa_ops_phy)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)pmksa_ops_phy;
+
+	ret = llhw_ipc_send_msg(IPC_API_WPA_PMKSA_OPS, param_buf, 1);
+
+	return ret;
+}
+
+int llhw_ipc_wifi_set_lps_enable(u8 enable)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)enable;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_LPS_EN, param_buf, 1);
 	return ret;
 }
 
@@ -543,3 +610,89 @@ u64 llhw_wifi_get_tsft(u8 iface_type)
 	return tsft_val;
 }
 
+#ifdef CONFIG_NAN
+int llhw_ipc_wifi_start_nan(u8 master_pref, u8 band_support)
+{
+	int ret = 0;
+	u32 param_buf[2];
+
+	param_buf[0] = (u32)master_pref;
+	param_buf[1] = (u32)band_support;
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_START, param_buf, 2);
+	return ret;
+}
+
+int llhw_ipc_wifi_stop_nan(void)
+{
+	int ret = 0;
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_STOP, NULL, 0);
+	return ret;
+}
+
+int llhw_ipc_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
+{
+	int ret = 0;
+	u32 param_buf[2];
+	dma_addr_t dma_addr_func = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	dma_addr_func = dma_map_single(pdev, func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_addr_func)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		return -1;
+	}
+
+	param_buf[0] = (u32)dma_addr_func;
+	param_buf[1] = (u32)nan_func_pointer;
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_ADD_FUNC, param_buf, 2);
+	dma_unmap_single(pdev, dma_addr_func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
+	return ret;
+}
+
+int llhw_ipc_wifi_del_nan_func(u64 cookie)
+{
+	int ret = 0;
+	u32 param_buf[2];
+
+	param_buf[0] = (u32)(cookie & 0xFFFFFFFF);
+	param_buf[1] = (u32)((cookie >> 32) & 0xFFFFFFFF);
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_DEL_FUNC, param_buf, 2);
+	return ret;
+}
+
+#if NAN_TODO
+int llhw_ipc_cfgvendor_set_nan_srvc_extinfo(const void *data, int len)
+{
+
+}
+
+int llhw_ipc_cfgvendor_set_nan_data_request(const void *data, int len)
+{
+
+}
+
+int llhw_ipc_cfgvendor_set_nan_data_response(const void *data, int len)
+{
+
+}
+
+int llhw_ipc_cfgvendor_set_nan_data_end(const void *data, int len)
+{
+
+}
+
+int llhw_ipc_cfgvendor_set_nan_follow_up(const void *data, int len)
+{
+
+}
+
+int llhw_ipc_cfgvendor_nandow_entry(const void *data, int len)
+{
+
+}
+#endif
+#endif

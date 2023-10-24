@@ -65,7 +65,7 @@ static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
 	}
 	crypt.pairwise = pairwise;
 	crypt.key_idx = key_index;
-	crypt.cipher = params->cipher;
+	crypt.driver_cipher = rtw_80211_cipher_suite_to_driver(params->cipher);
 	if (pairwise && mac_addr) {
 		memcpy(crypt.mac_addr, mac_addr, 6);
 	}
@@ -130,19 +130,92 @@ static int cfg80211_rtw_set_rekey_data(struct wiphy *wiphy, struct net_device *n
 
 static int cfg80211_rtw_set_pmksa(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_pmksa *pmksa)
 {
+	struct rtw_pmksa_ops_t *pmksa_ops_vir = NULL;
+	dma_addr_t		pmksa_ops_phy;
+
 	dev_dbg(global_idev.fullmac_dev, "--- %s ---", __func__);
+
+	pmksa_ops_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy, GFP_KERNEL);
+	if (!pmksa_ops_vir) {
+		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
+		return -ENOMEM;
+	}
+
+	memcpy(pmksa_ops_vir->pmkid, pmksa->pmkid, 16);
+	if (pmksa->pmk) {
+		memcpy(pmksa_ops_vir->pmk, pmksa->pmk, 32);
+	}
+	if (pmksa->bssid) {
+		dev_dbg(global_idev.fullmac_dev, "set [%02x:%02x:%02x:%02x:%02x:%02x] pmksa",
+				*pmksa->bssid, *(pmksa->bssid + 1), *(pmksa->bssid + 2), *(pmksa->bssid + 3), *(pmksa->bssid + 4), *(pmksa->bssid + 5));
+		memcpy(pmksa_ops_vir->mac_addr, pmksa->bssid, 6);
+	}
+
+	pmksa_ops_vir->wlan_idx = rtw_netdev_idx(ndev);
+	pmksa_ops_vir->ops_id = PMKSA_SET;
+	llhw_ipc_wifi_pmksa_ops(pmksa_ops_phy);
+
+	if (pmksa_ops_vir) {
+		dma_free_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
+	}
+
 	return 0;
 }
 
 static int cfg80211_rtw_del_pmksa(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_pmksa *pmksa)
 {
+	struct rtw_pmksa_ops_t	*pmksa_ops_vir = NULL;
+	dma_addr_t		pmksa_ops_phy;
+
 	dev_dbg(global_idev.fullmac_dev, "--- %s ---", __func__);
+
+	pmksa_ops_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy, GFP_KERNEL);
+	if (!pmksa_ops_vir) {
+		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
+		return -ENOMEM;
+	}
+
+	if (pmksa->pmkid) {
+		memcpy(pmksa_ops_vir->pmkid, pmksa->pmkid, 16);
+	}
+	if (pmksa->bssid) {
+		dev_dbg(global_idev.fullmac_dev, "delete [%02x:%02x:%02x:%02x:%02x:%02x] pmksa",
+				*pmksa->bssid, *(pmksa->bssid + 1), *(pmksa->bssid + 2), *(pmksa->bssid + 3), *(pmksa->bssid + 4), *(pmksa->bssid + 5));
+		memcpy(pmksa_ops_vir->mac_addr, pmksa->bssid, 6);
+	}
+
+	pmksa_ops_vir->wlan_idx = rtw_netdev_idx(ndev);
+	pmksa_ops_vir->ops_id = PMKSA_DEL;
+	llhw_ipc_wifi_pmksa_ops(pmksa_ops_phy);
+
+	if (pmksa_ops_vir) {
+		dma_free_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
+	}
+
 	return 0;
 }
 
 static int cfg80211_rtw_flush_pmksa(struct wiphy *wiphy, struct net_device *ndev)
 {
-	dev_dbg(global_idev.fullmac_dev, "--- %s ---!!!! ", __func__);
+	struct rtw_pmksa_ops_t *pmksa_ops_vir = NULL;
+	dma_addr_t		pmksa_ops_phy;
+
+	dev_dbg(global_idev.fullmac_dev, "--- %s --- ", __func__);
+
+	pmksa_ops_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy, GFP_KERNEL);
+	if (!pmksa_ops_vir) {
+		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
+		return -ENOMEM;
+	}
+
+	pmksa_ops_vir->wlan_idx = rtw_netdev_idx(ndev);
+	pmksa_ops_vir->ops_id = PMKSA_FLUSH;
+	llhw_ipc_wifi_pmksa_ops(pmksa_ops_phy);
+
+	if (pmksa_ops_vir) {
+		dma_free_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
+	}
+
 	return 0;
 }
 

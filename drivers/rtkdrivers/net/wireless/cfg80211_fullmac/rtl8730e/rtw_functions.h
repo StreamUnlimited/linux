@@ -33,11 +33,14 @@ int llhw_ipc_wifi_add_key(struct rtw_crypt_info *crypt);
 int llhw_ipc_wifi_set_EDCA_params(unsigned int *AC_param);
 int llhw_ipc_wifi_get_chplan(u8 *chplan);
 int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len);
-int llhw_ipc_wifi_sae_succ_start_assoc(void);
+int llhw_ipc_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr);
+int llhw_ipc_wifi_pmksa_ops(u32 pmksa_ops_phy);
 u32 llhw_ipc_wifi_update_ip_addr_in_wowlan(void);
 int llhw_ipc_wifi_get_statistics(u32 statistic_phy);
+int llhw_ipc_wifi_set_lps_enable(u8 enable);
 int llhw_ipc_wifi_mp_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy);
 int llhw_ipc_wifi_iwpriv_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy);
+int llhw_ipc_wifi_set_mac_addr(u32 wlan_idx, u8 *addr);
 int rtw_ndev_register(void);
 void rtw_ndev_unregister(void);
 void *rtw_get_ethtool_ops(void);
@@ -58,4 +61,11 @@ void llhw_ipc_send_packet(struct inic_ipc_ex_msg *p_ipc_msg);
 int rtw_regd_init(void);
 void rtw_ethtool_ops_init(void);
 
+#ifdef CONFIG_NAN
+void cfg80211_rtw_ops_nan_init(void);
+int llhw_ipc_wifi_start_nan(u8 master_pref, u8 band_support);
+int llhw_ipc_wifi_stop_nan(void);
+int llhw_ipc_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer);
+int llhw_ipc_wifi_del_nan_func(u64 cookie);
+#endif
 #endif // __RTW_FUNCTIONS_H__

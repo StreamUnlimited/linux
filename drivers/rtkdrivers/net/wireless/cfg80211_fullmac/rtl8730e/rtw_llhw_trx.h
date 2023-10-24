@@ -39,6 +39,11 @@ struct  dev_sk_buff_head {
 	unsigned int 		qlen;
 };
 
+struct skb_raw_para {
+	unsigned char enable;
+	unsigned char rate;
+};
+
 struct dev_sk_buff {
 	/* These two members must be first. */
 	struct dev_sk_buff	*next;		/* Next buffer in list */
@@ -55,6 +60,7 @@ struct dev_sk_buff {
 	int 			dyalloc_flag;
 	unsigned char		busy;
 	unsigned char		no_free;
+	struct skb_raw_para		tx_raw;
 };
 
 struct skb_data {

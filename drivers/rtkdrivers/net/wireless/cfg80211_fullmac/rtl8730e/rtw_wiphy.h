@@ -9,6 +9,7 @@
 #define RTW_G_RATES_NUM			12
 #define RTW_A_RATES_NUM			8
 
+/*cipher suite from 802.11-2016 p884*/
 #define WIFI_CIPHER_SUITE_WEP_40	0x000FAC01
 #define WIFI_CIPHER_SUITE_TKIP		0x000FAC02
 #define WIFI_CIPHER_SUITE_CCMP_128	0x000FAC04
@@ -23,6 +24,20 @@
 
 #define WIFI_AKM_SUITE_PSK		0x000FAC02
 #define WIFI_AKM_SUITE_SAE		0x000FAC08
+
+/*self-defined cipher suite used in driver*/
+#define _NO_PRIVACY_		0x0
+#define _WEP40_				0x1
+#define _TKIP_				0x2
+#define _TKIP_WTMIC_		0x3
+#define _AES_				0x4
+#define _WEP104_			0x5
+#define _WEP_WPA_MIXED_		0x07  // WEP + WPA
+#define _SMS4_				0x06
+#define _BIP_				0x8
+#define _GCMP_ 0x07
+#define _GCMP_256_ (_GCMP_ | BIT(3))
+#define _CCMP_256_ (_AES_ | BIT(3))
 
 #define RTW_SSID_SCAN_AMOUNT		1 //LINUX_TODO
 #define RTW_CHANNEL_SCAN_AMOUNT		(14+37)

@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/clk.h>
+#include <linux/pm_wakeirq.h>
 
 #include "realtek-captouch.h"
 
@@ -433,6 +434,11 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 		goto alloc_fail;
 	}
 
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		device_init_wakeup(&pdev->dev, true);
+		dev_pm_set_wake_irq(&pdev->dev, captouch->irq);
+	}
+
 	return 0;
 
 alloc_fail:
@@ -445,6 +451,11 @@ clk_fail:
 static int realtek_captouch_remove(struct platform_device *pdev)
 {
 	struct realtek_captouch_data *captouch = platform_get_drvdata(pdev);
+
+	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+		dev_pm_clear_wake_irq(&pdev->dev);
+		device_init_wakeup(&pdev->dev, false);
+	}
 
 	input_unregister_device(captouch->input);
 	clk_disable_unprepare(captouch->adc_clk);

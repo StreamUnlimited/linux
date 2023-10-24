@@ -321,10 +321,11 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x4200D000 0x400>;
-			realtek,gpio-bank = <0>;
+			rtk,gpio-bank = <0>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_GPIO>;
 		};
 
 		gpiob: gpio@4200D400 {
@@ -332,10 +333,11 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x4200D400 0x400>;
-			realtek,gpio-bank = <1>;
+			rtk,gpio-bank = <1>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_GPIO>;
 		};
 
 		gpioc: gpio@4200D800 {
@@ -343,10 +345,11 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x4200D800 0x400>;
-			realtek,gpio-bank = <2>;
+			rtk,gpio-bank = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_GPIO>;
 		};
 	};
 };

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-
+CONFIG_NAN = n
 obj-$(CONFIG_FULLMAC_RTK_RTL8730E)	+= fullmac-8730e.o
 fullmac-8730e-objs			:= rtw_drv_probe.o \
 					rtw_cfg80211_ops.o \
@@ -8,6 +8,7 @@ fullmac-8730e-objs			:= rtw_drv_probe.o \
 					rtw_ethtool_ops.o \
 					rtw_cfg80211_ops_ap.o \
 					rtw_cfg80211_ops_key.o \
+					rtw_cfg80211_ops_nan.o \
 					rtw_netdev_ops.o \
 					rtw_llhw_ops.o \
 					rtw_llhw_event.o \

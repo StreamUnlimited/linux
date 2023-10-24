@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/mfd/rtk-timer.h>
 #include <misc/realtek-otp-core.h>
 
@@ -272,17 +273,17 @@ static int realtek_adc_read_efuse_caldata(struct iio_dev *indio_dev, u16 otp_add
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
 	otp_ipc_host_req_t otp_req = {0};
 	u16 K_A, K_B, K_C;
-	u8 EfuseBuf[6];
+	u8 EfuseBuf[EFUSE_BUF_LEN];
 	int ret = 0;
 
 	otp_req.otp_id = LINUX_IPC_OTP_PHY_READ8;
 	otp_req.addr = otp_addr;
-	otp_req.len = 6;
+	otp_req.len = EFUSE_BUF_LEN;
 
 	ret = rtk_otp_process(&otp_req, EfuseBuf);
 	if (ret < 0) {
-        adc->k_coeff_normal[0] = adc->k_coeff_normal[1] = adc->k_coeff_normal[2] = 0;
-        adc->k_coeff_vbat[0] = adc->k_coeff_vbat[1] = adc->k_coeff_vbat[2] = 0;
+		adc->k_coeff_normal[0] = adc->k_coeff_normal[1] = adc->k_coeff_normal[2] = 0;
+		adc->k_coeff_vbat[0] = adc->k_coeff_vbat[1] = adc->k_coeff_vbat[2] = 0;
 		dev_err(&indio_dev->dev, "otp read fail\n");
 		return ret;
 	}
@@ -291,43 +292,47 @@ static int realtek_adc_read_efuse_caldata(struct iio_dev *indio_dev, u16 otp_add
 	K_B = EfuseBuf[3] << 8 | EfuseBuf[2];
 	K_C = EfuseBuf[5] << 8 | EfuseBuf[4];
 
-	if (K_A == 0xFFFF)
-        K_A = (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) ? 0xFED9 : 0xFF1C;
+	if (K_A == OTP_CALIB_COEFF_MAX) {
+		K_A = (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) ? OTP_CALIB_NORMAL_ACOEFF_MAX : OTP_CALIB_VBAT_ACOEFF_MAX;
+	}
 
-	if (K_B == 0xFFFF)
-        K_B = (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) ? 0x6D6C : 0xA4D1;
+	if (K_B == OTP_CALIB_COEFF_MAX) {
+		K_B = (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) ? OTP_CALIB_NORMAL_BCOEFF_MAX : OTP_CALIB_VBAT_BCOEFF_MAX;
+	}
 
-	if (K_C == 0xFFFF)
-        K_C = (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) ? 0xFD1D : 0xFD80;
+	if (K_C == OTP_CALIB_COEFF_MAX) {
+		K_C = (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) ? OTP_CALIB_NORMAL_CCOEFF_MAX : OTP_CALIB_VBAT_CCOEFF_MAX;
+	}
 
-    if (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) {
-        /* Normal channels CH0~Ch5 */
-	    adc->k_coeff_normal[0] = (K_A & 0x8000) ? -(0x10000 - K_A) : (K_A & 0x7FFF);
-        adc->k_coeff_normal[1] = (K_B & 0xFFFF);
-        adc->k_coeff_normal[2] = (K_C & 0x8000) ? -(0x10000 - K_C) : (K_C & 0x7FFF);
+	if (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) {
+		/* Normal channels CH0~Ch5 */
+		adc->k_coeff_normal[0] = (K_A & OTP_CALIB_COEFF_SIGN_BIT) ? -((OTP_CALIB_COEFF_MAX + 1) - K_A) : (K_A & (OTP_CALIB_COEFF_SIGN_BIT - 1));
+		adc->k_coeff_normal[1] = (K_B & OTP_CALIB_COEFF_MAX);
+		adc->k_coeff_normal[2] = (K_C & OTP_CALIB_COEFF_SIGN_BIT) ? -((OTP_CALIB_COEFF_MAX + 1) - K_C) : (K_C & (OTP_CALIB_COEFF_SIGN_BIT - 1));
 
-        dev_dbg(&indio_dev->dev, "Calibration params (normal channels) read from OTP: A = %d B = %d C = %d\n",
-                adc->k_coeff_normal[0], adc->k_coeff_normal[1], adc->k_coeff_normal[2]);
-        /*
-         * Offset for differential channel which corresponds to 0V input.
-         * To be read from OTP once calibration OTP params are added for
-         * differential channel mode as well. For now, fixing it to 1650.
-         * Actual input range: -1.65V<->0V<->+1.65V --> ADC range:
-         * 0V<->1.65V<->3.3V.
-         */
-        adc->diff_ch_offset = 1650;
-    } else {
-        /* VBAT chanel 6 */
-	    adc->k_coeff_vbat[0] = (K_A & 0x8000) ? -(0x10000 - K_A) : (K_A & 0x7FFF);
-        adc->k_coeff_vbat[1] = (K_B & 0xFFFF);
-        adc->k_coeff_vbat[2] = (K_C & 0x8000) ? -(0x10000 - K_C) : (K_C & 0x7FFF);
+		dev_dbg(&indio_dev->dev, "Calibration params (normal channels) read from OTP: A = %d B = %d C = %d\n",
+				adc->k_coeff_normal[0], adc->k_coeff_normal[1], adc->k_coeff_normal[2]);
+		/*
+		 * Offset for differential channel which corresponds to 0V input.
+		 * To be read from OTP once calibration OTP params are added for
+		 * differential channel mode as well. For now, fixing it to 1650.
+		 * Actual input range: -1.65V<->0V<->+1.65V --> ADC range:
+		 * 0V<->1.65V<->3.3V.
+		 */
+		adc->diff_ch_offset = ADC_DIFF_CH_DEFAULT_OFFSET;
+	} else {
+		/* VBAT chanel 6 */
+		adc->k_coeff_vbat[0] = (K_A & OTP_CALIB_COEFF_SIGN_BIT) ? -((OTP_CALIB_COEFF_MAX + 1) - K_A) : (K_A & (OTP_CALIB_COEFF_SIGN_BIT - 1));
+		adc->k_coeff_vbat[1] = (K_B & OTP_CALIB_COEFF_MAX);
+		adc->k_coeff_vbat[2] = (K_C & OTP_CALIB_COEFF_SIGN_BIT) ? -((OTP_CALIB_COEFF_MAX + 1) - K_C) : (K_C & (OTP_CALIB_COEFF_SIGN_BIT - 1));
 
-        dev_dbg(&indio_dev->dev, "Calibration params (VBAT channels) read from OTP: A = %d B = %d C = %d\n",
-                adc->k_coeff_vbat[0], adc->k_coeff_vbat[1], adc->k_coeff_vbat[2]);
 
-    }
+		dev_dbg(&indio_dev->dev, "Calibration params (VBAT channels) read from OTP: A = %d B = %d C = %d\n",
+				adc->k_coeff_vbat[0], adc->k_coeff_vbat[1], adc->k_coeff_vbat[2]);
 
-    return 0;
+	}
+
+	return 0;
 }
 
 /**
@@ -341,43 +346,43 @@ static int realtek_adc_read_efuse_caldata(struct iio_dev *indio_dev, u16 otp_add
   */
 static int realtek_adc_find_cal_offset(struct iio_dev *indio_dev, int raw_adc_cnt, int channel_num, bool is_differential)
 {
-    struct realtek_adc_data *adc = iio_priv(indio_dev);
-    int cal_offset = 0;
-    s64 y, tmp;
-    int scale_fraction = 32768;
+	struct realtek_adc_data *adc = iio_priv(indio_dev);
+	int cal_offset = 0;
+	s64 y, tmp = 0;
 
-    if (channel_num == 6) {
-        /* VBAT channel */
-        if (adc->k_coeff_vbat[0] && adc->k_coeff_vbat[1] && adc->k_coeff_vbat[2]) {
-            y = (s64)(((s64)adc->k_coeff_vbat[0] * (s64)raw_adc_cnt * (s64)raw_adc_cnt) / 67108864) +
-                       (s64)(((s64)adc->k_coeff_vbat[1] * (s64)raw_adc_cnt) / 32768) +
-                       (s64)((s64)adc->k_coeff_vbat[2] / 64);
+	if (channel_num == ADC_VBAT_CHANNEL_NUM) {
+		/* VBAT channel */
+		if (adc->k_coeff_vbat[0] && adc->k_coeff_vbat[1] && adc->k_coeff_vbat[2]) {
+			y = (s64)(((s64)adc->k_coeff_vbat[0] * (s64)raw_adc_cnt * (s64)raw_adc_cnt) / OTP_CALIB_ACOEFF_DIVISOR) +
+				(s64)(((s64)adc->k_coeff_vbat[1] * (s64)raw_adc_cnt) / OTP_CALIB_BCOEFF_DIVISOR) +
+				(s64)((s64)adc->k_coeff_vbat[2] / OTP_CALIB_CCOEFF_DIVISOR);
 
-            dev_dbg(&indio_dev->dev, "Channel[%d]: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
-                    channel_num, raw_adc_cnt, y);
+			dev_dbg(&indio_dev->dev, "Channel[%d]: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
+					channel_num, raw_adc_cnt, y);
 
-            tmp = div_s64((s64)adc->k_coeff_vbat[1] * 1000000000LL, 32768);
-        }
-    } else {
-        /* Normal channels */
-        if (adc->k_coeff_normal[0] && adc->k_coeff_normal[1] && adc->k_coeff_normal[2]) {
-            y =  (s64)(((s64)adc->k_coeff_normal[0] * (s64)raw_adc_cnt * (s64)raw_adc_cnt) / 67108864) +
-                        (s64)((s64)adc->k_coeff_normal[1] * (s64)raw_adc_cnt / 32768) +
-                        (s64)((s64)adc->k_coeff_normal[2] / 64);
-            y = is_differential ? (y - adc->diff_ch_offset) : y;
+			tmp = div_s64((s64)adc->k_coeff_vbat[1] * POWER_OF_TEN_MULTIPLIER, OTP_CALIB_BCOEFF_DIVISOR);
+		}
+	} else {
+		/* Normal channels */
+		if (adc->k_coeff_normal[0] && adc->k_coeff_normal[1] && adc->k_coeff_normal[2]) {
+			y = (s64)(((s64)adc->k_coeff_normal[0] * (s64)raw_adc_cnt * (s64)raw_adc_cnt) / OTP_CALIB_ACOEFF_DIVISOR) +
+				(s64)((s64)adc->k_coeff_normal[1] * (s64)raw_adc_cnt / OTP_CALIB_BCOEFF_DIVISOR) +
+				(s64)((s64)adc->k_coeff_normal[2] / OTP_CALIB_CCOEFF_DIVISOR);
+			y = is_differential ? (y - adc->diff_ch_offset) : y;
 
-            dev_dbg(&indio_dev->dev, "Channel[%d]: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
-                    channel_num, raw_adc_cnt, y);
+			dev_dbg(&indio_dev->dev, "Channel[%d]: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
+					channel_num, raw_adc_cnt, y);
 
-            tmp = div_s64((s64)adc->k_coeff_normal[1] * 1000000000LL, 32768);
-        }
-    }
+			tmp = div_s64((s64)adc->k_coeff_normal[1] * POWER_OF_TEN_MULTIPLIER, OTP_CALIB_BCOEFF_DIVISOR);
+		}
+	}
 
-    tmp = div_s64_rem(tmp, 1000000000, &scale_fraction);
-    tmp = div_s64(y * 1000000000LL, scale_fraction);
-    cal_offset = (int)tmp - raw_adc_cnt;
+	if (tmp) {
+		tmp = div_s64(y * POWER_OF_TEN_MULTIPLIER, tmp);
+		cal_offset = (int)tmp - raw_adc_cnt;
+	}
 
-    return cal_offset;
+	return cal_offset;
 }
 
 static int realtek_adc_read_raw(struct iio_dev *indio_dev,
@@ -387,18 +392,18 @@ static int realtek_adc_read_raw(struct iio_dev *indio_dev,
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
 	int ret;
 
-    if (adc->is_calibdata_read == false) {
-        adc->is_calibdata_read = true;
-        if (realtek_adc_read_efuse_caldata(indio_dev, ADC_NORMAL_CH_CAL_OTPADDR)) {
+	if (adc->is_calibdata_read == false) {
+		adc->is_calibdata_read = true;
+		if (realtek_adc_read_efuse_caldata(indio_dev, ADC_NORMAL_CH_CAL_OTPADDR)) {
 			dev_err(&indio_dev->dev, "failed to read calibration data from OTP for normal channels, no calibration supported\n");
-            adc->is_calibdata_read = false;
-        }
+			adc->is_calibdata_read = false;
+		}
 
-        if (realtek_adc_read_efuse_caldata(indio_dev, ADC_VBAT_CH_CAL_OTPADDR)) {
+		if (realtek_adc_read_efuse_caldata(indio_dev, ADC_VBAT_CH_CAL_OTPADDR)) {
 			dev_err(&indio_dev->dev, "failed to read calibration data from OTP for VBAT channel, no calibration supported\n");
-            adc->is_calibdata_read = false;
-        }
-    }
+			adc->is_calibdata_read = false;
+		}
+	}
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
@@ -408,14 +413,15 @@ static int realtek_adc_read_raw(struct iio_dev *indio_dev,
 		}
 		if (chan->type == IIO_VOLTAGE) {
 			ret = realtek_adc_single_read(indio_dev, chan, val);
-            /*
-             * Find out the calibration offset & store it for this channel.
-             * To be returned when IIO_CHAN_INFO_OFFSET is called for this channel.
-             */
-            if (chan->differential)
-                adc->cal_offset[chan->channel] = realtek_adc_find_cal_offset(indio_dev, *val, chan->channel, true);
-            else
-                adc->cal_offset[chan->channel] = realtek_adc_find_cal_offset(indio_dev, *val, chan->channel, false);
+			/*
+			 * Find out the calibration offset & store it for this channel.
+			 * To be returned when IIO_CHAN_INFO_OFFSET is called for this channel.
+			 */
+			if (chan->differential) {
+				adc->cal_offset[chan->channel] = realtek_adc_find_cal_offset(indio_dev, *val, chan->channel, true);
+			} else {
+				adc->cal_offset[chan->channel] = realtek_adc_find_cal_offset(indio_dev, *val, chan->channel, false);
+			}
 		} else {
 			ret = -EINVAL;
 		}
@@ -423,33 +429,34 @@ static int realtek_adc_read_raw(struct iio_dev *indio_dev,
 		return ret;
 
 	case IIO_CHAN_INFO_SCALE:
-        /*
-         * As per the ADC UM, V33 normal channels can also be configured
-         * in single ended bypass mode in which case the input voltage(Vin)
-         * will have a range of 0~0.85V instead of 0~3.3V in the default
-         * single ended divided mode. But this mode selection is made
-         * programmable from captouch registers instead of ADC registers.
-         * This creates a non-std conflict/dependency in ADC & captouch
-         * drivers if user wants to configure bypass mode.
-         * For now, not exposing bypass mode configuration to ADC users
-         * to avoid this conflict.
-         */
-        if (adc->is_calibdata_read == true) {
-            *val = (chan->channel == 6) ? adc->k_coeff_vbat[1] : adc->k_coeff_normal[1];
-            *val2 = 15;
-        } else {
-            *val = (chan->differential) ? 4095 / 2 : ((chan->channel == 6) ? 5000 : 4095);
+		/*
+		 * As per the ADC UM, V33 normal channels can also be configured
+		 * in single ended bypass mode in which case the input voltage(Vin)
+		 * will have a range of 0~0.85V instead of 0~3.3V in the default
+		 * single ended divided mode. But this mode selection is made
+		 * programmable from captouch registers instead of ADC registers.
+		 * This creates a non-std conflict/dependency in ADC & captouch
+		 * drivers if user wants to configure bypass mode.
+		 * For now, not exposing bypass mode configuration to ADC users
+		 * to avoid this conflict.
+		 */
+		if (adc->is_calibdata_read == true) {
+			*val = (chan->channel == ADC_VBAT_CHANNEL_NUM) ? adc->k_coeff_vbat[1] : adc->k_coeff_normal[1];
+			*val2 = OTP_CALIB_BCOEFF_DIV_PWR;
+		} else {
+			*val = (chan->differential) ? ADC_NORMAL_CH_SCALE_FACTOR / 2 : ((chan->channel == ADC_VBAT_CHANNEL_NUM) ? ADC_VBAT_CH_SCALE_FACTOR :
+					ADC_NORMAL_CH_SCALE_FACTOR);
 			*val2 = chan->scan_type.realbits;
-        }
+		}
 
 		return IIO_VAL_FRACTIONAL_LOG2;
 
 	case IIO_CHAN_INFO_OFFSET:
-        /*
-         * Note: offset for any channel is only available if IIO_CHAN_INFO_OFFSET
-         * is called after the IIO_CHAN_INFO_RAW for the same channel. Standard
-         * IIO API calls is get raw adc count --> get offset --> get scale.
-         */
+		/*
+		 * Note: offset for any channel is only available if IIO_CHAN_INFO_OFFSET
+		 * is called after the IIO_CHAN_INFO_RAW for the same channel. Standard
+		 * IIO API calls is get raw adc count --> get offset --> get scale.
+		 */
 		*val = adc->cal_offset[chan->channel];
 		return IIO_VAL_INT;
 
@@ -665,8 +672,8 @@ static void realtek_adc_channel_cfg(struct iio_dev *indio_dev,
 	chan->indexed = 1;
 	chan->info_mask_separate = BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE) | BIT(IIO_CHAN_INFO_OFFSET);
 	chan->scan_type.sign = 'u';
-	chan->scan_type.realbits = 12;
-	chan->scan_type.storagebits = 16;
+	chan->scan_type.realbits = ADC_RESOLUTION_BITS;
+	chan->scan_type.storagebits = ADC_STORAGE_BITS;
 }
 
 static int realtek_adc_init_channel(struct iio_dev *indio_dev)
@@ -734,20 +741,20 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 	}
 
 	for (i = 0; i < num_diff; i++) {
-		if ( ((diff[i].vinp == 0) && (diff[i].vinn == 1)) ||
-             ((diff[i].vinp == 1) && (diff[i].vinn == 0)) ||
-             ((diff[i].vinp == 2) && (diff[i].vinn == 3)) ||
-             ((diff[i].vinp == 3) && (diff[i].vinn == 2)) ||
-             ((diff[i].vinp == 4) && (diff[i].vinn == 5)) ||
-             ((diff[i].vinp == 5) && (diff[i].vinn == 4)) ) {
-            /* We only support differential with predefined channel pairs <0 1> <1 0> <2 3> <3 2> <4 5> <5 4>*/
-            realtek_adc_channel_cfg(indio_dev, &channels[scan_index], diff[i].vinp, diff[i].vinn, scan_index, true);
-            scan_index++;
+		if (((diff[i].vinp == 0) && (diff[i].vinn == 1)) ||
+			((diff[i].vinp == 1) && (diff[i].vinn == 0)) ||
+			((diff[i].vinp == 2) && (diff[i].vinn == 3)) ||
+			((diff[i].vinp == 3) && (diff[i].vinn == 2)) ||
+			((diff[i].vinp == 4) && (diff[i].vinn == 5)) ||
+			((diff[i].vinp == 5) && (diff[i].vinn == 4))) {
+			/* We only support differential with predefined channel pairs <0 1> <1 0> <2 3> <3 2> <4 5> <5 4>*/
+			realtek_adc_channel_cfg(indio_dev, &channels[scan_index], diff[i].vinp, diff[i].vinn, scan_index, true);
+			scan_index++;
 		} else {
-		    dev_err(&indio_dev->dev, "Invalid channel in%d-in%d\n",
+			dev_err(&indio_dev->dev, "Invalid channel in%d-in%d\n",
 					diff[i].vinp, diff[i].vinn);
 			return -EINVAL;
-        }
+		}
 	}
 
 	indio_dev->num_channels = scan_index;
@@ -831,6 +838,7 @@ static int realtek_adc_probe(struct platform_device *pdev)
 	struct realtek_adc_data *adc;
 	int ret;
 	struct resource *res;
+	const struct clk_hw *hwclk;
 
 	if (!pdev->dev.of_node) {
 		return -ENODEV;
@@ -911,11 +919,11 @@ static int realtek_adc_probe(struct platform_device *pdev)
 			return ret;
 		}
 
-        adc->is_calibdata_read = false;
-        adc->k_coeff_normal[0] = adc->k_coeff_normal[1] = adc->k_coeff_normal[2] = 0;
-        adc->k_coeff_vbat[0] = adc->k_coeff_vbat[1] = adc->k_coeff_vbat[2] = 0;
-        memset(adc->cal_offset, 0, sizeof(adc->cal_offset));
-        adc->diff_ch_offset = 0;
+		adc->is_calibdata_read = false;
+		adc->k_coeff_normal[0] = adc->k_coeff_normal[1] = adc->k_coeff_normal[2] = 0;
+		adc->k_coeff_vbat[0] = adc->k_coeff_vbat[1] = adc->k_coeff_vbat[2] = 0;
+		memset(adc->cal_offset, 0, sizeof(adc->cal_offset));
+		adc->diff_ch_offset = 0;
 
 		ret = iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time, &realtek_adc_trigger_handler,
 										 &realtek_adc_buffer_setup_ops);
@@ -939,6 +947,10 @@ static int realtek_adc_probe(struct platform_device *pdev)
 			goto err_dev_register;
 		}
 	}
+	adc->clk_sl = clk_get_parent(adc->adc_clk);
+	hwclk = __clk_get_hw(adc->clk_sl);
+	adc->adc_parent_ls_apb = clk_hw_get_parent_by_index(hwclk, 0)->clk;
+	adc->adc_parent_osc_2m = clk_hw_get_parent_by_index(hwclk, 1)->clk;
 
 	return 0;
 

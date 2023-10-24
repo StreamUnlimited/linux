@@ -15,6 +15,9 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
+#include <linux/suspend.h>
+#include <linux/clk-provider.h>
 #include "realtek-gpio.h"
 
 #define REALTEK_GPIO_PINS_PER_BANK 32
@@ -31,10 +34,15 @@ struct realtek_gpio_bank {
 	struct gpio_chip gpio_chip;
 	struct irq_chip irq_chip;
 	struct clk *clk;
+	struct clk *clk_sl;
+	struct clk *parent_ls_apb;
+	struct clk *parent_sdm32k;
 	int irq;
 	struct irq_domain *domain;
 	spinlock_t lock;
 };
+
+extern suspend_state_t pm_suspend_target_state;
 
 static inline int realtek_gpio_pin(int gpio)
 {
@@ -89,14 +97,21 @@ static void realtek_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 static int realtek_gpio_set_config(struct gpio_chip *chip, unsigned offset, unsigned long config)
 {
 	struct realtek_gpio_bank *bank = gpiochip_get_data(chip);
+	u32 reg_value;
 	u32 arg = (pinconf_to_config_argument(config) & 0x0000007F);
 	unsigned long flags;
 
-	spin_lock_irqsave(&bank->lock, flags);
+	if (pinconf_to_config_param(config) == PIN_CONFIG_INPUT_DEBOUNCE) {
+		spin_lock_irqsave(&bank->lock, flags);
 
-	writel(arg, bank->reg_base + GPIO_DB_DIV_CONFIG);
+		reg_value = readl(bank->reg_base + GPIO_DEBOUNCE);
+		reg_value |= BIT(offset);
+		writel(reg_value, bank->reg_base + GPIO_DEBOUNCE);
 
-	spin_unlock_irqrestore(&bank->lock, flags);
+		writel(arg, bank->reg_base + GPIO_DB_DIV_CONFIG);
+
+		spin_unlock_irqrestore(&bank->lock, flags);
+	}
 
 	return 0;
 }
@@ -301,6 +316,19 @@ static int realtek_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int	realtek_gpio_irq_set_wake(struct irq_data *data, unsigned int on)
+{
+	struct realtek_gpio_bank *bank = irq_data_get_irq_chip_data(data);
+
+	irq_set_irq_wake(bank->irq, on);
+
+	return 0;
+}
+#else
+#define realtek_gpio_irq_set_wake NULL
+#endif
+
 static void realtek_gpio_irq_handler(struct irq_desc *desc)
 {
 	struct realtek_gpio_bank *bank = irq_desc_get_handler_data(desc);
@@ -363,6 +391,7 @@ static const struct irq_domain_ops realtek_gpio_irq_domain_ops = {
 			.irq_mask = realtek_gpio_irq_mask,		\
 			.irq_unmask = realtek_gpio_irq_unmask,		\
 			.irq_set_type = realtek_gpio_irq_set_type,	\
+			.irq_set_wake = realtek_gpio_irq_set_wake,	\
 		},							\
 	}
 
@@ -380,8 +409,9 @@ int realtek_gpio_probe(struct platform_device *pdev)
 	int ret;
 	struct resource *res;
 	int i;
+	const struct clk_hw *hwclk;
 
-	if (of_property_read_u32(np, "realtek,gpio-bank", &id)) {
+	if (of_property_read_u32(np, "rtk,gpio-bank", &id)) {
 		dev_err(&pdev->dev, "realtek,gpio-bank property not found\n");
 		return -EINVAL;
 	}
@@ -432,8 +462,51 @@ int realtek_gpio_probe(struct platform_device *pdev)
 
 	irq_set_chained_handler_and_data(bank->irq, realtek_gpio_irq_handler, bank);
 
+	bank->clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(bank->clk)) {
+		ret =  PTR_ERR(bank->clk);
+		dev_err(&pdev->dev, "Fail to get rcc clk: %d\n", ret);
+		return ret;
+	}
+
+	bank->clk_sl = clk_get_parent(bank->clk);
+	hwclk = __clk_get_hw(bank->clk_sl);
+	bank->parent_ls_apb = clk_hw_get_parent_by_index(hwclk, 0)->clk;
+	bank->parent_sdm32k = clk_hw_get_parent_by_index(hwclk, 1)->clk;
+
+	platform_set_drvdata(pdev, bank);
+
 	return 0;
 }
+
+
+static int realtek_gpio_suspend(struct device *dev)
+{
+	struct realtek_gpio_bank *bank = (struct realtek_gpio_bank *) dev->driver_data;
+
+	/* For sleep type CG/PG, GPIO clock need to switch from LS APB to SDM32K when suspend. */
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		clk_set_parent(bank->clk_sl, bank->parent_sdm32k);
+	}
+	return 0;
+}
+
+static int realtek_gpio_resume(struct device *dev)
+{
+	struct realtek_gpio_bank *bank = (struct realtek_gpio_bank *) dev->driver_data;
+
+	/* For sleep type CG/PG, GPIO clock need to switch from SDM32K to LS APB when resume. */
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		clk_set_parent(bank->clk_sl, bank->parent_ls_apb);
+	}
+	return 0;
+}
+
+
+static const struct dev_pm_ops realtek_amebad2_gpio_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(realtek_gpio_suspend, realtek_gpio_resume)
+};
+
 
 static const struct of_device_id realtek_amebad2_gpio_of_match[] = {
 	{ .compatible = "realtek,amebad2-gpio", },
@@ -444,6 +517,7 @@ static struct platform_driver realtek_amebad2_gpio_driver = {
 	.driver = {
 		.name = "realtek-amebad2-gpio",
 		.of_match_table = realtek_amebad2_gpio_of_match,
+		.pm = &realtek_amebad2_gpio_pm_ops,
 	},
 	.probe = realtek_gpio_probe,
 };

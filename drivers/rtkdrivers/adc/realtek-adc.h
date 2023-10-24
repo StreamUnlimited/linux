@@ -188,8 +188,33 @@
 #define ADC_COMP_ASSIST_MODE			(0x03)	/*!< ADC comparator-assist mode */
 
 /* ADC calibration data addresses in OTP */
-#define ADC_NORMAL_CH_CAL_OTPADDR   0x704
-#define ADC_VBAT_CH_CAL_OTPADDR     0x70A
+#define ADC_NORMAL_CH_CAL_OTPADDR   	0x704
+#define ADC_VBAT_CH_CAL_OTPADDR     	0x70A
+#define EFUSE_BUF_LEN					6
+
+/* OTP Calibration offsets macros */
+#define OTP_CALIB_COEFF_MAX				0xFFFF
+#define OTP_CALIB_NORMAL_ACOEFF_MAX		0xFED9
+#define OTP_CALIB_VBAT_ACOEFF_MAX		0xFF1C
+#define OTP_CALIB_ACOEFF_DIV_PWR		26
+#define OTP_CALIB_ACOEFF_DIVISOR		BIT(OTP_CALIB_ACOEFF_DIV_PWR)
+#define OTP_CALIB_NORMAL_BCOEFF_MAX		0x6D6C
+#define OTP_CALIB_VBAT_BCOEFF_MAX		0xA4D1
+#define OTP_CALIB_BCOEFF_DIV_PWR		15
+#define OTP_CALIB_BCOEFF_DIVISOR		BIT(OTP_CALIB_BCOEFF_DIV_PWR)
+#define OTP_CALIB_NORMAL_CCOEFF_MAX		0xFD1D
+#define OTP_CALIB_VBAT_CCOEFF_MAX		0xFD80
+#define OTP_CALIB_CCOEFF_DIV_PWR		6
+#define OTP_CALIB_CCOEFF_DIVISOR		BIT(OTP_CALIB_CCOEFF_DIV_PWR)
+#define OTP_CALIB_COEFF_SIGN_BIT		0x8000
+#define ADC_DIFF_CH_DEFAULT_OFFSET		1650
+#define ADC_VBAT_CHANNEL_NUM			6
+#define POWER_OF_TEN_MULTIPLIER			1000000000LL
+#define ADC_RESOLUTION_BITS				12
+#define ADC_STORAGE_BITS				16
+#define ADC_NORMAL_CH_SCALE_FACTOR		GENMASK((ADC_RESOLUTION_BITS - 1),0)
+#define ADC_VBAT_CH_SCALE_FACTOR		5000
+
 
 /**
  * struct realtek_adc_info - ADC config data
@@ -251,12 +276,16 @@ struct realtek_adc_data {
 	u32 buf_index;
 	u32 num_conv;
 	struct clk *adc_clk;
+	struct clk *adc_parent_ls_apb;
+	struct clk *adc_parent_osc_2m;
+	struct clk *clk_sl;
+
 	struct clk *ctc_clk;
-    int k_coeff_normal[3];
-    int k_coeff_vbat[3];
-    int cal_offset[7];
-    int diff_ch_offset;
-    bool is_calibdata_read;
+	int k_coeff_normal[3];
+	int k_coeff_vbat[3];
+	int cal_offset[7];
+	int diff_ch_offset;
+	bool is_calibdata_read;
 };
 
 extern void realtek_adc_cmd(struct realtek_adc_data *adc, bool state);

@@ -216,14 +216,18 @@ int rtw_wiphy_init(void)
 	cfg80211_rtw_ops_sta_init();
 	cfg80211_rtw_ops_ap_init();
 	cfg80211_rtw_ops_key_init();
-
+#ifdef CONFIG_NAN
+	cfg80211_rtw_ops_nan_init();
+#endif
 	pwiphy = wiphy_new(&global_idev.rtw_cfg80211_ops, 0);
 	if (!pwiphy) {
 		return ret;
 	}
 	global_idev.pwiphy_global = pwiphy;
 	set_wiphy_dev(pwiphy, global_idev.fullmac_dev);
-
+#ifdef CONFIG_NAN
+	rtw_cfgvendor_attach(pwiphy);
+#endif
 	ret = rtw_wiphy_init_params(pwiphy);
 	if (ret != true) {
 		goto wiphy_fail;
@@ -248,6 +252,10 @@ wiphy_fail:
 
 void rtw_wiphy_deinit(void)
 {
+#ifdef CONFIG_NAN
+	rtw_cfgvendor_detach(global_idev.pwiphy_global);
+#endif
+
 	if (global_idev.pwiphy_global->bands[NL80211_BAND_2GHZ]) {
 		kfree(global_idev.pwiphy_global->bands[NL80211_BAND_2GHZ]);
 		global_idev.pwiphy_global->bands[NL80211_BAND_2GHZ] = NULL;

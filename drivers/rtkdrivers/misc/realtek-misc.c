@@ -20,9 +20,12 @@
 #include <linux/of_address.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
+#include <linux/seq_file.h>
+#include <linux/proc_fs.h>
 #include <misc/realtek-misc.h>
 
 static int realtek_misc_major;
+static struct proc_dir_entry *rl_version_proc_ent;
 struct mutex misc_mutex;
 
 struct realtek_misc_dev {
@@ -255,6 +258,26 @@ static long realtek_misc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 	return ret;
 }
 
+static int realtek_proc_show(struct seq_file *m, void *v)
+{
+	int val = rtk_misc_get_rl_version();
+	seq_printf(m, "%d\n", val);
+
+	return 0;
+}
+
+static int realtek_proc_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, realtek_proc_show, NULL);
+}
+
+static const struct file_operations realtek_misc_proc_fops = {
+	.open = realtek_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static const struct file_operations realtek_misc_fops = {
 	.owner = THIS_MODULE,
 	.open = realtek_misc_open,
@@ -283,6 +306,7 @@ int realtek_misc_init(void)
 	struct device_node *np;
 	void __iomem *base;
 	struct class *realtek_misc_class;
+	struct proc_dir_entry *realtek_misc_proc_dir;
 
 	ret = alloc_chrdev_region(&devno, 0, 1, "misc-ioctl");
 	if (ret < 0) {
@@ -319,6 +343,14 @@ int realtek_misc_init(void)
 	device_create(realtek_misc_class, NULL, MKDEV(realtek_misc_major, 0), NULL, "misc-ioctl");
 	mutex_init(&misc_mutex);
 
+	realtek_misc_proc_dir = proc_mkdir("realtek", NULL);
+	if (!realtek_misc_proc_dir) {
+		pr_err("%s: Fail to mkdir for procsys\n", __FUNCTION__);
+		goto fail_iomap;
+	}
+
+	rl_version_proc_ent = proc_create("rl_version", 0644, realtek_misc_proc_dir, &realtek_misc_proc_fops);
+
 	return 0;
 	
 fail_iomap:
@@ -334,6 +366,8 @@ fail_malloc:
 
 void realtek_misc_exit(void)
 {
+	proc_remove(rl_version_proc_ent);
+
 	if (realtek_misc_devp != NULL) {
 		iounmap(realtek_misc_devp->base);
 		cdev_del(&realtek_misc_devp->cdev);

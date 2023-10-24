@@ -58,6 +58,18 @@ void rtk_spi_reg_update(
 	rtk_spi_writel(ptr, reg, temp);
 }
 
+void rtk_spi_interrupt_config(
+	struct rtk_spi_controller *rtk_spi, u32 spi_int, u32 new_state)
+{
+	if (new_state == ENABLE) {
+		/* Enable the selected SSI interrupts */
+		rtk_spi_reg_update(rtk_spi->base, SPI_IMR, spi_int, spi_int);
+	} else {
+		/* Disable the selected SSI interrupts */
+		rtk_spi_reg_update(rtk_spi->base, SPI_IMR, spi_int, ~spi_int);
+	}
+}
+
 #if RTK_SPI_REG_DUMP
 void rtk_spi_reg_dump(struct rtk_spi_controller *rtk_spi)
 {
@@ -121,7 +133,6 @@ void rtk_spi_struct_init(
 	enum of_gpio_flags flags;
 
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.dma_params.spi_phy_addr, 0, s0);
-
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.spi_default_cs, 0, s1);
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.is_slave, 0, s2);
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.max_cs_num, 0xFFFF, s3);
@@ -147,33 +158,39 @@ void rtk_spi_struct_init(
 	rtk_spi->spi_param.sclk_phase = SCPH_TOGGLES_IN_MIDDLE;
 	rtk_spi->spi_param.sclk_polarity = SCPOL_INACTIVE_IS_LOW;
 
-	rtk_spi->spi_manage.spi_prepared = SPI_NOT_SETUP;
-	rtk_spi->spi_manage.dma_params.gdma_status = RTK_SPI_GDMA_UNPREPARED;
+	rtk_spi->spi_manage.dma_params.rx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
+	rtk_spi->spi_manage.dma_params.tx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
 
-	rtk_spi->spi_manage.spi_cs_pin = of_get_named_gpio_flags(np, "rtk,spi-cs-gpios", 0, &flags);
-	ret = gpio_request(rtk_spi->spi_manage.spi_cs_pin, NULL);
-	if (ret != 0) {
-		dev_err(rtk_spi->dev, "Fail to request spi cs pin\n");
-		goto fail;
+	if (!rtk_spi->spi_manage.is_slave) {
+		rtk_spi->spi_manage.spi_cs_pin = of_get_named_gpio_flags(np, "rtk,spi-cs-gpios", 0, &flags);
+		ret = gpio_request(rtk_spi->spi_manage.spi_cs_pin, NULL);
+		if (ret != 0) {
+			dev_err(rtk_spi->dev, "Fail to request spi cs pin\n");
+			goto fail;
+		}
+
+		ret = gpio_direction_output(rtk_spi->spi_manage.spi_cs_pin, 1);
+		if (IS_ERR_VALUE(ret)) {
+			dev_err(rtk_spi->dev, "Fail to request spi cs to output direction\n");
+			goto fail;
+		}
+
+		gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 1);
 	}
 
-	ret = gpio_direction_output(rtk_spi->spi_manage.spi_cs_pin, 0);
-	if (IS_ERR_VALUE(ret)) {
-		dev_err(rtk_spi->dev, "Fail to request spi cs to output direction\n");
-		goto fail;
-	}
+	rtk_spi->spi_manage.dma_params.rx_chan = NULL;
+	rtk_spi->spi_manage.dma_params.tx_chan = NULL;
+	rtk_spi->spi_manage.dma_params.rx_config = NULL;
+	rtk_spi->spi_manage.dma_params.tx_config = NULL;
+	init_completion(&rtk_spi->spi_manage.dma_params.dma_rx_completion);
+	init_completion(&rtk_spi->spi_manage.dma_params.dma_tx_completion);
+	init_completion(&rtk_spi->spi_manage.txrx_completion);
 
-	gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 1);
+	rtk_spi->spi_manage.dma_params.rx_dma_addr = 0;
+	rtk_spi->spi_manage.dma_params.tx_dma_addr = 0;
 
-	if (rtk_spi->spi_manage.dma_enabled) {
-		rtk_spi->spi_manage.dma_params.chan = NULL;
-		rtk_spi->spi_manage.dma_params.config = NULL;
-		mutex_init(&rtk_spi->spi_manage.dma_params.dma_lock);
-	}
-
-#if RTK_SPI_DMA_HELP
-	rtk_spi->spi_manage.dma_params.help_dma_addr = 0;
-#endif // RTK_SPI_DMA_HELP
+	/* disable all interrupts */
+	rtk_spi_interrupt_config(rtk_spi, 0xFF, DISABLE);
 
 fail:
 	gpio_free(rtk_spi->spi_manage.spi_cs_pin);
@@ -206,14 +223,6 @@ u32 rtk_spi_busy_check(
 void rtk_spi_set_slave_enable(
 	struct rtk_spi_controller *rtk_spi, u32 slave_index)
 {
-	if (rtk_spi_busy_check(rtk_spi)) {
-		dev_dbg(rtk_spi->dev, "SPI-%d is busy\n", rtk_spi->spi_manage.spi_index);
-		if (rtk_spi->spi_manage.current_direction != RTK_SPI_TRX) {
-			return;
-		}
-		dev_dbg(rtk_spi->dev, "but continue loopback test.");
-	}
-
 	rtk_spi_writel(rtk_spi->base, SPI_SER, 1 << slave_index);
 }
 
@@ -343,28 +352,13 @@ void rtk_spi_init_hw(struct rtk_spi_controller *rtk_spi)
 	rtk_spi_writel(rtk_spi->base, SPI_IMR, rtk_spi->spi_param.interrupt_mask);
 
 	/*DMA level set */
-	if (rtk_spi->spi_manage.dma_enabled) {
-		rtk_spi_set_dma_level(rtk_spi, rtk_spi->spi_param.dma_tx_data_level, rtk_spi->spi_param.dma_rx_data_level);
-	}
+	rtk_spi_set_dma_level(rtk_spi, rtk_spi->spi_param.dma_tx_data_level, rtk_spi->spi_param.dma_rx_data_level);
 
 	rtk_spi_enable_cmd(rtk_spi, ENABLE);
 
 	rtk_spi_set_clk_polarity(rtk_spi, rtk_spi->spi_param.sclk_polarity);
 	rtk_spi_set_clk_phase(rtk_spi, rtk_spi->spi_param.sclk_phase);
 	rtk_spi_set_baud_div(rtk_spi, rtk_spi->spi_param.clock_divider);
-
-}
-
-void rtk_spi_interrupt_config(
-	struct rtk_spi_controller *rtk_spi, u32 spi_int, u32 new_state)
-{
-	if (new_state == ENABLE) {
-		/* Enable the selected SSI interrupts */
-		rtk_spi_reg_update(rtk_spi->base, SPI_IMR, spi_int, spi_int);
-	} else {
-		/* Disable the selected SSI interrupts */
-		rtk_spi_reg_update(rtk_spi->base, SPI_IMR, spi_int, ~spi_int);
-	}
 }
 
 void rtk_spi_clean_interrupt(
@@ -397,7 +391,6 @@ void rtk_spi_clean_interrupt(
 		/* For slave only. This register is used as SSRICR in slave mode*/
 		rtk_spi_readl(rtk_spi->base, SPI_SSRICR);
 	}
-
 }
 
 void rtk_spi_write_data(
@@ -447,10 +440,7 @@ u32 rtk_spi_get_tx_cnt(
 u32 rtk_spi_get_data_frame_size(
 	struct rtk_spi_controller *rtk_spi)
 {
-
-	u32 size;
-	size = (rtk_spi_readl(rtk_spi->base, SPI_CTRLR0) & SPI_MASK_DFS) + 1;
-	return size;
+	return ((rtk_spi_readl(rtk_spi->base, SPI_CTRLR0) & SPI_MASK_DFS) + 1);
 }
 
 void rtk_spi_set_sample_delay(
@@ -517,15 +507,39 @@ u32 rtk_spi_get_writeable(
 	u8 status = 0;
 	u32 value = 0;
 
-#ifdef SPI_SLAVE_TXERR_WORK_AROUND
-	value = rtk_spi_get_tx_cnt(rtk_spi);
-	status = ((value < SSI_TX_FIFO_DEPTH - 1) ? 1 : 0);
-#else
 	value = rtk_spi_get_status(rtk_spi);
 	status = (((value & SPI_BIT_TFNF) != 0) ? 1 : 0);
-#endif
 
 	return status;
+}
+
+static int rtk_spi_wait_for_completion(struct spi_controller *controller,
+									   struct spi_transfer *transfer)
+{
+	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
+	unsigned long long ms = 1;
+
+	if (rtk_spi->spi_manage.is_slave) {
+		if (wait_for_completion_interruptible(&rtk_spi->spi_manage.txrx_completion)) {
+			dev_err(rtk_spi->dev, "wait for slave transfer interrupted\n");
+			return -EINTR;
+		}
+	} else {
+		ms = SPI_SHIFT_WAIT_MSECS * transfer->len;
+		do_div(ms, transfer->speed_hz);
+		ms += ms + SPI_WAIT_TOLERANCE; /* some tolerance */
+
+		if (ms > UINT_MAX) {
+			ms = UINT_MAX;
+		}
+
+		if (!wait_for_completion_timeout(&rtk_spi->spi_manage.txrx_completion, msecs_to_jiffies(ms))) {
+			dev_err(rtk_spi->dev, "wait for master transfer completion timeout\n");
+			return -ETIMEDOUT;
+		}
+	}
+
+	return 0;
 }
 
 void rtk_spi_status_switch(
@@ -537,16 +551,18 @@ void rtk_spi_status_switch(
 		if (rtk_spi->spi_manage.transfer_status == RTK_SPI_ONGOING) {
 			rtk_spi->spi_manage.transfer_status = RTK_SPI_RX_DONE;
 		}
-		if ((rtk_spi->spi_manage.transfer_status == RTK_SPI_TX_DONE) && (rtk_spi->spi_manage.current_direction == RTK_SPI_TRX)) {
-			rtk_spi->spi_manage.transfer_status = RTK_SPI_TRX_DONE;
+
+		if (rtk_spi->spi_manage.transfer_status == RTK_SPI_TX_DONE) {
+			rtk_spi->spi_manage.transfer_status = RTK_SPI_FULL_DUPLEX_DONE;
 		}
 		break;
 	case RTK_SPI_TX_DONE:
 		if (rtk_spi->spi_manage.transfer_status == RTK_SPI_ONGOING) {
 			rtk_spi->spi_manage.transfer_status = RTK_SPI_TX_DONE;
 		}
-		if ((rtk_spi->spi_manage.transfer_status == RTK_SPI_RX_DONE) && (rtk_spi->spi_manage.current_direction == RTK_SPI_TRX)) {
-			rtk_spi->spi_manage.transfer_status = RTK_SPI_TRX_DONE;
+
+		if (rtk_spi->spi_manage.transfer_status == RTK_SPI_RX_DONE) {
+			rtk_spi->spi_manage.transfer_status = RTK_SPI_FULL_DUPLEX_DONE;
 		}
 		break;
 	default:
@@ -567,7 +583,6 @@ u32 rtk_spi_receive_data(
 	u32 readable = rtk_spi_get_readable(rtk_spi);
 	u32 left_data = length;
 
-
 	while (readable) {
 		receive_level = rtk_spi_get_rx_cnt(rtk_spi);
 		dev_dbg(rtk_spi->dev, "rx level = %d", receive_level);
@@ -583,9 +598,6 @@ u32 rtk_spi_receive_data(
 					*((u8 *)(rx_data)) = (u8)rtk_spi_read_data(rtk_spi);
 					rx_data = (void *)(((u8 *)rx_data) + 1);
 				}
-			} else {
-				/*  for Master mode, doing TX also will got RX data, so drop the dummy data */
-				rtk_spi_read_data(rtk_spi);
 			}
 
 			if (left_data > 0) {
@@ -603,10 +615,12 @@ u32 rtk_spi_receive_data(
 		readable = rtk_spi_get_readable(rtk_spi);
 	}
 
-	if (left_data > RTK_SPI_FIFO_HALF) {
-		rtk_spi_set_rx_fifo_level(rtk_spi, RTK_SPI_FIFO_HALF);
-	} else if (left_data) {
-		rtk_spi_set_rx_fifo_level(rtk_spi, left_data - 1);
+	if (left_data) {
+		if (left_data <= RTK_SPI_FIFO_ALL) {
+			rtk_spi_set_rx_fifo_level(rtk_spi, left_data - 1);
+		} else {
+			rtk_spi_set_rx_fifo_level(rtk_spi, RTK_SPI_FIFO_ALL - 1);
+		}
 	}
 
 	return (length - left_data);
@@ -623,50 +637,36 @@ u32 rtk_spi_send_data(
 	u32 data_frame_size = rtk_spi_get_data_frame_size(rtk_spi);
 	u32 tx_length = length;
 
-#ifdef SPI_SLAVE_TXERR_WORK_AROUND
-	if (is_slave) {
-		tx_write_max = (tx_write_max > 0) ? (tx_write_max - 1) : 0;
-	}
-#endif
-
 	if (writeable) {
-		/* Disable Tx FIFO Empty IRQ */
-		rtk_spi_interrupt_config(rtk_spi, SPI_BIT_TXEIM, DISABLE);
-
 		while (tx_write_max--) {
 			if (data_frame_size > 8) {
 				// 16~9 bits mode
 				if (tx_data != NULL) {
 					rtk_spi_write_data(rtk_spi, *((u16 *)(tx_data)));
 					tx_data = (void *)(((u16 *)tx_data) + 1);
-				} else {
-					// For master mode: Push a dummy to TX FIFO for Read
-					if (!is_slave) {
-						rtk_spi_write_data(rtk_spi, (u16)0);// Dummy byte
-					}
 				}
 			} else {
 				// 8~4 bits mode
 				if (tx_data != NULL) {
 					rtk_spi_write_data(rtk_spi, *((u8 *)(tx_data)));
 					tx_data = (void *)(((u8 *)tx_data) + 1);
-				} else {
-					// For master mode: Push a dummy to TX FIFO for Read
-					if (!is_slave) {
-						rtk_spi_write_data(rtk_spi, (u8)0);// Dummy byte
-					}
 				}
 			}
 
-			tx_length--;
-
-			if (tx_length == 0) {
+			if (tx_length) {
+				tx_length--;
+			} else {
 				break;
 			}
 		}
+	}
 
-		/* Enable Tx FIFO Empty IRQ */
-		rtk_spi_interrupt_config(rtk_spi, SPI_BIT_TXEIM, ENABLE);
+	if (tx_length) {
+		if (tx_length < RTK_SPI_FIFO_ALL) {
+			rtk_spi_set_tx_fifo_level(rtk_spi, tx_length);
+		} else {
+			rtk_spi_set_tx_fifo_level(rtk_spi, RTK_SPI_FIFO_ALL - 1);
+		}
 	}
 
 	return (length - tx_length);
@@ -689,6 +689,13 @@ static irqreturn_t rtk_spi_interrupt_handler(int irq, void *dev_id)
 	if (int_status & SPI_BIT_SSRIS) {
 		dev_dbg(rtk_spi->dev, "[INT] SS_N Rising Edge Detect %x \n", int_status);
 		rtk_spi_interrupt_config(rtk_spi, SPI_BIT_SSRIM, DISABLE);
+		if (rtk_spi->spi_manage.is_slave) {
+			if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
+				complete(&rtk_spi->spi_manage.txrx_completion);
+			}
+
+			return IRQ_HANDLED;
+		}
 	}
 
 	if (int_status & SPI_BIT_MSTIS_FAEIS) {
@@ -697,6 +704,7 @@ static irqreturn_t rtk_spi_interrupt_handler(int irq, void *dev_id)
 
 	if ((int_status & SPI_BIT_RXFIS)) {
 
+		rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_RXFIM | SPI_BIT_RXOIM | SPI_BIT_RXUIM), DISABLE);
 		trans_len = rtk_spi_receive_data(rtk_spi, rtk_spi->spi_manage.rx_info.p_data_buf, rtk_spi->spi_manage.rx_info.data_len);
 		rtk_spi->spi_manage.rx_info.data_len -= trans_len;
 		if (data_frame_size > 8) {
@@ -707,43 +715,43 @@ static irqreturn_t rtk_spi_interrupt_handler(int irq, void *dev_id)
 			rtk_spi->spi_manage.rx_info.p_data_buf = (void *)(((u8 *)rtk_spi->spi_manage.rx_info.p_data_buf) + trans_len);
 		}
 
-		if (rtk_spi->spi_manage.rx_info.data_len == 0) {
-			rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_RXFIM | SPI_BIT_RXOIM | SPI_BIT_RXUIM), DISABLE);
+		if (!rtk_spi->spi_manage.rx_info.data_len) {
 			rtk_spi_status_switch(rtk_spi, RTK_SPI_RX_DONE);
-			spi_finalize_current_transfer(rtk_spi->controller);
+			if (rtk_spi->spi_manage.transfer_status == RTK_SPI_FULL_DUPLEX_DONE) {
+				complete(&rtk_spi->spi_manage.txrx_completion);
+			}
+		} else {
+			rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_RXFIM | SPI_BIT_RXOIM | SPI_BIT_RXUIM | SPI_BIT_SSRIS), ENABLE);
 		}
 	}
 
 	if (int_status & SPI_BIT_TXEIS) {
 
-		u32 trans_len = 0;
-		dev_dbg(rtk_spi->dev, "[INT] Tx Empty %x \n", int_status);
-
-		trans_len = rtk_spi_send_data(rtk_spi, rtk_spi->spi_manage.tx_info.p_data_buf, rtk_spi->spi_manage.tx_info.data_len, rtk_spi->spi_manage.is_slave);
-
-		rtk_spi->spi_manage.tx_info.data_len -= trans_len;
-		if (data_frame_size > 8) {
-			// 16~9 bits mode
-			rtk_spi->spi_manage.tx_info.p_data_buf = (void *)(((u16 *)rtk_spi->spi_manage.tx_info.p_data_buf) + trans_len);
-		} else {
-			// 8~4 bits mode
-			rtk_spi->spi_manage.tx_info.p_data_buf = (void *)(((u8 *)rtk_spi->spi_manage.tx_info.p_data_buf) + trans_len);
-		}
-
+		rtk_spi_interrupt_config(rtk_spi, SPI_BIT_TXEIM, DISABLE);
 		if (!rtk_spi->spi_manage.tx_info.data_len) {
-			rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_TXOIM | SPI_BIT_TXEIM), DISABLE);
 			rtk_spi_status_switch(rtk_spi, RTK_SPI_TX_DONE);
-			if (rtk_spi->spi_manage.current_direction != RTK_SPI_TRX) {
-				while(rtk_spi_busy_check(rtk_spi) == 1);
-				spi_finalize_current_transfer(rtk_spi->controller);
+			if (rtk_spi->spi_manage.transfer_status == RTK_SPI_FULL_DUPLEX_DONE) {
+				complete(&rtk_spi->spi_manage.txrx_completion);
 			}
+		} else {
+			trans_len = rtk_spi_send_data(rtk_spi, rtk_spi->spi_manage.tx_info.p_data_buf, rtk_spi->spi_manage.tx_info.data_len, rtk_spi->spi_manage.is_slave);
+			rtk_spi->spi_manage.tx_info.data_len -= trans_len;
+			if (data_frame_size > 8) {
+				// 16~9 bits mode
+				rtk_spi->spi_manage.tx_info.p_data_buf = (void *)(((u16 *)rtk_spi->spi_manage.tx_info.p_data_buf) + trans_len);
+			} else {
+				// 8~4 bits mode
+				rtk_spi->spi_manage.tx_info.p_data_buf = (void *)(((u8 *)rtk_spi->spi_manage.tx_info.p_data_buf) + trans_len);
+			}
+
+			rtk_spi_interrupt_config(rtk_spi, SPI_BIT_TXEIM | SPI_BIT_SSRIS, ENABLE);
 		}
 	}
 
 	return IRQ_HANDLED;
 }
 
-u32 rtk_spi_interrupt_read(
+void rtk_spi_interrupt_read(
 	struct rtk_spi_controller *rtk_spi,
 	void *rx_data, u32 length)
 {
@@ -753,20 +761,17 @@ u32 rtk_spi_interrupt_read(
 
 	if (data_frame_size > 8) {
 		/*  16~9 bits mode */
-		rtk_spi->spi_manage.rx_info.data_len = length >> 1; // 2 bytes(16 bit) every transfer
+		rtk_spi->spi_manage.rx_info.data_len = length >> 1;    // 2 bytes(16 bit) every transfer
 	} else {
 		/*  8~4 bits mode */
-		rtk_spi->spi_manage.rx_info.data_len = length; // 1 byte(8 bit) every transfer
+		rtk_spi->spi_manage.rx_info.data_len = length;    // 1 byte(8 bit) every transfer
 	}
 
 	rtk_spi->spi_manage.rx_info.p_data_buf = rx_data;
-
-	rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_RXFIM | SPI_BIT_RXOIM | SPI_BIT_RXUIM), ENABLE);
-
-	return USE_SPI_CORE_WAIT;
+	rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_RXFIM | SPI_BIT_RXOIM | SPI_BIT_RXUIM | SPI_BIT_SSRIS), ENABLE);
 }
 
-u32 rtk_spi_interrupt_write(
+void rtk_spi_interrupt_write(
 	struct rtk_spi_controller *rtk_spi,
 	const void *ptx_data, u32 length)
 {
@@ -780,16 +785,14 @@ u32 rtk_spi_interrupt_write(
 
 	if (data_frame_size > 8) {
 		/*  16~9 bits mode */
-		rtk_spi->spi_manage.tx_info.data_len = length >> 1; // 2 bytes(16 bit) every transfer
+		rtk_spi->spi_manage.tx_info.data_len = length >> 1;    // 2 bytes(16 bit) every transfer
 	} else {
 		/*  8~4 bits mode */
-		rtk_spi->spi_manage.tx_info.data_len = length; // 1 byte(8 bit) every transfer
+		rtk_spi->spi_manage.tx_info.data_len = length;    // 1 byte(8 bit) every transfer
 	}
 
 	rtk_spi->spi_manage.tx_info.p_data_buf = (void *)ptx_data;
-	rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_TXOIM | SPI_BIT_TXEIM), ENABLE);
-
-	return USE_SPI_CORE_WAIT;
+	rtk_spi_interrupt_config(rtk_spi, (SPI_BIT_TXOIM | SPI_BIT_TXEIM | SPI_BIT_SSRIS), ENABLE);
 }
 
 u32 rtk_spi_poll_send(
@@ -797,7 +800,6 @@ u32 rtk_spi_poll_send(
 	const void *ptx_data, u32 length)
 {
 	u32 data_frame_size = rtk_spi_get_data_frame_size(rtk_spi);
-	int ret = 0;
 
 	while (length) {
 		if (rtk_spi_get_status(rtk_spi) & SPI_BIT_TFNF) {
@@ -812,11 +814,15 @@ u32 rtk_spi_poll_send(
 		}
 	}
 
-	while(rtk_spi_busy_check(rtk_spi) == 1);
-	rtk_spi_status_switch(rtk_spi, RTK_SPI_TX_DONE);
-	spi_finalize_current_transfer(rtk_spi->controller);
+	/* Wait for SPI busy bit to clear */
+	while (rtk_spi_busy_check(rtk_spi)) {
+		dev_dbg(rtk_spi->dev, "slave spi still busy..");
+		schedule_timeout_interruptible(msecs_to_jiffies(SPI_BUSBUSY_WAIT_TIMESLICE));
+	}
 
-	return ret;
+	rtk_spi_status_switch(rtk_spi, RTK_SPI_TX_DONE);
+
+	return 0;
 }
 
 int rtk_spi_poll_receive(
@@ -842,7 +848,6 @@ int rtk_spi_poll_receive(
 				length--;
 				if (length == 0) {
 					rtk_spi_status_switch(rtk_spi, RTK_SPI_RX_DONE);
-					spi_finalize_current_transfer(rtk_spi->controller);
 					return 0;
 				}
 			}
@@ -859,7 +864,6 @@ u32 rtk_spi_poll_trx(
 {
 	u32 rx_tmp_cnt, tx_cnt = 0, rx_cnt = 0;
 	u32 data_frame_size = rtk_spi_get_data_frame_size(rtk_spi);
-	int ret = 0;
 
 	while (tx_cnt < length || rx_cnt < length) {
 		if (tx_cnt < length) {
@@ -878,12 +882,12 @@ u32 rtk_spi_poll_trx(
 		if (rx_cnt < length) {
 			while (rtk_spi_get_status(rtk_spi) & SPI_BIT_RFNE) {
 				rx_tmp_cnt = rtk_spi_get_rx_cnt(rtk_spi);
-				while(rx_tmp_cnt) {
+				while (rx_tmp_cnt) {
 					if (data_frame_size > 8) {
-						*(u16*)(prx_data) = (u16)rtk_spi_read_data(rtk_spi);
+						*(u16 *)(prx_data) = (u16)rtk_spi_read_data(rtk_spi);
 						prx_data = (void *)(((u16 *)prx_data) + 1);
 					} else {
-						*(u8*)(prx_data) = (u8)rtk_spi_read_data(rtk_spi);
+						*(u8 *)(prx_data) = (u8)rtk_spi_read_data(rtk_spi);
 						prx_data = (void *)(((u8 *)prx_data) + 1);
 					}
 
@@ -895,343 +899,436 @@ u32 rtk_spi_poll_trx(
 	}
 
 	rtk_spi_status_switch(rtk_spi, RTK_SPI_TX_DONE);
-	spi_finalize_current_transfer(rtk_spi->controller);
-
-	return ret;
+	return 0;
 }
 
-void rtk_spi_slave_tx_cmd(
-	struct rtk_spi_controller *rtk_spi, u32 Status)
-{
-	if (Status) {
-		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_BIT_SLV_OE, ~SPI_BIT_SLV_OE);
-	} else {
-		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_BIT_SLV_OE, SPI_BIT_SLV_OE);
-	}
-}
-
-void rtk_spi_dma_done_callback(void *data)
+void rtk_spi_dma_rx_done_callback(void *data)
 {
 	struct rtk_spi_controller *rtk_spi = data;
-	int check_times = 0;
 
-	while (!mutex_trylock(&rtk_spi->spi_manage.dma_params.dma_lock)) {
-	}
+	rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_RX_MODE);
+	rtk_spi->spi_manage.dma_params.rx_gdma_status = RTK_SPI_GDMA_DONE;
+	complete(&rtk_spi->spi_manage.dma_params.dma_rx_completion);
+}
 
-	/* DMA done. But still need a little time for spi transfer. */
-	/* Check times to prevent lost contact accidently. */
-	while (rtk_spi_busy_check(rtk_spi)) {
-		check_times++;
-		dev_dbg(rtk_spi->dev, "still transferring, wait.");
-		if (check_times > 10) {
-			break;
-		}
-	}
+void rtk_spi_dma_tx_done_callback(void *data)
+{
+	struct rtk_spi_controller *rtk_spi = data;
 
-	if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-		rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_TX_MODE);
-	} else {
-		rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_RX_MODE);
-	}
-
-	rtk_spi->spi_manage.dma_params.gdma_status = RTK_SPI_GDMA_DONE;
-
-	mutex_unlock(&rtk_spi->spi_manage.dma_params.dma_lock);
-
-	/* Inform upper layer that dma spi is completed. */
-	spi_finalize_current_transfer(rtk_spi->controller);
-
+	rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_TX_MODE);
+	rtk_spi->spi_manage.dma_params.tx_gdma_status = RTK_SPI_GDMA_DONE;
+	complete(&rtk_spi->spi_manage.dma_params.dma_tx_completion);
 }
 
 int rtk_spi_gdma_prepare(struct rtk_spi_controller *rtk_spi)
 {
 	int ret = 0;
-	const char *name = "dma_spi";
+	char name[10];
 
-	/* request chan. */
-	if (!rtk_spi->spi_manage.dma_params.chan) {
-		rtk_spi->spi_manage.dma_params.chan = dma_request_chan(rtk_spi->dev, name);
+	snprintf(name, 10, "spi%d-rx", rtk_spi->spi_manage.spi_index);
+	if (!rtk_spi->spi_manage.dma_params.rx_chan) {
+		rtk_spi->spi_manage.dma_params.rx_chan = dma_request_chan(rtk_spi->dev, name);
 	}
-
-	if (!rtk_spi->spi_manage.dma_params.chan) {
-		dev_err(rtk_spi->dev, "failed to request ledc dma channel.\n");
-		rtk_spi->spi_manage.dma_params.gdma_status = RTK_SPI_GDMA_UNPREPARED;
-		mutex_unlock(&rtk_spi->spi_manage.dma_params.dma_lock);
+	if (!rtk_spi->spi_manage.dma_params.rx_chan) {
+		dev_err(rtk_spi->dev, "failed to request SPI dma channel\n");
+		rtk_spi->spi_manage.dma_params.rx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
 		return -1;
 	}
-
-	dev_dbg(rtk_spi->dev, "request chan success for spi-%d.", rtk_spi->spi_manage.spi_index);
+	snprintf(name, 10, "spi%d-tx", rtk_spi->spi_manage.spi_index);
+	if (!rtk_spi->spi_manage.dma_params.tx_chan) {
+		rtk_spi->spi_manage.dma_params.tx_chan = dma_request_chan(rtk_spi->dev, name);
+	}
+	if (!rtk_spi->spi_manage.dma_params.tx_chan) {
+		dev_err(rtk_spi->dev, "failed to request SPI dma channel\n");
+		rtk_spi->spi_manage.dma_params.tx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
+		return -1;
+	}
 
 	return ret;
 }
 
 void rtk_spi_gdma_deinit(struct rtk_spi_controller *rtk_spi)
 {
-	mutex_lock(&rtk_spi->spi_manage.dma_params.dma_lock);
 
-	if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-		rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_TX_MODE);
-	} else {
-		rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_RX_MODE);
+	if (rtk_spi->spi_manage.dma_params.tx_config) {
+		kfree(rtk_spi->spi_manage.dma_params.tx_config);
+		rtk_spi->spi_manage.dma_params.tx_config = NULL;
 	}
-
-	if (rtk_spi->spi_manage.dma_params.config) {
-		kfree(rtk_spi->spi_manage.dma_params.config);
-		rtk_spi->spi_manage.dma_params.config = NULL;
+	if (rtk_spi->spi_manage.dma_params.tx_dma_addr) {
+		dma_unmap_single(rtk_spi->dev,
+						 rtk_spi->spi_manage.dma_params.tx_dma_addr,
+						 rtk_spi->spi_manage.dma_params.tx_dma_length,
+						 DMA_MEM_TO_DEV);
+		rtk_spi->spi_manage.dma_params.tx_dma_addr = 0;
 	}
-
-#if RTK_SPI_DMA_HELP
-	if (rtk_spi->spi_manage.dma_params.help_dma_addr) {
-		dma_unmap_single(rtk_spi->dev, rtk_spi->spi_manage.dma_params.help_dma_addr, rtk_spi->spi_manage.dma_params.dma_length,
-						 rtk_spi->spi_manage.current_direction ? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM);
-		rtk_spi->spi_manage.dma_params.help_dma_addr = 0;
+	if (rtk_spi->spi_manage.dma_enabled && rtk_spi->spi_manage.dma_params.tx_chan) {
+		dma_release_channel(rtk_spi->spi_manage.dma_params.tx_chan);
+		rtk_spi->spi_manage.dma_params.tx_chan = NULL;
+		rtk_spi->spi_manage.dma_params.tx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
 	}
-#endif // RTK_SPI_DMA_HELP
-
-	if (rtk_spi->spi_manage.dma_enabled && rtk_spi->spi_manage.dma_params.chan) {
-		dma_release_channel(rtk_spi->spi_manage.dma_params.chan);
-		rtk_spi->spi_manage.dma_params.chan = NULL;
-		rtk_spi->spi_manage.dma_params.gdma_status = RTK_SPI_GDMA_UNPREPARED;
-		dev_dbg(rtk_spi->dev, "release chan success for spi-%d.", rtk_spi->spi_manage.spi_index);
+	complete(&rtk_spi->spi_manage.dma_params.dma_tx_completion);
+	if (rtk_spi->spi_manage.dma_params.rx_config) {
+		kfree(rtk_spi->spi_manage.dma_params.rx_config);
+		rtk_spi->spi_manage.dma_params.rx_config = NULL;
 	}
-	mutex_unlock(&rtk_spi->spi_manage.dma_params.dma_lock);
-
+	if (rtk_spi->spi_manage.dma_params.rx_dma_addr) {
+		dma_unmap_single(rtk_spi->dev,
+						 rtk_spi->spi_manage.dma_params.rx_dma_addr,
+						 rtk_spi->spi_manage.dma_params.rx_dma_length,
+						 DMA_DEV_TO_MEM);
+		rtk_spi->spi_manage.dma_params.rx_dma_addr = 0;
+	}
+	if (rtk_spi->spi_manage.dma_enabled && rtk_spi->spi_manage.dma_params.rx_chan) {
+		dma_release_channel(rtk_spi->spi_manage.dma_params.rx_chan);
+		rtk_spi->spi_manage.dma_params.rx_chan = NULL;
+		rtk_spi->spi_manage.dma_params.rx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
+	}
+	complete(&rtk_spi->spi_manage.dma_params.dma_rx_completion);
+	rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_TX_MODE);
+	rtk_spi_set_dma_enable(rtk_spi, DISABLE, SPI_RX_MODE);
 }
 
-#if RTK_SPI_DMA_HELP
-dma_addr_t rtk_spi_prepare_dma_addr(
-	struct rtk_spi_controller *rtk_spi,
-	void *buf, int size)
+static bool rtk_spi_can_dma(struct spi_controller *controller,
+							struct spi_device *spi,
+							struct spi_transfer *transfer)
 {
-	dma_addr_t temp;
-	if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-		temp = dma_map_single(rtk_spi->dev, buf, size, DMA_MEM_TO_DEV);
-	} else {
-		temp = dma_map_single(rtk_spi->dev, buf, size, DMA_DEV_TO_MEM);
-	}
+	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 
-	return temp;
+	if (transfer->len > RTK_SPI_FIFO_ALL) {
+		rtk_spi->spi_manage.dma_enabled = 1;
+		return true;
+	} else {
+		rtk_spi->spi_manage.dma_enabled = 0;
+		return false;
+	}
 }
-#endif // RTK_SPI_DMA_HELP
+
+static int rtk_spi_calculate_dmatimeout(struct spi_transfer *transfer)
+{
+	unsigned long timeout = 0;
+
+	timeout = SPI_DMASHIFT_WAIT_MSECS * transfer->len / transfer->speed_hz;
+	timeout += SPI_DMAWAIT_TOLERANCE;
+	return msecs_to_jiffies(SPI_DMAWAIT_TOLERANCE * timeout * MSEC_PER_SEC);
+}
 
 /* Accept only 8-bit-rule data here. */
-int rtk_spi_can_dma(
+int rtk_spi_do_dma_transfer(
 	struct spi_controller *controller,
 	struct spi_device *spi,
 	struct spi_transfer *transfer)
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 	struct rtk_spi_gdma_parameters	*dma_params;
-	int ret = USE_SPI_CORE_WAIT;
+	unsigned long transfer_timeout, timeout;
+	int ret = -EIO;
 
 	if (transfer->len > MAX_DMA_LENGTH) {
-		return 0;
+		return ret;
 	}
 
 	dma_params = &rtk_spi->spi_manage.dma_params;
+	transfer_timeout = rtk_spi_calculate_dmatimeout(transfer);
 
-	mutex_lock(&dma_params->dma_lock);
-
-	if (rtk_spi->spi_manage.dma_enabled && (dma_params->gdma_status == RTK_SPI_GDMA_UNPREPARED)) {
+	if (rtk_spi->spi_manage.dma_enabled && (dma_params->rx_gdma_status == RTK_SPI_GDMA_UNPREPARED) && (dma_params->tx_gdma_status == RTK_SPI_GDMA_UNPREPARED)) {
 		ret = rtk_spi_gdma_prepare(rtk_spi);
 		if (ret < 0) {
-			dev_info(rtk_spi->dev, "DMA transfer is not prepared for spi-%d.\n", rtk_spi->spi_manage.spi_index);
-			dma_params->gdma_status = RTK_SPI_GDMA_UNPREPARED;
+			dev_err(rtk_spi->dev, "DMA transfer is not prepared for spi-%d.\n", rtk_spi->spi_manage.spi_index);
+			dma_params->rx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
+			dma_params->tx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
 			goto cannot_dma;
 		}
-		dma_params->gdma_status = RTK_SPI_GDMA_PREPARED;
+		dma_params->rx_gdma_status = RTK_SPI_GDMA_PREPARED;
+		dma_params->tx_gdma_status = RTK_SPI_GDMA_PREPARED;
 	}
 
-	if (dma_params->gdma_status == RTK_SPI_GDMA_UNPREPARED) {
-		dev_info(rtk_spi->dev, "Dma has not been prepared for spi-%d.\n", rtk_spi->spi_manage.spi_index);
+	if ((dma_params->rx_gdma_status == RTK_SPI_GDMA_UNPREPARED) || (dma_params->tx_gdma_status == RTK_SPI_GDMA_UNPREPARED)) {
+		dev_err(rtk_spi->dev, "Dma has not been prepared for spi-%d.\n", rtk_spi->spi_manage.spi_index);
 		goto cannot_dma;
-	} else if (dma_params->gdma_status == RTK_SPI_GDMA_ONGOING) {
-		dev_info(rtk_spi->dev, "Last dma is ongoing for spi-%d, please check.\n", rtk_spi->spi_manage.spi_index);
+	} else if ((dma_params->rx_gdma_status == RTK_SPI_GDMA_ONGOING) || (dma_params->tx_gdma_status == RTK_SPI_GDMA_ONGOING)) {
+		dev_err(rtk_spi->dev, "Last dma is ongoing for spi-%d, please check.\n", rtk_spi->spi_manage.spi_index);
+		goto cannot_dma;
+	}
+	if (!dma_params->rx_config) {
+		dma_params->rx_config = kmalloc(sizeof(*dma_params->rx_config), GFP_KERNEL);
+	}
+	if (!dma_params->tx_config) {
+		dma_params->tx_config = kmalloc(sizeof(*dma_params->tx_config), GFP_KERNEL);
+	}
+	dma_params->rx_gdma_status = RTK_SPI_GDMA_ONGOING;
+	dma_params->rx_config->device_fc = 1;
+	dma_params->rx_dma_length = transfer->len;
+	dma_params->rx_config->dst_port_window_size = 0;
+	dma_params->rx_config->src_port_window_size = 0;
+	dma_params->tx_gdma_status = RTK_SPI_GDMA_ONGOING;
+	dma_params->tx_config->device_fc = 1;
+	dma_params->tx_dma_length = transfer->len;
+	dma_params->tx_config->dst_port_window_size = 0;
+	dma_params->tx_config->src_port_window_size = 0;
+
+	transfer->rx_dma = dma_map_single(rtk_spi->dev, transfer->rx_buf, transfer->len, DMA_DEV_TO_MEM);
+	if (!transfer->rx_dma) {
 		goto cannot_dma;
 	}
 
-	if (!dma_params->config) {
-		dma_params->config = kmalloc(sizeof(*dma_params->config), GFP_KERNEL);
+	dma_params->rx_dma_addr = transfer->rx_dma;
+
+	transfer->tx_dma = dma_map_single(rtk_spi->dev, (void *)transfer->tx_buf, transfer->len, DMA_MEM_TO_DEV);
+	if (!transfer->tx_dma) {
+		goto cannot_dma;
 	}
 
-	dma_params->gdma_status = RTK_SPI_GDMA_ONGOING;
-	dma_params->config->device_fc = 1;
-	dma_params->dma_length = transfer->len;
-	dma_params->config->dst_port_window_size = 0;
-	dma_params->config->src_port_window_size = 0;
+	dma_params->tx_dma_addr = transfer->tx_dma;
 
-	if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-		/* DMA spi tx mode. */
-		if (!transfer->tx_dma) {
-			pr_err("There is no tx_dma address for spi-%d dma tx!", rtk_spi->spi_manage.spi_index);
-#if RTK_SPI_DMA_HELP
-			transfer->tx_dma = rtk_spi_prepare_dma_addr(rtk_spi, transfer->tx_buf, transfer->len);
-			if (!transfer->tx_dma) {
-				goto cannot_dma;
-			}
-			dma_params->help_dma_addr = transfer->tx_dma;
-#else // RTK_SPI_DMA_HELP
-			goto cannot_dma;
-#endif // RTK_SPI_DMA_HELP
-		}
+	rtk_spi_enable_cmd(rtk_spi, DISABLE);
+	rtk_spi_set_dma_level(rtk_spi, 1, 3);
+	rtk_spi_set_sample_delay(rtk_spi, 1);
+	rtk_spi_set_read_len(rtk_spi, transfer->len);
+	if (!rtk_spi->spi_manage.is_slave) {
+		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(0));
+	}
 
-		rtk_spi_enable_cmd(rtk_spi, DISABLE);
-		rtk_spi_set_dma_level(rtk_spi, 1, 3);
+	dma_params->rx_config->src_addr = rtk_spi->spi_manage.dma_params.spi_phy_addr + SPI_DATA_FIFO_ENRTY;
+	dma_params->rx_config->direction = DMA_DEV_TO_MEM;
+	dma_params->rx_config->dst_addr = transfer->rx_dma;
+	dma_params->rx_config->dst_port_window_size = 0;
+	dma_params->rx_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	dma_params->rx_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+	dma_params->rx_config->dst_maxburst = 1;
+	dma_params->rx_config->src_maxburst = 4;
 
-		dma_params->config->src_addr = transfer->tx_dma;
-		dma_params->config->direction = DMA_MEM_TO_DEV;
-		dma_params->config->dst_addr = dma_params->spi_phy_addr + SPI_DATA_FIFO_ENRTY;
-		dma_params->config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-		dma_params->config->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-		dma_params->config->dst_maxburst = 4;
-		dma_params->config->src_maxburst = 1;
-
-		if (rtk_spi->spi_manage.spi_index == 0) {
-			dma_params->config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_TX;
-		} else {
-			dma_params->config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_TX;
-		}
-
-	} else if (rtk_spi->spi_manage.current_direction == RTK_SPI_READ) {
-		/* DMA spi rx mode. */
-		if (!transfer->rx_dma) {
-			pr_err("There is no rx_dma address for spi-%d dma rx!", rtk_spi->spi_manage.spi_index);
-#if RTK_SPI_DMA_HELP
-			transfer->rx_dma = rtk_spi_prepare_dma_addr(rtk_spi, transfer->rx_buf, transfer->len);
-			if (!transfer->rx_dma) {
-				goto cannot_dma;
-			}
-			dma_params->help_dma_addr = transfer->rx_dma;
-#else // RTK_SPI_DMA_HELP
-			goto cannot_dma;
-#endif // RTK_SPI_DMA_HELP
-		}
-
-		rtk_spi_set_dma_level(rtk_spi, 56, 3);
-		rtk_spi_set_sample_delay(rtk_spi, 1);
-
-		dma_params->dma_length = transfer->len;
-		dma_params->config->src_addr = rtk_spi->spi_manage.dma_params.spi_phy_addr + SPI_DATA_FIFO_ENRTY;
-		dma_params->config->direction = DMA_DEV_TO_MEM;
-		dma_params->config->dst_addr = transfer->rx_dma;
-		dma_params->config->dst_port_window_size = 0;
-		dma_params->config->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-		dma_params->config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-		dma_params->config->dst_maxburst = 1;
-		dma_params->config->src_maxburst = 4;
-
-		if (rtk_spi->spi_manage.spi_index == 0) {
-			dma_params->config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_RX;
-		} else {
-			dma_params->config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_RX;
-		}
+	if (rtk_spi->spi_manage.spi_index == 0) {
+		dma_params->rx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_RX;
 	} else {
-		pr_err("Please confirm the transfer direction by setting one of the transfer buffer to NULL.");
-		goto cannot_dma;
+		dma_params->rx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_RX;
 	}
 
-	ret = dmaengine_slave_config(dma_params->chan, dma_params->config);
+	dma_params->tx_config->src_addr = transfer->tx_dma;
+	dma_params->tx_config->direction = DMA_MEM_TO_DEV;
+	dma_params->tx_config->dst_addr = dma_params->spi_phy_addr + SPI_DATA_FIFO_ENRTY;
+	dma_params->tx_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+	dma_params->tx_config->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	dma_params->tx_config->dst_maxburst = 4;
+	dma_params->tx_config->src_maxburst = 1;
+
+	if (rtk_spi->spi_manage.spi_index == 0) {
+		dma_params->tx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_TX;
+	} else {
+		dma_params->tx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_TX;
+	}
+
+	ret = dmaengine_slave_config(dma_params->rx_chan, dma_params->rx_config);
 	if (ret < 0) {
-		pr_info("dmaengine slave config fail. ");
+		dev_err(rtk_spi->dev, "dmaengine slave config for RX fail\n");
 		goto cannot_dma;
 	}
+	ret = dmaengine_slave_config(dma_params->tx_chan, dma_params->tx_config);
+	if (ret < 0) {
+		dev_err(rtk_spi->dev, "dmaengine slave config for TX fail\n");
+		goto cannot_dma;
+	}
+	dma_params->rxdesc = dmaengine_prep_dma_cyclic(dma_params->rx_chan,
+						 dma_params->rx_config->dst_addr,
+						 dma_params->rx_dma_length, transfer->len,
+						 dma_params->rx_config->direction,
+						 DMA_PREP_INTERRUPT);
 
-	dma_params->txdesc = dmaengine_prep_dma_cyclic(dma_params->chan,
-						 (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) ? dma_params->config->src_addr : dma_params->config->dst_addr,
-						 dma_params->dma_length, transfer->len,
-						 dma_params->config->direction, DMA_PREP_INTERRUPT);
+	dma_params->rxdesc->callback = rtk_spi_dma_rx_done_callback;
+	dma_params->rxdesc->callback_param = rtk_spi;
 
-	dma_params->txdesc->callback = rtk_spi_dma_done_callback;
+	dmaengine_submit(dma_params->rxdesc);
+	reinit_completion(&dma_params->dma_rx_completion);
+
+	dma_async_issue_pending(dma_params->rx_chan);
+
+	dma_params->txdesc = dmaengine_prep_dma_cyclic(dma_params->tx_chan,
+						 dma_params->tx_config->src_addr,
+						 dma_params->tx_dma_length, transfer->len,
+						 dma_params->tx_config->direction,
+						 DMA_PREP_INTERRUPT);
+
+	dma_params->txdesc->callback = rtk_spi_dma_tx_done_callback;
 	dma_params->txdesc->callback_param = rtk_spi;
 
 	dmaengine_submit(dma_params->txdesc);
-	dma_async_issue_pending(dma_params->chan);
+	reinit_completion(&dma_params->dma_tx_completion);
 
-	/* Open spi hw dma. */
-	if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-		if (rtk_spi->spi_manage.is_slave) {
-			rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_BIT_SLV_OE, ~SPI_BIT_SLV_OE);
-		}
+	dma_async_issue_pending(dma_params->tx_chan);
 
-		rtk_spi_enable_cmd(rtk_spi, ENABLE);
-		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_TX_MODE);
+	if (rtk_spi->spi_manage.is_slave) {
+		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_BIT_SLV_OE, ~SPI_BIT_SLV_OE);
+	}
 
-	} else {
-		rtk_spi_enable_cmd(rtk_spi, ENABLE);
+	rtk_spi_enable_cmd(rtk_spi, ENABLE);
+
+	if (rtk_spi->spi_manage.is_slave) {
 		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_RX_MODE);
-		if (!rtk_spi->spi_manage.is_slave) {
-			/* Tx dummy0, if master rx is ongoing. */
-			/* Freertos did not use dma tx dummy data in dma rx mode either.*/
-			while (1) {
-				if (rtk_spi_get_writeable(rtk_spi)) {
-					rtk_spi_write_data(rtk_spi, 0);
-					break;
-				}
-			}
+		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_TX_MODE);
+	} else {
+		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_TX_MODE);
+		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_RX_MODE);
+	}
+
+	if (!rtk_spi->spi_manage.is_slave) {
+		timeout = wait_for_completion_timeout(&dma_params->dma_tx_completion,
+											  transfer_timeout);
+		if (!timeout) {
+			dev_err(rtk_spi->dev, "DMA I/O Error in DMA TX - timeout\n");
+			rtk_spi_gdma_deinit(rtk_spi);
+			return -ETIMEDOUT;
+		}
+	} else {
+		if (wait_for_completion_interruptible(&dma_params->dma_tx_completion)) {
+			dev_err(rtk_spi->dev, "DMA I/O Error in DMA TX - interrupted\n");
+			rtk_spi_gdma_deinit(rtk_spi);
+			return -EINTR;
+		}
+	}
+	/* Wait for SPI busy bit to clear */
+	while (rtk_spi_busy_check(rtk_spi)) {
+		dev_dbg(rtk_spi->dev, "slave spi still busy..");
+		schedule_timeout_interruptible(msecs_to_jiffies(SPI_BUSBUSY_WAIT_TIMESLICE));
+	}
+	if (!rtk_spi->spi_manage.is_slave) {
+
+		timeout = wait_for_completion_timeout(&dma_params->dma_rx_completion,
+											  transfer_timeout);
+		if (!timeout) {
+			dev_err(rtk_spi->dev, "DMA I/O Error in DMA RX - timeout\n");
+			rtk_spi_gdma_deinit(rtk_spi);
+			return -ETIMEDOUT;
+		}
+	} else {
+		if (wait_for_completion_interruptible(&dma_params->dma_rx_completion)) {
+			dev_err(rtk_spi->dev, "DMA I/O Error in DMA RX - interrupted\n");
+			rtk_spi_gdma_deinit(rtk_spi);
+			return -EINTR;
 		}
 	}
 
-cannot_dma:
-	mutex_unlock(&dma_params->dma_lock);
+	rtk_spi_gdma_deinit(rtk_spi);
+
 	return 0;
 
+cannot_dma:
+	dev_err(rtk_spi->dev, "DMA transfer failed\n");
+	rtk_spi_gdma_deinit(rtk_spi);
+	return ret;
 }
 
-int rtk_spi_transfer_slave(
-	struct rtk_spi_controller *rtk_spi,
-	struct spi_transfer *transfer,
-	bool direction)
+int rtk_spi_transfer_slave(struct rtk_spi_controller *rtk_spi,
+						   struct spi_transfer *transfer, u32 transfer_len,
+						   u32 transfer_done)
 {
-	/* Based on spi core mechenism, tx poll only, rx interrupt only. */
-	int ret = USE_SPI_CORE_WAIT;
+	int ret = 0;
 
+	rtk_spi->spi_manage.transfer_status = RTK_SPI_ONGOING;
+	reinit_completion(&rtk_spi->spi_manage.txrx_completion);
 	rtk_spi_enable_cmd(rtk_spi, DISABLE);
 	rtk_spi_set_tx_fifo_level(rtk_spi, rtk_spi->spi_param.tx_threshold_level);
 	rtk_spi_set_rx_fifo_level(rtk_spi, rtk_spi->spi_param.rx_threshold_level);
 
-	if (direction == SPI_TX_MODE) {
-		/* slave spi tx mode. */
-		/*  As a Slave mode, if the peer(Master) side is power off, the BUSY flag is always on */
-		if (transfer->len >= RTK_SPI_FIFO_ALL) {
-			rtk_spi_set_tx_fifo_level(rtk_spi, RTK_SPI_FIFO_HALF);
-		} else {
-			rtk_spi_set_tx_fifo_level(rtk_spi, transfer->len / 2);
-		}
-
-		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_BIT_SLV_OE, ~SPI_BIT_SLV_OE);
-		rtk_spi_enable_cmd(rtk_spi, ENABLE);
-
-		rtk_spi->spi_manage.tx_info.p_data_buf = transfer->tx_buf;
-		rtk_spi->spi_manage.tx_info.data_len = transfer->len;
-		rtk_spi_interrupt_write(rtk_spi, transfer->tx_buf, transfer->len);
-
-#if RTK_SPI_REG_DUMP
-		rtk_spi_reg_dump(rtk_spi);
-#endif // RTK_SPI_REG_DUMP
-		return ret;
-	} else if (direction == SPI_RX_MODE) {
-		/* slave spi rx mode. */
-		if (transfer->len >= RTK_SPI_FIFO_ALL) {
-			rtk_spi_set_rx_fifo_level(rtk_spi, RTK_SPI_FIFO_HALF);
-		} else {
-			rtk_spi_set_rx_fifo_level(rtk_spi, transfer->len / 2);
-		}
-		rtk_spi_enable_cmd(rtk_spi, ENABLE);
-		rtk_spi_set_read_len(rtk_spi, transfer->len);
-
-		rtk_spi->spi_manage.rx_info.p_data_buf = transfer->rx_buf;
-		rtk_spi->spi_manage.rx_info.data_len = transfer->len;
-		rtk_spi_interrupt_read(rtk_spi, transfer->rx_buf, transfer->len);
-
-#if RTK_SPI_REG_DUMP
-		rtk_spi_reg_dump(rtk_spi);
-#endif // RTK_SPI_REG_DUMP
-		return ret;
+	if (transfer_len < RTK_SPI_FIFO_ALL) {
+		rtk_spi_set_tx_fifo_level(rtk_spi, transfer_len);
 	} else {
-		dev_info(rtk_spi->dev,
-				 "Please confirm whether you want tx or rx by set another buf = NULL.");
-		return -EINVAL;
+		rtk_spi_set_tx_fifo_level(rtk_spi, RTK_SPI_FIFO_ALL - 1);
 	}
+
+	if (transfer_len <= RTK_SPI_FIFO_ALL) {
+		rtk_spi_set_rx_fifo_level(rtk_spi, transfer_len - 1);
+	} else {
+		rtk_spi_set_rx_fifo_level(rtk_spi, RTK_SPI_FIFO_ALL - 1);
+	}
+
+	rtk_spi_set_read_len(rtk_spi, transfer_len);
+	rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_BIT_SLV_OE, ~SPI_BIT_SLV_OE);
+	rtk_spi_enable_cmd(rtk_spi, ENABLE);
+
+	rtk_spi->spi_manage.tx_info.p_data_buf = transfer->tx_buf + transfer_done;
+	rtk_spi->spi_manage.tx_info.data_len = transfer_len;
+	rtk_spi->spi_manage.rx_info.p_data_buf = transfer->rx_buf + transfer_done;
+	rtk_spi->spi_manage.rx_info.data_len = transfer_len;
+
+	rtk_spi_interrupt_read(rtk_spi, transfer->rx_buf + transfer_done, transfer_len);
+	rtk_spi_interrupt_write(rtk_spi, transfer->tx_buf + transfer_done, transfer_len);
+
+#if RTK_SPI_REG_DUMP
+	rtk_spi_reg_dump(rtk_spi);
+#endif // RTK_SPI_REG_DUMP
+
+	ret = rtk_spi_wait_for_completion(rtk_spi->controller, transfer);
+	if (ret) {
+		dev_err(rtk_spi->dev, "Slave interrupt mode transfer failed\n");
+		rtk_spi_enable_cmd(rtk_spi, DISABLE);
+		return ret;
+	}
+
+	/* Wait for SPI busy bit to clear */
+	while (rtk_spi_busy_check(rtk_spi)) {
+		dev_dbg(rtk_spi->dev, "slave spi still busy..");
+		schedule_timeout_interruptible(msecs_to_jiffies(SPI_BUSBUSY_WAIT_TIMESLICE));
+	}
+
+#if RTK_SPI_REG_DUMP
+	rtk_spi_reg_dump(rtk_spi);
+#endif // RTK_SPI_REG_DUMP
+
+	return ret;
+}
+
+int rtk_spi_transfer_master(struct rtk_spi_controller *rtk_spi,
+							struct spi_transfer *transfer, u32 transfer_len,
+							u32 transfer_done)
+{
+	int ret = 0;
+
+	rtk_spi->spi_manage.transfer_status = RTK_SPI_ONGOING;
+	rtk_spi_enable_cmd(rtk_spi, DISABLE);
+
+	if (transfer_len < RTK_SPI_FIFO_ALL) {
+		rtk_spi_set_tx_fifo_level(rtk_spi, transfer_len);
+	} else {
+		rtk_spi_set_tx_fifo_level(rtk_spi, RTK_SPI_FIFO_ALL - 1);
+	}
+
+	if (transfer_len <= RTK_SPI_FIFO_ALL) {
+		rtk_spi_set_rx_fifo_level(rtk_spi, transfer_len - 1);
+	} else {
+		rtk_spi_set_rx_fifo_level(rtk_spi, RTK_SPI_FIFO_ALL - 1);
+	}
+
+	rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(0));
+	rtk_spi_set_read_len(rtk_spi, transfer_len);
+	rtk_spi_enable_cmd(rtk_spi, ENABLE);
+
+	rtk_spi->spi_manage.tx_info.p_data_buf = transfer->tx_buf + transfer_done;
+	rtk_spi->spi_manage.tx_info.data_len = transfer_len;
+	rtk_spi->spi_manage.rx_info.p_data_buf = transfer->rx_buf + transfer_done;
+	rtk_spi->spi_manage.rx_info.data_len = transfer_len;
+	if (rtk_spi->spi_manage.spi_poll_mode) {
+		ret = rtk_spi_poll_trx(rtk_spi, transfer->rx_buf + transfer_done, transfer->tx_buf + transfer_done, transfer_len);
+	} else {
+		rtk_spi_interrupt_read(rtk_spi, transfer->rx_buf + transfer_done, transfer_len);
+		rtk_spi_interrupt_write(rtk_spi, transfer->tx_buf + transfer_done, transfer_len);
+		ret = rtk_spi_wait_for_completion(rtk_spi->controller, transfer);
+		if (ret) {
+			dev_err(rtk_spi->dev, "Master interrupt mode transfer failed\n");
+			rtk_spi_enable_cmd(rtk_spi, DISABLE);
+			return ret;
+		}
+
+		/* Wait for SPI busy bit to clear */
+		while (rtk_spi_busy_check(rtk_spi)) {
+			dev_dbg(rtk_spi->dev, "slave spi still busy..");
+			schedule_timeout_interruptible(msecs_to_jiffies(SPI_BUSBUSY_WAIT_TIMESLICE));
+		}
+
+	}
+#if RTK_SPI_REG_DUMP
+	rtk_spi_reg_dump(rtk_spi);
+#endif // RTK_SPI_REG_DUMP
+
+	return ret;
 }
 
 int rtk_spi_transfer_one(
@@ -1240,32 +1337,16 @@ int rtk_spi_transfer_one(
 	struct spi_transfer *transfer)
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
-	int ret = USE_SPI_CORE_WAIT;
+	u32 fifo_chunks = 0, bytes_per_frame = 0;
+	u32 fifo_entries = 0, fifo_residual = 0;
+	u32 transfer_done = 0;
+	int ret = -EINVAL;
 
-	if (!transfer->tx_buf) {
-		rtk_spi->spi_manage.current_direction = RTK_SPI_READ;
-	} else if (!transfer->rx_buf) {
-		rtk_spi->spi_manage.current_direction = RTK_SPI_WRITE;
-	} else if (transfer->rx_buf && transfer->tx_buf) {
-		rtk_spi->spi_manage.current_direction = RTK_SPI_TRX;
-	} else {
-		dev_info(rtk_spi->dev, "Please confirm whether you want tx or rx by set another buf = NULL.");
-		rtk_spi->controller->cur_msg_prepared = 0;
-		rtk_spi->spi_manage.current_direction = RTK_SPI_INVALID;
-		return -EINVAL;
-	}
-	dev_dbg(rtk_spi->dev, "Message prepare direction = %d", rtk_spi->spi_manage.current_direction);
-
-	if (rtk_spi->spi_manage.spi_prepared == SPI_NOT_SETUP) {
-		dev_info(rtk_spi->dev, "Please call prepare_transfer_hardware for spi-%d first.\n", rtk_spi->spi_manage.spi_index);
-		return -EINVAL;
-	}
-
-	if (transfer->bits_per_word) {
-		dev_dbg(rtk_spi->dev, "upper level given bits_per_word = %d", transfer->bits_per_word);
+	if (transfer->bits_per_word <= SPI_BITS_PER_WORD_MAX) {
+		dev_dbg(rtk_spi->dev, "upper level given bits_per_word = %d\n", transfer->bits_per_word);
 		rtk_spi_set_frame_size(rtk_spi, transfer->bits_per_word - 1);
 	} else {
-		dev_info(rtk_spi->dev, "Please set bits_per_word for spi-%d.\n", rtk_spi->spi_manage.spi_index);
+		dev_err(rtk_spi->dev, "Invalid bits_per_word-%d for spi-%d.\n", transfer->bits_per_word, rtk_spi->spi_manage.spi_index);
 		return -EINVAL;
 	}
 
@@ -1274,116 +1355,52 @@ int rtk_spi_transfer_one(
 		if (rtk_spi->spi_param.clock_divider % 2) {
 			rtk_spi->spi_param.clock_divider++;
 		}
-		dev_dbg(rtk_spi->dev, "upper level given speed_hz = %d", transfer->speed_hz);
-		dev_dbg(rtk_spi->dev, "clock divider caculated = %d", rtk_spi->spi_param.clock_divider);
-		dev_dbg(rtk_spi->dev, "actual speed_hz = %d", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
+		dev_dbg(rtk_spi->dev, "upper level given speed_hz = %d\n", transfer->speed_hz);
+		dev_dbg(rtk_spi->dev, "clock divider caculated = %d\n", rtk_spi->spi_param.clock_divider);
+		dev_dbg(rtk_spi->dev, "actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
 		rtk_spi_set_baud_div(rtk_spi, rtk_spi->spi_param.clock_divider);
 	}
 
+	dev_dbg(&spi->dev, "Transfer settings: bpw %d, CPOL %d, CPHA %d, speed %dHz, %s, transfer_len %d\n",
+			transfer->bits_per_word,
+			rtk_spi->spi_param.sclk_polarity,
+			rtk_spi->spi_param.sclk_phase,
+			MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider,
+			rtk_spi->spi_manage.dma_enabled ? "DMA Mode" : "Interrupt Mode",
+			transfer->len);
+
 	if (rtk_spi->spi_manage.dma_enabled) {
-		ret = rtk_spi_can_dma(controller, spi, transfer);
-		if (ret) {
-			ret = USE_SPI_CORE_WAIT;
-		} else {
-			ret = -EINVAL;
-		}
-		return ret;
+		return rtk_spi_do_dma_transfer(controller, spi, transfer);
 	}
 
-	dev_dbg(rtk_spi->dev, "slave mode = %d", rtk_spi->spi_manage.is_slave);
+	bytes_per_frame = (transfer->bits_per_word > 8) ? 2 : 1;
+	fifo_entries = transfer->len / bytes_per_frame;
+	fifo_chunks = fifo_entries / RTK_SPI_FIFO_ALL;
+	fifo_residual = fifo_entries % RTK_SPI_FIFO_ALL;
+
 	if (rtk_spi->spi_manage.is_slave) {
-		if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-			ret = rtk_spi_transfer_slave(rtk_spi, transfer, SPI_TX_MODE);
-			return ret;
-		} else if (rtk_spi->spi_manage.current_direction == RTK_SPI_READ) {
-			ret = rtk_spi_transfer_slave(rtk_spi, transfer, SPI_RX_MODE);
-			return ret;
-		} else {
-			pr_info("Spi slave read or write mode is not clear.");
-			return -EINVAL;
-		}
+		/* Slave mode - Non DMA */
+		return rtk_spi_transfer_slave(rtk_spi, transfer, transfer->len, 0);
 	}
 
-	rtk_spi->spi_manage.transfer_status = RTK_SPI_ONGOING;
-	rtk_spi->current_trans = transfer;
-	if (rtk_spi->spi_manage.current_direction == RTK_SPI_WRITE) {
-		/* spi tx mode. */
-		rtk_spi_enable_cmd(rtk_spi, DISABLE);
-		if (transfer->len >= RTK_SPI_FIFO_ALL) {
-			rtk_spi_set_tx_fifo_level(rtk_spi, RTK_SPI_FIFO_HALF);
+	/* Master mode - Non DMA */
+	while (fifo_chunks > 0) {
+		ret = rtk_spi_transfer_master(rtk_spi, transfer, RTK_SPI_FIFO_ALL, transfer_done);
+		if (ret) {
+			dev_err(rtk_spi->dev, "SPI master transfer failed\n");
+			return ret;
 		} else {
-			rtk_spi_set_tx_fifo_level(rtk_spi, transfer->len / 2);
+			fifo_chunks -= 1;
+			transfer_done += RTK_SPI_FIFO_ALL;
 		}
-		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(1));
-		rtk_spi_enable_cmd(rtk_spi, ENABLE);
-
-		rtk_spi->spi_manage.tx_info.p_data_buf = transfer->tx_buf;
-		rtk_spi->spi_manage.tx_info.data_len = transfer->len;
-		if (rtk_spi->spi_manage.spi_poll_mode) {
-			ret = rtk_spi_poll_send(rtk_spi, transfer->tx_buf, transfer->len);
-		} else {
-			ret = rtk_spi_interrupt_write(rtk_spi, transfer->tx_buf, transfer->len);
-		}
-	} else if (rtk_spi->spi_manage.current_direction == RTK_SPI_READ) {
-		/* spi rx mode. */
-		rtk_spi_enable_cmd(rtk_spi, DISABLE);
-		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(2));
-		rtk_spi_set_read_len(rtk_spi, transfer->len);
-
-		if (transfer->len >= RTK_SPI_FIFO_ALL) {
-			rtk_spi_set_rx_fifo_level(rtk_spi, RTK_SPI_FIFO_HALF);
-		} else {
-			rtk_spi_set_rx_fifo_level(rtk_spi, transfer->len / 2);
-		}
-
-		rtk_spi->spi_manage.rx_info.p_data_buf = transfer->rx_buf;
-		rtk_spi->spi_manage.rx_info.data_len = transfer->len;
-		if (rtk_spi->spi_manage.spi_poll_mode) {
-			/* tx dummy0 before poll read. */
-			while (1) {
-				if (rtk_spi_get_writeable(rtk_spi)) {
-					rtk_spi_write_data(rtk_spi, 0);
-					break;
-				}
-			}
-			rtk_spi->spi_manage.rx_info.data_len =  rtk_spi_poll_receive(rtk_spi, rtk_spi->spi_manage.rx_info.p_data_buf, rtk_spi->spi_manage.rx_info.data_len);
-		} else {
-			ret = rtk_spi_interrupt_read(rtk_spi, transfer->rx_buf, transfer->len);
-			/* tx dummy0 once to start the rx process. */
-			while (1) {
-				if (rtk_spi_get_writeable(rtk_spi)) {
-					rtk_spi_write_data(rtk_spi, 0);
-					break;
-				}
-			}
-		}
-	} else if (rtk_spi->spi_manage.current_direction == RTK_SPI_TRX) {
-		/* spi loopback mode. */
-		rtk_spi_enable_cmd(rtk_spi, DISABLE);
-		rtk_spi_set_rx_fifo_level(rtk_spi, rtk_spi->spi_param.rx_threshold_level);
-		rtk_spi_set_tx_fifo_level(rtk_spi, rtk_spi->spi_param.rx_threshold_level);
-		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(0));
-		rtk_spi_set_read_len(rtk_spi, transfer->len);
-
-		rtk_spi->spi_manage.tx_info.p_data_buf = transfer->tx_buf;
-		rtk_spi->spi_manage.tx_info.data_len = transfer->len;
-		rtk_spi->spi_manage.rx_info.p_data_buf = transfer->rx_buf;
-		rtk_spi->spi_manage.rx_info.data_len = transfer->len;
-		if (rtk_spi->spi_manage.spi_poll_mode) {
-			ret = rtk_spi_poll_trx(rtk_spi, transfer->rx_buf, transfer->tx_buf, transfer->len);
-		} else {
-			ret = rtk_spi_interrupt_read(rtk_spi, transfer->rx_buf, transfer->len);
-			ret = rtk_spi_interrupt_write(rtk_spi, transfer->tx_buf, transfer->len);
-		}
-	} else {
-		dev_info(rtk_spi->dev,
-				 "Please confirm whether you want tx or rx by set another buf = NULL.");
-		return -EINVAL;
 	}
-
-#if RTK_SPI_REG_DUMP
-	rtk_spi_reg_dump(rtk_spi);
-#endif // RTK_SPI_REG_DUMP
+	/* Transfer residual data */
+	if (fifo_residual) {
+		ret = rtk_spi_transfer_master(rtk_spi, transfer, fifo_residual, transfer_done);
+		if (ret) {
+			dev_err(rtk_spi->dev, "SPI master transfer failed\n");
+		}
+	}
 
 	return ret;
 }
@@ -1406,16 +1423,14 @@ static int rtk_spi_slave_abort(struct spi_controller *controller)
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 
 	dev_dbg(rtk_spi->dev, "rtk spi-%d slave abort.", rtk_spi->spi_manage.spi_index);
-	rtk_spi_enable_cmd(rtk_spi, DISABLE);
 
 	if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
 		/* Slave transfer abort manually. */
-
 		if (rtk_spi->spi_manage.dma_enabled) {
 			rtk_spi_gdma_deinit(rtk_spi);
 		}
 
-		spi_finalize_current_transfer(rtk_spi->controller);
+		complete(&rtk_spi->spi_manage.txrx_completion);
 	}
 
 	return 0;
@@ -1425,19 +1440,15 @@ static void rtk_spi_handle_err(struct spi_controller *controller,
 							   struct spi_message *msg)
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
-	/* Disable the SPI */
-
-	/* Clear and disable interrupts and service requests */
-
-	/*
-	 * Stop the DMA if running. Note DMA callback handler may have unset
-	 * the dma_running already, which is fine as stopping is not needed
-	 * then but we shouldn't rely this flag for anything else than
-	 * stopping. For instance to differentiate between PIO and DMA
-	 * transfers.
-	 */
-
 	rtk_spi->spi_manage.transfer_status = RTK_SPI_DONE_WITH_ERROR;
+	if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
+		/* Slave transfer abort manually. */
+		if (rtk_spi->spi_manage.dma_enabled) {
+			rtk_spi_gdma_deinit(rtk_spi);
+		}
+
+		complete(&rtk_spi->spi_manage.txrx_completion);
+	}
 
 }
 
@@ -1448,16 +1459,20 @@ void rtk_spi_set_cs(
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(spi->controller);
 
+	if (rtk_spi->spi_manage.is_slave) {
+		return;
+	}
+
 	dev_dbg(rtk_spi->dev, "enter %s to %s cs", __FUNCTION__, !enable ? "enable" : "disable");
 	if (spi->chip_select) {
 		dev_warn(rtk_spi->dev, "set cs id = %d", spi->chip_select);
 		dev_warn(rtk_spi->dev, "The hardware slave-select line is dedicated for general spi. One master supports only one slave actually.");
 	}
 
-	if (!rtk_spi->spi_manage.is_slave && !enable) {
+	if (!enable) {
 		rtk_spi_set_slave_enable(rtk_spi, spi->chip_select);
 		gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 0);
-	} else if (!rtk_spi->spi_manage.is_slave && enable) {
+	} else {
 		/* disbale cs is not recommended, change cs id directly. */
 		gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 1);
 	}
@@ -1470,8 +1485,8 @@ static int rtk_spi_prepare_message(
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 	int ret = 0;
 
+	rtk_spi_init_hw(rtk_spi);
 	rtk_spi->controller->cur_msg_prepared = 1;
-
 	return ret;
 }
 
@@ -1497,30 +1512,12 @@ static int rtk_spi_setup(struct spi_device *spi)
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(spi->controller);
 	int ret = 0;
 
-	if (rtk_spi->spi_manage.spi_prepared) {
-		dev_info(rtk_spi->dev, "spi-%d has already been prepared.\n", rtk_spi->spi_manage.spi_index);
-		return -EINVAL;
-	}
-
-	ret = clk_prepare_enable(rtk_spi->clk);
-	if (ret) {
-		dev_err(rtk_spi->dev, "Failed to prepare_enable clock\n");
-		return ret;
-	}
+	/* set CPHA & CPOL as requested by user - default is mode-0 SCPOL=0 SCPH=0 */
+	rtk_spi->spi_param.sclk_polarity = spi->mode & SPI_CPOL ? SCPOL_INACTIVE_IS_HIGH : SCPOL_INACTIVE_IS_LOW;
+	rtk_spi->spi_param.sclk_phase = spi->mode & SPI_CPHA ? SCPH_TOGGLES_AT_START : SCPH_TOGGLES_IN_MIDDLE;
 
 	rtk_spi_init_hw(rtk_spi);
-	rtk_spi->spi_manage.spi_prepared = SPI_SETUP_DONE;
-
 	return ret;
-}
-
-static void rtk_spi_cleanup(struct spi_device *spi)
-{
-	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(spi->controller);
-
-	clk_disable_unprepare(rtk_spi->clk);
-
-	rtk_spi->spi_manage.spi_prepared = SPI_NOT_SETUP;
 }
 
 static int rtk_spi_probe(struct platform_device *pdev)
@@ -1530,7 +1527,6 @@ static int rtk_spi_probe(struct platform_device *pdev)
 	struct spi_controller		*controller;
 	struct resource			*res;
 	struct device_node		*np = pdev->dev.of_node;
-
 	int ret, status;
 
 	rtk_spi = devm_kzalloc(&pdev->dev, sizeof(struct rtk_spi_controller), GFP_KERNEL);
@@ -1558,6 +1554,12 @@ static int rtk_spi_probe(struct platform_device *pdev)
 		return PTR_ERR(rtk_spi->clk);
 	}
 
+	ret = clk_prepare_enable(rtk_spi->clk);
+	if (ret) {
+		dev_err(rtk_spi->dev, "Failed to prepare_enable clock\n");
+		return ret;
+	}
+
 	rtk_spi->dev = &pdev->dev;
 	rtk_spi_struct_init(rtk_spi, np);
 
@@ -1569,18 +1571,17 @@ static int rtk_spi_probe(struct platform_device *pdev)
 
 	if (!controller) {
 		dev_err(&pdev->dev, "cannot alloc spi_controller\n");
+		clk_disable_unprepare(rtk_spi->clk);
 		return -ENOMEM;
 	}
 
 	rtk_spi->controller = controller;
-
 	controller->dev.of_node = pdev->dev.of_node;
 	/* the spi->mode bits understood by this driver: */
 	controller->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP;
-
 	controller->bus_num = rtk_spi->spi_manage.spi_index;
 	controller->dma_alignment = DMA_ALIGNMENT;
-	controller->cleanup = rtk_spi_cleanup;
+	controller->flags = SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX;
 	controller->setup = rtk_spi_setup;
 	controller->set_cs = rtk_spi_set_cs;
 	controller->transfer_one = rtk_spi_transfer_one;
@@ -1590,11 +1591,7 @@ static int rtk_spi_probe(struct platform_device *pdev)
 	controller->unprepare_message = rtk_spi_unprepare_message;
 	controller->auto_runtime_pm = false;
 	controller->num_chipselect = rtk_spi->spi_manage.max_cs_num;
-	controller->flags = SPI_CONTROLLER_MUST_RX | SPI_CONTROLLER_MUST_TX;
-#if RTK_LINUX_SPI_DMA_ENTRY
-	/* If spi driver support dma mode, controller will call can_dma prior to transfer one. */
 	controller->can_dma = rtk_spi_can_dma;
-#endif // RTK_LINUX_SPI_DMA_ENTRY
 	controller->max_speed_hz = 50000000;
 	controller->min_speed_hz = 762;
 
@@ -1602,6 +1599,7 @@ static int rtk_spi_probe(struct platform_device *pdev)
 	ret = devm_request_irq(&pdev->dev, rtk_spi->irq, rtk_spi_interrupt_handler, 0, dev_name(&pdev->dev), rtk_spi);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to request IRQ\n");
+		clk_disable_unprepare(rtk_spi->clk);
 		return ret;
 	}
 
@@ -1642,6 +1640,7 @@ out_error_pm_runtime_enabled:
 
 out_error_controller_alloc:
 	spi_controller_put(controller);
+	clk_disable_unprepare(rtk_spi->clk);
 	return status;
 }
 
@@ -1657,12 +1656,13 @@ static int rtk_spi_remove(struct platform_device *pdev)
 
 	if (rtk_spi->spi_manage.dma_enabled) {
 		rtk_spi_gdma_deinit(rtk_spi);
-		mutex_destroy(&rtk_spi->spi_manage.dma_params.dma_lock);
 	}
 
 	if (rtk_spi->controller) {
 		spi_unregister_controller(rtk_spi->controller);
 	}
+
+	clk_disable_unprepare(rtk_spi->clk);
 
 	return 0;
 }

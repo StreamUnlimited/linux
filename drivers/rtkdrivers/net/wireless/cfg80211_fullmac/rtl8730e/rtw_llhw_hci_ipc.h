@@ -11,7 +11,9 @@
 #define IPC_MSG_QUEUE_WARNING_DEPTH	(4)
 
 #define HOST_MSG_PARAM_NUM		(9)
-#define DEV_MSG_PARAM_NUM		(6)
+#define HOST_MSG_DUMY_NUM		(64 - (HOST_MSG_PARAM_NUM + 2) * 4)
+#define DEV_MSG_PARAM_NUM		(7)
+#define DEV_MSG_DUMY_NUM		(64 - (DEV_MSG_PARAM_NUM + 2) * 4)
 
 #define RTW_IP_ADDR_LEN 4
 
@@ -40,7 +42,7 @@ struct inic_ipc_host_req_msg {
 	u32				api_id;
 	u32				param_buf[HOST_MSG_PARAM_NUM];
 	int				ret;
-	u8				dummy[20]; /* add for 64B size alignment */
+	u8				dummy[HOST_MSG_DUMY_NUM]; /* add for 64B size alignment */
 };
 
 struct inic_ipc_ex_msg {
