@@ -7,6 +7,10 @@
 		daughterboard = "dabfm";
 	};
 
+	aliases {
+		i2c1 = &i2c1_gpio;
+	};
+
 	reserved-memory {
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -45,6 +49,22 @@
 			gpios = <&gpiob 16 GPIO_ACTIVE_LOW>;
 			default-state = "off";
 		};
+	};
+
+	i2c1_gpio: i2c1_gpio {
+		compatible = "i2c-gpio";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c1_gpio_pins>;
+
+		// SDA and SCL
+		gpios = <&gpiob 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN) &gpiob 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+
+		status = "okay";
 	};
 };
 
@@ -129,12 +149,6 @@
 	status = "disabled";
 };
 
-&i2c1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c1_pins>;
-	status = "okay";
-};
-
 &ledc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&ledc_pin>;
@@ -156,6 +170,14 @@
 			pinmux = <REALTEK_PINMUX('A', 15, GPIO)>,	// AMP_MUTE_N
 				 <REALTEK_PINMUX('A', 16, GPIO)>;	// AMP_ENABLE
 			bias-pull-down;
+		};
+	};
+
+	i2c1_gpio_pins: i2c1_gpios {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 12, GPIO)>, // I2C1_SDA
+					<REALTEK_PINMUX('B', 13, GPIO)>;  // I2C1_SCL
+			bias-pull-up;
 		};
 	};
 
