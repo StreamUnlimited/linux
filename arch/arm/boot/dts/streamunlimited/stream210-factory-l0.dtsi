@@ -1,5 +1,22 @@
+#include "../rtl8730e-drm.dtsi"
 
 / {
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		// Reserve 6 MiB for graphics, this is enough do drive a
+		// 480x800 32-bpp display with double-buffering using DRM.
+		// There is probably some more optimizations to be done,
+		// but for now let's keep it like that.
+		mem_drm_reserved: drm_buffer@0x64000000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x64000000 0x600000>;
+		};
+	};
+
 	i2c1_gpio: i2c1_gpio {
 		compatible = "i2c-gpio";
 
@@ -14,6 +31,16 @@
 		i2c-gpio,delay-us = <2>;
 
 		status = "okay";
+	};
+
+	backlight {
+		compatible = "gpio-backlight";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_backlight_pin>;
+		gpios = <&gpiob 30 GPIO_ACTIVE_HIGH>;
+
+		default-on;
 	};
 };
 
@@ -99,6 +126,20 @@
 			bias-disable;
 		};
 	};
+
+	lcd_rst_n_pin: lcd_rst_n_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 31, GPIO)>;
+			bias-pull-down;
+		};
+	};
+
+	lcd_backlight_pin: lcd_backlight_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 30, GPIO)>;
+			bias-pull-down;
+		};
+	};
 };
 
 &adc {
@@ -137,4 +178,20 @@
 			drive-strength = <0>;
 		};
 	};
+};
+
+&drm {
+	status = "okay";
+};
+
+&dsi {
+	status = "okay";
+};
+
+&rtkpanel {
+	compatible = "kingtech,pv04005td25e";
+	pinctrl-names = "default";
+	pinctrl-0 = <&lcd_rst_n_pin>;
+	mipi-gpios = <&gpiob 31 GPIO_ACTIVE_LOW>;
+	status = "okay";
 };
