@@ -412,4 +412,5 @@
 	dr_mode = "otg";
 	status = "okay";
 	vbus-supply = <&reg_usb1_drvvbus>;
+	usb-role-switch;
 };
