@@ -155,11 +155,26 @@ static struct snd_soc_dai_link amebad2_dai[] = {
 	},
 };
 
+static struct snd_soc_dai_link amebad2_dai_digital_only[] = {
+	{
+		.name = "codec AIF3",
+		.stream_name = "SPORT2_I2S_Dai",
+		.ops = &amebad2_ops,
+		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
+		SND_SOC_DAILINK_REG(aif3),
+	},
+	{
+		.name = "codec AIF4",
+		.stream_name = "SPORT3_I2S_Dai",
+		.ops = &amebad2_ops,
+		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
+		SND_SOC_DAILINK_REG(aif4),
+	},
+};
+
 static struct snd_soc_card amebad2_snd = {
 	.name = "Amebad2-snd",
 	.owner = THIS_MODULE,
-	.dai_link = amebad2_dai,
-	.num_links = ARRAY_SIZE(amebad2_dai),
 	.controls = snd_soc_amebad2_controls,
 	.num_controls = ARRAY_SIZE(snd_soc_amebad2_controls),
 };
@@ -176,8 +191,18 @@ static int amebad2_audio_probe(struct platform_device *pdev)
 
 	snd_soc_card_set_drvdata(card, priv);
 
-	//struct device_node *np = pdev->dev.of_node;
+	struct device_node *np = pdev->dev.of_node;
+	bool disable_analog_links = of_property_read_bool(np, "sue,disable-analog-links");
+
 	card->dev = &pdev->dev;
+
+	if (disable_analog_links) {
+		card->dai_link = amebad2_dai_digital_only;
+		card->num_links = ARRAY_SIZE(amebad2_dai_digital_only);
+	} else {
+		card->dai_link = amebad2_dai;
+		card->num_links = ARRAY_SIZE(amebad2_dai);
+	}
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	return ret;
