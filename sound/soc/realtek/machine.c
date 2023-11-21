@@ -93,7 +93,7 @@ static int amebad2_audio_probe(struct platform_device *pdev)
 	card->dev = &pdev->dev;
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
-	return 0;
+	return ret;
 }
 
 static const struct of_device_id amebad2_audio_of_match[] = {
