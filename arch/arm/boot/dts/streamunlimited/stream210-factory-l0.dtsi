@@ -42,6 +42,13 @@
 
 		default-on;
 	};
+
+	sound {
+		// This will disable the analog parts of the internal codecs and
+		// thus allowing the pins to be used as digital GPIOs for the
+		// factory test.
+		sue,disable-analog-links;
+	};
 };
 
 &pinctrl {
