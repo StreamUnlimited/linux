@@ -741,7 +741,7 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 
 			audio_codec_set_adc_gain(codec_priv->tdm_amic_numbers[adc_channel], codec_priv->amic_gains[(codec_priv->tdm_amic_numbers[adc_channel])-1], codec_priv->analog_addr);
 			} else {
-				codec_info(1,component->dev,"codec_priv->tdm_dmic_numbers[%d] = %d",adc_channel, codec_priv->tdm_dmic_numbers[adc_channel]);
+				dev_info(component->dev,"codec_priv->tdm_dmic_numbers[%d] = %d",adc_channel, codec_priv->tdm_dmic_numbers[adc_channel]);
 				/*unmute ad channel(AD_CHANNEL_0...) and select DMIC number for the channel(ADC1...)*/
 				audio_codec_mute_dmic_input(false, adc_channel, codec_priv->tdm_dmic_numbers[adc_channel], codec_priv->digital_addr);
 				/*enable ad channel & it's fifo*/
@@ -1011,10 +1011,12 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	codec_priv->tdm_amic_numbers[7] = (u8)AMIC3;
 
 	codec_priv->dmic_tdm_num = 4;
-	codec_priv->tdm_dmic_numbers[0] = (u8)DMIC1;
-	codec_priv->tdm_dmic_numbers[1] = (u8)DMIC2;
-	codec_priv->tdm_dmic_numbers[2] = (u8)DMIC3;
-	codec_priv->tdm_dmic_numbers[3] = (u8)DMIC4;
+	// Custom DMIC order for StreamKit210
+	codec_priv->tdm_dmic_numbers[0] = (u8)DMIC2;
+	codec_priv->tdm_dmic_numbers[1] = (u8)DMIC1;
+	codec_priv->tdm_dmic_numbers[2] = (u8)DMIC4;
+	codec_priv->tdm_dmic_numbers[3] = (u8)DMIC3;
+
 	codec_priv->tdm_dmic_numbers[4] = (u8)DMIC4;
 	codec_priv->tdm_dmic_numbers[5] = (u8)DMIC4;
 	codec_priv->tdm_dmic_numbers[6] = (u8)DMIC4;
