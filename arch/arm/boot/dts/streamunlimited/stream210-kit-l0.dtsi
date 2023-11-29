@@ -73,8 +73,10 @@
 	pinctrl-0 = <&captouch_pins>;
 	pinctrl-1 = <&captouch_pins>;
 
-	rtk,ctc-diffthr = <800>, <800>, <800>, <800>, <800>, <800>, <800>, <800>, <800>;
-	rtk,ctc-mbias = <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>, <0x18>;
+	// The values are resonably good defaults for StreamKit210, final
+	// products will have a calibration done.
+	rtk,ctc-diffthr = <900>, <900>, <900>, <900>, <900>, <900>, <900>, <900>, <900>;
+	rtk,ctc-mbias = <18>, <18>, <18>, <18>, <18>, <18>, <14>, <17>, <16>;
 	rtk,ctc-nnoise = <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>;
 	rtk,ctc-pnoise = <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>, <400>;
 	rtk,ctc-ch-status = <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>;
