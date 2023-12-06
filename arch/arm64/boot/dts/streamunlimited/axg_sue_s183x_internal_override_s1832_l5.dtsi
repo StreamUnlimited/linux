@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+#include "axg_sue_s183x_internal_override_s1832_l4.dtsi"
+
+/ {
+	sue {
+		moduleversion = "2";
+	};
+	aliases {
+		serial1 = &uart_AO_B;
+	};
+};
+
+&button_sense {
+	gpios = <&gpio GPIOA_16 GPIO_ACTIVE_HIGH>;
+};
+
+&wifi_reset {
+	/delete-property/ vrf_pin;
+	power_on_pin = <&gpio_ao GPIOAO_9 GPIO_ACTIVE_HIGH>;
+};
+
+&sdio_pwrseq {
+	/delete-property/ clocks;
+};
+
+&wifi32k {
+	status = "disabled";
+};
+
+&pwm_ab {
+	status = "disabled";
+};
+
+&uart_B {
+	status = "disabled";
+};
+
+&uart_AO_B {
+	status = "okay";
+	pinctrl-0 = <&uart_ao_b_pins>, <&uart_ao_b_cts_rts_pins>;
+	pinctrl-names = "default";
+	uart-has-rtscts;
+	fifo-size = <64>;
+	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_AO_UART2>, <&clkc CLKID_CLK81>;
+	clock-names = "xtal", "pclk", "baud";
+};
