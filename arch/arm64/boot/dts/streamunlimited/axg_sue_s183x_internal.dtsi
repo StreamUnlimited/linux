@@ -121,7 +121,7 @@
 	gpio_buttons: gpio-keys {
 		compatible = "gpio-keys";
 
-		button_sense {
+		button_sense: button_sense {
 			label = "button_sense";
 			/* The BUTTON_SENSE is the inverted NPB_IN so it is becomes active high.  */
 			gpios = <&gpio_ao 3 GPIO_ACTIVE_HIGH>;
