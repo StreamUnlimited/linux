@@ -18,8 +18,13 @@
 #include <linux/input.h>
 #include <linux/clk.h>
 #include <linux/pm_wakeirq.h>
+#include <linux/suspend.h>
+#include <linux/clk-provider.h>
+#include <linux/pinctrl/consumer.h>
 
 #include "realtek-captouch.h"
+
+struct realtek_captouch_data *captouch;
 
 /**
   * @brief  Set CapTouch initialization parameters.
@@ -27,7 +32,7 @@
   * @param  ct_init: CapTouch initialization parameters.
   * @retval None
   */
-static void realtek_captouch_para_set(struct realtek_captouch_data *captouch, struct realtek_ct_init_para *ct_init)
+static void realtek_captouch_para_set(struct realtek_ct_init_para *ct_init)
 {
 	ct_init->debounce_ena = 1;
 	ct_init->sample_cnt = 6;
@@ -87,25 +92,7 @@ static int realtek_captouch_para_chk(struct realtek_ct_init_para *ct_init)
 	return 0;
 }
 
-/**
-  * @brief  Enable or Disable the captouch peripheral.
-  * @param  captouch: captouch driver data.
-  * @param  state: state of the captouch.
-  *   			This parameter can be: true or false.
-  * @retval None
-  */
-static void realtek_captouch_cmd(struct realtek_captouch_data *captouch, bool state)
-{
-	u32 reg_value;
 
-	reg_value = readl(captouch->base + RTK_CT_CTC_CTRL);
-	if (state) {
-		reg_value |= (CT_BIT_ENABLE | CT_BIT_BASELINE_INI);
-	} else {
-		reg_value &= ~CT_BIT_ENABLE;
-	}
-	writel(reg_value, captouch->base + RTK_CT_CTC_CTRL);
-}
 
 /**
   * @brief  Enables or disables the specified CapTouch interrupts.
@@ -123,7 +110,7 @@ static void realtek_captouch_cmd(struct realtek_captouch_data *captouch, bool st
   *   This parameter can be: true or false.
   * @retval None
   */
-static void realtek_captouch_int_config(struct realtek_captouch_data *captouch, u32 ct_int, bool state)
+static void realtek_captouch_int_config(u32 ct_int, bool state)
 {
 	u32 reg_value;
 
@@ -142,7 +129,7 @@ static void realtek_captouch_int_config(struct realtek_captouch_data *captouch, 
   * @param  ct_init: CapTouch initialization parameters.
   * @retval Init status
   */
-static int realtek_captouch_init(struct realtek_captouch_data *captouch, struct realtek_ct_init_para *ct_init)
+static int realtek_captouch_init(struct realtek_ct_init_para *ct_init)
 {
 	u32 reg_value;
 	int ret;
@@ -153,7 +140,7 @@ static int realtek_captouch_init(struct realtek_captouch_data *captouch, struct 
 		return -1;
 	}
 
-	realtek_captouch_cmd(captouch, false);
+	realtek_captouch_set_en(false);
 
 	//clear pending interrupt
 	writel(0, captouch->base + RTK_CT_INTERRUPT_ENABLE);
@@ -173,16 +160,20 @@ static int realtek_captouch_init(struct realtek_captouch_data *captouch, struct 
 	writel(reg_value, captouch->base + RTK_CT_ETC_CTRL);
 	writel(CT_BIT_CH_SWITCH_CTRL, captouch->base + RTK_CT_DEBUG_MODE_CTRL);
 
+	reg_value = readl(captouch->path_base);
 	/* Configure each channel */
 	for (i = 0; i < CT_CHANNEL_NUM ; i++) {
 		if (ct_init->ch[i].ch_ena) {
 			writel((CT_CHx_D_TOUCH_TH(ct_init->ch[i].diff_thr) | CT_BIT_CHx_EN), captouch->base + RTK_CT_CHx_CTRL + i * 0x10);
 			writel(CT_CHx_MBIAS(ct_init->ch[i].mbias_current), captouch->base + RTK_CT_CHx_MBIAS_ATH + i * 0x10);
 			writel((CT_CHx_N_ENT(ct_init->ch[i].nnoise_thr) | CT_CHx_P_ENT(ct_init->ch[i].pnoise_thr)), captouch->base + RTK_CT_CHx_NOISE_TH + i * 0x10);
+			reg_value &= ~(1 << i);
 		}
 	}
+	// Disable digital path input for captouch
+	writel(reg_value, captouch->path_base);
 
-	realtek_captouch_cmd(captouch, true);
+	realtek_captouch_set_en(true);
 
 	return 0;
 }
@@ -199,10 +190,10 @@ static irqreturn_t realtek_captouch_irq(int irq, void *dev_id)
 
 	for (i = 0; i < (CT_CHANNEL_NUM - 1); i++) {
 		if (IntStatus & CT_CHX_PRESS_INT(i)) {
-			dev_dbg(captouch->dev, "Key  %x press \n", i);
+			printk("Key  %x press \n", i);
 			input_report_key(captouch->input, captouch->keycode[i], 1);
 		} else if (IntStatus & CT_CHX_RELEASE_INT(i)) {
-			dev_dbg(captouch->dev, "Key  %x release \n", i);
+			printk("Key  %x release \n", i);
 			input_report_key(captouch->input, captouch->keycode[i], 0);
 		}
 	}
@@ -213,8 +204,8 @@ static irqreturn_t realtek_captouch_irq(int irq, void *dev_id)
 
 	if (IntStatus & CT_BIT_OVER_P_NOISE_TH_INTR) {
 		dev_dbg(captouch->dev, "CT_BIT_OVER_P_NOISE_TH_INTR \n");
-		realtek_captouch_cmd(captouch, false);
-		realtek_captouch_cmd(captouch, true);
+		realtek_captouch_set_en(false);
+		realtek_captouch_set_en(true);
 
 		goto exit;
 	}
@@ -237,7 +228,7 @@ exit:
 	return IRQ_HANDLED;
 }
 
-static int realtek_captouch_pase_dt(struct device *dev, struct realtek_captouch_data *captouch)
+static int realtek_captouch_pase_dt(struct device *dev)
 {
 	struct device_node *node = dev->of_node;
 	int ret;
@@ -324,11 +315,11 @@ static int realtek_captouch_pase_dt(struct device *dev, struct realtek_captouch_
 
 static int realtek_captouch_probe(struct platform_device *pdev)
 {
-	struct realtek_captouch_data *captouch;
 	struct resource *res;
 	struct realtek_ct_init_para *ct_init;
 	u8 i;
 	int ret;
+	const struct clk_hw *hwclk;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "%s: device tree node not found\n", __func__);
@@ -349,6 +340,12 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 	captouch->dev = &pdev->dev;
 
 	spin_lock_init(&captouch->lock);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	captouch->base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(captouch->base)) {
+		return PTR_ERR(captouch->base);
+	}
 
 	captouch->adc_clk = devm_clk_get(&pdev->dev, "rtk_adc_clk");
 	if (IS_ERR(captouch->adc_clk)) {
@@ -374,15 +371,37 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 		goto clk_fail;
 	}
 
-	ret = realtek_captouch_pase_dt(&pdev->dev, captouch);
+	captouch->path_base = of_iomap(pdev->dev.of_node, 1);
+	if (IS_ERR(captouch->path_base)) {
+		goto err_fail;
+	}
+
+	captouch->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR_OR_NULL(captouch->pinctrl)) {
+		dev_err(&pdev->dev, "%s: Pinctrl not defined\n", __func__);
+		goto map_fail;
+	} else {
+		captouch->ctc_state_active  = pinctrl_lookup_state(captouch->pinctrl, PINCTRL_STATE_DEFAULT);
+		if (IS_ERR_OR_NULL(captouch->ctc_state_active)) {
+			dev_err(&pdev->dev, "Fail to lookup pinctrl default state %d\n", ret);
+			goto map_fail;
+		}
+		captouch->ctc_state_sleep = pinctrl_lookup_state(captouch->pinctrl, PINCTRL_STATE_SLEEP);
+		if (IS_ERR_OR_NULL(captouch->ctc_state_sleep)) {
+			dev_err(&pdev->dev, "Fail to lookup pinctrl sleep state %d\n", ret);
+			goto map_fail;
+		}
+	}
+
+	ret = realtek_captouch_pase_dt(&pdev->dev);
 	if (ret < 0) {
-		goto alloc_fail;
+		goto map_fail;
 	}
 
 	captouch->input = devm_input_allocate_device(&pdev->dev);
 	if (!captouch->input) {
 		ret = -ENOMEM;
-		goto alloc_fail;
+		goto map_fail;
 	}
 
 	captouch->input->name = pdev->name;
@@ -399,39 +418,34 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 
 	input_set_drvdata(captouch->input, captouch);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	captouch->base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(captouch->base)) {
-		ret = -EBUSY;
-		goto alloc_fail;
-	}
 
 	/* Register IRQ into GIC */
 	captouch->irq = platform_get_irq(pdev, 0);
 	if (captouch->irq < 0) {
 		dev_err(&pdev->dev, "Unable to find IRQ\n");
 		ret = -EBUSY;
-		goto alloc_fail;
+		goto map_fail;
 	}
 
 	ret = devm_request_irq(&pdev->dev, captouch->irq, realtek_captouch_irq, 0, pdev->dev.driver->name, captouch);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to register IRQ %d\n", captouch->irq);
-		goto alloc_fail;
+		goto map_fail;
 	}
 
-	realtek_captouch_para_set(captouch, ct_init);
-	ret = realtek_captouch_init(captouch, ct_init);
+	realtek_captouch_para_set(ct_init);
+	ret = realtek_captouch_init(ct_init);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to init captouch: parameter error\n");
-		goto alloc_fail;
+		goto map_fail;
 	}
-	realtek_captouch_int_config(captouch, CT_ALL_INT_EN, true);
+	realtek_captouch_int_config(CT_ALL_INT_EN, true);
+	realtek_captouch_int_config(CT_BIT_SCAN_END_INTR_EN, false);
 
 	ret = input_register_device(captouch->input);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to register input device\n");
-		goto alloc_fail;
+		goto map_fail;
 	}
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
@@ -439,9 +453,16 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 		dev_pm_set_wake_irq(&pdev->dev, captouch->irq);
 	}
 
+	captouch->clk_sl = clk_get_parent(captouch->ctc_clk);
+	hwclk = __clk_get_hw(captouch->clk_sl);
+	captouch->ctc_parent_osc_131k = clk_hw_get_parent_by_index(hwclk, 0)->clk;
+	captouch->ctc_parent_ls_apb = clk_hw_get_parent_by_index(hwclk, 1)->clk;
+
 	return 0;
 
-alloc_fail:
+map_fail:
+	iounmap(captouch->path_base);
+err_fail:
 	clk_disable_unprepare(captouch->ctc_clk);
 clk_fail:
 	clk_disable_unprepare(captouch->adc_clk);
@@ -457,13 +478,48 @@ static int realtek_captouch_remove(struct platform_device *pdev)
 		device_init_wakeup(&pdev->dev, false);
 	}
 
-	input_unregister_device(captouch->input);
 	clk_disable_unprepare(captouch->adc_clk);
 	clk_disable_unprepare(captouch->ctc_clk);
-	realtek_captouch_cmd(captouch, false);
+	iounmap(captouch->path_base);
+	input_unregister_device(captouch->input);
+	realtek_captouch_set_en(false);
 
 	return 0;
 }
+
+static int realtek_ctc_suspend(struct device *dev)
+{
+	struct realtek_captouch_data *captouch = dev_get_drvdata(dev);
+	int ret;
+
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		ret = pinctrl_select_state(captouch->pinctrl, captouch->ctc_state_sleep);
+		if (ret) {
+			dev_err(dev, "Failed to select suspend state\n");
+		}
+		clk_set_parent(captouch->clk_sl, captouch->ctc_parent_osc_131k);
+	}
+	return 0;
+}
+
+static int realtek_ctc_resume(struct device *dev)
+{
+	struct realtek_captouch_data *captouch = dev_get_drvdata(dev);
+	int ret;
+
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		clk_set_parent(captouch->clk_sl, captouch->ctc_parent_ls_apb);
+		ret = pinctrl_select_state(captouch->pinctrl, captouch->ctc_state_active);
+		if (ret) {
+			dev_err(dev, "Failed to select active state\n");
+		}
+	}
+	return 0;
+}
+
+static const struct dev_pm_ops realtek_amebad2_ctc_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(realtek_ctc_suspend, realtek_ctc_resume)
+};
 
 static const struct of_device_id realtek_captouch_match[] = {
 	{ .compatible = "realtek,amebad2-captouch"},
@@ -475,6 +531,8 @@ static struct platform_driver realtek_captouch_driver = {
 	.driver = {
 		.name	= "realtek-amebad2-captouch",
 		.of_match_table = realtek_captouch_match,
+		.pm = &realtek_amebad2_ctc_pm_ops,
+		.dev_groups = captouch_configs,
 	},
 	.probe		= realtek_captouch_probe,
 	.remove		= realtek_captouch_remove,

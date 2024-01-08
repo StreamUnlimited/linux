@@ -23,15 +23,18 @@
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <misc/realtek-misc.h>
+#include <linux/nvmem-consumer.h>
 
 static int realtek_misc_major;
 static struct proc_dir_entry *rl_version_proc_ent;
+static struct proc_dir_entry *uuid_proc_ent;
 struct mutex misc_mutex;
 
 struct realtek_misc_dev {
 	struct cdev cdev;
 	void __iomem *base;
 	int current_affair;
+	u32 uuid;
 };
 struct realtek_misc_dev *realtek_misc_devp;
 
@@ -258,7 +261,54 @@ static long realtek_misc_ioctl(struct file *file, unsigned int cmd, unsigned lon
 	return ret;
 }
 
-static int realtek_proc_show(struct seq_file *m, void *v)
+static int realtek_misc_get_uuid(struct device *dev, u32 *uuid)
+{
+	struct nvmem_cell *cell;
+	unsigned char *efuse_buf;
+	size_t len;
+
+	cell = nvmem_cell_get(dev, "uuid");
+	if (IS_ERR(cell))
+		return PTR_ERR(cell);
+
+	efuse_buf = nvmem_cell_read(cell, &len);
+	nvmem_cell_put(cell);
+
+	if (IS_ERR(efuse_buf))
+		return PTR_ERR(efuse_buf);
+
+	*uuid = (efuse_buf[3] << 24) | (efuse_buf[2] << 16)
+		| (efuse_buf[1] << 8) | efuse_buf[0];
+
+	return 0;
+}
+
+/*
+* uuid proc ops
+*/
+static int realtek_uuid_proc_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "uuid: %u\n", realtek_misc_devp->uuid);
+
+	return 0;
+}
+
+static int realtek_uuid_proc_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, realtek_uuid_proc_show, NULL);
+}
+
+static const struct file_operations realtek_uuid_proc_fops = {
+	.open = realtek_uuid_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+/*
+* rl_version proc ops
+*/
+static int realtek_rl_version_proc_show(struct seq_file *m, void *v)
 {
 	int val = rtk_misc_get_rl_version();
 	seq_printf(m, "%d\n", val);
@@ -266,13 +316,13 @@ static int realtek_proc_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static int realtek_proc_open(struct inode *inode, struct file *filp)
+static int realtek_rl_verion_proc_open(struct inode *inode, struct file *filp)
 {
-	return single_open(filp, realtek_proc_show, NULL);
+	return single_open(filp, realtek_rl_version_proc_show, NULL);
 }
 
-static const struct file_operations realtek_misc_proc_fops = {
-	.open = realtek_proc_open,
+static const struct file_operations realtek_rl_verion_proc_fops = {
+	.open = realtek_rl_verion_proc_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -307,6 +357,7 @@ int realtek_misc_init(void)
 	void __iomem *base;
 	struct class *realtek_misc_class;
 	struct proc_dir_entry *realtek_misc_proc_dir;
+	struct device *dev;
 
 	ret = alloc_chrdev_region(&devno, 0, 1, "misc-ioctl");
 	if (ret < 0) {
@@ -340,7 +391,8 @@ int realtek_misc_init(void)
 	}
 
 	realtek_misc_class = class_create(THIS_MODULE, "misc-ioctl");
-	device_create(realtek_misc_class, NULL, MKDEV(realtek_misc_major, 0), NULL, "misc-ioctl");
+	dev = device_create(realtek_misc_class, NULL, MKDEV(realtek_misc_major, 0), NULL, "misc-ioctl");
+	dev->of_node = np;
 	mutex_init(&misc_mutex);
 
 	realtek_misc_proc_dir = proc_mkdir("realtek", NULL);
@@ -349,10 +401,13 @@ int realtek_misc_init(void)
 		goto fail_iomap;
 	}
 
-	rl_version_proc_ent = proc_create("rl_version", 0644, realtek_misc_proc_dir, &realtek_misc_proc_fops);
+	rl_version_proc_ent = proc_create("rl_version", 0644, realtek_misc_proc_dir, &realtek_rl_verion_proc_fops);
+	uuid_proc_ent = proc_create("uuid", 0644, realtek_misc_proc_dir, &realtek_uuid_proc_fops);
+
+	realtek_misc_get_uuid(dev, &realtek_misc_devp->uuid);
 
 	return 0;
-	
+
 fail_iomap:
 	of_node_put(np);
 

@@ -154,21 +154,29 @@ static u64 ameba_get_dai_counter_ntime(struct snd_pcm_substream *substream)
 	u64 now_counter = 0;
 	//means the delta_counter between now counter and last irq total counter.
 	u64 delta_counter = 0;
+	u32 phase = 0;
 
 	if (dma_params == NULL) {
 		return -EFAULT;
 	}
 
-	if (is_playback)
+	if (is_playback) {
+		audio_sp_set_phase_latch(dma_params->sport_base_addr);
 		delta_counter = audio_sp_get_tx_count(dma_params->sport_base_addr);
-	else
+		phase = audio_sp_get_tx_phase_val(dma_params->sport_base_addr);
+	} else {
+		audio_sp_set_phase_latch(dma_params->sport_base_addr);
 		delta_counter = audio_sp_get_rx_count(dma_params->sport_base_addr);
+		phase = audio_sp_get_rx_phase_val(dma_params->sport_base_addr);
+	}
 
 	now_counter = dma_params->total_sport_counter + delta_counter;
 	//this will cause __aeabi_uldivmod compile issue, so need to use div_u64 func.
 	//nsec = now_counter * 1000000000 / runtime->rate;
 	//pr_info("dma_params->total_sport_counter:%lld, delta_counter:%lld, now_counter:%lld \n", dma_params->total_sport_counter, delta_counter, now_counter);
-	nsec = div_u64(now_counter * 1000000000LL, runtime->rate);
+	//1000000000*phase/32 = 31250000 * phase
+	nsec = div_u64(now_counter * 1000000000LL + 31250000LL * (u64)phase, runtime->rate);
+
 	return nsec;
 }
 

@@ -55,6 +55,20 @@
 /** @} */
 
 /**************************************************************************//**
+* @defgroup CT_SNR_INF
+* @brief Signal Noise Ratio Register
+* @{
+*****************************************************************************/
+#define CT_BIT_SNR_UPD_ALWAYS            ((u32)0x00000001 << 31)          /*!<R/W 0  1: Update SNR info no matter touch or not (used only in debug function) */
+#define CT_MASK_SNR_NOISE_DATA           ((u32)0x00000FFF << 16)          /*!<R/W/ES 0  Noise peak to peak signal raw data for SNR monitor */
+#define CT_SNR_NOISE_DATA(x)             ((u32)(((x) & 0x00000FFF) << 16))
+#define CT_GET_SNR_NOISE_DATA(x)         ((u32)(((x >> 16) & 0x00000FFF)))
+#define CT_MASK_SNR_TOUCH_DATA           ((u32)0x00000FFF << 0)          /*!<R/W/ES 0h  Raw data of touch(signal-baseline)for SNR monitor */
+#define CT_SNR_TOUCH_DATA(x)             ((u32)(((x) & 0x00000FFF) << 0))
+#define CT_GET_SNR_TOUCH_DATA(x)         ((u32)(((x >> 0) & 0x00000FFF)))
+/** @} */
+
+/**************************************************************************//**
  * @defgroup CT_DEBUG_MODE_CTRL
  * @brief Debug and Channel Swith Mode Register
  * @{
@@ -67,10 +81,34 @@
 /** @} */
 
 /**************************************************************************//**
+* @defgroup CT_RAW_CODE_FIFO_STATUS
+* @brief FIFO Status Register
+* @{
+*****************************************************************************/
+#define CT_MASK_AFIFO_VALID_CNT          ((u32)0x00000007 << 4)          /*!<R 0h  Raw code FIFO valid cnt(push unit number which can be read) */
+#define CT_AFIFO_VALID_CNT(x)            ((u32)(((x) & 0x00000007) << 4))
+#define CT_GET_AFIFO_VALID_CNT(x)        ((u32)(((x >> 4) & 0x00000007)))
+#define CT_BIT_AFIFO_EMPTY               ((u32)0x00000001 << 1)          /*!<R 1  0: Raw code FIFO not empty 1: Raw code FIFO empty */
+#define CT_BIT_AFIFO_FULL                ((u32)0x00000001 << 0)          /*!<R 0  0: Raw code FIFO not full 1: Raw code FIFO full */
+/** @} */
+
+/**************************************************************************//**
+* @defgroup CT_RAW_CODE_FIFO_READ
+* @brief FIFO Read Register
+* @{
+*****************************************************************************/
+#define CT_BIT_AFIFO_RD_DATA_VLD         ((u32)0x00000001 << 31)          /*!<R 0h  Read data from raw code FIFO valid */
+#define CT_MASK_AFIFO_RD_DATA            ((u32)0x00000FFF << 0)          /*!<RP 0h  Read data from raw code FIFO */
+#define CT_AFIFO_RD_DATA(x)              ((u32)(((x) & 0x00000FFF) << 0))
+#define CT_GET_AFIFO_RD_DATA(x)          ((u32)(((x >> 0) & 0x00000FFF)))
+/** @} */
+
+/**************************************************************************//**
  * @defgroup CT_INTERRUPT_ENABLE
  * @brief Interrupt Enable Register
  * @{
  *****************************************************************************/
+#define CT_BIT_SCAN_END_INTR_EN          ((u32)0x00000001 << 21)          /*!<R/W 0h  Scan end interrupt enable */
 #define CT_BIT_GUARD_RELEASE_INTR_EN     ((u32)0x00000001 << 20)          /*!<R/W 0h  Guard sensor release enable */
 #define CT_BIT_GUARD_PRESS_INTR_EN       ((u32)0x00000001 << 19)          /*!<R/W 0h  Guard sensor press enable */
 #define CT_BIT_OVER_N_NOISE_TH_INTR_EN   ((u32)0x00000001 << 18)          /*!<R/W 0h  Negative noise threshold overflow enable */
@@ -150,6 +188,20 @@
 #define CT_GET_CHx_MBIAS(x)              ((u32)(((x >> 0) & 0x0000003F)))
 /** @} */
 
+/**************************************************************************//**
+* @defgroup CT_CHx_DATA_INF
+* @brief Channel x Dtouch Register
+* @{
+*****************************************************************************/
+#define CT_BIT_CHx_DIFF_DATA_POLARITY    ((u32)0x00000001 << 28)          /*!<R/W/ES 0h  Polarity of chx_diff_data 0: chx_data_ave<baseline 1: chx_data_ave>=baseline */
+#define CT_MASK_CHx_DIFF_DATA            ((u32)0x00000FFF << 16)          /*!<R/W/ES 0h  Difference digital data of channelx between chx_data_ave and baseline */
+#define CT_CHx_DIFF_DATA(x)              ((u32)(((x) & 0x00000FFF) << 16))
+#define CT_GET_CHx_DIFF_DATA(x)          ((u32)(((x >> 16) & 0x00000FFF)))
+#define CT_MASK_CHx_DATA_AVE             ((u32)0x00000FFF << 0)          /*!<R/W/ES 0h  Average of channel x raw code */
+#define CT_CHx_DATA_AVE(x)               ((u32)(((x) & 0x00000FFF) << 0))
+#define CT_GET_CHx_DATA_AVE(x)           ((u32)(((x >> 0) & 0x00000FFF)))
+/** @} */
+
 /* Registers for captouch */
 #define RTK_CT_CTC_CTRL						0x000 /*!< CAPTOUCH CONTROL REGISTER */
 #define RTK_CT_SCAN_PERIOD					0x004 /*!< SCAN PARAMETERS REGISTER */
@@ -189,7 +241,8 @@
 											CT_BIT_AFIFO_OVERFLOW_INTR_EN |\
 											CT_BIT_OVER_N_NOISE_TH_INTR_EN |\
 											CT_BIT_GUARD_PRESS_INTR_EN |\
-											CT_BIT_GUARD_RELEASE_INTR_EN)
+											CT_BIT_GUARD_RELEASE_INTR_EN|\
+											CT_BIT_SCAN_END_INTR_EN)
 
 #define IS_CT_INT_EN(IT)				(((IT) & ~CT_ALL_INT_EN) == 0)
 #define IS_CT_INT_CLR(IT)				(((IT) & ~CT_ALL_INT_EN) == 0)
@@ -250,10 +303,20 @@ struct realtek_captouch_data {
 	struct realtek_ct_chinit_para ch_init[CT_CHANNEL_NUM];
 	u32 keycode[CT_CHANNEL_NUM];
 	void __iomem *base;
+	void __iomem *path_base;
 	int irq;
 	struct clk *adc_clk;
 	struct clk *ctc_clk;
+	struct clk *ctc_parent_osc_131k;
+	struct clk *ctc_parent_ls_apb;
+	struct clk *clk_sl;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *ctc_state_active;
+	struct pinctrl_state *ctc_state_sleep;
 	spinlock_t lock;		/* interrupt lock */
 };
 
+extern const struct attribute_group *captouch_configs[];
+extern struct realtek_captouch_data *captouch;
+extern void realtek_captouch_set_en(bool state);
 #endif

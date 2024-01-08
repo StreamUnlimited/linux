@@ -26,7 +26,7 @@ static int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *p)
 	int ret = 0;
 	struct sockaddr *addr = p;
 
-	if (rtw_netdev_idx(pnetdev) > 1) {
+	if (rtw_netdev_idx(pnetdev) >= INIC_MAX_NET_PORT_NUM) {
 		dev_err(global_idev.fullmac_dev, "Netdevice index err.");
 		return -1;
 	}
@@ -232,6 +232,7 @@ int rtw_ndev_open(struct net_device *pnetdev)
 	rtw_netdev_priv_is_on(pnetdev) = true;
 	netif_tx_start_all_queues(pnetdev);
 	netif_tx_wake_all_queues(pnetdev);
+
 	return 0;
 }
 
@@ -318,6 +319,116 @@ static const struct net_device_ops rtw_ndev_ops_ap = {
 	.ndo_get_stats = rtw_ndev_get_stats,
 	.ndo_do_ioctl = NULL,
 };
+
+#ifdef CONFIG_NAN
+const struct net_device_ops rtw_ndev_ops_nan = {
+	.ndo_init = rtw_ndev_init,
+	.ndo_uninit = rtw_ndev_uninit,
+	.ndo_open = rtw_ndev_open,
+	.ndo_stop = rtw_ndev_close,
+	.ndo_start_xmit = rtw_xmit_entry,
+	.ndo_select_queue = rtw_ndev_select_queue,
+	.ndo_set_mac_address = rtw_ndev_set_mac_address,
+	.ndo_get_stats = rtw_ndev_get_stats,
+	.ndo_do_ioctl = rtw_ndev_ioctl,
+};
+
+int rtw_nan_iface_alloc(struct wiphy *wiphy,
+						const char *name,
+						struct wireless_dev **nan_wdev,
+						struct vif_params *params)
+{
+	struct wireless_dev *wdev = NULL;
+	struct net_device *ndev = NULL;
+	int ret = 0;
+
+	if (global_idev.pwdev_global[2]) {
+		dev_info(global_idev.fullmac_dev, "%s: nan_wdev already exists", __func__);
+		ret = -EBUSY;
+		goto exit;
+	}
+
+	/* alloc and init netdev */
+	ndev = alloc_etherdev_mq(sizeof(struct netdev_priv_t), 1);
+	if (!ndev) {
+		goto exit;
+	}
+	global_idev.pndev[2] = ndev;
+	rtw_netdev_idx(ndev) = 2;
+	ndev->netdev_ops = &rtw_ndev_ops_nan;
+	ndev->watchdog_timeo = HZ * 3; /* 3 second timeout */
+	SET_NETDEV_DEV(ndev, global_idev.fullmac_dev);
+
+	netdev_set_default_ethtool_ops(global_idev.pndev[2], &global_idev.rtw_ethtool_ops);
+	if (dev_alloc_name(global_idev.pndev[2], "nan0") < 0) {
+		dev_err(global_idev.fullmac_dev, "dev_alloc_name, fail!\n");
+	}
+
+	netif_carrier_off(global_idev.pndev[2]);
+	/* set nan port mac address */
+	memcpy(global_idev.pndev[2]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
+	global_idev.pndev[2]->dev_addr[5] = global_idev.pndev[0]->dev_addr[5] + 2;
+
+	ret = (register_netdevice(global_idev.pndev[2]) == 0) ? true : false;
+	if (ret != true) {
+		dev_err(global_idev.fullmac_dev, "netdevice register fail!\n");
+		goto exit;
+	}
+
+	/* alloc and init wireless_dev */
+	wdev = (struct wireless_dev *)kzalloc(sizeof(struct wireless_dev), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	if (!wdev) {
+		dev_err(global_idev.fullmac_dev, "%s: allocate wdev fail", __func__);
+		ret = -ENOMEM;
+		goto exit;
+	}
+	wdev->wiphy = global_idev.pwiphy_global;
+	wdev->netdev = ndev;
+	wdev->iftype = NL80211_IFTYPE_NAN;
+	ndev->ieee80211_ptr = wdev;
+	global_idev.pwdev_global[2] = wdev;
+
+	*nan_wdev = wdev;
+	netif_carrier_on(global_idev.pndev[2]);
+	netif_tx_start_all_queues(global_idev.pndev[2]);
+
+	llhw_ipc_wifi_init_nan();
+	return ret;
+
+exit:
+	if (global_idev.pwdev_global[2]) { //wdev
+		kfree((u8 *)global_idev.pwdev_global[2]);
+		global_idev.pwdev_global[2] = NULL;
+	}
+
+	if (global_idev.pndev[2]) {
+		free_netdev(global_idev.pndev[2]);
+		global_idev.pndev[2] = NULL;
+	}
+	return -ENODEV;
+
+}
+
+void rtw_nan_iface_free(struct wiphy *wiphy)
+{
+	if (!global_idev.pwdev_global[2]) {
+		goto exit;
+	}
+
+	//rtnl_lock();
+	cfg80211_unregister_wdev(global_idev.pwdev_global[2]);
+	//rtnl_unlock();
+
+	kfree((u8 *)global_idev.pwdev_global[2]);
+	global_idev.pwdev_global[2] = NULL;
+
+	llhw_ipc_wifi_deinit_nan();
+
+exit:
+	return;
+}
+
+#endif
 
 int rtw_ndev_register(void)
 {

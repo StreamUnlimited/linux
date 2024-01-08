@@ -36,15 +36,16 @@
 #define DEBUG
 #define RTK_DMAC_DEBUG_DETAILS		0
 
-/* RTK_DMAC_FLEXIBLE_CHANNEL set 0 means use DTS fixed DMA channel. */
-/* RTK_DMAC_FLEXIBLE_CHANNEL set 1 means dma driver can allocate any free channel. */
-#define RTK_DMAC_FLEXIBLE_CHANNEL	0
 
 /* RTK_DMAC_INTERRUPT_COMBINE set 0 means use 8 interrupt callback function. */
 /*RTK_DMAC_INTERRUPT_COMBINE set 1 means use 1 interrupt callback function. */
 #define RTK_DMAC_INTERRUPT_COMBINE	0
 
 #define RTK_DMAC_RUN_CPU		1
+#define RTK_MAX_TXD_PER_VCHAN	8
+#define RTK_DMA_HIGH_PERF_CH0	0
+#define RTK_DMA_HIGH_PERF_CH1	1
+
 
 /**************************************************************************/
 
@@ -391,6 +392,9 @@ struct rtk_dma_txd {
 	struct virt_dma_desc	vd;
 	struct list_head	lli_list;
 	bool			cyclic;
+	bool	allocated;
+	bool	is_active;
+	struct rtk_dma_vchan	*vchan;
 };
 
 enum dma_status_record {
@@ -443,7 +447,7 @@ struct rtk_dma_vbase {
 struct rtk_dma_vchan {
 	struct virt_dma_chan	vc;
 	struct rtk_dma_pchan	*pchan;
-	struct rtk_dma_txd	*txd;
+	struct rtk_dma_txd	txd[RTK_MAX_TXD_PER_VCHAN];
 	struct dma_slave_config cfg;
 	u8			drq;
 };

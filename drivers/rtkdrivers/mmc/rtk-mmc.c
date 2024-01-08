@@ -617,7 +617,7 @@ static u32 rtk_mmc_sdioh_init(struct mmc_host *mmc, u8 BusBitMode)
 
 	tmp = readl(base + 0x50c);
 	tmp &= 0xFF00FFFF;
-	tmp |= (SDIOH_CARD_SEL_SD_MODULE << SDIOH_REG_SHIFT_8);
+	tmp |= (SDIOH_CARD_SEL_SD_MODULE << SDIOH_REG_SHIFT_16);
 	writel(tmp, base + 0x50c);
 
 	tmp = readl(base + 0x500);

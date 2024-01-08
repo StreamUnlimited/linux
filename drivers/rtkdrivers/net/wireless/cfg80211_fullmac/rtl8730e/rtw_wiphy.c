@@ -156,17 +156,32 @@ int rtw_wiphy_init_params(struct wiphy *pwiphy)
 	pwiphy->max_scan_ssids = RTW_SSID_SCAN_AMOUNT;
 	pwiphy->max_scan_ie_len = RTW_SCAN_IE_LEN_MAX;
 	pwiphy->max_num_pmkids = RTW_MAX_NUM_PMKIDS;
-	pwiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP);
+	pwiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+							  | BIT(NL80211_IFTYPE_AP)
+#ifdef CONFIG_NAN
+							  | BIT(NL80211_IFTYPE_NAN)
+#endif
+							  ;
 	pwiphy->cipher_suites = rtw_cipher_suites;
 	pwiphy->n_cipher_suites = sizeof(rtw_cipher_suites) / sizeof((rtw_cipher_suites)[0]);
 	pwiphy->features |= NL80211_FEATURE_SAE;
+	pwiphy->support_mbssid = true;
+	pwiphy->support_only_he_mbssid = false;
+	pwiphy->max_num_csa_counters = 5;
+
+	wiphy_ext_feature_set(pwiphy, NL80211_EXT_FEATURE_MFP_OPTIONAL);
 
 #ifdef CONFIG_PM
 	pwiphy->wowlan = &rtw_wowlan_stub;
 #endif
 
+#ifdef CONFIG_NAN
+	pwiphy->nan_supported_bands |= BIT(NL80211_BAND_2GHZ);
+	pwiphy->nan_supported_bands |= BIT(NL80211_BAND_5GHZ);
+#endif
+
 	/* Support for AP mode. */
-	pwiphy->flags |= WIPHY_FLAG_HAVE_AP_SME;
+	pwiphy->flags |= (WIPHY_FLAG_HAVE_AP_SME | WIPHY_FLAG_HAS_CHANNEL_SWITCH);
 	pwiphy->mgmt_stypes = rtw_cfg80211_default_mgmt_stypes;
 
 	ret = rtw_wiphy_band_init(pwiphy, NL80211_BAND_2GHZ);
@@ -226,8 +241,9 @@ int rtw_wiphy_init(void)
 	global_idev.pwiphy_global = pwiphy;
 	set_wiphy_dev(pwiphy, global_idev.fullmac_dev);
 #ifdef CONFIG_NAN
-	rtw_cfgvendor_attach(pwiphy);
+	rtw_cfgvendor_attach(global_idev.pwiphy_global);
 #endif
+
 	ret = rtw_wiphy_init_params(pwiphy);
 	if (ret != true) {
 		goto wiphy_fail;

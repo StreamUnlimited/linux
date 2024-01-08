@@ -33,7 +33,10 @@ static int cfg80211_rtw_get_station(struct wiphy *wiphy, struct net_device *ndev
 
 static int cfg80211_rtw_change_iface(struct wiphy *wiphy, struct net_device *ndev, enum nl80211_iftype type, struct vif_params *params)
 {
-	ndev->ieee80211_ptr->iftype = type;
+#ifdef CONFIG_NAN
+	if (ndev->ieee80211_ptr->iftype != NL80211_IFTYPE_NAN)
+#endif
+		ndev->ieee80211_ptr->iftype = type;
 	return 0;
 }
 
@@ -176,7 +179,7 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 	memset(&scan_param, 0, sizeof(rtw_scan_param_t));
 
 	/* Add fake callback to inform rots give scan indicate when scan done. */
-	scan_param.scan_user_callback = (long int (*)(unsigned int,  void *))0xffffffff;
+	scan_param.scan_user_callback = (rtw_result_t (*)(unsigned int,  void *))0xffffffff;
 	scan_param.ssid = NULL;
 
 	//LINUX_TODO: do we need to support multi ssid scan?
@@ -369,8 +372,9 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	u8 *vir_pwd = NULL;
 	u8 pwd[] = "12345678";
 	dma_addr_t phy_pwd;
-	int rsnx_ielen = 0;
-	u8 *prsnx;
+	int rsnx_ielen = 0, rsn_ielen = 0;
+	u8 pmf_mode = 0, spp_opt = 0;
+	u8 *prsnx, *prsn;
 	struct cfg80211_external_auth_params *auth_ext_para = &global_idev.mlme_priv.auth_ext_para;
 
 	if (ndev) {
@@ -469,6 +473,31 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	memset(connect_param.bssid.octet, 0, ETH_ALEN);
 	if (sme->bssid) {
 		memcpy(connect_param.bssid.octet, sme->bssid, ETH_ALEN);
+	}
+
+	/* read rsn*/
+	prsn = rtw_get_ie((u8 *)sme->ie, WLAN_EID_RSN, &rsn_ielen, sme->ie_len);
+	if (prsn && (rsn_ielen > 0)) {
+		spp_opt = rtw_get_pmf_option(prsn, rsn_ielen);
+		/*no RSN Capability in RSN*/
+		if (spp_opt == 0xff) {
+			spp_opt = sme->mfp;
+		}
+	}
+
+	/* convert nl80211_mfp to pmf_mode */
+	if (spp_opt & MFPR_BIT) {
+		pmf_mode = 2;
+	} else if (spp_opt & MFPC_BIT) {
+		pmf_mode = 1;
+	} else {
+		pmf_mode = 0;
+	}
+
+	ret = llhw_ipc_wifi_set_pmf_mode(pmf_mode);
+	if (ret < 0) {
+		/* set pmf failed */
+		dev_err(global_idev.fullmac_dev, "%s: set mfp mode failed (%d).", __func__, ret);
 	}
 
 	/* set rsnxe*/

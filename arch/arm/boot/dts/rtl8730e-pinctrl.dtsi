@@ -66,18 +66,7 @@
 				};
 			};
 
-			captouch_pins_a: captouch@0 {
-				pins {
-					pinmux = <REALTEK_PINMUX('A', 0, CAPTOUCH_AUX_ADC)>, // TOUCH0_ADC0
-							<REALTEK_PINMUX('A', 1, CAPTOUCH_AUX_ADC)>,  // TOUCH1_ADC1
-							<REALTEK_PINMUX('A', 6, CAPTOUCH_AUX_ADC)>,  // TOUCH6
-							<REALTEK_PINMUX('A', 7, CAPTOUCH_AUX_ADC)>,  // TOUCH7
-							<REALTEK_PINMUX('A', 8, CAPTOUCH_AUX_ADC)>;  // GTOUCH
-					bias-disable;
-				};
-			};
-
-			captouch_pins_b: captouch@1 {
+			captouch_pins: captouch@0 {
 				pins {
 					pinmux = <REALTEK_PINMUX('A', 0, CAPTOUCH_AUX_ADC)>, // TOUCH0_ADC0
 							<REALTEK_PINMUX('A', 1, CAPTOUCH_AUX_ADC)>,  // TOUCH1_ADC1
@@ -125,8 +114,8 @@
 
 			ir_pins: ir@0 {
 				pins {
-					pinmux = <REALTEK_PINMUX('A', 3, IR)>, // IR_TX
-							<REALTEK_PINMUX('A', 4, IR)>;  // IR_RX
+					pinmux = <REALTEK_PINMUX('B', 11, IR)>, // IR_TX
+							<REALTEK_PINMUX('B', 10, IR)>;  // IR_RX
 					bias-pull-up;
 					slew-rate = <0>;
 					drive-strength = <0>;
@@ -195,7 +184,7 @@
 
 			ledc_pins: ledc@0 {
 				pins {
-					pinmux = <REALTEK_PINMUX('B', 20, LEDC)>;
+					pinmux = <REALTEK_PINMUX('A', 6, LEDC)>;
 					bias-pull-up;
 					slew-rate = <0>;
 					drive-strength = <0>;
@@ -285,8 +274,8 @@
 
 			uart2_pins: uart2@0 {
 				pins {
-					pinmux = <REALTEK_PINMUX('A', 7, UART_DATA)>,         // UART2_RXD
-							<REALTEK_PINMUX('A', 8, UART_DATA)>;          // UART2_TXD
+					pinmux = <REALTEK_PINMUX('A', 11, UART_DATA)>,         // UART2_RXD
+							<REALTEK_PINMUX('A', 12, UART_DATA)>;          // UART2_TXD
 					bias-pull-up;
 					slew-rate = <0>;
 					drive-strength = <0>;

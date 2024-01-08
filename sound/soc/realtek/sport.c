@@ -84,6 +84,7 @@ struct sport_dai {
 	u64 last_total_delay;
 
 	unsigned int dai_fmt;
+	u32 fifo_num;
 
 	spinlock_t lock;
 };
@@ -223,6 +224,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 			sport->irq_tx_count = 0;
 			sport->dma_playback.total_sport_counter = 0;
 			sport_info(1,&sport->pdev->dev,"tx X:%llu, counter boundary:%llu", sport->tx_sport_compare_val, sport->total_tx_counter_boundary);
+			audio_sp_tx_set_fifo(sport->addr, sport->fifo_num, true);
 			audio_sp_tx_start(sport->addr, true);
 			audio_sp_set_tx_count(sport->addr, (u32)(sport->tx_sport_compare_val));
 		} else {
@@ -235,6 +237,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 			sport->irq_rx_count = 0;
 			sport->dma_capture.total_sport_counter = 0;
 			sport_info(1,&sport->pdev->dev,"rx X:%llu, counter boundary:%llu", sport->rx_sport_compare_val, sport->total_rx_counter_boundary);
+			audio_sp_rx_set_fifo(sport->addr, sport->fifo_num, true);
 			audio_sp_rx_start(sport->addr, true);
 			audio_sp_set_rx_count(sport->addr, (u32)(sport->rx_sport_compare_val));
 		}
@@ -255,12 +258,14 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		audio_sp_dma_cmd(sport->addr, false);
 
-		if (is_playback ) {
+		if (is_playback) {
 			audio_sp_tx_start(sport->addr, false);
 			audio_sp_disable_tx_count(sport->addr);
+			audio_sp_tx_set_fifo(sport->addr, sport->fifo_num, false);
 		} else {
 			audio_sp_rx_start(sport->addr, false);
 			audio_sp_disable_rx_count(sport->addr);
+			audio_sp_rx_set_fifo(sport->addr, sport->fifo_num, false);
 		}
 
 		sport_info(1, &sport->pdev->dev,"%s stop done \n",__func__);
@@ -330,10 +335,12 @@ static snd_pcm_sframes_t sport_delay(struct snd_pcm_substream *substream, struct
 
 	spin_lock(&sport->lock);
 	if (is_playback) {
+		audio_sp_set_phase_latch(sport->addr);
 		counter = audio_sp_get_tx_count(sport->addr);
 		total_counter = counter + sport->irq_tx_count * sport->tx_sport_compare_val;
 		dma_buf_delay = snd_pcm_playback_hw_avail(substream->runtime);
 	} else {
+		audio_sp_set_phase_latch(sport->addr);
 		counter = audio_sp_get_rx_count(sport->addr);
 		total_counter = counter + sport->irq_rx_count * sport->rx_sport_compare_val;
 		dma_buf_delay = snd_pcm_capture_avail(substream->runtime);
@@ -680,10 +687,13 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 
 	snd_soc_dai_init_dma_data(dai, &sport->dma_playback, &sport->dma_capture);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		audio_sp_tx_init(sport->addr, &sp_tx_init);
-	else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		sport->fifo_num = sp_tx_init.sp_sel_fifo;
+	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		audio_sp_rx_init(sport->addr, &sp_rx_init);
+		sport->fifo_num = sp_rx_init.sp_sel_fifo;
+	}
 
 	audio_sp_set_i2s_mode(sport->addr, sport->sport_mode);
 
@@ -1134,6 +1144,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sport->tx_sport_compare_val = 6144;
 	sport->rx_sport_compare_val = 6144;
 	sport->dai_fmt = SND_SOC_DAIFMT_LEFT_J;
+	sport->fifo_num = 0;
 
 	spin_lock_init(&sport->lock);
 

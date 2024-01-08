@@ -871,6 +871,11 @@ bool audio_sp_is_rx_sport_irq(void __iomem * sportx);
 void audio_sp_clear_rx_sport_irq(void __iomem * sportx);
 void audio_sp_disable_rx_tx_sport_irq(void __iomem * sportx);
 void audio_sp_set_i2s_mode(void __iomem * sportx, u32 mode);
+void audio_sp_set_phase_latch(void __iomem * sportx);
+u32 audio_sp_get_tx_phase_val(void __iomem * sportx);
+u32 audio_sp_get_rx_phase_val(void __iomem * sportx);
+void audio_sp_tx_set_fifo(void __iomem * sportx, u32 fifo_num, bool new_state);
+void audio_sp_rx_set_fifo(void __iomem * sportx, u32 fifo_num, bool new_state);
 
 #if 0
 void audio_sp_set_sport_addr(u32 sport_index, void __iomem * sportx);

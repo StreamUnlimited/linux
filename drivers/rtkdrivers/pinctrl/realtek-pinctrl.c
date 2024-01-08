@@ -432,13 +432,15 @@ static int realtek_pconf_set_bias(struct pinctrl_dev *pctldev,
 	val = readl(pctl->membase + offset);
 
 	/* clear Pin_Num Pull contrl */
-	val &= ~(PAD_BIT_GPIOx_PU | PAD_BIT_GPIOx_PD);
+	val &= ~(PAD_BIT_GPIOx_PU | PAD_BIT_GPIOx_PD | PAD_BIT_GPIOx_PD_SLP | PAD_BIT_GPIOx_PU_SLP);
 
 	/* set needs Pull contrl */
 	if (pull_type == GPIO_PuPd_DOWN) {
 		val |= PAD_BIT_GPIOx_PD;
+		val |= PAD_BIT_GPIOx_PD_SLP;
 	} else if (pull_type == GPIO_PuPd_UP) {
 		val |= PAD_BIT_GPIOx_PU;
+		val |= PAD_BIT_GPIOx_PU_SLP;
 	}
 
 	writel(val, pctl->membase + offset);

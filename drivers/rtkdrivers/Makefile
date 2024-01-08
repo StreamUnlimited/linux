@@ -3,11 +3,10 @@
 # taken to initialize them in the correct order. Link order is the only way
 # to ensure this currently.
 
+obj-$(CONFIG_OTP_RTK_AMEBA)		        += otp/
 obj-$(CONFIG_MFD_RTK_AMEBA_TIMERS)		+= mfd_timer/
 obj-$(CONFIG_DRM_RTK_AMEBA)				+= drm/
 obj-$(CONFIG_IPC_RTK_AMEBA)				+= ipc/
-obj-$(CONFIG_OTP_RTK_AMEBA_CORE)		+= otp/
-obj-$(CONFIG_OTP_RTK_AMEBA_CDEV)		+= otp/
 obj-$(CONFIG_LEDC_RTK_WS28XXX)			+= ledc/
 obj-$(CONFIG_CLK_RTK_AMEBA_RCC)			+= clk/
 obj-$(CONFIG_USB_RTK_AMEBA_USB20PHY)	+= usb_phy/

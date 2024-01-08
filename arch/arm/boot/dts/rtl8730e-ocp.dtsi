@@ -25,13 +25,16 @@
 			compatible = "realtek,amebad2-adc";
 			#io-channel-cells = <1>;
 			reg = <0x42012000 0x100>,
-				<0x42012800 0x100>;
+				<0x42012800 0x100>,
+				<0x420082F8 0x4>;//Control digital path input for ADC and CTC pad
 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
 			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
 			rtk,adc-mode = <1>;
 			rtk,adc-channels = <0>, <1>, <2>, <6>;
 			//rtk,adc-diff-channels = <4 5>;
+			nvmem-cells = <&adc_normal_cal>, <&adc_vbat_cal>;
+			nvmem-cell-names = "normal_cal", "vbat_cal";
 			status = "disabled";
 
 			comparator: comparator@0 {
@@ -188,10 +191,36 @@
 		lsys: lsys@42008000 {
 			compatible = "realtek,amebad2-system-ctrl-ls";
 			reg = <0x42008000 0x2000>;
+			nvmem-cells = <&efuse_uuid>;
+			nvmem-cell-names = "uuid";
 		};
 
-		otp: otp@0 {
-			compatible = "realtek,amebad2-otp";
+
+
+		otp_phy: otp_phy@42000000 {
+			compatible = "realtek,amebad2-otp-phy";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x42000000 0x800>,
+				<0x42008000 0x1000>;
+
+			efuse_uuid: uuid@7F4 {
+				reg = <0x07F4 0x4>;
+			};
+
+			adc_normal_cal: normal_cal@704 {
+				reg = <0x0704 0x6>;
+			};
+
+			adc_vbat_cal: vbat_cal@70A {
+				reg = <0x070A 0x6>;
+			};
+		};
+
+		otp_logical: otp_logical@42000000 {
+			compatible = "realtek,amebad2-otp-logical";
+			reg = <0x42000000 0x400>,
+				<0x42008000 0x1000>;
 		};
 
 		rtc: rtc@4200E000 {
@@ -222,7 +251,7 @@
 			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <0>;
 			rtk,spi-dma-en = <0>;
-			dmas = <&dma 0>,<&dma 1>;
+			dmas = <&dma 16>,<&dma 17>;
 			dma-names = "spi0-tx","spi0-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
@@ -244,7 +273,7 @@
 			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <1>;
 			rtk,spi-dma-en = <0>;
-			dmas = <&dma 2>,<&dma 3>;
+			dmas = <&dma 18>,<&dma 19>;
 			dma-names = "spi1-tx","spi1-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;

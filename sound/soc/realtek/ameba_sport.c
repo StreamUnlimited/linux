@@ -703,6 +703,19 @@ void audio_sp_set_mono_stereo(void __iomem * sportx, u32 SP_MonoStereo)
 	}
 }
 
+/**
+  * @brief  Set SPORT phase latch.
+  * @param  index: select SPORT.
+  */
+void audio_sp_set_phase_latch(void __iomem * sportx)
+{
+	u32 tmp;
+	tmp = readl(sportx + REG_SP_RX_LRCLK);
+	tmp |= SP_BIT_EN_FS_PHASE_LATCH;
+	writel(tmp, sportx + REG_SP_RX_LRCLK);
+}
+
+
 void audio_sp_set_tx_count(void __iomem * sportx, u32 comp_val)
 {
 	u32 tmp;
@@ -729,14 +742,25 @@ u32 audio_sp_get_tx_count(void __iomem * sportx)
 	u32 dsp_counter;
 	u32 tx_counter;
 
-	tmp = readl(sportx + REG_SP_RX_LRCLK);
-	tmp |= SP_BIT_EN_FS_PHASE_LATCH;
-	writel(tmp, sportx + REG_SP_RX_LRCLK);
-
 	dsp_counter = readl(sportx + REG_SP_DSP_COUNTER);
 	tx_counter = (dsp_counter & SP_MASK_TX_SPORT_COUNTER) >> 5;
 
 	return tx_counter;
+}
+
+/**
+  * @brief  Get SPORT tx phase value.
+  * @param  index: select SPORT.
+  */
+u32 audio_sp_get_tx_phase_val(void __iomem * sportx)
+{
+	u32 tmp;
+	u32 tx_phase;
+
+	tmp = readl(sportx + REG_SP_DSP_COUNTER);
+	tx_phase = tmp & SP_MASK_TX_FS_PHASE_RPT;
+
+	return tx_phase;
 }
 
 bool audio_sp_is_tx_sport_irq(void __iomem * sportx)
@@ -780,14 +804,25 @@ u32 audio_sp_get_rx_count(void __iomem * sportx)
 	u32 rx_counter2;
 	u32 rx_counter;
 
-	tmp = readl(sportx + REG_SP_RX_LRCLK);
-	tmp |= SP_BIT_EN_FS_PHASE_LATCH;
-	writel(tmp, sportx + REG_SP_RX_LRCLK);
-
 	rx_counter2 = readl(sportx + REG_SP_RX_COUNTER2);
 	rx_counter = (rx_counter2 & SP_MASK_RX_SPORT_COUNTER) >> 5;
 
 	return rx_counter;
+}
+
+/**
+  * @brief  Get SPORT RX phase.
+  * @param  index: select SPORT.
+  */
+u32 audio_sp_get_rx_phase_val(void __iomem * sportx)
+{
+	u32 tmp;
+	u32 rx_phase;
+
+	tmp = readl(sportx + REG_SP_RX_COUNTER2);
+	rx_phase = tmp & SP_MASK_RX_FS_PHASE_RPT;
+
+	return rx_phase;
 }
 
 bool audio_sp_is_rx_sport_irq(void __iomem * sportx)
@@ -820,6 +855,83 @@ void audio_sp_disable_rx_tx_sport_irq(void __iomem * sportx)
 	tmp &= ~SP_BIT_EN_RX_SPORT_INTERRUPT;
 	writel(tmp, sportx + REG_SP_RX_COUNTER1);
 
+}
+
+/**
+  * @brief  Set AUDIO SPORT TX FIFO enable or disable.
+  * @param  index: sport index.
+  * @param  fifo_num: tx fifo number.
+  * @param  new_state: enable or disable.
+  * @retval None
+  */
+void audio_sp_tx_set_fifo(void __iomem * sportx, u32 fifo_num, bool new_state)
+{
+	assert_param(IS_SP_SEL_TX_FIFO(fifo_num));
+	u32 tmp;
+	tmp = readl(sportx + REG_SP_CTRL1);
+
+	if (new_state) {
+		if (fifo_num == SP_TX_FIFO2) {
+			tmp |= SP_BIT_TX_FIFO_0_REG_0_EN;
+		} else if (fifo_num == SP_TX_FIFO4) {
+			tmp |= SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN;
+		} else if (fifo_num == SP_TX_FIFO6) {
+			tmp |= (SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN | SP_BIT_TX_FIFO_1_REG_0_EN);
+		} else {
+			tmp |= (SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN | SP_BIT_TX_FIFO_1_REG_0_EN | SP_BIT_TX_FIFO_1_REG_1_EN);
+		}
+	} else {
+		if (fifo_num == SP_TX_FIFO2) {
+			tmp &= ~(SP_BIT_TX_FIFO_0_REG_0_EN);
+		} else if (fifo_num == SP_TX_FIFO4) {
+			tmp &= ~(SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN);
+		} else if (fifo_num == SP_TX_FIFO6) {
+			tmp &= ~(SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN | SP_BIT_TX_FIFO_1_REG_0_EN);
+		} else {
+			tmp &= ~(SP_BIT_TX_FIFO_0_REG_0_EN | SP_BIT_TX_FIFO_0_REG_1_EN | SP_BIT_TX_FIFO_1_REG_0_EN | SP_BIT_TX_FIFO_1_REG_1_EN);
+		}
+	}
+
+	writel(tmp, sportx + REG_SP_CTRL1);
+}
+
+/**
+  * @brief  Set AUDIO SPORT RX FIFO enable or disable.
+  * @param  index: sport index.
+  * @param  fifo_num: rx fifo number.
+  * @param  new_state: enable or disable.
+  * @retval None
+  */
+void audio_sp_rx_set_fifo(void __iomem * sportx, u32 fifo_num, bool new_state)
+{
+	assert_param(IS_SP_SEL_RX_FIFO(fifo_num));
+	u32 tmp;
+	tmp = readl(sportx + REG_SP_CTRL1);
+
+	if (new_state) {
+		if (fifo_num == SP_RX_FIFO2) {
+			tmp |= SP_BIT_RX_FIFO_0_REG_0_EN;
+		} else if (fifo_num == SP_RX_FIFO4) {
+			tmp |= SP_BIT_RX_FIFO_0_REG_0_EN | SP_BIT_RX_FIFO_0_REG_1_EN;
+		} else if (fifo_num == SP_RX_FIFO6) {
+			tmp |= (SP_BIT_RX_FIFO_0_REG_0_EN | SP_BIT_RX_FIFO_0_REG_1_EN | SP_BIT_RX_FIFO_1_REG_0_EN);
+		} else {
+			tmp |= (SP_BIT_RX_FIFO_0_REG_0_EN | SP_BIT_RX_FIFO_0_REG_1_EN | SP_BIT_RX_FIFO_1_REG_0_EN | SP_BIT_RX_FIFO_1_REG_1_EN);
+		}
+
+	} else {
+		if (fifo_num == SP_RX_FIFO2) {
+			tmp &= ~(SP_BIT_RX_FIFO_0_REG_0_EN);
+		} else if (fifo_num == SP_RX_FIFO4) {
+			tmp &= ~(SP_BIT_RX_FIFO_0_REG_0_EN | SP_BIT_RX_FIFO_0_REG_1_EN);
+		} else if (fifo_num == SP_RX_FIFO6) {
+			tmp &= ~(SP_BIT_RX_FIFO_0_REG_0_EN | SP_BIT_RX_FIFO_0_REG_1_EN | SP_BIT_RX_FIFO_1_REG_0_EN);
+		} else {
+			tmp &= ~(SP_BIT_RX_FIFO_0_REG_0_EN | SP_BIT_RX_FIFO_0_REG_1_EN | SP_BIT_RX_FIFO_1_REG_0_EN | SP_BIT_RX_FIFO_1_REG_1_EN);
+		}
+	}
+
+	writel(tmp, sportx + REG_SP_CTRL1);
 }
 
 #if 0

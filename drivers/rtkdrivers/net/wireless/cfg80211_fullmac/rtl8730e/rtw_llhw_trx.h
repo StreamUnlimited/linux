@@ -42,6 +42,8 @@ struct  dev_sk_buff_head {
 struct skb_raw_para {
 	unsigned char enable;
 	unsigned char rate;
+	unsigned char retry_limit;
+	unsigned char ac_queue;		/*0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO*/
 };
 
 struct dev_sk_buff {

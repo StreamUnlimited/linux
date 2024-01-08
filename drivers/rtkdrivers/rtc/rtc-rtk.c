@@ -700,8 +700,7 @@ static int rtk_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	if (readl(base + RTK_RTC_ISR) & RTC_BIT_ALMWF) {
 		/* Configure the Alarm1 register H:M:S */
 		reg = readl(base + RTK_RTC_ALMR1L);
-		reg &= (~ RTC_MASK_ALR_HT) | (~ RTC_MASK_ALR_HU) | (~ RTC_MASK_ALR_MNT) | \
-			   (~ RTC_MASK_ALR_MNU) | (~ RTC_MASK_ALR_ST) | (~ RTC_MASK_ALR_SU);
+		reg &= RTC_BIT_ALR_PM;
 		reg |= RTC_ALR_HT(hourt) | RTC_ALR_HU(houru) | RTC_ALR_MNT(mint) | \
 			   RTC_ALR_MNU(minu) | RTC_ALR_ST(sect) | RTC_ALR_SU(secu);
 		writel(reg, base + RTK_RTC_ALMR1L);
@@ -822,15 +821,6 @@ static int rtk_rtc_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
-											&rtk_rtc_ops, THIS_MODULE);
-	if (IS_ERR(rtc->rtc_dev)) {
-		ret = PTR_ERR(rtc->rtc_dev);
-		dev_err(&pdev->dev, "Fail to register rtc device: %d\n",
-				ret);
-		goto fail;
-	}
-
 	/* Handle RTC alarm interrupts */
 	ret = devm_request_threaded_irq(&pdev->dev, rtc->irq_alarm, NULL,
 									rtk_rtc_alarm_irq, IRQF_ONESHOT,
@@ -841,14 +831,23 @@ static int rtk_rtc_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	/*set time to 1970-01-01 00:00:00*/
-	rtc_time64_to_tm(0, &tm);
-	rtk_rtc_set_time(&pdev->dev, &tm);
-
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
 		device_init_wakeup(&pdev->dev, true);
 		dev_pm_set_wake_irq(&pdev->dev, rtc->irq_alarm);
 	}
+
+	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
+											&rtk_rtc_ops, THIS_MODULE);
+	if (IS_ERR(rtc->rtc_dev)) {
+		ret = PTR_ERR(rtc->rtc_dev);
+		dev_err(&pdev->dev, "Fail to register rtc device: %d\n",
+				ret);
+		goto fail;
+	}
+
+	/*set time to 1970-01-01 00:00:00*/
+	rtc_time64_to_tm(0, &tm);
+	rtk_rtc_set_time(&pdev->dev, &tm);
 
 	return 0;
 

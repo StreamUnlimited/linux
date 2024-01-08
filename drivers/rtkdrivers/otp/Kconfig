@@ -1,11 +1,4 @@
-menuconfig OTP_RTK_AMEBA_CORE
-	tristate "OTP"
+menuconfig OTP_RTK_AMEBA
+	tristate "NVMEM OTP driver"
 	help
-	  Driver for Realtek OTP core
-
-if OTP_RTK_AMEBA_CORE
-config OTP_RTK_AMEBA_CDEV
-	tristate "OTP for userspace"
-	help
-		This enables the OTP for userspace.
-endif
+	  NVMEM OTP driver

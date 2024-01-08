@@ -38,7 +38,6 @@ void dump_cfg80211_nan_func(struct cfg80211_nan_func *func)
 		printk("type: follow up\n");
 		printk("followup_id: %d\n", func->followup_id);
 		printk("followup_reqid: %d\n", func->followup_reqid);
-		printk("followup_dest: "MAC_FMT"\n", MAC_ARG(func->followup_dest.addr));
 		break;
 	default:
 		printk("type: unknown\n");
@@ -63,9 +62,6 @@ void dump_cfg80211_nan_func(struct cfg80211_nan_func *func)
 	}
 	if (func->srf_num_macs > 0) {
 		printk("srf_num_macs: %d\n", func->srf_num_macs);
-		for (i = 0; i < func->srf_num_macs; i++) {
-			printk("srf_mac: "MAC_FMT"\n", MAC_ARG(func->srf_macs[i].addr));
-		}
 	}
 	if (func->num_rx_filters > 0) {
 		printk("num_rx_filters: %d\n", func->num_rx_filters);
@@ -125,7 +121,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 
 	printk(" => %s\n", __func__);
 
-	rtw_memcpy(&nan_param, func, sizeof(rtw_nan_func_info_t));
+	memcpy(&nan_param, func, sizeof(rtw_nan_func_info_t));
 
 	if (func->serv_spec_info) {
 		serv_spec_info_vir = dmam_alloc_coherent(global_idev.fullmac_dev, func->serv_spec_info_len, &serv_spec_info_phy, GFP_KERNEL);
@@ -134,7 +130,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			return -ENOMEM;
 			goto exit;
 		}
-		rtw_memcpy(serv_spec_info_vir, func->serv_spec_info, func->serv_spec_info_len);
+		memcpy(serv_spec_info_vir, func->serv_spec_info, func->serv_spec_info_len);
 		nan_param.serv_spec_info = serv_spec_info_phy;
 	}
 
@@ -145,7 +141,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			ret = -ENOMEM;
 			goto exit;
 		}
-		rtw_memcpy(srf_bf_vir, func->srf_bf, func->srf_bf_len);
+		memcpy(srf_bf_vir, func->srf_bf, func->srf_bf_len);
 		nan_param.srf_bf = srf_bf_phy;
 	}
 
@@ -157,7 +153,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			ret = -ENOMEM;
 			goto exit;
 		}
-		rtw_memcpy(srf_macs_vir, func->srf_macs, func->srf_num_macs * sizeof(struct mac_address));
+		memcpy(srf_macs_vir, func->srf_macs, func->srf_num_macs * sizeof(struct mac_address));
 		nan_param.srf_macs = srf_macs_phy;
 	}
 
@@ -169,7 +165,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			ret = -ENOMEM;
 			goto exit;
 		}
-		rtw_memcpy(rx_filters_vir, func->rx_filters, func->num_rx_filters * sizeof(struct cfg80211_nan_func_filter));
+		memcpy(rx_filters_vir, func->rx_filters, func->num_rx_filters * sizeof(struct cfg80211_nan_func_filter));
 		nan_param.rx_filters = rx_filters_phy;
 	}
 
@@ -181,7 +177,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			ret = -ENOMEM;
 			goto exit;
 		}
-		rtw_memcpy(tx_filters_vir, func->tx_filters, func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter));
+		memcpy(tx_filters_vir, func->tx_filters, func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter));
 		nan_param.tx_filters = tx_filters_phy;
 	}
 
@@ -209,29 +205,6 @@ exit:
 	}
 
 	return ret;
-}
-
-void cfg80211_rtw_nan_func_free(struct wireless_dev *nan_wdev, void *os_dep_data)
-{
-	gfp_t kflags;
-	struct cfg80211_nan_func *func = os_dep_data;
-
-	if (nan_wdev == NULL) {
-		printk("%s: No nan wdev\n", __func__);
-		return;
-	}
-
-	if (func == NULL) {
-		return;
-	}
-
-	kflags = in_atomic() ? GFP_ATOMIC : GFP_KERNEL;
-
-	printk("%s: Remove NAN func cookie (%llu)\n", __func__, func->cookie);
-	cfg80211_nan_func_terminated(nan_wdev, func->instance_id,
-								 NL80211_NAN_FUNC_TERM_REASON_USER_REQUEST,
-								 func->cookie, kflags);
-	cfg80211_free_nan_func(func);
 }
 
 void cfg80211_rtw_del_nan_func(struct wiphy *wiphy,
@@ -262,7 +235,7 @@ exit:
 }
 
 
-void cfg80211_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32 info_len, u8 *info, u64 cookie)
+void cfg80211_rtw_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32 info_len, u8 *info, u64 cookie)
 {
 	struct cfg80211_nan_match_params match_param;
 
@@ -277,27 +250,23 @@ void cfg80211_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32
 	match_param.info_len = info_len;
 	match_param.info = info;
 	match_param.cookie = cookie;
-	RTW_INFO("%s: type = %d inst_id = %d peer_inst_id = %d addr = "MAC_FMT" cookie = %llu\n", __func__,
-			 match_param.type, match_param.inst_id, match_param.peer_inst_id, MAC_ARG(match_param.addr), match_param.cookie);
 	cfg80211_nan_match(global_idev.pwdev_global[1], &match_param, kflags);
 
 }
 
-void cfg80211_nan_func_free(void *os_dep_data)
+void cfg80211_rtw_nan_func_free(void *os_dep_data)
 {
 	struct wireless_dev *wdev = global_idev.pwdev_global[2];
 	gfp_t kflags;
 	struct cfg80211_nan_func *func = os_dep_data;
 
 	if (wdev == NULL) {
-		RTW_WARN("%s: No nan wdev\n", __func__);
 		return;
 	}
 
 	kflags = in_atomic() ? GFP_ATOMIC : GFP_KERNEL;
 
 	if (func != NULL) {
-		RTW_INFO("%s: Remove NAN func cookie (%llu)\n", __func__, func->cookie);
 		cfg80211_nan_func_terminated(wdev, func->instance_id, NL80211_NAN_FUNC_TERM_REASON_USER_REQUEST, func->cookie, kflags);
 		cfg80211_free_nan_func(func);
 	}

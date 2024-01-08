@@ -9,6 +9,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
 #include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/realtek/pinctrl/realtek-amebad2-pinfunc.h>
 
 / {
 	model = "Ameba Platform";
@@ -209,11 +210,35 @@
 			clock-frequency = <40000000>;
 		};
 
+		pinctrl: pinctrl@42008A00 {
+			compatible = "realtek,amebad2-pinctrl";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x42008A00 0x120>;
+
+			sdioh_pins: sdioh@0 {
+				pins {
+					pinmux = <REALTEK_PINMUX('B', 27, SDIO)>, // SD_CMD
+						 <REALTEK_PINMUX('B', 28, SDIO)>,     // SD_CLK
+						 <REALTEK_PINMUX('C', 0, SDIO)>,      // SD_CD
+						 <REALTEK_PINMUX('B', 29, SDIO)>,     // SD_D0
+						 <REALTEK_PINMUX('B', 25, SDIO)>,     // SD_D1
+						 <REALTEK_PINMUX('B', 26, SDIO)>,     // SD_D2
+						 <REALTEK_PINMUX('B', 30, SDIO)>;     // SD_D3
+					bias-pull-up;
+					slew-rate = <0>;
+					drive-strength = <0>;
+				};
+			};
+		};
+
 		sdioh: sdioh@400D0000 {
 			compatible = "realtek,amebad2-sdiohost";
 			reg = <0x400D0000 0x8000>;
 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_SDH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&sdioh_pins>;
 		};
 
 		// Watchdog4 is non-secure for linux system.
@@ -296,11 +321,11 @@
 					};
 					partition@4 {
 						label = "Squashfs filesystem";
-						reg = <0x25E0000 0x3C00000>;
+						reg = <0x1BE0000 0x3C00000>;
 					};
 					partition@5 {
 						label = "ubi/jffs2 filesystem";
-						reg = <0x9DE0000 0x6220000>;
+						reg = <0x57E0000 0x2820000>;
 					};
 					partition@6 {
 						label = "KM4 boot slotA";

@@ -177,7 +177,7 @@
 #define RTK_ADC_CH_NUM					(7)
 #define RTK_ADC_MAX_DIFF_CHAN_PAIRS		(3)
 #define RTK_ADC_BUF_SIZE					(32)
-#define ADC_DIFFERENTIAL_CH(x)				((u32)0x00000001 << (x))
+#define ADC_CH_BIT(x)				((u32)0x00000001 << (x))
 #define ADC_MASK_CHSW                     			(0xF)
 #define ADC_SHIFT_CHSW0(x)				(4*x)
 #define ADC_SHIFT_CHSW1(x)				(4*(x - 8))
@@ -268,6 +268,7 @@ struct realtek_adc_diff_channel {
 struct realtek_adc_data {
 	void __iomem *base;
 	void __iomem *comp_base;
+	void __iomem *path_base;
 	struct completion completion;
 	int irq;
 	spinlock_t lock;		/* interrupt lock */

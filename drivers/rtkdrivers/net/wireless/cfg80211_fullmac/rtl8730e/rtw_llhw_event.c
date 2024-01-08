@@ -140,7 +140,7 @@ static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_
 		goto func_exit;
 	}
 
-	if (idx >= TOTAL_IFACE_NUM) {
+	if (idx >= INIC_MAX_NET_PORT_NUM) {
 		dev_dbg(global_idev.fullmac_dev, "%s: interface %d not exist!\n", __func__, idx);
 		goto func_exit;
 	}
@@ -164,7 +164,7 @@ static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_
 
 	/*set ap port mac address*/
 	memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-	global_idev.pndev[1]->dev_addr[5] = global_idev.pndev[0]->dev_addr[5] + 1;
+	global_idev.pndev[1]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] = global_idev.pndev[0]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] + 1;
 
 	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
 
@@ -231,6 +231,7 @@ static void llhw_ipc_event_get_network_info(struct event_priv_t *event_priv, ini
 func_exit:
 	return;
 }
+
 #ifdef CONFIG_NAN
 static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
@@ -244,11 +245,6 @@ static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, i
 	unsigned char *IEs = phys_to_virt(p_ipc_msg->param_buf[4]);
 	u32 info_len = p_ipc_msg->param_buf[5];
 	u64 cookie = p_ipc_msg->param_buf[7] << 32 | p_ipc_msg->param_buf[6];
-
-	if (!global_idev.event_ch) {
-		dev_err(global_idev.fullmac_dev, "%s,%s: event_priv_t is NULL in!\n", "event", __func__);
-		goto func_exit;
-	}
 
 	pdev = global_idev.ipc_dev;
 	if (!pdev) {
@@ -268,7 +264,7 @@ static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, i
 		goto func_exit;
 	}
 
-	cfg80211_nan_handle_sdf(type, inst_id, peer_inst_id, addr, info_len, info, cookie);
+	cfg80211_rtw_nan_handle_sdf(type, inst_id, peer_inst_id, mac_addr, info_len, dma_ie, cookie);
 
 	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
 	dma_unmap_single(pdev, dma_ie, info_len, DMA_FROM_DEVICE);
@@ -276,6 +272,62 @@ static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, i
 func_exit:
 	return;
 }
+
+static void llhw_ipc_event_nan_cfgvendor_event_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+{
+	struct device *pdev = NULL;
+	dma_addr_t dma_event = 0;
+	u8 event_id = p_ipc_msg->param_buf[0];
+	unsigned char *event_addr = phys_to_virt(p_ipc_msg->param_buf[1]);
+	u32 size = p_ipc_msg->param_buf[2];
+
+	pdev = global_idev.ipc_dev;
+	if (!pdev) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	dma_event = dma_map_single(pdev, event_addr, size, DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, dma_event)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		goto func_exit;
+	}
+
+	rtw_cfgvendor_nan_event_indication(event_id, event_addr, size);
+
+	dma_unmap_single(pdev, dma_event, size, DMA_FROM_DEVICE);
+
+func_exit:
+	return;
+}
+
+static void llhw_ipc_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+{
+	struct device *pdev = NULL;
+	dma_addr_t dma_data = 0;
+	unsigned char *data_addr = phys_to_virt(p_ipc_msg->param_buf[0]);
+	u32 size = p_ipc_msg->param_buf[1];
+
+	pdev = global_idev.ipc_dev;
+	if (!pdev) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	dma_data = dma_map_single(pdev, data_addr, size, DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, dma_data)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		goto func_exit;
+	}
+
+	rtw_cfgvendor_send_cmd_reply(dma_data, size);
+
+	dma_unmap_single(pdev, dma_data, size, DMA_FROM_DEVICE);
+
+func_exit:
+	return;
+}
+
 #endif
 
 void llhw_ipc_event_task(unsigned long data)
@@ -345,6 +397,15 @@ void llhw_ipc_event_task(unsigned long data)
 #ifdef CONFIG_NAN
 	case IPC_WIFI_EVT_CFG80211_NAN_REPORT_MATCH_EVENT:
 		llhw_ipc_event_nan_match_indicate(event_priv, p_recv_msg);
+		break;
+	case IPC_WIFI_EVT_CFG80211_NAN_DEL_FUNC:
+		cfg80211_rtw_nan_func_free(p_recv_msg->param_buf[0]);
+		break;
+	case IPC_WIFI_EVT_CFG80211_NAN_CFGVENDOR_EVENT:
+		llhw_ipc_event_nan_cfgvendor_event_indicate(event_priv, p_recv_msg);
+		break;
+	case IPC_WIFI_EVT_CFG80211_NAN_CFGVENDOR_CMD_REPLY:
+		llhw_ipc_event_nan_cfgvendor_event_indicate(event_priv, p_recv_msg);
 		break;
 #endif
 	default:

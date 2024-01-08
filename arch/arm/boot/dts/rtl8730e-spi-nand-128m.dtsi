@@ -60,15 +60,10 @@
 					};
 					partition@8 {
 						label = "Rootfs Image A";
-						reg = <0x1BE0000 0x1E00000>;
+						reg = <0x1BE0000 0x3C00000>;
 						read-only;
 					};
 					partition@9 {
-						label = "Rootfs Image B";
-						reg = <0x39E0000 0x1E00000>;
-						read-only;
-					};
-					partition@10 {
 						label = "Userdata Area";
 						reg = <0x57E0000 0x2820000>;
 					};
@@ -78,7 +73,7 @@
 	};
 
 	chosen {
-		bootargs = "console=ttyS0,1500000 earlycon psci=enable ubi.mtd=8 ubi.block=0,0 root=/dev/ubiblock0_0 rootfstype=squashfs,ubifs ubi.mtd=10";
+		bootargs = "console=ttyS0,1500000 earlycon psci=enable ubi.mtd=8 ubi.block=0,0 root=/dev/ubiblock0_0 rootfstype=squashfs,ubifs ubi.mtd=9";
 		stdout-path = &loguart;
 	};
 

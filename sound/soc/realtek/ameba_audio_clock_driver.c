@@ -615,7 +615,7 @@ static int ameba_choose_input_clock_for_sport_index(struct audio_clock_component
 	system_control_base_lp = data->system_control_base_lp;
 
 	RegValue = readl(system_control_base_lp + REG_LSYS_CKSL_GRP0);
-	RegValue2 = readl(system_control_base_lp + REG_LSYS_CKD_GRP1);
+	RegValue2 = readl(system_control_base_lp + REG_LSYS_SPORT_CLK);
 	SPORTClk = LSYS_GET_CKSL_SPORT(RegValue);
 
 	if (clock == CKSL_I2S_XTAL40M) {

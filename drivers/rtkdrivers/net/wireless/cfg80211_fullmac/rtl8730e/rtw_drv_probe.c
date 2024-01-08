@@ -198,6 +198,7 @@ static int rtw_dev_probe(struct platform_device *pdev)
 	}
 
 	rtw_regd_init();
+	rtw_drv_proc_init();
 
 	return 0; /* probe success */
 
@@ -224,6 +225,8 @@ static int rtw_dev_remove(struct platform_device *pdev)
 
 	llhw_ipc_deinit();
 	dev_dbg(global_idev.fullmac_dev, "remove ipc done.");
+
+	rtw_drv_proc_deinit();
 
 	platform_device_deinit(pdev);
 	dev_dbg(global_idev.fullmac_dev, "platform driver remove done.");

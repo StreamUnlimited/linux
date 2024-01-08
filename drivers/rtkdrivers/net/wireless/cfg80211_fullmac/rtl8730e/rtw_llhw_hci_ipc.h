@@ -1,63 +1,23 @@
 #ifndef __INIC_LINUX_BASE_TYPE__
 #define __INIC_LINUX_BASE_TYPE__
 
-#include "rtw_llhw_trx.h"
-
+#ifdef CONFIG_NAN
+#define INIC_MAX_NET_PORT_NUM		(3)
+#else
 #define INIC_MAX_NET_PORT_NUM		(2)
+#endif
 #define INIC_STA_PORT			(0)
 #define INIC_AP_PORT			(1)
 
 #define IPC_MSG_QUEUE_DEPTH		(50)
 #define IPC_MSG_QUEUE_WARNING_DEPTH	(4)
 
-#define HOST_MSG_PARAM_NUM		(9)
-#define HOST_MSG_DUMY_NUM		(64 - (HOST_MSG_PARAM_NUM + 2) * 4)
-#define DEV_MSG_PARAM_NUM		(7)
-#define DEV_MSG_DUMY_NUM		(64 - (DEV_MSG_PARAM_NUM + 2) * 4)
-
 #define RTW_IP_ADDR_LEN 4
 
 /* TODO: typeof */
 /* Layer 2 structs. */
 
-enum {
-	/* Separated from IPC, can add/delete independently. */
-	RTW_JOINSTATUS_UNKNOWN = 0,
-	RTW_JOINSTATUS_STARTING,
-	RTW_JOINSTATUS_SCANNING,
-	RTW_JOINSTATUS_AUTHENTICATING,
-	RTW_JOINSTATUS_AUTHENTICATED,
-	RTW_JOINSTATUS_ASSOCIATING,
-	RTW_JOINSTATUS_ASSOCIATED,
-	RTW_JOINSTATUS_4WAY_HANDSHAKING,
-	RTW_JOINSTATUS_4WAY_HANDSHAKE_DONE,
-	RTW_JOINSTATUS_SUCCESS,
-	RTW_JOINSTATUS_FAIL,
-	RTW_JOINSTATUS_DISCONNECT,
-	//TODO: RTW_JOINSTATUS_ABORTED,
-};
 typedef unsigned int fullmac_join_status;
-
-struct inic_ipc_host_req_msg {
-	u32				api_id;
-	u32				param_buf[HOST_MSG_PARAM_NUM];
-	int				ret;
-	u8				dummy[HOST_MSG_DUMY_NUM]; /* add for 64B size alignment */
-};
-
-struct inic_ipc_ex_msg {
-	u32				event_num;
-	u32				msg_addr;
-	u32				msg_queue_status;
-	u32				wlan_idx;
-	u32				rsvd[12]; /* keep total size 64B aligned */
-};
-
-struct ipc_msg_node {
-	struct list_head		list;
-	struct inic_ipc_ex_msg		ipc_msg; /* to store ipc message */
-	bool				is_used; /* sign whether to be used */
-};
 
 /* Layer 1 structs. */
 struct event_priv_t {
@@ -140,16 +100,6 @@ struct inic_device {
 extern struct inic_device global_idev;
 
 #define MAX_NUM_WLAN_PORT		(2)
-#define FLAG_WLAN_IF_NOT_RUNNING	((u32)0xFFFFFFFF)
 #define IPC_USER_POINT			0
-
-enum IPC_WIFI_CTRL_TYPE {
-	IPC_WIFI_MSG_READ_DONE = 0,
-	IPC_WIFI_MSG_MEMORY_NOT_ENOUGH,
-	IPC_WIFI_MSG_RECV_DONE,
-	IPC_WIFI_CMD_XIMT_PKTS,
-	IPC_WIFI_EVT_RECV_PKTS,
-	IPC_WIFI_EVT_TX_DONE
-};
 
 #endif /* __INIC_LINUX_BASE_TYPE__ */

@@ -35,6 +35,7 @@ int llhw_ipc_wifi_get_chplan(u8 *chplan);
 int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len);
 int llhw_ipc_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr);
 int llhw_ipc_wifi_pmksa_ops(u32 pmksa_ops_phy);
+int llhw_ipc_wifi_channel_switch(u32 csa_param_phy);
 u32 llhw_ipc_wifi_update_ip_addr_in_wowlan(void);
 int llhw_ipc_wifi_get_statistics(u32 statistic_phy);
 int llhw_ipc_wifi_set_lps_enable(u8 enable);
@@ -58,14 +59,25 @@ int inic_ipc_msg_q_init(struct device *pdev, void (*task_hdl)(struct inic_ipc_ex
 int inic_ipc_msg_enqueue(struct inic_ipc_ex_msg *p_ipc_msg);
 void inic_ipc_msg_q_deinit(void);
 void llhw_ipc_send_packet(struct inic_ipc_ex_msg *p_ipc_msg);
+u64 llhw_wifi_get_tsft(u8 iface_type);
 int rtw_regd_init(void);
 void rtw_ethtool_ops_init(void);
 
 #ifdef CONFIG_NAN
 void cfg80211_rtw_ops_nan_init(void);
+void cfg80211_rtw_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32 info_len, u8 *info, u64 cookie);
+void cfg80211_rtw_nan_func_free(void *os_dep_data);
+int llhw_ipc_wifi_init_nan(void);
+int llhw_ipc_wifi_deinit_nan(void);
 int llhw_ipc_wifi_start_nan(u8 master_pref, u8 band_support);
 int llhw_ipc_wifi_stop_nan(void);
 int llhw_ipc_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer);
 int llhw_ipc_wifi_del_nan_func(u64 cookie);
+int rtw_nan_iface_alloc(struct wiphy *wiphy, const char *name, struct wireless_dev **nan_wdev, struct vif_params *params);
+void rtw_nan_iface_free(struct wiphy *wiphy);
+int llhw_ipc_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len);
+
 #endif
+
+int llhw_ipc_wifi_set_pmf_mode(u8 pmf_mode);
 #endif // __RTW_FUNCTIONS_H__

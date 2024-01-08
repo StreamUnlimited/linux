@@ -1,14 +1,20 @@
 #ifndef _RTW_TOP_HEADER_
 #define _RTW_TOP_HEADER_
 
+/******************************************************************/
+/********** MACROS for FULLMAC. **************/
+/******************************************************************/
 /* Allow print debug info at runtime by control log level. */
 /* Runtime order: echo 8 4 1 7 > /proc/sys/kernel/printk   */
 #define DEBUG 1
 
+#ifdef CONFIG_NAN
+#define CONFIG_NAN_PAIRING
+#endif
+
 /******************************************************************/
 /******************** Linux platform related. *********************/
 /******************************************************************/
-
 #include <linux/version.h>
 #include <linux/stddef.h>
 #include <linux/spinlock.h>
@@ -65,7 +71,12 @@
 #include <ameba_ipc/ameba_ipc.h>
 
 /* fullmac headers. */
+#include "rom_rtw_defs.h"
+#include "rtw_wifi_defs.h"
 #include "rtw_wiphy.h"
+#include "wifi_intf_drv_to_app_basic.h"
+#include "inic_ipc.h"
+
 #include "rtw_llhw_event.h"
 #include "rtw_drv_probe.h"
 #include "rtw_regd.h"
@@ -76,6 +87,8 @@
 #include "rtw_llhw_trx.h"
 #include "rtw_llhw_hci_ipc_msg.h"
 #include "rtw_functions.h"
+#include "rtw_cfgvendor.h"
+#include "rtw_proc.h"
 
 /******************************************************************/
 /********** Definitions between Linux and FULLMAC. **************/
@@ -84,6 +97,7 @@
 #define ETH_ALEN			6
 #define FUNC_NDEV_FMT			"%s(%s)"
 #define FUNC_NDEV_ARG(ndev)		__func__, ndev->name
+#define SOFTAP_ADDR_OFFSET_INDEX	1
 
 /******************************************************************/
 /***************** Definitions for cfg80211_ops. ******************/
@@ -105,6 +119,13 @@ struct rtw_ieee80211_hdr_3addr {
 	} while (0)
 
 #define get_addr2_ptr(pbuf)    ((unsigned char *)((unsigned int)(pbuf) + 10))
+
+#define RTW_GET_LE16(a) ((u16) (((a)[1] << 8) | (a)[0]))
+#define RSN_HEADER_LEN 4
+#define RSN_SELECTOR_LEN 4
+
+#define MFPR_BIT BIT(0)
+#define MFPC_BIT BIT(1)
 
 /******************************************************************/
 /***************** inline functions for fullmac. *****************/
@@ -144,31 +165,77 @@ static inline int rtw_freq2ch(int freq)
 	}
 }
 
-static inline u8 *rtw_get_ie(const u8 *pbuf, int index, int *len, int limit)
+static inline u8 *rtw_get_ie(const u8 *pbuf, int element_id, int *element_len, int total_len)
 {
-	int tmp, i;
-	const u8 *p;
-	if (limit < 1) {
-		return NULL;
-	}
+	int tmp_element_len, used_len;
+	const u8 *pie;
 
-	p = pbuf;
-	i = 0;
-	*len = 0;
-	while (1) {
-		if (*p == index) {
-			*len = *(p + 1);
-			return (u8 *)p;
+	pie = pbuf;
+	used_len = 0;
+	*element_len = 0;
+	while (total_len - used_len > 2) {
+		if (*pie == element_id) {
+			*element_len = *(pie + 1);
+			if (*element_len + 2 + used_len > total_len) {
+				return NULL;
+			} else {
+				return (u8 *)pie;
+			}
 		} else {
-			tmp = *(p + 1);
-			p += (tmp + 2);
-			i += (tmp + 2);
-		}
-		if (i >= limit) {
-			break;
+			tmp_element_len = *(pie + 1);
+			pie += (tmp_element_len + 2);
+			used_len += (tmp_element_len + 2);
 		}
 	}
 	return NULL;
+}
+
+static inline u8 rtw_get_pmf_option(const u8 *ie, u32 ie_len)
+{
+	const u8 *pos = ie;
+	u16 cnt;
+	if (ie + ie_len < pos + RSN_HEADER_LEN) {
+		goto err;
+	}
+	pos += RSN_HEADER_LEN;
+
+	/* Group CS processing */
+	if (ie + ie_len < pos + RSN_SELECTOR_LEN) {
+		goto err;
+	}
+	pos += RSN_SELECTOR_LEN;
+
+	/* Pairwise CS processing */
+	if (ie + ie_len < pos + 2) {
+		goto err;
+	}
+	cnt = RTW_GET_LE16(pos);
+	pos += 2;
+
+	if (!cnt || (ie + ie_len < pos + cnt * RSN_SELECTOR_LEN)) {
+		goto err;
+	}
+	pos += cnt * RSN_SELECTOR_LEN;
+
+	/* AKM processing */
+	if (ie + ie_len < pos + 2) {
+		goto err;
+	}
+	cnt = RTW_GET_LE16(pos);
+	pos += 2;
+
+	if (!cnt || (ie + ie_len < pos + cnt * RSN_SELECTOR_LEN)) {
+		goto err;
+	}
+	pos += cnt * RSN_SELECTOR_LEN;
+
+	/* RSN Capability processing */
+	if (ie + ie_len < pos + 2) {
+		goto err;
+	}
+	return pos[0] >> 6;
+err:
+	return 0xff;
 }
 
 static inline void rtw_dump_buf(u8 *_titlestring, const u8 *_hexdata, int _hexdatalen)
@@ -177,7 +244,6 @@ static inline void rtw_dump_buf(u8 *_titlestring, const u8 *_hexdata, int _hexda
 	u8 *ptr = (u8 *)_hexdata;
 
 	if (_titlestring) {
-		printk("");
 		printk("%s", _titlestring);
 		if (_hexdatalen >= 16) {
 			printk("\n");

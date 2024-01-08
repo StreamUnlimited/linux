@@ -15,11 +15,13 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/mfd/rtk-timer.h>
+#include <linux/nvmem-consumer.h>
 #include <misc/realtek-otp-core.h>
 
 #include "realtek-adc.h"
@@ -273,20 +275,26 @@ static int realtek_adc_read_efuse_caldata(struct iio_dev *indio_dev, u16 otp_add
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
 	otp_ipc_host_req_t otp_req = {0};
 	u16 K_A, K_B, K_C;
-	u8 EfuseBuf[EFUSE_BUF_LEN];
+	u8 *EfuseBuf = NULL;
 	int ret = 0;
+	int len = 0;
+	struct nvmem_cell *cell;
 
-	otp_req.otp_id = LINUX_IPC_OTP_PHY_READ8;
-	otp_req.addr = otp_addr;
-	otp_req.len = EFUSE_BUF_LEN;
+	if (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR)
+		cell = nvmem_cell_get(&indio_dev->dev, "normal_cal");
+	else
+		cell = nvmem_cell_get(&indio_dev->dev, "vbat_cal");
 
-	ret = rtk_otp_process(&otp_req, EfuseBuf);
-	if (ret < 0) {
+	if (IS_ERR(cell)) {
 		adc->k_coeff_normal[0] = adc->k_coeff_normal[1] = adc->k_coeff_normal[2] = 0;
 		adc->k_coeff_vbat[0] = adc->k_coeff_vbat[1] = adc->k_coeff_vbat[2] = 0;
 		dev_err(&indio_dev->dev, "otp read fail\n");
+		ret = (int)PTR_ERR(cell);
 		return ret;
 	}
+
+	EfuseBuf = nvmem_cell_read(cell, &len);
+	nvmem_cell_put(cell);
 
 	K_A = EfuseBuf[1] << 8 | EfuseBuf[0];
 	K_B = EfuseBuf[3] << 8 | EfuseBuf[2];
@@ -607,6 +615,7 @@ static void realtek_adc_hw_init(struct iio_dev *indio_dev)
 {
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
 	u32 reg_value, i;
+	u32 path_reg;
 
 	realtek_adc_cmd(adc, false);
 	// disable interrupt, clear all interrupts
@@ -619,14 +628,20 @@ static void realtek_adc_hw_init(struct iio_dev *indio_dev)
 	reg_value &= ~ADC_MASK_OP_MOD;
 	reg_value |= ADC_OP_MOD(adc->mode);
 	writel(reg_value, adc->base + RTK_ADC_CONF);
+
 	// set adc input type
 	reg_value = 0;
+	path_reg = readl(adc->path_base);
 	for (i = 0; i < indio_dev->num_channels; i++) {
 		if (indio_dev->channels[i].differential == 1) {
-			reg_value |= ADC_DIFFERENTIAL_CH(indio_dev->channels[i].channel);
+			reg_value |= ADC_CH_BIT(indio_dev->channels[i].channel);
+			path_reg &= ~ ADC_CH_BIT(indio_dev->channels[i].channel2);
 		}
+		path_reg &= ~ ADC_CH_BIT(indio_dev->channels[i].channel);
 	}
 	writel(reg_value, adc->base + RTK_ADC_IN_TYPE);
+	// Disable digital path input for adc
+	writel(path_reg, adc->path_base);
 	// set particular channel
 	if (realtek_adc_cfg.special_ch < RTK_ADC_CH_NUM) {
 		writel(ADC_BIT_IT_CHCV_END_EN, adc->base + RTK_ADC_INTR_CTRL);
@@ -851,18 +866,6 @@ static int realtek_adc_probe(struct platform_device *pdev)
 
 	adc = iio_priv(indio_dev);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	adc->base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(adc->base)) {
-		return PTR_ERR(adc->base);
-	}
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	adc->comp_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(adc->base)) {
-		return PTR_ERR(adc->base);
-	}
-
 	spin_lock_init(&adc->lock);
 	init_completion(&adc->completion);
 	indio_dev->name = dev_name(&pdev->dev);
@@ -876,6 +879,18 @@ static int realtek_adc_probe(struct platform_device *pdev)
 	if (of_property_read_u32(pdev->dev.of_node, "rtk,adc-mode", &adc->mode)) {
 		dev_err(&pdev->dev, "adc mode property not found\n");
 		return -EINVAL;
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	adc->base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(adc->base)) {
+		return PTR_ERR(adc->base);
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	adc->comp_base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(adc->base)) {
+		return PTR_ERR(adc->base);
 	}
 
 	adc->adc_clk = devm_clk_get(&pdev->dev, "rtk_adc_clk");
@@ -902,21 +917,26 @@ static int realtek_adc_probe(struct platform_device *pdev)
 		goto clk_fail;
 	}
 
+	adc->path_base = of_iomap(pdev->dev.of_node, 2);
+	if (IS_ERR(adc->path_base)) {
+		goto err_fail;
+	}
+
 	if (adc->mode != ADC_COMP_ASSIST_MODE) {
 		adc->irq = platform_get_irq(pdev, 0);
 		if (adc->irq < 0) {
-			return adc->irq;
+			goto map_fail;
 		}
 
 		ret = devm_request_irq(&pdev->dev, adc->irq, realtek_adc_isr, 0, pdev->name, adc);
 		if (ret) {
 			dev_err(&pdev->dev, "failed to request IRQ\n");
-			return ret;
+			goto map_fail;
 		}
 
 		ret = realtek_adc_init_channel(indio_dev);
 		if (ret < 0) {
-			return ret;
+			goto map_fail;
 		}
 
 		adc->is_calibdata_read = false;
@@ -929,7 +949,7 @@ static int realtek_adc_probe(struct platform_device *pdev)
 										 &realtek_adc_buffer_setup_ops);
 		if (ret) {
 			dev_err(&pdev->dev, "buffer setup failed\n");
-			return ret;
+			goto map_fail;
 		}
 
 		realtek_adc_hw_init(indio_dev);
@@ -937,7 +957,7 @@ static int realtek_adc_probe(struct platform_device *pdev)
 	ret = iio_device_register(indio_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "iio dev register failed\n");
-		goto err_fail;
+		goto map_fail;
 	}
 
 	if (adc->mode == ADC_COMP_ASSIST_MODE) {
@@ -956,8 +976,10 @@ static int realtek_adc_probe(struct platform_device *pdev)
 
 err_dev_register:
 	iio_device_unregister(indio_dev);
-err_fail:
 	realtek_adc_hw_deinit(indio_dev);
+map_fail:
+	iounmap(adc->path_base);
+err_fail:
 	clk_disable_unprepare(adc->ctc_clk);
 clk_fail:
 	clk_disable_unprepare(adc->adc_clk);
@@ -971,6 +993,7 @@ static int realtek_adc_remove(struct platform_device *pdev)
 
 	clk_disable_unprepare(adc->adc_clk);
 	clk_disable_unprepare(adc->ctc_clk);
+	iounmap(adc->path_base);
 	iio_device_unregister(indio_dev);
 	realtek_adc_hw_deinit(indio_dev);
 

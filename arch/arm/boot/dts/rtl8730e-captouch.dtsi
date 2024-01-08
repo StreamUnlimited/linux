@@ -19,7 +19,8 @@
 	ocp {
 		captouch: captouch@42010000 {
 			compatible = "realtek,amebad2-captouch";
-			reg = <0x42010000 0x500>;
+			reg = <0x42010000 0x500>,
+				<0x420082F8 0x4>;//Control digital path input for ADC and CTC pad
 			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
 			clock-names = "rtk_ctc_clk", "rtk_adc_clk";

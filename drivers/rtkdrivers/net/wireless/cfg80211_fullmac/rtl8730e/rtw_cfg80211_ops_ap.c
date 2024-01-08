@@ -3,12 +3,50 @@
 static struct wireless_dev *cfg80211_rtw_add_virtual_intf(struct wiphy *wiphy, const char *name,
 		unsigned char name_assign_type, enum nl80211_iftype type, struct vif_params *params)
 {
-	return 0;
+	int ret = 0;
+	struct wireless_dev *wdev = NULL;
+
+	dev_info(global_idev.fullmac_dev, "%s: name:%s, type:%d.", __func__, name, type);
+
+	switch (type) {
+#ifdef CONFIG_NAN
+	case NL80211_IFTYPE_NAN:
+		ret = rtw_nan_iface_alloc(wiphy, name, &wdev, params);
+		break;
+#endif
+	default:
+		ret = -ENODEV;
+		dev_err(global_idev.fullmac_dev, "%s: Unsupported interface type.", __func__);
+		break;
+	}
+
+	dev_info(global_idev.fullmac_dev, "%s: wdev:%p, ret:%d.", __func__, wdev, ret);
+
+	return wdev ? wdev : ERR_PTR(ret);
 }
 
 static int cfg80211_rtw_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
-	return 0;
+	struct net_device *ndev = wdev_to_ndev(wdev);
+	int ret = 0;
+
+#if defined (CONFIG_NAN)
+	if (wdev->iftype == NL80211_IFTYPE_NAN) {
+		dev_info(global_idev.fullmac_dev, "%s: free nan.", __func__, FUNC_NDEV_ARG(ndev));
+		if (wdev == global_idev.pwdev_global[2]) {
+			rtw_nan_iface_free(wiphy);
+		} else {
+			dev_err(global_idev.fullmac_dev, "%s: unknown NAN wdev:%p.", __func__, wdev);
+		}
+	} else
+#endif
+	{
+		ret = -EINVAL;
+		goto exit;
+	}
+
+exit:
+	return ret;
 }
 
 #if defined(CONFIG_RTW_MACADDR_ACL) && (CONFIG_RTW_MACADDR_ACL == 1)
@@ -144,7 +182,36 @@ static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *nd
 
 static int cfg80211_rtw_channel_switch(struct wiphy *wiphy, struct net_device *dev, struct cfg80211_csa_settings *params)
 {
-	return 0;
+	int ret;
+	rtw_csa_parm_t *csa_param_vir;
+	dma_addr_t csa_param_phy;
+
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
+	dev_dbg(global_idev.fullmac_dev, "switch to channel: %d", ieee80211_frequency_to_channel(params->chandef.chan->center_freq));
+	dev_dbg(global_idev.fullmac_dev, "switch to freq: %d", params->chandef.chan->center_freq);
+	dev_dbg(global_idev.fullmac_dev, "channel switch count: %d", params->count);
+
+	csa_param_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(rtw_csa_parm_t), &csa_param_phy, GFP_KERNEL);
+	if (!csa_param_vir) {
+		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
+		return -ENOMEM;
+	}
+
+	csa_param_vir->new_chl = ieee80211_frequency_to_channel(params->chandef.chan->center_freq);
+	csa_param_vir->chl_switch_cnt = params->count;
+	/* 0: unicast csa action, 1: broadcast csa action, other values: disable transmit csa action */
+	csa_param_vir->action_type = 1;
+	/* If set broadcast csa, set broadcast CSA counts. */
+	csa_param_vir->bc_action_cnt = 5;
+	csa_param_vir->callback = NULL;
+
+	ret = llhw_ipc_wifi_channel_switch(csa_param_phy);
+
+	if (csa_param_vir) {
+		dma_free_coherent(global_idev.fullmac_dev, sizeof(rtw_csa_parm_t), csa_param_vir, csa_param_phy);
+	}
+
+	return ret;
 }
 
 void cfg80211_rtw_sta_assoc_indicate(char *buf, int buf_len)

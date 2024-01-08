@@ -52,7 +52,7 @@
 
 	//GPIO UIO test
 	chosen {
-		bootargs = "console=ttyS0,1500000 earlycon psci=enable ubi.mtd=8 ubi.block=0,0 root=/dev/ubiblock0_0 rootfstype=squashfs,ubifs ubi.mtd=10 uio_pdrv_genirq.of_id=generic-uio";
+		bootargs = "console=ttyS0,1500000 earlycon psci=enable ubi.mtd=8 ubi.block=0,0 root=/dev/ubiblock0_0 rootfstype=squashfs,ubifs ubi.mtd=9 uio_pdrv_genirq.of_id=generic-uio";
 	};
 };
 
@@ -86,13 +86,14 @@
 
 // Pinmux Group2
 &captouch {
-	pinctrl-names = "default";
-	pinctrl-0 = <&captouch_pins_a>;
+	pinctrl-names = "default","sleep";
+	pinctrl-0 = <&captouch_pins>;
+	pinctrl-1 = <&captouch_pins>;
 	rtk,ctc-diffthr = <800>, <800>, <800>, <800>, <1000>, <1000>, <1000>, <1000>, <1000>;
 	rtk,ctc-mbias = <0x18>, <0x17>, <16>, <0x1B>, <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
 	rtk,ctc-nnoise = <400>, <400>, <400>, <400>, <1000>, <1000>, <1000>, <1000>, <1000>;
 	rtk,ctc-pnoise = <400>, <400>, <400>, <400>, <1000>, <1000>, <1000>, <1000>, <1000>;
-	rtk,ctc-ch-status = <1>, <1>, <0>, <0>, <0>, <0>, <1>, <1>, <1>;
+	rtk,ctc-ch-status = <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>;
 	status = "okay";
 	wakeup-source;
 };
@@ -156,22 +157,13 @@
     };
 };
 
-// Pinmux Group0
+// Pinmux Group2
 &i2c2 {
 	#address-cells = <1>;
 	#size-cells = <0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c2_pins>;
-	status = "disabled";
-
-	rtk_ts@1a {
-		compatible = "realtek,rtk_ts";
-		reg = <0x1a>;
-		ts-reset-gpios = <&gpioa 10 0>;
-		ts-irq-gpios = <&gpioa 9 0>;
-		max-touch-number = <5>;
-		ts-display-coords = <480 800>;
-	};
+	status = "okay";
 };
 
 &loguart{
@@ -189,20 +181,20 @@
 	status = "okay";
 };
 
-// Pinmux Group2
+// Pinmux Group1
 &spi0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi0_pins>;
 	rtk,spi-slave-mode = <0>; // SPI master
-	status = "okay";
+	status = "disabled";
 };
 
-// Pinmux Group2
+// Pinmux Group1
 &spi1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_pins>;
 	rtk,spi-slave-mode = <1>; // SPI slave
-	status = "okay";
+	status = "disabled";
 };
 
 // Pinmux Group3
@@ -254,11 +246,11 @@
 	status = "disabled";
 };
 
-// Pinmux Group1
+// Pinmux Group2
 &uart2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart2_pins>;
-	status = "disabled";
+	status = "okay";
 };
 
 &usb {

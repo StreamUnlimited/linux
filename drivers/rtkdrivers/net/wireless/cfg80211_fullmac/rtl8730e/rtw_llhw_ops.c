@@ -499,6 +499,17 @@ int llhw_ipc_wifi_get_statistics(u32 statistic_phy)
 	return ret;
 }
 
+int llhw_ipc_wifi_channel_switch(u32 csa_param_phy)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)csa_param_phy;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_AP_CH_SWITCH, param_buf, 1);
+	return ret;
+}
+
 int llhw_ipc_wifi_pmksa_ops(u32 pmksa_ops_phy)
 {
 	int ret = 0;
@@ -611,6 +622,22 @@ u64 llhw_wifi_get_tsft(u8 iface_type)
 }
 
 #ifdef CONFIG_NAN
+int llhw_ipc_wifi_init_nan(void)
+{
+	int ret = 0;
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_INIT, NULL, 0);
+	return ret;
+}
+
+int llhw_ipc_wifi_deinit_nan(void)
+{
+	int ret = 0;
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_DEINIT, NULL, 0);
+	return ret;
+}
+
 int llhw_ipc_wifi_start_nan(u8 master_pref, u8 band_support)
 {
 	int ret = 0;
@@ -664,35 +691,44 @@ int llhw_ipc_wifi_del_nan_func(u64 cookie)
 	return ret;
 }
 
+int llhw_ipc_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len)
+{
+	int ret = 0;
+	u32 param_buf[3];
+	dma_addr_t dma_data = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	dma_data = dma_map_single(pdev, data, len, DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_data)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		return -1;
+	}
+
+	param_buf[0] = (u32)vendor_cmd;
+	param_buf[1] = (u32)dma_data;
+	param_buf[2] = (u32)len;
+
+	ret = llhw_ipc_send_msg(IPC_API_NAN_CFGVENFOR, param_buf, 3);
+	dma_unmap_single(pdev, dma_data, len, DMA_TO_DEVICE);
+	return ret;
+}
+
 #if NAN_TODO
-int llhw_ipc_cfgvendor_set_nan_srvc_extinfo(const void *data, int len)
-{
-
-}
-
-int llhw_ipc_cfgvendor_set_nan_data_request(const void *data, int len)
-{
-
-}
-
-int llhw_ipc_cfgvendor_set_nan_data_response(const void *data, int len)
-{
-
-}
-
-int llhw_ipc_cfgvendor_set_nan_data_end(const void *data, int len)
-{
-
-}
-
-int llhw_ipc_cfgvendor_set_nan_follow_up(const void *data, int len)
-{
-
-}
-
 int llhw_ipc_cfgvendor_nandow_entry(const void *data, int len)
 {
 
 }
 #endif
 #endif
+
+int llhw_ipc_wifi_set_pmf_mode(u8 pmf_mode)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)pmf_mode;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_PMF_MODE, param_buf, 1);
+	return ret;
+}
+
