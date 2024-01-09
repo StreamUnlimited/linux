@@ -192,10 +192,10 @@ static irqreturn_t realtek_captouch_irq(int irq, void *dev_id)
 
 	for (i = 0; i < (CT_CHANNEL_NUM - 1); i++) {
 		if (IntStatus & CT_CHX_PRESS_INT(i)) {
-			dev_info(captouch->dev, "Key %d press\n", i);
+			dev_dbg(captouch->dev, "Key %d press\n", i);
 			input_report_key(captouch->input, captouch->keycode[i], 1);
 		} else if (IntStatus & CT_CHX_RELEASE_INT(i)) {
-			dev_info(captouch->dev, "Key %d release\n", i);
+			dev_dbg(captouch->dev, "Key %d release\n", i);
 			input_report_key(captouch->input, captouch->keycode[i], 0);
 		}
 	}
