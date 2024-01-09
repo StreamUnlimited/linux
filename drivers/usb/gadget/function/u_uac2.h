@@ -52,12 +52,14 @@ struct f_uac2_opts {
 	s16				p_volume_min;
 	s16				p_volume_max;
 	s16				p_volume_res;
+	char			p_volume_name[32];
 
 	bool			c_mute_present;
 	bool			c_volume_present;
 	s16				c_volume_min;
 	s16				c_volume_max;
 	s16				c_volume_res;
+	char			c_volume_name[32];
 
 	int				req_number;
 	int				fb_max;
