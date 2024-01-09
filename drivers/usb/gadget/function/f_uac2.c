@@ -115,8 +115,8 @@ static struct usb_string strings_fn[] = {
 	[STR_IO_IT].s = "USBD Out",
 	[STR_USB_OT].s = "USBH In",
 	[STR_IO_OT].s = "USBD In",
-	[STR_FU_IN].s = "Capture Volume",
-	[STR_FU_OUT].s = "Playback Volume",
+	/* [STR_FU_IN].s = DYNAMIC, */
+	/* [STR_FU_OUT].s = DYNAMIC, */
 	[STR_AS_OUT_ALT0].s = "Playback Inactive",
 	[STR_AS_OUT_ALT1].s = "Playback Active",
 	[STR_AS_IN_ALT0].s = "Capture Inactive",
@@ -1046,6 +1046,8 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 		return ret;
 
 	strings_fn[STR_ASSOC].s = uac2_opts->function_name;
+	strings_fn[STR_FU_IN].s = uac2_opts->p_volume_name;
+	strings_fn[STR_FU_OUT].s = uac2_opts->c_volume_name;
 
 	us = usb_gstrings_attach(cdev, fn_strings, ARRAY_SIZE(strings_fn));
 	if (IS_ERR(us))
@@ -2086,12 +2088,15 @@ UAC2_ATTRIBUTE(bool, p_volume_present);
 UAC2_ATTRIBUTE(s16, p_volume_min);
 UAC2_ATTRIBUTE(s16, p_volume_max);
 UAC2_ATTRIBUTE(s16, p_volume_res);
+UAC2_ATTRIBUTE_STRING(p_volume_name);
 
 UAC2_ATTRIBUTE(bool, c_mute_present);
 UAC2_ATTRIBUTE(bool, c_volume_present);
 UAC2_ATTRIBUTE(s16, c_volume_min);
 UAC2_ATTRIBUTE(s16, c_volume_max);
 UAC2_ATTRIBUTE(s16, c_volume_res);
+UAC2_ATTRIBUTE_STRING(c_volume_name);
+
 UAC2_ATTRIBUTE(u32, fb_max);
 UAC2_ATTRIBUTE_STRING(function_name);
 
@@ -2113,12 +2118,14 @@ static struct configfs_attribute *f_uac2_attrs[] = {
 	&f_uac2_opts_attr_p_volume_min,
 	&f_uac2_opts_attr_p_volume_max,
 	&f_uac2_opts_attr_p_volume_res,
+	&f_uac2_opts_attr_p_volume_name,
 
 	&f_uac2_opts_attr_c_mute_present,
 	&f_uac2_opts_attr_c_volume_present,
 	&f_uac2_opts_attr_c_volume_min,
 	&f_uac2_opts_attr_c_volume_max,
 	&f_uac2_opts_attr_c_volume_res,
+	&f_uac2_opts_attr_c_volume_name,
 
 	&f_uac2_opts_attr_function_name,
 
@@ -2168,12 +2175,14 @@ static struct usb_function_instance *afunc_alloc_inst(void)
 	opts->p_volume_min = UAC2_DEF_MIN_DB;
 	opts->p_volume_max = UAC2_DEF_MAX_DB;
 	opts->p_volume_res = UAC2_DEF_RES_DB;
+	snprintf(opts->p_volume_name, sizeof(opts->p_volume_name), "Capture Volume");
 
 	opts->c_mute_present = UAC2_DEF_MUTE_PRESENT;
 	opts->c_volume_present = UAC2_DEF_VOLUME_PRESENT;
 	opts->c_volume_min = UAC2_DEF_MIN_DB;
 	opts->c_volume_max = UAC2_DEF_MAX_DB;
 	opts->c_volume_res = UAC2_DEF_RES_DB;
+	snprintf(opts->c_volume_name, sizeof(opts->c_volume_name), "Playback Volume");
 
 	opts->req_number = UAC2_DEF_REQ_NUM;
 	opts->fb_max = FBACK_FAST_MAX;
