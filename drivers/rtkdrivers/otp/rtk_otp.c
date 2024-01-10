@@ -82,6 +82,7 @@ struct rtk_otp {
 
 struct rtk_otp_params {
 	const char *name;
+	bool is_logical;
 	int (*read)(void *priv, unsigned int offset, void *val, size_t bytes);
 	int (*write)(void *priv, unsigned int offset, void *val, size_t bytes);
 };
@@ -600,6 +601,31 @@ exit:
 	return ret;
 }
 
+
+static ssize_t remaining_space_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	u32 otp_addr = 0;
+	u32 otp_data = 0;
+	struct rtk_otp *rtk_otp = dev_get_drvdata(dev);
+
+	while (otp_addr < RTK_LOGICAL_MAP_SECTION_LEN) {
+		rtk_otp_readl(rtk_otp, otp_addr, &otp_data);
+
+		if (otp_data == 0xFFFFFFFF)
+			break;
+
+		otp_addr += 4;
+
+		if (RTK_OTP_GET_LTYP(otp_data) == RTK_OTP_LTYP2) {
+			u32 plen = RTK_OTP_GET_LTYP2_LEN(otp_data);
+			otp_addr += plen;
+		}
+	}
+
+	return sprintf(buf, "%d\n", RTK_LOGICAL_MAP_SECTION_LEN - otp_addr);
+}
+static DEVICE_ATTR_RO(remaining_space);
+
 static int rtk_otp_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -622,6 +648,7 @@ static int rtk_otp_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto exit;
 	}
+	dev_set_drvdata(&pdev->dev, rtk_otp);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -675,6 +702,12 @@ static int rtk_otp_probe(struct platform_device *pdev)
 	if (ret)
 		goto exit;
 
+	if (data->is_logical) {
+		ret = device_create_file(rtk_otp->dev, &dev_attr_remaining_space);
+		if (ret)
+			goto exit;
+	}
+
 	dev_info(&pdev->dev, "%s success!\n", __func__);
 	return ret;
 exit:
@@ -697,6 +730,7 @@ static const struct rtk_otp_params otp_logical_params = {
 	.name = "otp_map",
 	.read = rtk_otp_logical_read,
 	.write = rtk_otp_logical_write,
+	.is_logical = true,
 };
 
 static const struct of_device_id rtk_otp_of_match[] = {
