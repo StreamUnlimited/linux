@@ -248,7 +248,7 @@ static int rtk_otp_logical_read(void *context,
 		rtk_otp_readl(rtk_otp, otp_addr, &otp_data);
 
 		if (otp_data == 0xFFFFFFFF) {
-			dev_err(rtk_otp->dev, "rtk_otp_logical_read: data end at address=%x\n", otp_addr);
+			dev_info(rtk_otp->dev, "rtk_otp_logical_read: data end at address=%x\n", otp_addr);
 			break;
 		}
 
@@ -514,7 +514,7 @@ static int rtk_otp_logical_write(void *context,
 	int remain = bytes;
 	int ret = 0;
 
-	dev_info(rtk_otp->dev, "LogicalMap write enter addr:%x bytes:%x \n", addr, bytes);
+	dev_dbg(rtk_otp->dev, "LogicalMap write enter addr:%x bytes:%x \n", addr, bytes);
 
 	if (addr + bytes > RTK_OTP_LMAP_LEN) {
 		dev_err(rtk_otp->dev, "LogicalMap write error %x+%x exceed limit\n", addr, bytes);
@@ -545,7 +545,7 @@ static int rtk_otp_logical_write(void *context,
 				bytemap |= BIT(i);
 				wordmap |= BIT(i >> 2);
 				bytechange++;
-				dev_info(rtk_otp->dev,"newdata[%x]= %x\n", i, newdata[i]);
+				dev_dbg(rtk_otp->dev,"newdata[%x]= %x\n", i, newdata[i]);
 			}
 		}
 
@@ -593,7 +593,7 @@ next:
 		wordmap = 0;
 		bytechange = 0;
 
-		dev_info(rtk_otp->dev, "next write cycle base: %x remain: %x \n", base, remain);
+		dev_dbg(rtk_otp->dev, "next write cycle base: %x remain: %x \n", base, remain);
 	}
 
 exit:
