@@ -256,7 +256,7 @@ static int rtk_otp_logical_read(void *context,
 		rtk_otp_readl(rtk_otp, otp_addr, &otp_data);
 
 		if (otp_data == 0xFFFFFFFF) {
-			dev_err(rtk_otp->dev, "Logical read data end at address 0x%08X\n", otp_addr);
+			dev_info(rtk_otp->dev, "Logical read data end at address 0x%08X\n", otp_addr);
 			break;
 		}
 
