@@ -895,6 +895,8 @@ static int rtk_dma_terminate_all(struct dma_chan *chan)
 	int i;
 	LIST_HEAD(head);
 
+	spin_lock_irqsave(&vchan->vc.lock, flags);
+
 	/* Set TERMINATE before release all txdesc. */
 	vchan->pchan->dma_pause.status = DMA_TERMINATE;
 
@@ -904,10 +906,7 @@ static int rtk_dma_terminate_all(struct dma_chan *chan)
 		}
 	}
 
-	spin_lock_irqsave(&vchan->vc.lock, flags);
 	vchan_get_all_descriptors(&vchan->vc, &head);
-	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-
 	vchan_dma_desc_free_list(&vchan->vc, &head);
 
 	/* restore to init value */
@@ -915,6 +914,7 @@ static int rtk_dma_terminate_all(struct dma_chan *chan)
 
 	dev_dbg(rsdma->dma.dev, "terminate chan %d\n",	vchan->pchan->id);
 
+	spin_unlock_irqrestore(&vchan->vc.lock, flags);
 	return 0;
 }
 
