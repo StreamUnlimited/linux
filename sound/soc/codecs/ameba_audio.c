@@ -1580,6 +1580,25 @@ bool  audio_codec_get_dac_mute(u32 channel, void __iomem	* audio_base_addr){
 	return (tmp > 0)? true : false;
 }
 
+void audio_codec_set_dac_asrc_rate(int rate, void __iomem *audio_base_addr)
+{
+	u32 tmp;
+	u32 sel;
+
+	if (rate < 60000) {
+		sel = 0;
+	} else if (rate < 120000) {
+		sel = 1;
+	} else {
+		sel = 2;
+	}
+
+	tmp = readl(audio_base_addr + CODEC_ASRC_CONTROL_0);
+	tmp &= ~AUD_MASK_ASRC_RATE_SEL_TX;
+	tmp |= AUD_ASRC_RATE_SEL_TX(sel);
+	writel(tmp, audio_base_addr + CODEC_ASRC_CONTROL_0);
+}
+
 /**
   * @brief  Enable or disable DAC ASRC mode.
   *			 This parameter can be one of the following values:
