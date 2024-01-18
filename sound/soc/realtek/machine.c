@@ -11,6 +11,13 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 
+#include <uapi/sound/rtk_audio_pll.h>
+#include "ameba_audio_clock.h"
+
+struct amebad2_priv {
+	int cur_pll_ppm;
+};
+
 enum {
 	DAI_LINK_PLAYBACK,
 	DAI_LINK_CAPTURE,
@@ -36,9 +43,80 @@ SND_SOC_DAILINK_DEFS(aif4,
 	DAILINK_COMP_ARRAY(COMP_DUMMY()),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("audiodma@3")));
 
+#define KCONTROL_DRIFT_COMPENSATOR_NAME "Drift compensator"
+
+static int snd_soc_amebad2_set_pll_ppm(int new_ppm)
+{
+	u32 ppm = abs(new_ppm);
+	u32 action = new_ppm < 0 ? PLL_SLOWER : PLL_FASTER;
+
+	pll_i2s_98P304M_clk_tune(ppm, action);
+	// We do not need to tune the 24.576 MHz PLL as it is just
+	// divided down from the 98.304 MHz PLL above.
+	// pll_i2s_24P576M_clk_tune(ppm, action);
+	pll_i2s_45P1584M_clk_tune(ppm, action);
+
+	return 0;
+}
+
+static int snd_soc_amebad2_ppm_info(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->value.integer.min = -500;
+	uinfo->value.integer.max = 500;
+	uinfo->count = 1;
+
+	return 0;
+}
+
+static int snd_soc_amebad2_ppm_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct amebad2_priv *priv = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = priv->cur_pll_ppm;
+
+	return 0;
+}
+
+static int snd_soc_amebad2_ppm_put(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct amebad2_priv *priv = snd_soc_card_get_drvdata(card);
+	int ppm = ucontrol->value.integer.value[0];
+
+	priv->cur_pll_ppm = ppm;
+	snd_soc_amebad2_set_pll_ppm(priv->cur_pll_ppm);
+
+	return 1;
+}
+
+static const struct snd_kcontrol_new snd_soc_amebad2_controls[] = {
+	{
+		.name = KCONTROL_DRIFT_COMPENSATOR_NAME,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.info = snd_soc_amebad2_ppm_info,
+		.get = snd_soc_amebad2_ppm_get,
+		.put = snd_soc_amebad2_ppm_put,
+	},
+};
+
 static int amebad2_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
+	struct snd_kcontrol *kcontrol;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct amebad2_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+
+	// Re-set the PLLs to 0
+	priv->cur_pll_ppm = 0;
+	snd_soc_amebad2_set_pll_ppm(priv->cur_pll_ppm);
+
+	kcontrol = snd_soc_card_get_kcontrol(rtd->card, KCONTROL_DRIFT_COMPENSATOR_NAME);
+	if (kcontrol) {
+		snd_ctl_notify(rtd->card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &kcontrol->id);
+	}
+
 	return 0;
 }
 
@@ -82,14 +160,23 @@ static struct snd_soc_card amebad2_snd = {
 	.owner = THIS_MODULE,
 	.dai_link = amebad2_dai,
 	.num_links = ARRAY_SIZE(amebad2_dai),
+	.controls = snd_soc_amebad2_controls,
+	.num_controls = ARRAY_SIZE(snd_soc_amebad2_controls),
 };
 
 static int amebad2_audio_probe(struct platform_device *pdev)
 {
 	int ret;
+	struct amebad2_priv *priv;
+	struct snd_soc_card *card = &amebad2_snd;
+
+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	snd_soc_card_set_drvdata(card, priv);
 
 	//struct device_node *np = pdev->dev.of_node;
-	struct snd_soc_card *card = &amebad2_snd;
 	card->dev = &pdev->dev;
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
