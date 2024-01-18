@@ -46,6 +46,8 @@
 &codec {
 	pinctrl-names = "default";
 	pinctrl-0 = <&dmic_pins_stream210>;
+
+	enable-dac-asrc;
 };
 
 &gpiob {
@@ -98,4 +100,11 @@
 	// The default is something like 2 seconds which is way too
 	// long as it seem to stop the kernel for that amount of time.
 	rtk,wait-timeout = <100>;
+};
+
+&sport {
+	// Setting this parameter will force the SPORT0 interface to use
+	// the audio PLLs as the clock sources. The SPORT0 is internally
+	// connected to the internal DAC and does not need any MCLK actually.
+	rtk,sport-mclk-multiplier = <256>;
 };
