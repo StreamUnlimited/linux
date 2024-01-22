@@ -562,16 +562,17 @@ static int ak4458_set_dai_mute(struct snd_soc_dai *dai, int mute, int direction)
 	ndt = att_speed[ats] / (nfs / 1000);
 
 	if (mute) {
-		snd_soc_component_update_bits(component, AK4458_01_CONTROL2,  0x01, 1);
-		mdelay(ndt);
+		if(snd_soc_component_update_bits(component, AK4458_01_CONTROL2,  0x01, 1) == 1)
+			mdelay(ndt);
 		if (ak4458->mute_gpiod)
 			gpiod_set_value_cansleep(ak4458->mute_gpiod, 1);
 	} else {
 		if (ak4458->mute_gpiod)
 			gpiod_set_value_cansleep(ak4458->mute_gpiod, 0);
-		snd_soc_component_update_bits(component, AK4458_01_CONTROL2, 0x01, 0);
-		mdelay(ndt);
+		if (snd_soc_component_update_bits(component, AK4458_01_CONTROL2, 0x01, 0) == 1)
+			mdelay(ndt);
 	}
+
 
 	return 0;
 }
