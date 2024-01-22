@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek MIPI support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _AMEBAD2_MIPI_H_
 #define _AMEBAD2_MIPI_H_
 

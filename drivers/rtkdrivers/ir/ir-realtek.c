@@ -1,28 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    ir-realtek.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-11-20
-  * @brief   This file contains all the functions prototypes for the IR firmware
-  *             library, including the following functionalities of the Universal Asynchronous
-  *             Receiver/Transmitter peripheral:
-  *           -Initialization
-  *           -IR Control (disable/enable)
-  *           -Receive/Send Data Interface
-  *           -Interrupts and flags management
-  *           -Threshold setting interface
-  *           -Clear TX/RX FIFO
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek IR support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "ir-realtek.h"
 
@@ -904,6 +885,6 @@ static struct platform_driver rtk_ir_platform_driver = {
 };
 module_platform_driver(rtk_ir_platform_driver);
 
-MODULE_DESCRIPTION("Realtek IR controller for Amebad2");
+MODULE_DESCRIPTION("Realtek Ameba IR driver");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Realtek Corporation");
-MODULE_LICENSE("GPL");

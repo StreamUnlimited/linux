@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek UART support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/init.h>
@@ -1119,8 +1126,6 @@ static void __exit rtk_uart_exit(void)
 module_init(rtk_uart_init);
 module_exit(rtk_uart_exit);
 
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek UART driver");
+MODULE_DESCRIPTION("Realtek Ameba UART driver");
 MODULE_LICENSE("GPL v2");
-
-
+MODULE_AUTHOR("Realtek Corporation");

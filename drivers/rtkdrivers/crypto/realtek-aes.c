@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of Realtek Crypto driver for Linux.
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek AES support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/clk.h>
 #include <linux/crypto.h>
@@ -1234,5 +1234,6 @@ static struct platform_driver realtek_aes_driver = {
 
 builtin_platform_driver(realtek_aes_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_aes driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba AES driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek I2C master support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include "i2c-realtek.h"
 #include <linux/mfd/rtk-timer.h>
 

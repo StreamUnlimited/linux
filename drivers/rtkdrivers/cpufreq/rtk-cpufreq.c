@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek CPU frequency support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/cpufreq.h>
@@ -254,8 +261,6 @@ static void __exit rtk_cpufreq_exitcall(void)
 module_init(rtk_cpufreq_initcall);
 module_exit(rtk_cpufreq_exitcall);
 
-
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek cpufreq driver");
+MODULE_DESCRIPTION("Realtek Ameba CPU frequency driver");
 MODULE_LICENSE("GPL v2");
-
+MODULE_AUTHOR("Realtek Corporation");

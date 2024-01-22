@@ -1,11 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/bspchip.h:
- *     bsp chip address and IRQ mapping file
- *
- * Copyright (C) 2006-2012 Tony Wu (tonywu@realtek.com)
- */
+* Realtek Chip support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #ifndef _BSPCHIP_H_
 #define _BSPCHIP_H_

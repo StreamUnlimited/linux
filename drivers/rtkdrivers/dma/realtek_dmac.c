@@ -1,20 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    realtek_dmac.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-08-03
-  * @brief   This file contains all the functions prototypes for the GDMA firmware
-  *          library.
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2021, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek DMAC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "realtek_dmac.h"
 
@@ -1628,6 +1617,6 @@ static struct platform_driver rtk_dma_driver = {
 
 builtin_platform_driver(rtk_dma_driver);
 
-MODULE_AUTHOR("Jessica XU <jessica_xu@realsil.com.cn>");
-MODULE_DESCRIPTION("AmebaD2 RTK_DMAC driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba DMAC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

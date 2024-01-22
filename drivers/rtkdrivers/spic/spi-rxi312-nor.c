@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Driver for Realtek IPCam RTS39XX SPI Controller
- *
- * Copyright (C) 2015 Darcy Lu, Realtek <darcy_lu@realsil.com.cn>
- * Copyright (C) 2016 Jim Cao, Realtek <jim_cao@realsil.com.cn>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License verqspiion 2 as
- * published by the Free Software Foundation.
- */
+* Realtek SPIC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/clk.h>
@@ -936,6 +933,6 @@ static struct platform_driver rts_qspi_driver = {
 module_platform_driver(rts_qspi_driver);
 
 MODULE_ALIAS("platform:rts-quadspi");
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("QuadSPI flash controller driver for realtek IoT-control soc");
-MODULE_AUTHOR("Realsil");
+MODULE_DESCRIPTION("Realtek Ameba Quad SPIC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

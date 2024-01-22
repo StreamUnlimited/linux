@@ -1,28 +1,15 @@
-/**
-  ******************************************************************************
-  * @file    i2c-realtek.c
-  * @author
-  * @version V2.0.0
-  * @date    2022-04-24
-  * @brief   This file contains all the functions prototypes for the I2C firmware
-  *          library, including the following functionalities of theIntel-Integrated
-  *             Circuit (I2C) peripheral:
-  *           - I2C Master mode:
-  *             1) rtk_i2c_xfer: to send or receive i2c messages as i2c master.
-  *           - I2C Slave mode:
-  *             1) rtk_i2c_reg_slave: to register an i2c slave,
-  *             2) rtk_i2c_unreg_slave: to unregister an i2c slave.
-  *
-  *  @verbatim
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek I2C support
+*
+*       - I2C Master mode:
+*             1) rtk_i2c_xfer: to send or receive i2c messages as i2c master.
+*       - I2C Slave mode:
+*             1) rtk_i2c_reg_slave: to register an i2c slave,
+*             2) rtk_i2c_unreg_slave: to unregister an i2c slave.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "i2c-realtek.h"
 
@@ -896,6 +883,6 @@ static struct platform_driver rtk_i2c_driver = {
 
 module_platform_driver(rtk_i2c_driver);
 
-MODULE_AUTHOR("realtek");
-MODULE_DESCRIPTION("RTK I2C driver");
+MODULE_DESCRIPTION("Realtek Ameba I2C driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

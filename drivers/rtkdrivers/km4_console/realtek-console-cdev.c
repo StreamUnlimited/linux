@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek Km4-console support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
@@ -126,6 +133,6 @@ void realtek_console_exit(void)
 fs_initcall(realtek_console_init);
 module_exit(realtek_console_exit);
 
-MODULE_DESCRIPTION("Realtek console-ctrl");
+MODULE_DESCRIPTION("Realtek Ameba Console driver");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Realtek Corporation");
-MODULE_LICENSE("GPL");

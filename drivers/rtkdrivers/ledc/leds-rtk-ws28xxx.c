@@ -1,28 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    leds-rtk-ws28xxx.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-09-15
-  * @brief   This file contains all the functions prototypes for the LEDC firmware
-  *             library, including the following functionalities of the Universal Asynchronous
-  *             Transmitter peripheral:
-  *           - Initialization
-  *           - LEDC Transmit Control (disable/enable)
-  *           - Output Timings Control
-  *           - Output RGB mode control
-  *           - Interrupts management
-  *           - FIFO Threshold setting interface
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2021, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek LEDC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "leds-rtk-ws28xxx.h"
 
@@ -1279,6 +1260,6 @@ static struct platform_driver rtk_ws28xxx_led_driver = {
 
 module_platform_driver(rtk_ws28xxx_led_driver);
 
-MODULE_AUTHOR("Jessica XU <jessica_xu@realsil.com.cn>");
-MODULE_DESCRIPTION("Realtek AmebaD2 ws28xxx led light controller driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba LEDC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

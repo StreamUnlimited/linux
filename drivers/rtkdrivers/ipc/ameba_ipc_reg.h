@@ -1,11 +1,8 @@
 /* SPDX-License-Identifier:  GPL-2.0-or-later */
 /*
- * Derived from many drivers using ameba IPC device.
+ * Realtek IPC support
  *
- * Copyright (C) 2020-2021 Realsil <andrew_su@realsil.com.cn>
- *
- * RTK IPC(Inter Process Communication) driver for Ameba IPC.
- *
+ * Copyright (C) 2023, Realtek Corporation. All rights reserved.
  */
 #ifndef __AMEBA_IPC_REG_H__
 #define __AMEBA_IPC_REG_H__

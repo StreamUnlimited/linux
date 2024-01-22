@@ -1,4 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek USB PHY support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -869,4 +874,5 @@ module_exit(rtk_phy_module_exit);
 #endif
 
 MODULE_DESCRIPTION("Realtek Ameba USB PHY driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

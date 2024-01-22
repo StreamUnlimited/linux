@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek MMC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #define SDIOH_SHIFT_LX_BURST_SIZE									6
 #define SDIOH_LX_BURST_SIZE_64B										(0 << SDIOH_SHIFT_LX_BURST_SIZE)
 #define SDIOH_SHIFT_MAP_SEL											5

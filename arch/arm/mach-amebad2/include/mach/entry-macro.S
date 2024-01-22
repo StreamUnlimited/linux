@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/include/mach/entry-macro.S
- *
- * Copyright 2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek IRQ support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #if defined(CONFIG_ARM_GIC)
 #include <mach/entry-macro-gic.S>

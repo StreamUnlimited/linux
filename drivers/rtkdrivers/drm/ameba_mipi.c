@@ -1,25 +1,12 @@
-/**
-  ******************************************************************************
-  * @file    ameba_mipi.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-05-27
-  * @brief   This file contains all the functions prototypes for the MIPI firmware
-  *             library, including the following functionalities of DSI/DPHY controller:
-
-  *           - MIPI Initialization For DSI Vedio Mode
-  *           - DSI Command Mode
-  *           - Interrupts and flags management
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2020, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek MIPI support
+*
+*           - MIPI Initialization For DSI Vedio Mode
+*           - DSI Command Mode
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 //#include "ameba_soc.h"
 #include <drm/drm_print.h>

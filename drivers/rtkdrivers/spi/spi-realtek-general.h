@@ -1,34 +1,10 @@
-/** @addtogroup SPI
-  * @verbatim
-  *****************************************************************************************
-  * Introduction
-  *****************************************************************************************
-  * SPI0:
-  *		- Support Motorola SPI interface
-  *		- Role: Master or Slave
-  *		- Base Address: SPI0_DEV
-  *		- Bus Clk: 100MHz
-  *		- BaudRate: less than or equal to 50M
-  *		- Transfer mode:Tx,Rx,TRx,EEPROM Read when configured as Master; TRx when configured as Slave
-  *		- Data Frame Size: 4-16 bits supported
-  *		- IRQ Number: SPI0_IRQ
-  *		- GDMA TX handshake interface: GDMA_HANDSHAKE_INTERFACE_SPI0_TX
-  *		- GDMA RX handshake interface: GDMA_HANDSHAKE_INTERFACE_SPI0_RX
-  *
-  * SPI1:
-  *		- Support Motorola SPI interface
-  *		- Role: Master or Slave
-  *		- Base Address: SPI1_DEV
-  *		- Bus Clk: 100MHz
-  *		- BaudRate: less than or equal to 100M
-  *		- Transfer mode:Tx,Rx,TRx,EEPROM Read when configured as Master; TRx when configured as Slave
-  *		- Data Frame Size: 4-16 bits supported
-  *		- IRQ Number: SPI1_IRQ
-  *		- GDMA TX handshake interface: GDMA_HANDSHAKE_INTERFACE_SPI1_TX
-  *		- GDMA RX handshake interface: GDMA_HANDSHAKE_INTERFACE_SPI1_RX
-  *
-  *****************************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek SPI support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>

@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * arch/arm/bsp/headsmp.S
- *
- * Copyright 2014  Jethro Hsu(jethro@realtek.com)
- */
+* Realtek SMP support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/linkage.h>
 #include <linux/init.h>

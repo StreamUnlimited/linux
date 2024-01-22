@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek OTP support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _REALTEK_OTP_CORE_H_
 #define _REALTEK_OTP_CORE_H_
 

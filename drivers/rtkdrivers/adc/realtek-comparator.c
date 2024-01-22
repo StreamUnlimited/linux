@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of realtek comparator driver
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek ADC comparator support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -339,5 +339,6 @@ static struct platform_driver realtek_comp_driver = {
 
 builtin_platform_driver(realtek_comp_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_comp_data driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba ADC comparator driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

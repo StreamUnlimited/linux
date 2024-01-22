@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek I2C slave support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 #include "i2c-realtek.h"
 

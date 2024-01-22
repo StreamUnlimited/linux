@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek Km4-console support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <misc/realtek-console-core.h>
 
 static struct rtk_console *piihp_priv = NULL;
@@ -208,6 +215,6 @@ static struct platform_driver rtk_console_driver = {
 
 builtin_platform_driver(rtk_console_driver);
 
-MODULE_AUTHOR("<jessica_xu@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek console driver");
+MODULE_DESCRIPTION("Realtek Ameba Km4 console driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

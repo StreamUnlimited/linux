@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek RTC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/module.h>
 #include <linux/err.h>
 #include <linux/rtc.h>
@@ -874,7 +881,6 @@ static struct platform_driver rtk_rtc_driver = {
 builtin_platform_driver(rtk_rtc_driver);
 
 
-MODULE_AUTHOR("<eric_gao@realsile.com.cn>");
-MODULE_DESCRIPTION("realtek amebad2 rtc driver");
+MODULE_DESCRIPTION("Realtek Ameba RTC driver");
 MODULE_LICENSE("GPL v2");
-
+MODULE_AUTHOR("Realtek Corporation");

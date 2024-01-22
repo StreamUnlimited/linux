@@ -1,20 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    realtek_dmac.h
-  * @author
-  * @version V1.0.0
-  * @date    2021-08-03
-  * @brief   This file contains all the functions prototypes for the GDMA firmware
-  *          library.
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2021, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek DMAC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/bitops.h>
 #include <linux/clk.h>

@@ -1,12 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Derived from many drivers using generic_serial interface.
- *
- * Copyright (C) 2020 Realsil <jingjun_wu@realsil.com.cn>
- *
- *  Serial driver for Ameba integrated UART.
- *
- */
+* Realtek UART support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #if defined(CONFIG_SERIAL_RTK_AMEBA_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -968,6 +965,6 @@ static void __exit ameba_uart_exit(void)
 module_init(ameba_uart_init);
 module_exit(ameba_uart_exit);
 
-MODULE_AUTHOR("Jingjun WU <jingjun_wu@realsil.com.cn>");
-MODULE_DESCRIPTION("Ameba uart driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba UART driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

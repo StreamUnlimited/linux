@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/mach/timex.h:
- *
- * Copyright 2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek Timex support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #ifndef _TIMEX_H_
 #define _TIMEX_H_

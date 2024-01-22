@@ -1,34 +1,16 @@
-/**
-  ******************************************************************************
-  * @file    spi-realtek-general.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-11-11
-  * @brief   This file contains all the functions prototypes for Serial peripheral interface (SPI):
-  *		- Initialization
-  *		- Clock polarity and phase setting
-  *		- SPI data frame size setting
-  *		- SPI baud rate setting
-  *		- Receive/Send data interface
-  *		- Get TRx FIFO valid entries
-  *		- check SPI device busy status
-  *		- SPI device pinmux initialization and deinitialization
-  *		- DMA transfers management
-  *		- Interrupts and management
-  * @attention
-  *		- for master tx, slave rx, slave prepare first and wait for master's tx data.
-  *		- for master rx, slave tx, slave tx to its fifo first and wait master's rx signal and dummy data.
-  *		- spi master trx can choose interrupt mode or poll mode by configuring dts.
-  *		- spi slave rx support interrupt mode only, so tx is also in interrupt mode.
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek SPI support
+*
+* @attention
+*		- for master tx, slave rx, slave prepare first and wait for master's tx data.
+*		- for master rx, slave tx, slave tx to its fifo first and wait master's rx signal and dummy data.
+*		- spi master trx can choose interrupt mode or poll mode by configuring dts.
+*		- spi slave rx support interrupt mode only, so tx is also in interrupt mode.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include "spi-realtek-general.h"
 #include <linux/of_gpio.h>
 
@@ -1746,6 +1728,7 @@ static struct platform_driver rtk_spi_driver = {
 };
 
 module_platform_driver(rtk_spi_driver);
-MODULE_AUTHOR("realtek");
-MODULE_DESCRIPTION("RTK SPI driver general.");
+
+MODULE_DESCRIPTION("Realtek Ameba SPI driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

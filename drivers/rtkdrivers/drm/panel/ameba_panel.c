@@ -1,7 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * MIPI-DSI ameba_panel_desc panel driver. This is a 480*800
- */
+* Realtek Panel support
+*
+* MIPI-DSI ameba_panel_desc panel driver. This is a 480*800
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <drm/drm_modes.h>
 #include <drm/drm_mipi_dsi.h>
@@ -139,7 +143,6 @@ static void __exit rtk_panel_exit(void)
 }
 module_exit(rtk_panel_exit);
 
-
-MODULE_AUTHOR("Chunlin.Yi <chunlin.yi@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek AmebaD2 SoCs' Panel driver");
+MODULE_DESCRIPTION("Realtek Ameba Panel driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");
