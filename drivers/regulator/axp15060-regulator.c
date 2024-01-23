@@ -276,11 +276,11 @@ static int axp15060_power_off(struct sys_off_data *data)
 	return NOTIFY_DONE;
 }
 
-static int axp15060_power_off_prepare(struct i2c_client *client)
+static int axp15060_power_off_init(struct i2c_client *client)
 {
 	int err;
 	err = devm_register_sys_off_handler(&client->dev,
-					    SYS_OFF_MODE_POWER_OFF_PREPARE,
+					    SYS_OFF_MODE_POWER_OFF,
 					    SYS_OFF_PRIO_DEFAULT,
 					    axp15060_power_off,
 					    client);
@@ -307,7 +307,7 @@ static int axp15060_i2c_probe(struct i2c_client *client, const struct i2c_device
 	config.driver_data = NULL;
 	config.regmap = regmap;
 
-	err = axp15060_power_off_prepare(client);
+	err = axp15060_power_off_init(client);
 	if(err)
 		return err;
 
