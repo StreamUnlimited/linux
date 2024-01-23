@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2022 StreamUnlimited, Inc. All rights reserved.
+ */
+
+#include "axg_sue_s183x_internal_override_s1832_l4.dtsi"
+
+/ {
+	sue {
+		moduleversion = "2";
+	};
+};
+
+
+&wifi_reset {
+	/delete-property/ vrf_pin;
+	wifi-reset-gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_LOW>;
+	bt-reset-gpios = <&gpio GPIOX_20 GPIO_ACTIVE_LOW>;
+};
+
+&sdio_pwrseq {
+	/delete-property/ clocks;
+};
+
+&wifi32k {
+	status = "disabled";
+};
+
+&pwm_ab {
+	status = "disabled";
+};
