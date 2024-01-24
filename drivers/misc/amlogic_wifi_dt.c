@@ -28,6 +28,7 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
 #include <linux/pci.h>
@@ -52,6 +53,9 @@ struct wifi_plat_info {
 	int power_on_pin_level;
 	int power_on_pin_OD;
 	int power_on_pin2;
+
+	struct gpio_desc *bt_reset;
+	struct gpio_desc *wifi_reset;
 
 	int plat_info_valid;
 	struct pinctrl *p;
@@ -340,6 +344,10 @@ static int wifi_dev_probe(struct platform_device *pdev)
 				"power_on_pin2", 0));
 			plat->power_on_pin2 = desc_to_gpio(desc);
 		}
+
+		/* Individual reset is not used currently, so only initialize it here */
+		plat->wifi_reset = devm_gpiod_get_optional(&pdev->dev, "wifi-reset", GPIOD_OUT_LOW);
+		plat->bt_reset = devm_gpiod_get_optional(&pdev->dev, "bt-reset", GPIOD_OUT_LOW);
 
 		plat->plat_info_valid = 1;
 
