@@ -191,7 +191,7 @@ static unsigned int axg_spdifin_mode_timer(struct axg_spdifin *priv,
 	 * Number of period of the reference clock during a period of the
 	 * input signal reference clock
 	 */
-	return rate / (128 * priv->conf->mode_rates[mode]);
+	return rate / (64 * priv->conf->mode_rates[mode]);
 }
 
 static int axg_spdifin_sample_mode_config(struct snd_soc_dai *dai,
@@ -224,11 +224,11 @@ static int axg_spdifin_sample_mode_config(struct snd_soc_dai *dai,
 
 	/* Threshold based on the minimum width between two edges */
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
-			   SPDIFIN_CTRL0_WIDTH_SEL, SPDIFIN_CTRL0_WIDTH_SEL);
+			   SPDIFIN_CTRL0_WIDTH_SEL, 0);
 
 	/* Calculate the last timer which has no threshold */
 	t_next = axg_spdifin_mode_timer(priv, i, rate);
-	axg_spdifin_write_timer(priv->map, i, t_next);
+	axg_spdifin_write_timer(priv->map, i, t_next>>1);
 
 	do {
 		unsigned int t;
@@ -239,10 +239,10 @@ static int axg_spdifin_sample_mode_config(struct snd_soc_dai *dai,
 		t = axg_spdifin_mode_timer(priv, i, rate);
 
 		/* Set the timer value */
-		axg_spdifin_write_timer(priv->map, i, t);
+		axg_spdifin_write_timer(priv->map, i, t>>1);
 
 		/* Set the threshold value */
-		axg_spdifin_write_threshold(priv->map, i, t + t_next);
+		axg_spdifin_write_threshold(priv->map, i, 3 * (t + t_next) >> 1);
 
 		/* Save the current timer for the next threshold calculation */
 		t_next = t;
@@ -513,7 +513,7 @@ static const struct regmap_config axg_spdifin_regmap_cfg = {
 
 static const struct axg_spdifin_cfg axg_cfg = {
 	.mode_rates = axg_spdifin_mode_rates,
-	.ref_rate = 333333333,
+	.ref_rate = 250000000,
 };
 
 static const struct of_device_id axg_spdifin_of_match[] = {
