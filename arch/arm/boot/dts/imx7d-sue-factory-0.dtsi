@@ -9,7 +9,9 @@
 / {
 	model = "StreamUnlimited stream810 factory board (imx7d)";
 	compatible = "sue,stream810-factory", "sue,stream810", "fsl,imx7d";
+};
 
+&cpu0 {
 	/*
 	 * All currently produced modules support 1.2 GHz operation, so in the
 	 * factory tester we always enable the 1.2 GHz operating point. The
@@ -21,6 +23,8 @@
 		996000	1075000
 		792000	975000
 	>;
+
+	/delete-property/additional-operating-points;
 };
 
 &gpio_buttons {
