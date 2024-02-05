@@ -19,6 +19,7 @@ void llhw_ipc_event_deinit(void);
 int llhw_ipc_send_msg(u32 id, u32 *param_buf, u32 buf_len);
 void llhw_ipc_wifi_on(void);
 int llhw_ipc_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_len, u32 block);
+int llhw_wifi_scan_abort(void);
 int llhw_ipc_wifi_connect(rtw_network_info_t *connect_param, unsigned char block);
 int llhw_ipc_wifi_disconnect(void);
 int llhw_ipc_wifi_is_connected_to_ap(void);

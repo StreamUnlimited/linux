@@ -239,9 +239,21 @@ int rtw_ndev_open(struct net_device *pnetdev)
 static int rtw_ndev_close(struct net_device *pnetdev)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
+	struct cfg80211_scan_info info;
+	int ret = 0;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 	spin_lock_bh(&event_priv->event_lock);
+	ret = llhw_wifi_scan_abort();
+	if (ret) {
+		dev_err(global_idev.fullmac_dev, "[fullmac]: %s abort wifi scan failed!\n", __func__);
+		return -EPERM;
+	}
+	if (global_idev.mlme_priv.pscan_req_global) {
+		memset(&info, 0, sizeof(info));;
+		info.aborted = 1;
+		cfg80211_scan_done(global_idev.mlme_priv.pscan_req_global, &info);
+	}
 	netif_tx_stop_all_queues(pnetdev);
 	netif_carrier_off(pnetdev);
 	rtw_netdev_priv_is_on(pnetdev) = false;

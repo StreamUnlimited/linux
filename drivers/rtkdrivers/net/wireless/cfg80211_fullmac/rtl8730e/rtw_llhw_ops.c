@@ -100,6 +100,15 @@ int llhw_ipc_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 	return ret;
 }
 
+int llhw_wifi_scan_abort(void)
+{
+	int ret = 0;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_SCAN_ABORT, NULL, 0);
+
+	return ret;
+}
+
 int llhw_ipc_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
 {
 	int ret = 0;
