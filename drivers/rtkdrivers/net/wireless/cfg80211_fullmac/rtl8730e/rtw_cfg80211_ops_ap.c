@@ -239,6 +239,7 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	char fake_pwd[] = "12345678";
 	u8 *pwd_vir = NULL;
 	dma_addr_t pwd_phy;
+	const struct element *elem;
 
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Start Softap\n", FUNC_NDEV_ARG(ndev));
 
@@ -295,6 +296,15 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 
 	if (pwd_vir) {
 		dma_free_coherent(global_idev.fullmac_dev, strlen(pwd_vir), pwd_vir, pwd_phy);
+	}
+
+	if (settings->beacon.beacon_ies_len) {
+		llhw_wifi_del_custom_ie(1);
+		for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
+				    settings->beacon.beacon_ies,
+				    settings->beacon.beacon_ies_len) {
+			llhw_wifi_add_custom_ie(elem);
+		}
 	}
 
 	return ret;

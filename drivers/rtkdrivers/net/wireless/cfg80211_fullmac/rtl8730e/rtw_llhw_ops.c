@@ -741,3 +741,98 @@ int llhw_ipc_wifi_set_pmf_mode(u8 pmf_mode)
 	return ret;
 }
 
+static void *rtw_malloc(size_t size, dma_addr_t *dma_addr)
+{
+	return dma_alloc_coherent(global_idev.fullmac_dev, size, dma_addr, GFP_KERNEL);
+}
+
+static void rtw_mfree(size_t size, void *ptr, dma_addr_t dma_addr)
+{
+	dma_free_coherent(global_idev.fullmac_dev, size, ptr, dma_addr);
+}
+
+int llhw_wifi_add_custom_ie(const struct element *elem)
+{
+	int ret = 0;
+	u32 param_buf[3];
+	dma_addr_t ie_phy = 0, sub_ie_phy = 0;
+	u8 *sub_ie_vir = NULL;
+	rtw_custom_ie_t *cus_ie = NULL;
+	struct device *pdev = global_idev.ipc_dev;
+
+	cus_ie = rtw_malloc(sizeof(rtw_custom_ie_t), &ie_phy);
+	if (!cus_ie) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom ie failed.", __func__);
+		return -ENOMEM;
+	}
+	cus_ie->type = elem->id;
+	sub_ie_vir = rtw_malloc(elem->datalen + 2, &sub_ie_phy);
+	if (!sub_ie_vir) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
+		rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie, ie_phy);
+		return -ENOMEM;
+	}
+	sub_ie_vir[0] = elem->id;
+	sub_ie_vir[1] = elem->datalen;
+	memcpy(sub_ie_vir + 2, elem->data, elem->datalen);
+	cus_ie->ie = sub_ie_phy;
+
+	param_buf[0] = (u32)0;
+	param_buf[1] = (u32)ie_phy;
+	param_buf[2] = (u32)1;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_CUS_IE, param_buf, 3);
+
+	rtw_mfree(elem->datalen, sub_ie_vir, sub_ie_phy);
+	rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie, ie_phy);
+
+	return ret;
+}
+
+int llhw_wifi_del_custom_ie(unsigned char wlan_idx)
+{
+	int ret = 0;
+	u32 param_buf[2];
+
+	param_buf[0] = (u32)2;
+	param_buf[1] = (u32)wlan_idx;
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_CUS_IE, param_buf, 2);
+
+	return ret;
+}
+
+int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
+{
+	int ret = 0;
+	u32 param_buf[3];
+	dma_addr_t ie_phy = 0, sub_ie_phy = 0;
+	u8 *sub_ie_vir = NULL;
+	rtw_custom_ie_t *cus_ie = NULL;
+	struct device *pdev = global_idev.ipc_dev;
+
+	cus_ie = rtw_malloc(sizeof(rtw_custom_ie_t), &ie_phy);
+	if (!cus_ie) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom ie failed.", __func__);
+		return -ENOMEM;
+	}
+	cus_ie->type = ie[0];
+	sub_ie_vir = rtw_malloc(ie[1] + 2, &sub_ie_phy);
+	if (!sub_ie_vir) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
+		rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie, ie_phy);
+		return -ENOMEM;
+	}
+	memcpy(sub_ie_vir, ie, ie[1] + 2);
+	cus_ie->ie = sub_ie_phy;
+
+	param_buf[0] = (u32)1;
+	param_buf[1] = (u32)ie_phy;
+	param_buf[2] = (u32)ie_index;
+
+	ret = llhw_ipc_send_msg(IPC_API_WIFI_CUS_IE, param_buf, 3);
+
+	rtw_mfree(ie[1] + 2, sub_ie_vir, sub_ie_phy);
+	rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie, ie_phy);
+
+	return ret;
+}

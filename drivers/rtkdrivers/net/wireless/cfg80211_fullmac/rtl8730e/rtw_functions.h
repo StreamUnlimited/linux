@@ -63,6 +63,9 @@ void llhw_ipc_send_packet(struct inic_ipc_ex_msg *p_ipc_msg);
 u64 llhw_wifi_get_tsft(u8 iface_type);
 int rtw_regd_init(void);
 void rtw_ethtool_ops_init(void);
+int llhw_wifi_add_custom_ie(const struct element *elem);
+int llhw_wifi_del_custom_ie(unsigned char wlan_idx);
+int llhw_wifi_update_custom_ie(u8 *ie, int ie_index);
 
 #ifdef CONFIG_NAN
 void cfg80211_rtw_ops_nan_init(void);
