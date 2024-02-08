@@ -1,28 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    leds-rtk-ws28xxx.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-09-15
-  * @brief   This file contains all the functions prototypes for the LEDC firmware
-  *             library, including the following functionalities of the Universal Asynchronous
-  *             Transmitter peripheral:
-  *           - Initialization
-  *           - LEDC Transmit Control (disable/enable)
-  *           - Output Timings Control
-  *           - Output RGB mode control
-  *           - Interrupts management
-  *           - FIFO Threshold setting interface
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2021, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek LEDC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "leds-rtk-ws28xxx.h"
 
@@ -43,13 +24,6 @@ static u32 rtk_ledc_readl(void __iomem *ptr, u32 reg)
 	return readl((void __iomem *)((u32)ptr + reg));
 }
 
-static void assert_param(u8 check_result)
-{
-	if (!check_result) {
-		pr_info("error: illegal parameter.");
-	}
-}
-
 static void rtk_get_dts_info(
 	struct rtk_ws28xxx_led_priv *priv,
 	struct device *dev,
@@ -59,13 +33,13 @@ static void rtk_get_dts_info(
 {
 	int nr_requests, ret;
 
-	/* get dts params. */
+	/* Get DTS params. */
 	ret = of_property_read_u32(np, dts_name, &nr_requests);
 	if (ret) {
-		dev_err(dev, "can't get %s", dts_name);
+		dev_warn(dev, "Can't get DTS property %s, set it to default value %d\n", dts_name, default_value);
 		*param_to_set = default_value;
 	} else {
-		dev_dbg(dev, "%s = %d", dts_name, nr_requests);
+		dev_dbg(dev, "Get DTS property %s = %d\n", dts_name, nr_requests);
 		*param_to_set = nr_requests;
 	}
 }
@@ -82,7 +56,7 @@ void rtk_ledc_struct_init(
 {
 	struct device_node *np = dev->of_node;
 
-	/* dts rtk defined params. */
+	/* LEDC DTS defined params. */
 	char s1[] = "reg";
 	char s2[] = "rtk,led-nums";
 	char s3[] = "rtk,leds-dma-enable";
@@ -109,7 +83,6 @@ void rtk_ledc_struct_init(
 	} else {
 		init_struct_ledc->ledc_fifo_level = 0x7;
 	}
-	dev_dbg(dev, "ledc_fifo_level = %d", init_struct_ledc->ledc_fifo_level);
 
 	rtk_get_dts_info(priv, dev, np, &init_struct_ledc->t0h_ns, 0xd, s6);
 	rtk_get_dts_info(priv, dev, np, &init_struct_ledc->t0l_ns, 0x27, s7);
@@ -187,7 +160,10 @@ void rtk_ledc_interrupt_config(
 	u32 reg_val = 0;
 	u32 temp_int_reg;
 
-	assert_param(IS_LEDC_INTERRUPT(ledc_it));
+	if (!IS_LEDC_INTERRUPT(ledc_it)) {
+		dev_err(priv->dev, "Illegal parameter: interrupt config bits\n");
+		return;
+	}
 	temp_int_reg = rtk_ledc_readl(priv->base, LEDC_LED_INTERRUPT_CTRL_REG);
 
 	if (new_state == ENABLE) {
@@ -213,8 +189,11 @@ void rtk_ledc_clear_interrupt(
 	struct rtk_ws28xxx_led_priv *priv, u32 ledc_it)
 {
 	u32 temp_int_reg;
+	if (!IS_LEDC_INTERRUPT(ledc_it)) {
+		dev_err(priv->dev, "Illegal parameter: interrupt clear bits\n");
+		return;
 
-	assert_param(IS_LEDC_INTERRUPT(ledc_it));
+	}
 	temp_int_reg = rtk_ledc_readl(priv->base, LEDC_LED_INT_STS_REG);
 	rtk_ledc_writel(priv->base, LEDC_LED_INT_STS_REG, temp_int_reg | ledc_it);
 }
@@ -254,7 +233,10 @@ void rtk_ledc_set_trans_mode(
 	temp_ctrl_reg = rtk_ledc_readl(priv->base, LEDC_DMA_CTRL_REG);
 	temp_int_reg = rtk_ledc_readl(priv->base, LEDC_LED_INTERRUPT_CTRL_REG);
 
-	assert_param(IS_LEDC_TRANS_MODE(mode));
+	if (!IS_LEDC_TRANS_MODE(mode)) {
+		dev_err(priv->dev, "Illegal parameter: transfer mode\n");
+		return;
+	}
 
 	if (mode) {
 		rtk_ledc_writel(priv->base, LEDC_DMA_CTRL_REG, temp_ctrl_reg | LEDC_BIT_DMA_EN);
@@ -360,7 +342,7 @@ void rtk_ledc_gdma_tx_periodic(
 
 	ret = dmaengine_slave_config(dma_params->chan, dma_params->config);
 	if (ret != 0) {
-		pr_info("dmaengine slave config fail. ");
+		dev_err(dma_params->dma_dev, "DMA engine slave config fail\n");
 		goto out;
 	}
 
@@ -389,17 +371,13 @@ void rtk_ledc_dma_done_callback(void *data)
 {
 	struct rtk_ledc_dmac_parameters *dma_params;
 	dma_params = data;
-#if RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 	int i;
-#endif // RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 
 #if RTK_LEDC_TODO
-
 	if (dma_params->gdma_count < dma_params->gdma_loop) {
-		/* need to dma next loop. each loop has the same pattern! */
-		/* think if src or dst change. */
+		/* Need to dma next loop. each loop has the same pattern! */
+		/* Think if src or dst change. */
 		dma_params->gdma_count++;
-		pr_debug("count(loop) = (%d)%d", dma_params->gdma_count, dma_params->gdma_loop);
 		rtk_ledc_gdma_tx_periodic(dma_params);
 		return;
 	}
@@ -408,7 +386,7 @@ void rtk_ledc_dma_done_callback(void *data)
 
 #if RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 	for (i = 0; i < dma_params->dma_length; i += 4) {
-		pr_info("[%x]: %d", dma_params->dma_test_buf_addr + i, *(dma_params->dma_test_buf_addr + i));
+		dev_dbg(dma_params->dma_dev, "Dump test buf [%p] = 0x%02X\n", dma_params->dma_test_buf_addr + i, *(dma_params->dma_test_buf_addr + i));
 	}
 #endif // RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 
@@ -438,10 +416,10 @@ void rtk_ledc_gdma_tx(
 #if RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 	int i;
 	dma_params->dma_test_buf_addr = dma_alloc_coherent(dma_params->dma_dev, length * 4, &dma_params->dma_test_buf_phy_addr, GFP_KERNEL);
-	pr_info("dma test buf addr [%x]", dma_params->dma_test_buf_addr);
+	dev_dbg(dev, "DMA test buf addr = %p\n", dma_params->dma_test_buf_addr);
 	for (i = 0; i < length * 4; i += 4) {
 		*(dma_params->dma_test_buf_addr + i) = 0xFFFFFFFF;
-		pr_info("phy addr [%x]: %d", dma_params->dma_test_buf_phy_addr + i, *(dma_params->dma_test_buf_addr + i));
+		dev_dbg(dev, "Dump phy addr [%p] = 0x%02X\n", dma_params->dma_test_buf_phy_addr + i, *(dma_params->dma_test_buf_addr + i));
 	}
 #endif // RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 
@@ -449,7 +427,7 @@ void rtk_ledc_gdma_tx(
 	dma_params->dma_length = length * 4; // each leds pattern is 32 bits.
 
 	if (dma_params->dma_length < 32) {
-		dev_err(dev, "Pattern data length too small to use dma.\n");
+		dev_err(dev, "Pattern data length is too small to use DMA\n");
 	}
 
 	if (dma_params->dma_length >= 64) {
@@ -458,11 +436,11 @@ void rtk_ledc_gdma_tx(
 
 	dma_params->chan = dma_request_chan(dev, name);
 	if (!dma_params->chan) {
-		dev_err(dev, "failed to request ledc dma channel.\n");
+		dev_err(dev, "Failed to request LEDC dma channel\n");
 		dma_params->gdma_done = 1;
 		return;
 	}
-	dev_dbg(dev, "virtual chan:%d", dma_params->chan->chan_id);
+	dev_dbg(dev, "TX virtual chan = %d\n", dma_params->chan->chan_id);
 
 	/* Fill in config parameters. */
 	dma_params->config->device_fc = 1;
@@ -471,8 +449,8 @@ void rtk_ledc_gdma_tx(
 
 #if RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 	dma_params->config->dst_addr = dma_params->dma_test_buf_phy_addr;
-	pr_info("WARNING!! LEDC dma dst addr has been changed to test buf addr [%x], check test buf later.",
-			dma_params->config->dst_addr);
+	dev_warn(dev, "DMA dst addr has been changed to test buf addr [%p], check test buf later\n",
+			 dma_params->config->dst_addr);
 #endif // RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 
 	dma_params->config->dst_port_window_size = 0;
@@ -523,15 +501,17 @@ void rtk_ledc_set_total_len(
 {
 	u32 reg_val;
 
-	assert_param(IS_LEDC_DATA_LENGTH(total_data));
+	if (!IS_LEDC_DATA_LENGTH(total_data)) {
+		dev_err(priv->dev, "Illegal parameter: total data length\n");
+		return;
+	}
 
 	reg_val = rtk_ledc_readl(priv->base, LEDC_CTRL_REG);
 	reg_val &= ~ LEDC_MASK_TOTAL_DATA_LENGTH;
 	reg_val |= LEDC_TOTAL_DATA_LENGTH(total_data - 1);
 	rtk_ledc_writel(priv->base, LEDC_CTRL_REG, reg_val);
 
-	pr_debug("%s total len = %d", __FUNCTION__, total_data);
-	pr_debug("check immediately ctl reg for total len = %x (bit 16~28)", rtk_ledc_readl(priv->base, LEDC_CTRL_REG));
+	pr_debug("Check immediately ctl reg for total length = 0x%08X (bit 16~28)\n", rtk_ledc_readl(priv->base, LEDC_CTRL_REG));
 }
 
 /**
@@ -544,7 +524,10 @@ void rtk_ledc_set_led_num(struct rtk_ws28xxx_led_priv *priv, u32 num)
 {
 	u32 reg_val;
 
-	assert_param(IS_LEDC_LED_NUM(num));
+	if (!IS_LEDC_LED_NUM(num)) {
+		dev_err(priv->dev, "Illegal parameter: LED number\n");
+		return;
+	}
 
 	reg_val = rtk_ledc_readl(priv->base, LEDC_LED_RESET_TIMING_CTRL_REG);
 	reg_val &= ~ LEDC_MASK_LED_NUM;
@@ -593,7 +576,10 @@ void rtk_ledc_set_output_mode(
 {
 	u32 reg_val;
 
-	assert_param(IS_LEDC_OUTPUT_MODE(mode));
+	if (!IS_LEDC_OUTPUT_MODE(mode)) {
+		dev_err(priv->dev, "Illegal parameter: output RGB mode\n");
+		return;
+	}
 
 	reg_val = rtk_ledc_readl(priv->base, LEDC_CTRL_REG);
 	reg_val &= ~LEDC_MASK_LED_RGB_MODE;
@@ -631,7 +617,10 @@ void rtk_ledc_set_input_mode(struct rtk_ws28xxx_led_priv *priv, u8 order)
 {
 	u32 reg_val;
 
-	assert_param(IS_LEDC_INPUT_ORDER(order));
+	if (!IS_LEDC_INPUT_ORDER(order)) {
+		dev_err(priv->dev, "Illegal parameter: input order\n");
+		return;
+	}
 
 	reg_val = rtk_ledc_readl(priv->base, LEDC_CTRL_REG);
 	if (order) {
@@ -681,12 +670,15 @@ void rtk_ledc_send_data(
 	u32 tx_max;
 	u32 data_len = len;
 
-	assert_param(IS_LEDC_DATA_LENGTH(len));
+	if (!IS_LEDC_DATA_LENGTH(len)) {
+		dev_err(priv->dev, "Illegal parameter: data length\n");
+		return;
+	}
 
 	fifo_full = rtk_ledc_get_interrupt(priv) & LEDC_BIT_FIFO_FULL;
 	tx_max = LEDC_FIFO_DEPTH - rtk_ledc_get_fifo_level(priv);
 
-	/* what if break in by interrupt, mask all interrupts. */
+	/* What if break in by interrupt, mask all interrupts. */
 
 	if (!fifo_full) {
 		while (tx_max--) {
@@ -707,7 +699,6 @@ void rtk_ledc_send_data(
 	priv->cpu_params.data_current_p = data;
 	priv->cpu_params.left_u32 = data_len;
 
-	pr_debug(" left data = %d (u32 len)", priv->cpu_params.left_u32);
 }
 
 /**
@@ -862,7 +853,7 @@ u32 ledc_irq_handler(struct rtk_ws28xxx_led_priv *priv, u32 InterruptStatus)
 {
 	if (InterruptStatus & LEDC_BIT_LED_TRANS_FINISH_INT) {
 		rtk_ledc_clear_interrupt(priv, LEDC_BIT_LED_TRANS_FINISH_INT);
-		pr_info("[LEDC] TRANS DONE.");
+		dev_info(priv->dev, "Transfer done\n");
 
 		if (rtk_ledc_get_trans_mode(priv) == LEDC_DMA_MODE) {
 			priv->dma_params.gdma_done = 1;
@@ -874,7 +865,6 @@ u32 ledc_irq_handler(struct rtk_ws28xxx_led_priv *priv, u32 InterruptStatus)
 	}
 
 	if (InterruptStatus & LEDC_BIT_WAITDATA_TIMEOUT_INT) {
-		pr_debug("[INT]wait data timeout %x\n", InterruptStatus);
 		rtk_ledc_clear_interrupt(priv, LEDC_BIT_WAITDATA_TIMEOUT_INT);
 
 		priv->irq_result = RESULT_ERR;
@@ -887,24 +877,20 @@ u32 ledc_irq_handler(struct rtk_ws28xxx_led_priv *priv, u32 InterruptStatus)
 	}
 
 	if (InterruptStatus & LEDC_BIT_FIFO_OVERFLOW_INT) {
-		pr_debug("[INT]FIFO OF %x\n", InterruptStatus);
 		rtk_ledc_clear_interrupt(priv, LEDC_BIT_FIFO_OVERFLOW_INT);
-
 		priv->irq_result = RESULT_ERR;
 		rtk_ledc_soft_reset(priv);
 	}
 
 	if (InterruptStatus & LEDC_BIT_FIFO_CPUREQ_INT) {
-		pr_debug("[INT]CPU REQ %x\n", InterruptStatus);
-
 		if (priv->cpu_params.data_current_p == NULL) {
-			pr_debug("tx data error!\n");
+			dev_err(priv->dev, "TX data error\n");
 			rtk_ledc_clear_interrupt(priv, LEDC_BIT_FIFO_CPUREQ_INT);
 			return -1;
 		} else {
 			if (!priv->cpu_params.left_u32) {
 				priv->cpu_params.cpu_trans_done = 1;
-				pr_debug("warning: no more data to tx!");
+				dev_warn(priv->dev, "No more data to TX\n");
 				rtk_ledc_clear_interrupt(priv, LEDC_BIT_FIFO_CPUREQ_INT);
 			} else {
 				rtk_ledc_send_data(priv, priv->cpu_params.data_current_p, priv->cpu_params.left_u32);
@@ -912,8 +898,6 @@ u32 ledc_irq_handler(struct rtk_ws28xxx_led_priv *priv, u32 InterruptStatus)
 		}
 	}
 
-	/* The last log of interrupt will not print in this period. */
-	pr_info("\n");
 	return 0;
 }
 
@@ -923,18 +907,16 @@ static irqreturn_t rtk_ledc_interrupt(int irq, void *dev_id)
 	u32 ledc_interrupt_res;
 
 	ledc_interrupt_res = rtk_ledc_readl(priv->base, LEDC_LED_INT_STS_REG);
-	pr_debug("before lock: LEDC_LED_INT_STS_REG = %x", ledc_interrupt_res);
-
 	priv->irq_result = ledc_interrupt_res & BIT(0);
 
 	if (ledc_interrupt_res) {
 		ledc_irq_handler(priv, ledc_interrupt_res);
 	} else {
-		pr_debug("Warning: Expired interrupt.");
+		dev_warn(priv->dev, "Expired interrupt\n");
 	}
 
 	ledc_interrupt_res = rtk_ledc_readl(priv->base, LEDC_LED_INTERRUPT_CTRL_REG);
-	pr_debug("check interrupt mask = %x", ledc_interrupt_res);
+	dev_dbg(priv->dev, "Check interrupt mask = 0x%08X\n", ledc_interrupt_res);
 
 	return IRQ_HANDLED;
 }
@@ -1015,7 +997,7 @@ static int rtk_ws28xxx_led_pattern_clear(struct led_classdev *ldev)
 static void rtk_ws28xxx_led_hw_prepare(
 	struct rtk_ws28xxx_led_priv *priv, u32 len)
 {
-	/* Fresh ledc reg paramters. */
+	/* Fresh LEDC reg paramters */
 	priv->ledc_params.data_length = len;
 	priv->ledc_params.t0h_ns = 0x10;
 	priv->ledc_params.t0l_ns = 0x20;
@@ -1035,9 +1017,9 @@ static void rtk_ws28xxx_led_hw_prepare(
 	rtk_ledc_interrupt_config(priv, LEDC_BIT_WAITDATA_TIMEOUT_INT_EN, ENABLE);
 	rtk_ledc_interrupt_config(priv, LEDC_BIT_FIFO_OVERFLOW_INT_EN, ENABLE);
 
-	pr_debug("trans mode = %s", priv->ledc_params.ledc_trans_mode ? "dma" : "cpu");
-	pr_debug("total data len set in ctl reg = %x (bit 16~28)", rtk_ledc_readl(priv->base, LEDC_CTRL_REG));
-	pr_debug("LED num = %x (bit 0~9)", rtk_ledc_readl(priv->base, LEDC_LED_RESET_TIMING_CTRL_REG));
+	dev_dbg(priv->dev, "Trans mode = %s\n", priv->ledc_params.ledc_trans_mode ? "DMA" : "CPU");
+	dev_dbg(priv->dev, "Total data len set in ctl reg = 0x%08X (bit 16~28)\n", rtk_ledc_readl(priv->base, LEDC_CTRL_REG));
+	dev_dbg(priv->dev, "LED num = 0x%08X (bit 0~9)\n", rtk_ledc_readl(priv->base, LEDC_LED_RESET_TIMING_CTRL_REG));
 }
 
 static int rtk_ws28xxx_led_pattern_set_cpu(
@@ -1068,7 +1050,7 @@ static int rtk_ws28xxx_led_pattern_set_dma(
 {
 	int wait_timeout = 0;
 
-	/* For test only. */
+	/* For test only */
 	int repeat = 1;
 
 	priv->dma_params.gdma_done = 0;
@@ -1078,11 +1060,10 @@ static int rtk_ws28xxx_led_pattern_set_dma(
 	rtk_ledc_gdma_tx(priv, priv->dma_params.dma_dev, &priv->dma_params, len);
 	while (!priv->dma_params.gdma_done) {
 		if (wait_timeout % 100 == 0) {
-			pr_debug("info: wait dma.");
-			pr_debug("LEDC_LED_INT_STS_REG = %x", rtk_ledc_readl(priv->base, LEDC_LED_INT_STS_REG));
+			dev_dbg(priv->dma_params.dma_dev, "LEDC_LED_INT_STS_REG = 0x%08X\n", rtk_ledc_readl(priv->base, LEDC_LED_INT_STS_REG));
 		}
 		if (wait_timeout > 1000) {
-			pr_debug("\nwarning: dma timeout.");
+			dev_err(priv->dma_params.dma_dev, "DMA timeout\n");
 			return -1;
 		}
 		msleep(2);
@@ -1102,18 +1083,18 @@ static int rtk_ws28xxx_led_pattern_set(
 
 	mutex_lock(&leds->priv->lock);
 
-	/* get patterns. */
+	/* Get patterns */
 	if (leds->priv->ledc_params.ledc_trans_mode == LEDC_DMA_MODE) {
 		leds->priv->dma_params.dma_buf_addr = dma_alloc_coherent(leds->priv->dma_params.dma_dev, len, &leds->priv->dma_params.dma_buf_phy_addr, GFP_KERNEL);
 		for (i = 0; i < len * 4; i += 4) {
 			*(leds->priv->dma_params.dma_buf_addr + i) = pattern[i / 4].brightness;
-			pr_debug("check src data [%p]: %x", leds->priv->dma_params.dma_buf_addr + i, *(leds->priv->dma_params.dma_buf_addr + i));
+			dev_dbg(leds->priv->dev, "Check src data [%p]: 0x%02X\n", leds->priv->dma_params.dma_buf_addr + i, *(leds->priv->dma_params.dma_buf_addr + i));
 		}
 	} else {
 		leds->priv->cpu_params.pattern_data_buff = kmalloc(len * 4, GFP_KERNEL);
 		for (i = 0; i < len; i++) {
 			*(leds->priv->cpu_params.pattern_data_buff + i) = pattern[i].brightness;
-			pr_debug("check data [%p]: %x", leds->priv->cpu_params.pattern_data_buff + i, *(leds->priv->cpu_params.pattern_data_buff + i));
+			dev_dbg(leds->priv->dev, "Check data [%p]: 0x%08X\n", leds->priv->cpu_params.pattern_data_buff + i, *(leds->priv->cpu_params.pattern_data_buff + i));
 		}
 	}
 
@@ -1136,8 +1117,8 @@ PATTERN_OUT:
 	return ret;
 }
 
-static int rtk_ws28xxx_led_register(
-	struct device *dev, struct rtk_ws28xxx_led_priv *priv)
+static int rtk_ws28xxx_led_register(struct device *dev,
+									struct rtk_ws28xxx_led_priv *priv)
 {
 	int i, err;
 
@@ -1172,7 +1153,7 @@ static int rtk_ws28xxx_led_register(
 }
 
 static const struct of_device_id rtk_ws28xxx_led_of_match[] = {
-	{ .compatible = "realtek,rtk-ws28xxx-led", },
+	{ .compatible = "realtek,amebad2-ws28xxx-led", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, rtk_ws28xxx_led_of_match);
@@ -1212,7 +1193,7 @@ static int rtk_ws28xxx_led_probe(struct platform_device *pdev)
 	mutex_init(&priv->lock);
 	priv->base = devm_ioremap_resource(&pdev->dev, res);
 
-	/* Init default params. */
+	/* Init default params */
 	rtk_ledc_struct_init(priv, &pdev->dev, &priv->ledc_params);
 
 	for_each_child_of_node(np, child) {
@@ -1232,18 +1213,18 @@ static int rtk_ws28xxx_led_probe(struct platform_device *pdev)
 		priv->leds[reg].fwnode = of_fwnode_handle(child);
 		priv->leds[reg].active = true;
 	}
-
+	priv->dev = dev;
 	priv->irq = platform_get_irq(pdev, 0);
 	ret = devm_request_irq(&pdev->dev, priv->irq, rtk_ledc_interrupt, 0, dev_name(&pdev->dev), priv);
 	if (ret) {
-		dev_err(&pdev->dev, "unable to request IRQ\n");
+		dev_err(&pdev->dev, "Failed to request IRQ\n");
 		return ret;
 	}
 
-	/* Enable LEDC Clock. */
+	/* Enable LEDC Clock */
 	priv->clock = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(priv->clock)) {
-		dev_err(&pdev->dev, "unable to get RTK_CKE_LEDC clock\n");
+		dev_err(&pdev->dev, "Failed to get clock\n");
 		return PTR_ERR(priv->clock);
 	}
 
@@ -1270,7 +1251,7 @@ static int rtk_ws28xxx_led_remove(struct platform_device *pdev)
 
 static struct platform_driver rtk_ws28xxx_led_driver = {
 	.driver = {
-		.name = "rtk-ws28xxx-ledc",
+		.name = "realtek-amebad2-ws28xxx-ledc",
 		.of_match_table = rtk_ws28xxx_led_of_match,
 	},
 	.probe = rtk_ws28xxx_led_probe,
@@ -1279,6 +1260,6 @@ static struct platform_driver rtk_ws28xxx_led_driver = {
 
 module_platform_driver(rtk_ws28xxx_led_driver);
 
-MODULE_AUTHOR("Jessica XU <jessica_xu@realsil.com.cn>");
-MODULE_DESCRIPTION("Realtek AmebaD2 ws28xxx led light controller driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba LEDC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

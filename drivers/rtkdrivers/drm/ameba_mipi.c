@@ -1,25 +1,12 @@
-/**
-  ******************************************************************************
-  * @file    ameba_mipi.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-05-27
-  * @brief   This file contains all the functions prototypes for the MIPI firmware
-  *             library, including the following functionalities of DSI/DPHY controller:
-
-  *           - MIPI Initialization For DSI Vedio Mode
-  *           - DSI Command Mode
-  *           - Interrupts and flags management
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2020, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek MIPI support
+*
+*           - MIPI Initialization For DSI Vedio Mode
+*           - DSI Command Mode
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 //#include "ameba_soc.h"
 #include <drm/drm_print.h>
@@ -104,7 +91,7 @@ static void MIPI_DPHY_Reset_Release(struct device *dev, void __iomem *MIPIx_, u3
 	} else if (lane_num == 2) {
 		Value32 |= (MIPI_BIT_PLL_LANE1_ENABLE | MIPI_BIT_PLL_LANE0_ENABLE | MIPI_BIT_LANE1_EN | MIPI_BIT_LANE0_EN);
 	} else {
-		DRM_DEV_ERROR(dev, "MIPI not support %d lane\n", lane_num);
+		DRM_ERROR("MIPI not support %d lane\n", lane_num);
 	}
 	writel(Value32, (void*)(MIPIx + MIPI_CLOCK_GEN_OFFSET));
 
@@ -120,7 +107,7 @@ void MIPI_DPHY_PLL_Set(struct device *dev, void __iomem *MIPIx_, u32 dataLane_fr
 	u32 MIPIx = (u32) MIPIx_ ;
 
 	if (dataLane_freq < 100) {
-		DRM_DEV_ERROR(dev, "dataLane_freq %d cannot less than 100M\n", dataLane_freq);
+		DRM_ERROR("DataLane freq(%d) cannot less than 100M\n", dataLane_freq);
 		return;
 	} else if (dataLane_freq <= 200) { //100Mbps ~ 200Mbps
 		div_number = 4;
@@ -233,11 +220,6 @@ void MIPI_DPHY_Timing_Set(void __iomem *MIPIx_, u32 dataLane_freq)
 	Value32 &= ~MIPI_MASK_ULPS_EXIT_TIME;
 	Value32 |= MIPI_ULPS_EXIT_TIME(1000000 / 50);		/*ulps exit time should lager than 1ms*/
 	writel(Value32, (void*)(MIPIx + MIPI_ESCAPE_TX_DATA_6_OFFSET));
-//	printk("MIPI_ESCAPE_TX_DATA_1 =0x%8x[%s]0x%8x \n",MIPIx->MIPI_ESCAPE_TX_DATA_1,((MIPIx->MIPI_ESCAPE_TX_DATA_1==MIPI_ESCAPE_TX_DATA_11)?("T"):("F")),MIPI_ESCAPE_TX_DATA_11);
-//	printk("MIPI_ESCAPE_TX_DATA_2 =0x%8x[%s]0x%8x \n",MIPIx->MIPI_ESCAPE_TX_DATA_2,((MIPIx->MIPI_ESCAPE_TX_DATA_2==MIPI_ESCAPE_TX_DATA_22)?("T"):("F")),MIPI_ESCAPE_TX_DATA_22);
-//	printk("MIPI_ESCAPE_TX_DATA_3 =0x%8x[%s]0x%8x \n",MIPIx->MIPI_ESCAPE_TX_DATA_3,((MIPIx->MIPI_ESCAPE_TX_DATA_3==MIPI_ESCAPE_TX_DATA_33)?("T"):("F")),MIPI_ESCAPE_TX_DATA_33);
-//	printk("MIPI_ESCAPE_TX_CLK_0 =0x%8x[%s]0x%8x \n",MIPIx->MIPI_ESCAPE_TX_CLK_0,((MIPIx->MIPI_ESCAPE_TX_CLK_0==MIPI_ESCAPE_TX_CLK_00)?("T"):("F")),MIPI_ESCAPE_TX_CLK_00);
-//	printk("MIPI_ESCAPE_TX_DATA_6 =0x%8x[%s]0x%8x \n",MIPIx->MIPI_ESCAPE_TX_DATA_6,((MIPIx->MIPI_ESCAPE_TX_DATA_6==MIPI_ESCAPE_TX_DATA_66)?("T"):("F")),MIPI_ESCAPE_TX_DATA_66);
 #else
 //https://yarchive.net/comp/linux/kernel_fp.html
 //todo fixme yiyuan @20210916 , not support some aeabi apis
@@ -576,11 +558,11 @@ u32 MIPI_DSI_CMD_Rxcv_CMD(void __iomem *MIPIx_, u8 rcmd_idx)
 	return  0 ;
 }
 
-void MIPI_DSI_Mode_Switch(void __iomem *MIPIx_, u32 MIPI_VideoNCmdMode)
+void MIPI_DSI_Mode_Switch(void __iomem *MIPIx_, u32 video)
 {
 	u32 MIPIx = (u32) MIPIx_ ;
 	u32 Value32 = readl((void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET)) ;
-	if (MIPI_VideoNCmdMode) {
+	if (video) {
 		Value32 |= MIPI_BIT_DSI_MODE;
 		writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
 	} else {

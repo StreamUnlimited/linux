@@ -1,20 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    realtek_dmac.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-08-03
-  * @brief   This file contains all the functions prototypes for the GDMA firmware
-  *          library.
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2021, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek DMAC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "realtek_dmac.h"
 
@@ -40,35 +29,34 @@ static u32 rsdma_readl(void __iomem *ptr, u32 reg)
 /************ Indirect Operation to control RTK_GDMA Hardware *************/
 
 /**************************************************************************/
-
-#if RTK_DMAC_DEBUG_DETAILS
 static void rtk_dma_reg_check_all(struct rtk_dma *rsdma, u32 channel)
 {
-	dev_info(rsdma->dma.dev, "\n\nrtk_dma_reg_check_all\n\n");
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_SAR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SAR_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_DAR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DAR_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_LLP_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_LLP_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_CTL_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CTL_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_CTL_U = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CTL_U));
+#if RTK_DMAC_DEBUG_DETAILS
+	dev_dbg(rsdma->dma.dev, "\n\nrtk_dma_reg_check_all\n\n");
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_SAR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SAR_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_DAR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DAR_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_LLP_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_LLP_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_CTL_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CTL_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_CTL_U = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CTL_U));
 
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_SSTAT_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SSTAT_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_DSTAT_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DSTAT_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_SSTATAR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SSTATAR_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_DSTATAR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DSTATAR_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_CFG_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CFG_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_CFG_U = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CFG_U));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_SSTAT_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SSTAT_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_DSTAT_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DSTAT_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_SSTATAR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SSTATAR_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_DSTATAR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DSTATAR_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_CFG_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CFG_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_CFG_U = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_CFG_U));
 
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_SGR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SGR_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_CHAN_DSR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DSR_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_SGR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_SGR_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_CHAN_DSR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHAN_BASE(channel) + RTK_DMA_CHAN_DSR_L));
 
-	dev_info(rsdma->dma.dev, "\n");
-	dev_info(rsdma->dma.dev, "RTK_DMA_INT_MASK_BLOCK_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_INT_MASK_BLOCK_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_INT_MASK_DST_TRAN_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_INT_MASK_DST_TRAN_L));
-	dev_info(rsdma->dma.dev, "RTK_DMA_INT_MASK_ERR_L = %x\n", rsdma_readl(rsdma->base, RTK_DMA_INT_MASK_ERR_L));
+	dev_dbg(rsdma->dma.dev, "\n");
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_INT_MASK_BLOCK_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_INT_MASK_BLOCK_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_INT_MASK_DST_TRAN_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_INT_MASK_DST_TRAN_L));
+	dev_dbg(rsdma->dma.dev, "RTK_DMA_INT_MASK_ERR_L = 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_INT_MASK_ERR_L));
 
-	dev_info(rsdma->dma.dev, "\n\n");
-}
+	dev_dbg(rsdma->dma.dev, "\n\n");
 #endif // RTK_DMAC_DEBUG_DETAILS
+}
 
 static void rtk_dma_set_interrupt_mask(
 	struct rtk_dma *rsdma,
@@ -116,7 +104,7 @@ static void rtk_dma_channel_enable(struct rtk_dma *rsdma, u32 channel_num, u8 en
 
 	if (enable) {
 		channel_order |= BIT(channel_num);
-		dev_dbg(rsdma->dma.dev, "enable channel_num:%d %s", channel_num, enable ? "enable" : "disable");
+		dev_dbg(rsdma->dma.dev, "Channel %d is %s\n", channel_num, enable ? "enable" : "disable");
 	} else {
 		channel_order &= ~ BIT(channel_num);
 	}
@@ -166,11 +154,6 @@ static void rtk_dma_prepare_cmd(
 static inline struct rtk_dma *to_rtk_dma(struct dma_device *dd)
 {
 	return container_of(dd, struct rtk_dma, dma);
-}
-
-static struct device *chan2dev(struct dma_chan *chan)
-{
-	return &chan->dev->device;
 }
 
 static inline struct rtk_dma_vchan *to_rtk_vchan(struct dma_chan *chan)
@@ -285,7 +268,7 @@ static u32 to_rtk_width(struct rtk_dma *rsdma, u32 width)
 	case DMA_SLAVE_BUSWIDTH_4_BYTES:
 		return TrWidthFourBytes;
 	default:
-		dev_err(rsdma->dma.dev, "dma width error.\n");
+		dev_err(rsdma->dma.dev, "DMA width error\n");
 		return TrWidthOneByte;
 	}
 }
@@ -302,7 +285,7 @@ static u32 to_rtk_msize(struct rtk_dma *rsdma, u32 msize)
 	case 16:
 		return MsizeSixteen;
 	default:
-		dev_err(rsdma->dma.dev, "dma msize error.\n");
+		dev_err(rsdma->dma.dev, "DMA msize error\n");
 		return MsizeFour;
 	}
 }
@@ -331,20 +314,6 @@ static inline int rtk_dma_hw_cfg_lli(
 	u8 src_handshake_add2 = 0;
 	u8 dst_handshake_add1 = 0;
 	u8 dst_handshake_add2 = 0;
-
-#if RTK_DMAC_DEBUG_DETAILS
-	dev_info(rsdma->dma.dev, "input flow controller = %x", sconfig->device_fc);
-	dev_info(rsdma->dma.dev, "input src_addr = %x", src);
-	dev_info(rsdma->dma.dev, "input dst_addr = %x", dst);
-	dev_info(rsdma->dma.dev, "input src_width = %d", src_width);
-	dev_info(rsdma->dma.dev, "input dst_width = %d", dst_width);
-	dev_info(rsdma->dma.dev, "input src_msize = %d", src_msize);
-	dev_info(rsdma->dma.dev, "input dst_msize = %d", dst_msize);
-	dev_info(rsdma->dma.dev, "input src_port_window_size = %d", sconfig->src_port_window_size);
-	dev_info(rsdma->dma.dev, "input dst_port_window_size = %d", sconfig->dst_port_window_size);
-	dev_info(rsdma->dma.dev, "input slave_id = %d", sconfig->slave_id);
-	dev_info(rsdma->dma.dev, "\n");
-#endif // RTK_DMAC_DEBUG_DETAILS
 
 	switch (dir) {
 	case DMA_DEV_TO_MEM:
@@ -422,9 +391,7 @@ static inline int rtk_dma_hw_cfg_lli(
 		hw_cfg->dst_reload = 0;
 	}
 
-#if RTK_DMAC_DEBUG_DETAILS
-	dev_info(rsdma->dma.dev, "block size = %d", hw_cfg->block_size);
-#endif // RTK_DMAC_DEBUG_DETAILS
+	dev_dbg(rsdma->dma.dev, "Config block size = %d\n", hw_cfg->block_size);
 
 	/* combine ctl and cfg regs */
 	hw_cfg->ctlx_up = BIT_DMA_CTL_BLOCK_TS_U(hw_cfg->block_size);
@@ -476,7 +443,7 @@ static void rtk_dma_terminate_pchan(
 	u32 interrupt_error = 0;
 	u32 temp;
 
-	dev_dbg(rsdma->dma.dev, "rtk_dma_terminate_pchan");
+	dev_dbg(rsdma->dma.dev, "DMA terminate pchan %d\n", pchan->id);
 
 	/* suspend and disable the chan. */
 	temp = rsdma_readl(pchan->base, RTK_DMA_CHAN_CFG_L);
@@ -489,7 +456,7 @@ static void rtk_dma_terminate_pchan(
 
 	if (interrupt_block_end || interrupt_error) {
 		dev_warn(rsdma->dma.dev,
-				 "pchan: %d terminated with unresolved interrupt, pchan %s",
+				 "Terminate pchan %d with unresolved interrupt %s\n",
 				 pchan->id, interrupt_block_end ? "success" : "error");
 	}
 
@@ -505,14 +472,10 @@ static int rtk_dma_start_next_txd(struct rtk_dma_vchan *vchan, u8 last_lli)
 	struct rtk_dma_lli *lli;
 	int pchan_wait_timeout = 0;
 
-#if RTK_DMAC_DEBUG_DETAILS
-	pr_info("start next txd.");
-#endif // RTK_DMAC_DEBUG_DETAILS
-
 	txd = rtk_dma_find_vchan_txd(vchan);
 	if (!txd) {
-		dev_err(rsdma->dma.dev, "Unable to find txd for chan %d\n", vchan->vc.chan.chan_id);
-		return 0;
+		dev_dbg(rsdma->dma.dev, "Unable to find TXD for channel %d\n", vchan->vc.chan.chan_id);
+		return -1;
 	}
 
 	if (last_lli) {
@@ -523,14 +486,14 @@ static int rtk_dma_start_next_txd(struct rtk_dma_vchan *vchan, u8 last_lli)
 
 	/* Wait for channel inactive */
 	while (rtk_dma_pchan_busy(rsdma, pchan)) {
-		dev_warn(rsdma->dma.dev, "WARNING: pchan_busy. chan reg = %x", rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L));
 		cpu_relax();
 		pchan_wait_timeout++;
 		if (pchan_wait_timeout % 10 == 0) {
-			dev_warn(rsdma->dma.dev, "vchan %d is using pchan %d, please release this vchan first.", vchan->vc.chan.chan_id, pchan->id);
+			dev_dbg(rsdma->dma.dev, "Vchan %d is using pchan %d, please release this vchan first\n", vchan->vc.chan.chan_id, pchan->id);
 		}
 		if (pchan_wait_timeout == 100) {
-			return 0;
+			dev_warn(rsdma->dma.dev, "Pchan %d keeps busy\n", pchan->id);
+			return -1;
 		}
 	}
 
@@ -540,15 +503,13 @@ static int rtk_dma_start_next_txd(struct rtk_dma_vchan *vchan, u8 last_lli)
 	rtk_dma_clear_channel_interrupts(rsdma, pchan->id);
 
 	lli->hw.channel_index = pchan->id;
-	dev_dbg(rsdma->dma.dev, "lli->hw.channel_index = %d.\n", lli->hw.channel_index);
+	dev_dbg(rsdma->dma.dev, "Link list lli->hw.channel_index = %d\n", lli->hw.channel_index);
 
 	rtk_dma_prepare_cmd(rsdma, &lli->hw, vd->tx.flags & DMA_PREP_INTERRUPT);
 
-	dev_dbg(chan2dev(&vchan->vc.chan), "starting pchan %d\n", pchan->id);
+	dev_dbg(rsdma->dma.dev, "Starting pchan %d\n", pchan->id);
 
-#if RTK_DMAC_DEBUG_DETAILS
 	rtk_dma_reg_check_all(rsdma, pchan->id);
-#endif // RTK_DMAC_DEBUG_DETAILS
 
 	/* Start DMA transfer for this pchan */
 	rtk_dma_channel_enable(rsdma, pchan->id, ENABLE);
@@ -579,7 +540,7 @@ static void rtk_dma_phy_free(struct rtk_dma *rsdma, struct rtk_dma_vchan *vchan)
 	/* Ensure that the physical channel is stopped */
 	/* Other interruptions. */
 
-	dev_dbg(rsdma->dma.dev, "channel usage see %x", rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L));
+	dev_dbg(rsdma->dma.dev, "Channel usage see 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L));
 
 	if (!vchan->pchan) {
 		/* This is expected coz pchan can be freed from both
@@ -592,7 +553,7 @@ static void rtk_dma_phy_free(struct rtk_dma *rsdma, struct rtk_dma_vchan *vchan)
 	if ((vchan->pchan->id < GDMA_MAX_CHANNEL) &&
 		(rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L) &
 		 BIT(vchan->pchan->id))) {
-		dev_dbg(rsdma->dma.dev, "pchan terminate.");
+		dev_dbg(rsdma->dma.dev, "Terminate pchan\n");
 		rtk_dma_terminate_pchan(rsdma, vchan->pchan);
 	}
 }
@@ -602,7 +563,7 @@ static void rtk_dma_phy_terminate(struct rtk_dma *rsdma, struct rtk_dma_vchan *v
 	/* Ensure that the physical channel is stopped */
 	/* Other interruptions. */
 
-	dev_dbg(rsdma->dma.dev, "channel usage see %x", rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L));
+	dev_dbg(rsdma->dma.dev, "Channel usage see 0x%08X\n", rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L));
 
 	if (!vchan->pchan) {
 		return;
@@ -613,7 +574,7 @@ static void rtk_dma_phy_terminate(struct rtk_dma *rsdma, struct rtk_dma_vchan *v
 	if ((vchan->pchan->id < GDMA_MAX_CHANNEL) &&
 		(rsdma_readl(rsdma->base, RTK_DMA_CHANNEL_EN_L) &
 		 BIT(vchan->pchan->id))) {
-		dev_dbg(rsdma->dma.dev, "pchan terminate.");
+		dev_dbg(rsdma->dma.dev, "Terminate pchan\n");
 		rtk_dma_terminate_pchan(rsdma, vchan->pchan);
 	}
 }
@@ -628,15 +589,11 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 	u8 has_next = 0;
 	u8 delete_prev = 0;
 
-#if RTK_DMAC_DEBUG_DETAILS
-	pr_info("rtk_dma_success, channel = %d", channel_num);
-#endif // RTK_DMAC_DEBUG_DETAILS
-
 	pchan = &rsdma->pchans[channel_num];
 
 	vchan = pchan->vchan;
 	if (!vchan) {
-		dev_warn(rsdma->dma.dev, "no vchan attached on pchan %d\n", pchan->id);
+		dev_warn(rsdma->dma.dev, "No vchan attached on pchan %d\n", pchan->id);
 		rtk_dma_channel_enable(rsdma, channel_num, DISABLE);
 		rtk_dma_clear_channel_interrupts(rsdma, channel_num);
 		return;
@@ -646,7 +603,7 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 
 	txd = rtk_dma_find_vchan_txd(vchan);
 	if (!txd) {
-		dev_warn(rsdma->dma.dev, "Unable to find txd for chan %d\n", vchan->vc.chan.chan_id);
+		dev_warn(rsdma->dma.dev, "Unable to find TXD for channel %d\n", vchan->vc.chan.chan_id);
 		goto END_SUCCESS;
 	}
 
@@ -675,7 +632,7 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 			has_next = 0;
 			goto END_SUCCESS;
 		} else if (vchan->pchan->dma_pause.status == DMA_PAUSED_NOW) {
-			pr_info("error: dma has been paused, but still online.");
+			dev_err(rsdma->dma.dev, "DMA has been paused, but still online\n");
 			has_next = 0;
 			goto END_SUCCESS;
 		}
@@ -693,7 +650,7 @@ static void rtk_dma_success(struct rtk_dma *rsdma, u32 channel_num)
 			vchan->pchan->dma_pause.status = DMA_PAUSED_NOW;
 			vchan->pchan->dma_pause.has_next = 0;
 		} else if (vchan->pchan->dma_pause.status == DMA_PAUSED_NOW) {
-			pr_info("error: dma has been paused, but still online.");
+			dev_err(rsdma->dma.dev, "DMA has been paused, but still online\n");
 			goto END_SUCCESS;
 		}
 		txd->vd.tx_result.result = DMA_TRANS_NOERROR;
@@ -716,15 +673,11 @@ static void rtk_dma_fail(struct rtk_dma *rsdma, u32 channel_num)
 	struct rtk_dma_pchan *pchan;
 	struct rtk_dma_txd *txd;
 
-#if RTK_DMAC_DEBUG_DETAILS
-	pr_info("rtk_dma_fail");
-#endif // RTK_DMAC_DEBUG_DETAILS
-
 	pchan = &rsdma->pchans[channel_num];
 
 	vchan = pchan->vchan;
 	if (!vchan) {
-		dev_warn(rsdma->dma.dev, "no vchan attached on pchan %d\n", pchan->id);
+		dev_warn(rsdma->dma.dev, "No vchan attached on pchan %d\n", pchan->id);
 		rtk_dma_channel_enable(rsdma, channel_num, DISABLE);
 		rtk_dma_clear_channel_interrupts(rsdma, channel_num);
 		return;
@@ -736,7 +689,7 @@ static void rtk_dma_fail(struct rtk_dma *rsdma, u32 channel_num)
 
 	txd = rtk_dma_find_vchan_txd(vchan);
 	if (!txd) {
-		dev_warn(rsdma->dma.dev, "Unable to find txd for chan %d\n", vchan->vc.chan.chan_id);
+		dev_warn(rsdma->dma.dev, "Unable to find TXD for channel %d\n", vchan->vc.chan.chan_id);
 		spin_unlock(&vchan->vc.lock);
 		return;
 	}
@@ -880,12 +833,12 @@ static void rtk_dma_desc_free(struct virt_dma_desc *vd)
 	struct rtk_dma_txd *txd = NULL;
 
 	if (!vd) {
-		pr_err("Input vd is NULL!\n");
+		dev_err(rsdma->dma.dev, "Input vd is null\n");
 		return;
 	}
 
 	if (!vd->tx.chan) {
-		pr_err("Input vd has no chan!\n");
+		dev_err(rsdma->dma.dev, "Input vd has no channel\n");
 		return;
 	}
 
@@ -894,7 +847,7 @@ static void rtk_dma_desc_free(struct virt_dma_desc *vd)
 	if (txd) {
 		rtk_dma_free_txd(rsdma, txd);
 	} else {
-		dev_warn(rsdma->dma.dev, "Input vd has no txd!");
+		dev_warn(rsdma->dma.dev, "Input vd has no TXD\n");
 	}
 }
 
@@ -906,6 +859,8 @@ static int rtk_dma_terminate_all(struct dma_chan *chan)
 	int i;
 	LIST_HEAD(head);
 
+	spin_lock_irqsave(&vchan->vc.lock, flags);
+
 	/* Set TERMINATE before release all txdesc. */
 	vchan->pchan->dma_pause.status = DMA_TERMINATE;
 
@@ -915,17 +870,16 @@ static int rtk_dma_terminate_all(struct dma_chan *chan)
 		}
 	}
 
-	spin_lock_irqsave(&vchan->vc.lock, flags);
 	vchan_get_all_descriptors(&vchan->vc, &head);
-	spin_unlock_irqrestore(&vchan->vc.lock, flags);
 
 	vchan_dma_desc_free_list(&vchan->vc, &head);
 
 	/* restore to init value */
 	rtk_dma_phy_terminate(rsdma, vchan);
 
-	dev_dbg(rsdma->dma.dev, "terminate chan %d\n",	vchan->pchan->id);
+	dev_dbg(rsdma->dma.dev, "Terminate channel %d\n",	vchan->pchan->id);
 
+	spin_unlock_irqrestore(&vchan->vc.lock, flags);
 	return 0;
 }
 
@@ -947,15 +901,15 @@ static int rtk_dma_config(struct dma_chan *chan, struct dma_slave_config *config
 static int rtk_dma_pause(struct dma_chan *chan)
 {
 	struct rtk_dma_vchan *vchan = to_rtk_vchan(chan);
+	struct rtk_dma *rsdma = to_rtk_dma(chan->device);
 	struct rtk_dma_txd *txd;
 	unsigned long flags;
 	u32 temp;
 
 	spin_lock_irqsave(&vchan->vc.lock, flags);
-	dev_info(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
 
 	if (!vchan->pchan) {
-		pr_info("vchan %p has no pchan, do not need to pause\n",
+		dev_dbg(rsdma->dma.dev, "Vchan %p has no pchan, do not need to pause\n",
 				&vchan->vc);
 		goto END_PAUSE_PROCESS;
 	}
@@ -964,8 +918,8 @@ static int rtk_dma_pause(struct dma_chan *chan)
 
 	if ((txd) && (txd->vd.tx.flags & DMA_PREP_INTERRUPT)) {
 		if (vchan->pchan->dma_pause.status != DMA_ONGOING) {
-			pr_info("vchan %p dma status before pause-requst is %x\n",
-					&vchan->vc, vchan->pchan->dma_pause.status);
+			dev_dbg(rsdma->dma.dev, "Vchan %p DMA status before pause-requst is 0x%08X\n",
+					 &vchan->vc, vchan->pchan->dma_pause.status);
 		}
 		vchan->pchan->dma_pause.status = DMA_PAUSE_REQUSTED;
 	} else {
@@ -973,10 +927,7 @@ static int rtk_dma_pause(struct dma_chan *chan)
 		temp = rsdma_readl(vchan->pchan->base, RTK_DMA_CHAN_CFG_L);
 		rsdma_writel(vchan->pchan->base, RTK_DMA_CHAN_CFG_L, temp | BIT_DMA_CFG_CH_SUSP(1));
 		vchan->pchan->dma_pause.status = DMA_PAUSED_NOW;
-#if RTK_DMAC_DEBUG_DETAILS
-		struct rtk_dma *rsdma = to_rtk_dma(chan->device);
 		rtk_dma_reg_check_all(rsdma, vchan->pchan->id);
-#endif // RTK_DMAC_DEBUG_DETAILS
 	}
 
 END_PAUSE_PROCESS:
@@ -996,17 +947,17 @@ static int rtk_dma_resume(struct dma_chan *chan)
 	spin_lock_irqsave(&vchan->vc.lock, flags);
 
 	if (!vchan->pchan) {
-		pr_info("vchan %p has no pchan, cannot pause\n",
+		dev_err(rsdma->dma.dev, "Vchan %p has no pchan, cannot pause\n",
 				&vchan->vc);
 		ret = -EFAULT;
 		goto END_RESUME_PROCESS;
 	}
 
-	dev_info(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
+	dev_dbg(rsdma->dma.dev, "Vchan %p resume\n", &vchan->vc);
 
 	txd = rtk_dma_find_vchan_txd(vchan);
 	if (!txd) {
-		dev_err(chan2dev(chan), "Unable to find txd for chan %d\n", vchan->vc.chan.chan_id);
+		dev_err(rsdma->dma.dev, "Unable to find TXD for channel %d\n", vchan->vc.chan.chan_id);
 		ret = -EINVAL;
 		goto END_RESUME_PROCESS;
 	}
@@ -1019,11 +970,11 @@ static int rtk_dma_resume(struct dma_chan *chan)
 			} else if (vchan->pchan->dma_pause.has_next > 1) {
 				rtk_dma_start_next_txd(vchan, 0);
 			} else {
-				pr_info("Last TXD has been completed. \n");
+				dev_dbg(rsdma->dma.dev, "Last TXD has been completed\n");
 			}
 		} else {
 			vchan->pchan->dma_pause.status = DMA_RESUMED_NOW;
-			pr_info("vchan %p dma has not been paused\n", &vchan->vc);
+			dev_err(rsdma->dma.dev, "Vchan %p DMA has not been paused\n", &vchan->vc);
 			ret = -EINVAL;
 			goto END_RESUME_PROCESS;
 		}
@@ -1033,9 +984,7 @@ static int rtk_dma_resume(struct dma_chan *chan)
 		rsdma_writel(vchan->pchan->base, RTK_DMA_CHAN_CFG_L, ~(~temp | BIT_DMA_CFG_CH_SUSP(1)));
 		rtk_dma_channel_enable(rsdma, vchan->pchan->id, ENABLE);
 		vchan->pchan->dma_pause.status = DMA_RESUMED_NOW;
-#if RTK_DMAC_DEBUG_DETAILS
 		rtk_dma_reg_check_all(rsdma, vchan->pchan->id);
-#endif // RTK_DMAC_DEBUG_DETAILS
 	}
 
 END_RESUME_PROCESS:
@@ -1118,15 +1067,13 @@ static void rtk_dma_phy_alloc_and_start(struct rtk_dma_vchan *vchan)
 	struct rtk_dma *rsdma = to_rtk_dma(vchan->vc.chan.device);
 	struct rtk_dma_pchan *pchan;
 
-	dev_dbg(rsdma->dma.dev, "rtk_dma_phy_alloc_and_start");
-
 	pchan = rtk_dma_get_pchan(rsdma, vchan);
 	if (!pchan) {
-		dev_err(rsdma->dma.dev, "Error: No DMA physical channel available for use for requested virtual channel %d, all are used up\n", vchan->vc.chan.chan_id);
+		dev_err(rsdma->dma.dev, "No dma physical channel available for use for requested virtual channel %d, all are used up\n", vchan->vc.chan.chan_id);
 		return;
 	}
 
-	dev_dbg(rsdma->dma.dev, "allocated pchan %d\n", pchan->id);
+	dev_dbg(rsdma->dma.dev, "Allocated pchan %d\n", pchan->id);
 
 	vchan->pchan = pchan;
 	rtk_dma_start_next_txd(vchan, 0);
@@ -1135,6 +1082,7 @@ static void rtk_dma_phy_alloc_and_start(struct rtk_dma_vchan *vchan)
 static void rtk_dma_issue_pending(struct dma_chan *chan)
 {
 	struct rtk_dma_vchan *vchan = to_rtk_vchan(chan);
+	struct rtk_dma *rsdma = to_rtk_dma(chan->device);
 	unsigned long flags;
 
 	spin_lock_irqsave(&vchan->vc.lock, flags);
@@ -1142,7 +1090,7 @@ static void rtk_dma_issue_pending(struct dma_chan *chan)
 		if (!vchan->pchan) {
 			rtk_dma_phy_alloc_and_start(vchan);
 		} else {
-			pr_debug("INFO: has pchan, start txd directly.");
+			dev_dbg(rsdma->dma.dev, "DMA has pchan, start TXD directly\n");
 			rtk_dma_start_next_txd(vchan, 0);
 		}
 	}
@@ -1167,7 +1115,7 @@ static struct dma_async_tx_descriptor
 
 	txd = rtk_dma_find_unused_txd(vchan);
 	if (!txd) {
-		dev_err(chan2dev(chan), "No free txd available for chan %d\n", vchan->vc.chan.chan_id);
+		dev_err(rsdma->dma.dev, "No free TXD available for channel %d\n", vchan->vc.chan.chan_id);
 		return NULL;
 	}
 
@@ -1177,7 +1125,7 @@ static struct dma_async_tx_descriptor
 	for (offset = 0; offset < len; offset += bytes) {
 		lli = rtk_dma_alloc_lli(rsdma);
 		if (!lli) {
-			dev_warn(chan2dev(chan), "failed to allocate lli\n");
+			dev_warn(rsdma->dma.dev, "Failed to allocate lli\n");
 			goto err_txd_free;
 		}
 
@@ -1187,7 +1135,7 @@ static struct dma_async_tx_descriptor
 								 bytes, DMA_MEM_TO_MEM,
 								 &vchan->cfg, txd, 0);
 		if (ret) {
-			dev_warn(chan2dev(chan), "failed to config lli\n");
+			dev_warn(rsdma->dma.dev, "Failed to config lli\n");
 			goto err_txd_free;
 		}
 
@@ -1221,7 +1169,7 @@ static struct dma_async_tx_descriptor
 
 	txd = rtk_dma_find_unused_txd(vchan);
 	if (!txd) {
-		dev_err(chan2dev(chan), "No free txd available for chan %d\n", vchan->vc.chan.chan_id);
+		dev_err(rsdma->dma.dev, "No free TXD available for channel %d\n", vchan->vc.chan.chan_id);
 		return NULL;
 	}
 
@@ -1233,13 +1181,13 @@ static struct dma_async_tx_descriptor
 
 		if (len > RTK_DMA_FRAME_MAX_LENGTH) {
 			dev_err(rsdma->dma.dev,
-					"frame length exceeds max supported length");
+					"Frame length exceeds max supported length\n");
 			goto err_txd_free;
 		}
 
 		lli = rtk_dma_alloc_lli(rsdma);
 		if (!lli) {
-			dev_err(chan2dev(chan), "failed to allocate lli");
+			dev_err(rsdma->dma.dev, "Failed to allocate lli\n");
 			goto err_txd_free;
 		}
 
@@ -1254,7 +1202,7 @@ static struct dma_async_tx_descriptor
 		ret = rtk_dma_hw_cfg_lli(vchan, lli, src, dst, len, dir, sconfig,
 								 txd, 0);
 		if (ret) {
-			dev_warn(chan2dev(chan), "failed to config lli");
+			dev_warn(rsdma->dma.dev, "Failed to config lli\n");
 			goto err_txd_free;
 		}
 
@@ -1291,16 +1239,16 @@ static struct dma_async_tx_descriptor
 	interrupt_en = flags & DMA_PREP_INTERRUPT;
 	if (!interrupt_en) {
 		/* Do not trigger callback after dma success, use auto-reload mode. */
-		dev_dbg(chan2dev(chan), "Enter DMA auto-reload mode.");
+		dev_dbg(rsdma->dma.dev, "Enter DMA auto-reload mode\n");
 		if (period_len != buf_len) {
-			dev_warn(chan2dev(chan), "Wrong period length for dma auto-reload mode.");
+			dev_warn(rsdma->dma.dev, "Wrong period length for DMA auto-reload mode\n");
 			return NULL;
 		}
 	}
 
 	txd = rtk_dma_find_unused_txd(vchan);
 	if (!txd) {
-		dev_err(chan2dev(chan), "No free txd available for chan %d\n", vchan->vc.chan.chan_id);
+		dev_err(rsdma->dma.dev, "No free TXD available for channel %d\n", vchan->vc.chan.chan_id);
 		return NULL;
 	}
 
@@ -1310,7 +1258,7 @@ static struct dma_async_tx_descriptor
 	for (i = 0; i < periods; i++) {
 		lli = rtk_dma_alloc_lli(rsdma);
 		if (!lli) {
-			dev_warn(chan2dev(chan), "failed to allocate lli");
+			dev_warn(rsdma->dma.dev, "Failed to allocate lli\n");
 			goto err_txd_free;
 		}
 		if (dir == DMA_MEM_TO_DEV) {
@@ -1328,7 +1276,7 @@ static struct dma_async_tx_descriptor
 								 dir, sconfig, txd, interrupt_en);
 
 		if (ret) {
-			dev_warn(chan2dev(chan), "failed to config lli");
+			dev_warn(rsdma->dma.dev, "Failed to config lli\n");
 			goto err_txd_free;
 		}
 
@@ -1386,7 +1334,7 @@ static struct dma_chan *rtk_dma_of_xlate(
 
 	chan = dma_get_slave_channel(&vchan->vc.chan);
 	if (!chan) {
-		dev_err(rsdma->dma.dev, "Unable to get dma channel for vchan %d\n", drq);
+		dev_err(rsdma->dma.dev, "Unable to get DMA channel for vchan %d\n", drq);
 		return NULL;
 	}
 
@@ -1403,7 +1351,7 @@ static struct dma_chan *rtk_dma_of_xlate(
 /**************************************************************************/
 
 static const struct of_device_id rtk_dma_match[] = {
-	{.compatible = "realtek,amebad2-rtk-dmac",},
+	{.compatible = "realtek,amebad2-dmac",},
 	{},
 };
 MODULE_DEVICE_TABLE(of, rtk_dma_match);
@@ -1444,10 +1392,10 @@ static int rtk_dma_probe(struct platform_device *pdev)
 
 	ret = of_property_read_u32(np, "dma-requests", &nr_requests);
 	if (ret) {
-		dev_err(&pdev->dev, "can't get dma-requests\n");
+		dev_err(&pdev->dev, "Can't get dma-requests\n");
 		return ret;
 	}
-	dev_info(&pdev->dev, "dma-channels %d, dma-requests %d\n",
+	dev_info(&pdev->dev, "DMA channels %d, DMA requests %d\n",
 			 nr_channels, nr_requests);
 
 	rsdma->nr_pchans = nr_channels;
@@ -1483,7 +1431,7 @@ static int rtk_dma_probe(struct platform_device *pdev)
 
 	rsdma->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(rsdma->clk)) {
-		dev_err(&pdev->dev, "unable to get clock\n");
+		dev_err(&pdev->dev, "Unable to get clock\n");
 		return PTR_ERR(rsdma->clk);
 	}
 
@@ -1515,7 +1463,7 @@ static int rtk_dma_probe(struct platform_device *pdev)
 #endif // !RTK_DMAC_INTERRUPT_COMBINE
 
 	if (ret) {
-		dev_err(&pdev->dev, "unable to request IRQ\n");
+		dev_err(&pdev->dev, "Unable to request IRQ\n");
 		return ret;
 	}
 
@@ -1553,7 +1501,7 @@ static int rtk_dma_probe(struct platform_device *pdev)
 	/* Create a pool of consistent memory blocks for hardware descriptors */
 	rsdma->lli_pool = dma_pool_create(dev_name(rsdma->dma.dev), rsdma->dma.dev, sizeof(struct rtk_dma_lli), __alignof__(struct rtk_dma_lli), 0);
 	if (!rsdma->lli_pool) {
-		dev_err(&pdev->dev, "unable to allocate DMA descriptor pool\n");
+		dev_err(&pdev->dev, "Unable to allocate DMA descriptor pool\n");
 		return -ENOMEM;
 	}
 
@@ -1561,14 +1509,14 @@ static int rtk_dma_probe(struct platform_device *pdev)
 
 	ret = dma_async_device_register(&rsdma->dma);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to register DMA engine device\n");
+		dev_err(&pdev->dev, "Failed to register DMA engine device\n");
 		goto err_pool_free;
 	}
 
 	/* Device-tree DMA controller registration */
 	ret = of_dma_controller_register(pdev->dev.of_node, rtk_dma_of_xlate, rsdma);
 	if (ret) {
-		dev_err(&pdev->dev, "of_dma_controller_register failed\n");
+		dev_err(&pdev->dev, "Failed to register DMA controller\n");
 		goto err_dma_unregister;
 	}
 
@@ -1621,13 +1569,13 @@ static struct platform_driver rtk_dma_driver = {
 	.probe	= rtk_dma_probe,
 	.remove	= rtk_dma_remove,
 	.driver = {
-		.name = "amebad2-rtk-dmac",
+		.name = "realtek-amebad2-dmac",
 		.of_match_table = of_match_ptr(rtk_dma_match),
 	},
 };
 
 builtin_platform_driver(rtk_dma_driver);
 
-MODULE_AUTHOR("Jessica XU <jessica_xu@realsil.com.cn>");
-MODULE_DESCRIPTION("AmebaD2 RTK_DMAC driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba DMAC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

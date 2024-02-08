@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
+* Realtek Bluetooth support
 *
-*  Realtek Bluetooth USB driver
-*
-*
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program; if not, write to the Free Software
-*  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -34,6 +21,10 @@
 #include <net/bluetooth/l2cap.h>
 
 #include "rtk_coex.h"
+
+#define HCI_CONN_HANDLE_UNSET_START	(0x0eff + 1)
+#define HCI_CONN_TYPE_CIS		0x04
+#define HCI_CONN_TYPE_BIS		0x05
 
 /* Software coex message can be sent to and receive from WiFi driver by
  * UDP socket or exported symbol */
@@ -57,10 +48,10 @@
 
 #define RTK_VERSION "1.2"
 
-#define RTKBT_DBG(fmt, arg...) printk(KERN_INFO "rtk_btcoex: " fmt "\n" , ## arg)
+#define RTKBT_DBG(fmt, arg...) printk(KERN_DEBUG "rtk_btcoex: " fmt "\n" , ## arg)
 #define RTKBT_INFO(fmt, arg...) printk(KERN_INFO "rtk_btcoex: " fmt "\n" , ## arg)
 #define RTKBT_WARN(fmt, arg...) printk(KERN_WARNING "rtk_btcoex: " fmt "\n", ## arg)
-#define RTKBT_ERR(fmt, arg...) printk(KERN_WARNING "rtk_btcoex: " fmt "\n", ## arg)
+#define RTKBT_ERR(fmt, arg...) printk(KERN_ERR "rtk_btcoex: " fmt "\n", ## arg)
 
 static struct rtl_coex_struct btrtl_coex;
 
@@ -73,12 +64,16 @@ static u8 rtw_coex_on;
 #endif
 #endif
 
-#define is_profile_connected(profile)   ((btrtl_coex.profile_bitmap & BIT(profile)) > 0)
-#define is_profile_busy(profile)        ((btrtl_coex.profile_status & BIT(profile)) > 0)
+#define is_profile_connected(conn, profile)   ((conn->profile_bitmap & BIT(profile)) > 0)
+#define is_profile_busy(conn, profile)        ((conn->profile_status & BIT(profile)) > 0)
 
 #ifdef RTB_SOFTWARE_MAILBOX
-static void rtk_handle_event_from_wifi(uint8_t *msg);
+static void rtk_handle_event_from_wifi(uint8_t * msg);
 #endif
+
+static void count_a2dp_packet_timeout(struct work_struct *work);
+static void count_pan_packet_timeout(struct work_struct *work);
+static void count_hogp_packet_timeout(struct work_struct *work);
 
 static int rtl_alloc_buff(struct rtl_coex_struct *coex)
 {
@@ -145,25 +140,25 @@ static void rtl_free_buff(struct rtl_coex_struct *coex)
 
 	while (!list_empty(&coex->ev_used_list)) {
 		ev = list_entry(coex->ev_used_list.next, struct rtl_hci_ev,
-						list);
+				list);
 		list_del(&ev->list);
 	}
 
 	while (!list_empty(&coex->ev_free_list)) {
 		ev = list_entry(coex->ev_free_list.next, struct rtl_hci_ev,
-						list);
+				list);
 		list_del(&ev->list);
 	}
 
 	while (!list_empty(&coex->l2_used_list)) {
 		l2 = list_entry(coex->l2_used_list.next, struct rtl_l2_buff,
-						list);
+				list);
 		list_del(&l2->list);
 	}
 
 	while (!list_empty(&coex->l2_free_list)) {
 		l2 = list_entry(coex->l2_free_list.next, struct rtl_l2_buff,
-						list);
+				list);
 		list_del(&l2->list);
 	}
 
@@ -181,24 +176,22 @@ static struct rtl_hci_ev *rtl_ev_node_get(struct rtl_coex_struct *coex)
 	struct rtl_hci_ev *ev;
 	unsigned long flags;
 
-	if (!coex->buff_size) {
+	if (!coex->buff_size)
 		return NULL;
-	}
 
 	spin_lock_irqsave(&coex->buff_lock, flags);
 	if (!list_empty(&coex->ev_free_list)) {
 		ev = list_entry(coex->ev_free_list.next, struct rtl_hci_ev,
-						list);
+				list);
 		list_del(&ev->list);
-	} else {
+	} else
 		ev = NULL;
-	}
 	spin_unlock_irqrestore(&coex->buff_lock, flags);
 	return ev;
 }
 
 static int rtl_ev_node_to_used(struct rtl_coex_struct *coex,
-							   struct rtl_hci_ev *ev)
+		struct rtl_hci_ev *ev)
 {
 	unsigned long flags;
 
@@ -214,26 +207,24 @@ static struct rtl_l2_buff *rtl_l2_node_get(struct rtl_coex_struct *coex)
 	struct rtl_l2_buff *l2;
 	unsigned long flags;
 
-	if (!coex->buff_size) {
+	if (!coex->buff_size)
 		return NULL;
-	}
 
 	spin_lock_irqsave(&coex->buff_lock, flags);
 
-	if (!list_empty(&coex->l2_free_list)) {
+	if(!list_empty(&coex->l2_free_list)) {
 		l2 = list_entry(coex->l2_free_list.next, struct rtl_l2_buff,
-						list);
+				list);
 		list_del(&l2->list);
-	} else {
+	} else
 		l2 = NULL;
-	}
 
 	spin_unlock_irqrestore(&coex->buff_lock, flags);
 	return l2;
 }
 
 static int rtl_l2_node_to_used(struct rtl_coex_struct *coex,
-							   struct rtl_l2_buff *l2)
+		struct rtl_l2_buff *l2)
 {
 	unsigned long flags;
 
@@ -244,12 +235,12 @@ static int rtl_l2_node_to_used(struct rtl_coex_struct *coex,
 	return 0;
 }
 
-static int8_t psm_to_profile_index(uint16_t psm)
+static uint8_t psm_to_profile_index(uint16_t psm)
 {
 	switch (psm) {
 	case PSM_AVCTP:
 	case PSM_SDP:
-		return -1;	//ignore
+		return 0xFF;	//ignore
 
 	case PSM_HID:
 	case PSM_HID_INT:
@@ -270,7 +261,7 @@ static int8_t psm_to_profile_index(uint16_t psm)
 	}
 }
 
-static rtk_prof_info *find_by_psm(u16 psm)
+static rtk_prof_info *find_by_psm(u16 handle, u16 psm)
 {
 	struct list_head *head = &btrtl_coex.profile_list;
 	struct list_head *iter = NULL;
@@ -279,74 +270,67 @@ static rtk_prof_info *find_by_psm(u16 psm)
 
 	list_for_each_safe(iter, temp, head) {
 		desc = list_entry(iter, rtk_prof_info, list);
-		if (desc->psm == psm) {
+		if ((handle & 0xfff) == (desc->handle & 0xfff) &&
+                    desc->psm == psm)
 			return desc;
-		}
 	}
 
 	return NULL;
 }
 
-static void rtk_check_setup_timer(int8_t profile_index)
+static void rtk_check_setup_timer(rtk_conn_prof * phci_conn, uint8_t profile_index)
 {
+	int delay = msecs_to_jiffies(1000);
 	if (profile_index == profile_a2dp) {
-		btrtl_coex.a2dp_packet_count = 0;
-		btrtl_coex.a2dp_count_timer.expires =
-			jiffies + msecs_to_jiffies(1000);
-		mod_timer(&btrtl_coex.a2dp_count_timer,
-				  btrtl_coex.a2dp_count_timer.expires);
+		phci_conn->a2dp_packet_count = 0;
+		queue_delayed_work(btrtl_coex.timer_wq, &phci_conn->a2dp_count_work, delay);
 	}
 
 	if (profile_index == profile_pan) {
-		btrtl_coex.pan_packet_count = 0;
-		btrtl_coex.pan_count_timer.expires =
-			jiffies + msecs_to_jiffies(1000);
-		mod_timer(&btrtl_coex.pan_count_timer,
-				  btrtl_coex.pan_count_timer.expires);
+		phci_conn->pan_packet_count = 0;
+		queue_delayed_work(btrtl_coex.timer_wq, &phci_conn->pan_count_work, delay);
 	}
 
 	/* hogp & voice share one timer now */
 	if ((profile_index == profile_hogp) || (profile_index == profile_voice)) {
-		if ((0 == btrtl_coex.profile_refcount[profile_hogp])
-			&& (0 == btrtl_coex.profile_refcount[profile_voice])) {
-			btrtl_coex.hogp_packet_count = 0;
-			btrtl_coex.voice_packet_count = 0;
-			btrtl_coex.hogp_count_timer.expires =
-				jiffies + msecs_to_jiffies(1000);
-			mod_timer(&btrtl_coex.hogp_count_timer,
-					  btrtl_coex.hogp_count_timer.expires);
+		if ((0 == phci_conn->profile_refcount[profile_hogp])
+		    && (0 == phci_conn->profile_refcount[profile_voice])) {
+			phci_conn->hogp_packet_count = 0;
+			phci_conn->voice_packet_count = 0;
+			queue_delayed_work(btrtl_coex.timer_wq, &phci_conn->hogp_count_work, delay);
 		}
 	}
 }
 
-static void rtk_check_del_timer(int8_t profile_index)
+static void rtk_check_del_timer(uint8_t profile_index, rtk_conn_prof * phci_conn)
 {
+	RTKBT_DBG("%s: handle 0x%4x", __func__, phci_conn->handle);
 	if (profile_a2dp == profile_index) {
-		btrtl_coex.a2dp_packet_count = 0;
-		del_timer_sync(&btrtl_coex.a2dp_count_timer);
+		phci_conn->a2dp_packet_count = 0;
+		cancel_delayed_work_sync(&phci_conn->a2dp_count_work);
 	}
 	if (profile_pan == profile_index) {
-		btrtl_coex.pan_packet_count = 0;
-		del_timer_sync(&btrtl_coex.pan_count_timer);
+		phci_conn->pan_packet_count = 0;
+		cancel_delayed_work_sync(&phci_conn->pan_count_work);
 	}
 	if (profile_hogp == profile_index) {
-		btrtl_coex.hogp_packet_count = 0;
-		if (btrtl_coex.profile_refcount[profile_voice] == 0) {
-			del_timer_sync(&btrtl_coex.hogp_count_timer);
+		phci_conn->hogp_packet_count = 0;
+		if (phci_conn->profile_refcount[profile_voice] == 0) {
+			cancel_delayed_work_sync(&phci_conn->hogp_count_work);
 		}
 	}
 	if (profile_voice == profile_index) {
-		btrtl_coex.voice_packet_count = 0;
-		if (btrtl_coex.profile_refcount[profile_hogp] == 0) {
-			del_timer_sync(&btrtl_coex.hogp_count_timer);
+		phci_conn->voice_packet_count = 0;
+		if (phci_conn->profile_refcount[profile_hogp] == 0) {
+			cancel_delayed_work_sync(&phci_conn->hogp_count_work);
 		}
 	}
 }
 
 
 
-static rtk_conn_prof *find_connection_by_handle(struct rtl_coex_struct *coex,
-		uint16_t handle)
+static rtk_conn_prof *find_connection_by_handle(struct rtl_coex_struct * coex,
+						uint16_t handle)
 {
 	struct list_head *head = &coex->conn_hash;
 	struct list_head *iter = NULL, *temp = NULL;
@@ -354,7 +338,7 @@ static rtk_conn_prof *find_connection_by_handle(struct rtl_coex_struct *coex,
 
 	list_for_each_safe(iter, temp, head) {
 		desc = list_entry(iter, rtk_conn_prof, list);
-		if ((handle & 0xEFF) == desc->handle) {
+		if ((handle & 0xFFF) == desc->handle) {
 			return desc;
 		}
 	}
@@ -365,35 +349,40 @@ static rtk_conn_prof *allocate_connection_by_handle(uint16_t handle)
 {
 	rtk_conn_prof *phci_conn = NULL;
 	phci_conn = kmalloc(sizeof(rtk_conn_prof), GFP_ATOMIC);
-	if (phci_conn) {
+	if (phci_conn)
 		phci_conn->handle = handle;
-	}
 
 	return phci_conn;
 }
 
-static void init_connection_hash(struct rtl_coex_struct *coex)
+static void init_connection_hash(struct rtl_coex_struct * coex)
 {
 	struct list_head *head = &coex->conn_hash;
 	INIT_LIST_HEAD(head);
 }
 
-static void add_connection_to_hash(struct rtl_coex_struct *coex,
-								   rtk_conn_prof *desc)
+static void add_connection_to_hash(struct rtl_coex_struct * coex,
+				   rtk_conn_prof * desc)
 {
 	struct list_head *head = &coex->conn_hash;
 	list_add_tail(&desc->list, head);
+	INIT_DELAYED_WORK(&desc->a2dp_count_work, (void *)count_a2dp_packet_timeout);
+	INIT_DELAYED_WORK(&desc->pan_count_work, (void *)count_pan_packet_timeout);
+	INIT_DELAYED_WORK(&desc->hogp_count_work, (void *)count_hogp_packet_timeout);
 }
 
-static void delete_connection_from_hash(rtk_conn_prof *desc)
+static void delete_connection_from_hash(rtk_conn_prof * desc)
 {
 	if (desc) {
+		cancel_delayed_work_sync(&desc->a2dp_count_work);
+		cancel_delayed_work_sync(&desc->pan_count_work);
+		cancel_delayed_work_sync(&desc->hogp_count_work);
 		list_del(&desc->list);
 		kfree(desc);
 	}
 }
 
-static void flush_connection_hash(struct rtl_coex_struct *coex)
+static void flush_connection_hash(struct rtl_coex_struct * coex)
 {
 	struct list_head *head = &coex->conn_hash;
 	struct list_head *iter = NULL, *temp = NULL;
@@ -402,6 +391,9 @@ static void flush_connection_hash(struct rtl_coex_struct *coex)
 	list_for_each_safe(iter, temp, head) {
 		desc = list_entry(iter, rtk_conn_prof, list);
 		if (desc) {
+			cancel_delayed_work_sync(&desc->a2dp_count_work);
+			cancel_delayed_work_sync(&desc->pan_count_work);
+			cancel_delayed_work_sync(&desc->hogp_count_work);
 			list_del(&desc->list);
 			kfree(desc);
 		}
@@ -409,25 +401,19 @@ static void flush_connection_hash(struct rtl_coex_struct *coex)
 	//INIT_LIST_HEAD(head);
 }
 
-static void init_profile_hash(struct rtl_coex_struct *coex)
+static void init_profile_hash(struct rtl_coex_struct * coex)
 {
 	struct list_head *head = &coex->profile_list;
 	INIT_LIST_HEAD(head);
 }
 
 static uint8_t list_allocate_add(uint16_t handle, uint16_t psm,
-								 int8_t profile_index, uint16_t dcid,
-								 uint16_t scid)
+				 uint8_t profile_index, uint16_t dcid,
+				 uint16_t scid)
 {
 	rtk_prof_info *pprof_info = NULL;
 
-	if (profile_index < 0) {
-		RTKBT_ERR("PSM 0x%x do not need parse", psm);
-		return FALSE;
-	}
-
 	pprof_info = kmalloc(sizeof(rtk_prof_info), GFP_ATOMIC);
-
 	if (NULL == pprof_info) {
 		RTKBT_ERR("list_allocate_add: allocate error");
 		return FALSE;
@@ -437,7 +423,7 @@ static uint8_t list_allocate_add(uint16_t handle, uint16_t psm,
 	 * a2dp signal channel will be created first than media channel.
 	 */
 	if (psm == PSM_AVDTP) {
-		rtk_prof_info *pinfo = find_by_psm(psm);
+		rtk_prof_info *pinfo = find_by_psm(handle, psm);
 		if (!pinfo) {
 			pprof_info->flags = A2DP_SIGNAL;
 			RTKBT_INFO("%s: Add a2dp signal channel", __func__);
@@ -457,36 +443,45 @@ static uint8_t list_allocate_add(uint16_t handle, uint16_t psm,
 	return TRUE;
 }
 
-static void delete_profile_from_hash(rtk_prof_info *desc)
+static void delete_profile_from_hash(rtk_prof_info * desc)
 {
-	RTKBT_DBG("Delete profile: hndl 0x%04x, psm 0x%04x, dcid 0x%04x, "
-			  "scid 0x%04x", desc->handle, desc->psm, desc->dcid,
-			  desc->scid);
 	if (desc) {
+		RTKBT_DBG("Delete profile: hndl 0x%04x, psm 0x%04x, dcid 0x%04x, "
+			"scid 0x%04x", desc->handle, desc->psm, desc->dcid,
+			desc->scid);
+
 		list_del(&desc->list);
 		kfree(desc);
 		desc = NULL;
 	}
 }
 
-static void flush_profile_hash(struct rtl_coex_struct *coex)
+static void flush_profile_hash(struct rtl_coex_struct * coex)
 {
 	struct list_head *head = &coex->profile_list;
 	struct list_head *iter = NULL, *temp = NULL;
 	rtk_prof_info *desc = NULL;
 
-	spin_lock(&btrtl_coex.spin_lock_profile);
+	mutex_lock(&btrtl_coex.profile_mutex);
 	list_for_each_safe(iter, temp, head) {
 		desc = list_entry(iter, rtk_prof_info, list);
-		delete_profile_from_hash(desc);
+		if (desc) {
+			RTKBT_DBG("Delete profile: hndl 0x%04x, psm 0x%04x, "
+				"dcid 0x%04x, scid 0x%04x", desc->handle,
+				desc->psm, desc->dcid, desc->scid);
+
+			list_del(&desc->list);
+			kfree(desc);
+			desc = NULL;
+		}
 	}
 	//INIT_LIST_HEAD(head);
-	spin_unlock(&btrtl_coex.spin_lock_profile);
+	mutex_unlock(&btrtl_coex.profile_mutex);
 }
 
 static rtk_prof_info *find_profile_by_handle_scid(struct rtl_coex_struct *
-		coex, uint16_t handle,
-		uint16_t scid)
+						  coex, uint16_t handle,
+						  uint16_t scid)
 {
 	struct list_head *head = &coex->profile_list;
 	struct list_head *iter = NULL, *temp = NULL;
@@ -502,8 +497,8 @@ static rtk_prof_info *find_profile_by_handle_scid(struct rtl_coex_struct *
 }
 
 static rtk_prof_info *find_profile_by_handle_dcid(struct rtl_coex_struct *
-		coex, uint16_t handle,
-		uint16_t dcid)
+						  coex, uint16_t handle,
+						  uint16_t dcid)
 {
 	struct list_head *head = &coex->profile_list;
 	struct list_head *iter = NULL, *temp = NULL;
@@ -519,9 +514,9 @@ static rtk_prof_info *find_profile_by_handle_dcid(struct rtl_coex_struct *
 }
 
 static rtk_prof_info *find_profile_by_handle_dcid_scid(struct rtl_coex_struct
-		* coex, uint16_t handle,
-		uint16_t dcid,
-		uint16_t scid)
+						       * coex, uint16_t handle,
+						       uint16_t dcid,
+						       uint16_t scid)
 {
 	struct list_head *head = &coex->profile_list;
 	struct list_head *iter = NULL, *temp = NULL;
@@ -530,7 +525,7 @@ static rtk_prof_info *find_profile_by_handle_dcid_scid(struct rtl_coex_struct
 	list_for_each_safe(iter, temp, head) {
 		desc = list_entry(iter, rtk_prof_info, list);
 		if (((handle & 0xFFF) == desc->handle) && (dcid == desc->dcid)
-			&& (scid == desc->scid)) {
+		    && (scid == desc->scid)) {
 			return desc;
 		}
 	}
@@ -538,7 +533,7 @@ static rtk_prof_info *find_profile_by_handle_dcid_scid(struct rtl_coex_struct
 }
 
 static void rtk_vendor_cmd_to_fw(uint16_t opcode, uint8_t parameter_len,
-								 uint8_t *parameter)
+				 uint8_t * parameter)
 {
 	int len = HCI_CMD_PREAMBLE_SIZE + parameter_len;
 	uint8_t *p;
@@ -563,9 +558,8 @@ static void rtk_vendor_cmd_to_fw(uint16_t opcode, uint8_t parameter_len,
 	UINT16_TO_STREAM(p, opcode);
 	*p++ = parameter_len;
 
-	if (parameter_len) {
+	if (parameter_len)
 		memcpy(skb_put(skb, parameter_len), parameter, parameter_len);
-	}
 
 	bt_cb(skb)->pkt_type = HCI_COMMAND_PKT;
 
@@ -614,6 +608,7 @@ static void rtk_vendor_cmd_to_fw(uint16_t opcode, uint8_t parameter_len,
 	return;
 }
 
+static uint8_t profileinfo_cmd = 0;
 static void rtk_notify_profileinfo_to_fw(void)
 {
 	struct list_head *head = NULL;
@@ -628,12 +623,15 @@ static void rtk_notify_profileinfo_to_fw(void)
 	head = &btrtl_coex.conn_hash;
 	list_for_each_safe(iter, temp, head) {
 		hci_conn = list_entry(iter, rtk_conn_prof, list);
-		if (hci_conn && hci_conn->profile_bitmap) {
+		if (hci_conn && hci_conn->profile_bitmap)
 			handle_number++;
-		}
 	}
 
-	buffer_size = 1 + handle_number * 3 + 1;
+	if(!profileinfo_cmd) {
+		buffer_size = 1 + handle_number * 3 + 1;
+	} else {
+		buffer_size = 1 + handle_number * 6;
+	}
 
 	p_buf = kmalloc(buffer_size, GFP_ATOMIC);
 
@@ -642,157 +640,151 @@ static void rtk_notify_profileinfo_to_fw(void)
 		return;
 	}
 	p = p_buf;
+	*p++ = handle_number;
 
 	RTKBT_DBG("%s: BufferSize %u", __func__, buffer_size);
-	*p++ = handle_number;
 	RTKBT_DBG("%s: NumberOfHandles %u", __func__, handle_number);
 	head = &btrtl_coex.conn_hash;
 	list_for_each(iter, head) {
 		hci_conn = list_entry(iter, rtk_conn_prof, list);
 		if (hci_conn && hci_conn->profile_bitmap) {
-			UINT16_TO_STREAM(p, hci_conn->handle);
-			RTKBT_DBG("%s: handle 0x%04x", __func__,
-					  hci_conn->handle);
-			*p++ = hci_conn->profile_bitmap;
+			if(!profileinfo_cmd) {
+				UINT16_TO_STREAM(p, hci_conn->handle);
+				RTKBT_DBG("%s: handle 0x%04x", __func__,
+						hci_conn->handle);
+				*p++ = hci_conn->profile_bitmap;
+				btrtl_coex.profile_status |= hci_conn->profile_status;
+			} else {
+				UINT16_TO_STREAM(p, hci_conn->handle);
+				UINT16_TO_STREAM(p, hci_conn->profile_bitmap);
+				UINT16_TO_STREAM(p, hci_conn->profile_status);
+				RTKBT_DBG("%s: profile_status 0x%02x", __func__,
+						hci_conn->profile_status);
+			}
 			RTKBT_DBG("%s: profile_bitmap 0x%02x", __func__,
-					  hci_conn->profile_bitmap);
+							hci_conn->profile_bitmap);
 			handle_number--;
 		}
-		if (0 == handle_number) {
+		if (0 == handle_number)
 			break;
-		}
 	}
 
-	*p++ = btrtl_coex.profile_status;
-	RTKBT_DBG("%s: profile_status 0x%02x", __func__,
-			  btrtl_coex.profile_status);
-
-	rtk_vendor_cmd_to_fw(HCI_VENDOR_SET_PROFILE_REPORT_COMMAND, buffer_size,
-						 p_buf);
+	if(!profileinfo_cmd) {
+		*p++ = btrtl_coex.profile_status;
+		btrtl_coex.profile_status = 0;
+		rtk_vendor_cmd_to_fw(HCI_VENDOR_SET_PROFILE_REPORT_LEGACY_COMMAND, buffer_size,
+			     p_buf);
+	} else {
+		rtk_vendor_cmd_to_fw(HCI_VENDOR_SET_PROFILE_REPORT_COMMAND, buffer_size,
+				p_buf);
+	}
 
 	kfree(p_buf);
 	return;
 }
 
-static void update_profile_state(uint8_t profile_index, uint8_t is_busy)
+static void update_profile_state(rtk_conn_prof * phci_conn,
+		uint8_t profile_index, uint8_t is_busy)
 {
 	uint8_t need_update = FALSE;
 
-	if ((btrtl_coex.profile_bitmap & BIT(profile_index)) == 0) {
+	RTKBT_DBG("%s: is_busy %d, profile_index %x", __func__,
+			is_busy, profile_index);
+	if ((phci_conn->profile_bitmap & BIT(profile_index)) == 0) {
 		RTKBT_ERR("%s: : ERROR!!! profile(Index: %x) does not exist",
-				  __func__, profile_index);
+				__func__, profile_index);
 		return;
 	}
 
+
 	if (is_busy) {
-		if ((btrtl_coex.profile_status & BIT(profile_index)) == 0) {
+		if ((phci_conn->profile_status & BIT(profile_index)) == 0) {
 			need_update = TRUE;
-			btrtl_coex.profile_status |= BIT(profile_index);
+			phci_conn->profile_status |= BIT(profile_index);
 		}
 	} else {
-		if ((btrtl_coex.profile_status & BIT(profile_index)) > 0) {
+		if ((phci_conn->profile_status & BIT(profile_index)) > 0) {
 			need_update = TRUE;
-			btrtl_coex.profile_status &= ~(BIT(profile_index));
+			phci_conn->profile_status &= ~(BIT(profile_index));
 		}
 	}
 
 	if (need_update) {
-		RTKBT_DBG("%s: btrtl_coex.profie_bitmap = %x",
-				  __func__, btrtl_coex.profile_bitmap);
-		RTKBT_DBG("%s: btrtl_coex.profile_status = %x",
-				  __func__, btrtl_coex.profile_status);
+		RTKBT_DBG("%s: phci_conn->profile_status 0x%02x",
+				__func__, phci_conn->profile_status);
 		rtk_notify_profileinfo_to_fw();
 	}
 }
 
-static void update_profile_connection(rtk_conn_prof *phci_conn,
-									  int8_t profile_index, uint8_t is_add)
+static void update_profile_connection(rtk_conn_prof * phci_conn,
+				      uint8_t profile_index, uint8_t is_add)
 {
 	uint8_t need_update = FALSE;
-	uint8_t kk;
 
 	RTKBT_DBG("%s: is_add %d, profile_index %x", __func__,
-			  is_add, profile_index);
-	if (profile_index < 0) {
-		return;
-	}
+			is_add, profile_index);
 
 	if (is_add) {
-		if (btrtl_coex.profile_refcount[profile_index] == 0) {
-			need_update = TRUE;
-			btrtl_coex.profile_bitmap |= BIT(profile_index);
-
-			/* SCO is always busy */
-			if (profile_index == profile_sco)
-				btrtl_coex.profile_status |=
-					BIT(profile_index);
-
-			rtk_check_setup_timer(profile_index);
-		}
-		btrtl_coex.profile_refcount[profile_index]++;
 
 		if (0 == phci_conn->profile_refcount[profile_index]) {
 			need_update = TRUE;
 			phci_conn->profile_bitmap |= BIT(profile_index);
+			/* SCO is always busy */
+			if (profile_index == profile_sco)
+				phci_conn->profile_status |=
+				    BIT(profile_index);
+			else if (profile_index == profile_le_audio)
+				phci_conn->profile_status |= BIT(profile_le_audio);
+
+			rtk_check_setup_timer(phci_conn, profile_index);
 		}
 		phci_conn->profile_refcount[profile_index]++;
 	} else {
-		if (!btrtl_coex.profile_refcount[profile_index]) {
+		if (!phci_conn->profile_refcount[profile_index]) {
 			RTKBT_WARN("profile %u refcount is already zero",
-					   profile_index);
+				   profile_index);
 			return;
-		}
-		btrtl_coex.profile_refcount[profile_index]--;
-		RTKBT_DBG("%s: btrtl_coex.profile_refcount[%x] = %x",
-				  __func__, profile_index,
-				  btrtl_coex.profile_refcount[profile_index]);
-		if (btrtl_coex.profile_refcount[profile_index] == 0) {
-			need_update = TRUE;
-			btrtl_coex.profile_bitmap &= ~(BIT(profile_index));
-
-			/* if profile does not exist, status is meaningless */
-			btrtl_coex.profile_status &= ~(BIT(profile_index));
-			rtk_check_del_timer(profile_index);
 		}
 
 		phci_conn->profile_refcount[profile_index]--;
+
+		if (profile_index == profile_a2dp &&
+			phci_conn->profile_refcount[profile_index] == 1) {
+			phci_conn->profile_status &= ~(BIT(profile_index));
+			RTKBT_DBG("%s: clear a2dp status",__func__);
+		}
+
 		if (0 == phci_conn->profile_refcount[profile_index]) {
 			need_update = TRUE;
 			phci_conn->profile_bitmap &= ~(BIT(profile_index));
 
+			phci_conn->profile_status &= ~(BIT(profile_index));
+			rtk_check_del_timer(profile_index, phci_conn);
 			/* clear profile_hid_interval if need */
 			if ((profile_hid == profile_index)
-				&& (phci_conn->
-					profile_bitmap & (BIT(profile_hid_interval)))) {
+			    && (phci_conn->
+				profile_bitmap & (BIT(profile_hid_interval)))) {
 				phci_conn->profile_bitmap &=
-					~(BIT(profile_hid_interval));
-				btrtl_coex.
-				profile_refcount[profile_hid_interval]--;
+				    ~(BIT(profile_hid_interval));
 			}
 		}
 	}
 
-	RTKBT_DBG("%s: btrtl_coex.profile_bitmap 0x%02x", __func__,
-			  btrtl_coex.profile_bitmap);
-	for (kk = 0; kk < 8; kk++)
-		RTKBT_DBG("%s: btrtl_coex.profile_refcount[%d] = %d",
-				  __func__, kk,
-				  btrtl_coex.profile_refcount[kk]);
+	RTKBT_DBG("%s: phci_conn->profile_bitmap 0x%02x", __func__,
+			phci_conn->profile_bitmap);
 
-	if (need_update) {
+	if (need_update)
 		rtk_notify_profileinfo_to_fw();
-	}
 }
 
 static void update_hid_active_state(uint16_t handle, uint16_t interval)
 {
 	uint8_t need_update = 0;
 	rtk_conn_prof *phci_conn =
-		find_connection_by_handle(&btrtl_coex, handle);
+	    find_connection_by_handle(&btrtl_coex, handle);
 
-	if (phci_conn == NULL) {
+	if (phci_conn == NULL)
 		return;
-	}
 
 	RTKBT_DBG("%s: handle 0x%04x, interval %u", __func__, handle, interval);
 	if (((phci_conn->profile_bitmap) & (BIT(profile_hid))) == 0) {
@@ -802,154 +794,151 @@ static void update_hid_active_state(uint16_t handle, uint16_t interval)
 
 	if (interval < 60) {
 		if ((phci_conn->profile_bitmap & (BIT(profile_hid_interval))) ==
-			0) {
+		    0) {
 			need_update = 1;
 			phci_conn->profile_bitmap |= BIT(profile_hid_interval);
 
-			btrtl_coex.profile_refcount[profile_hid_interval]++;
-			if (btrtl_coex.
-				profile_refcount[profile_hid_interval] == 1)
-				btrtl_coex.profile_status |=
-					BIT(profile_hid);
+			phci_conn->profile_refcount[profile_hid_interval]++;
+			if (phci_conn->
+			    profile_refcount[profile_hid_interval] == 1)
+				phci_conn->profile_status |=
+				    BIT(profile_hid);
 		}
 	} else {
 		if ((phci_conn->profile_bitmap & (BIT(profile_hid_interval)))) {
 			need_update = 1;
 			phci_conn->profile_bitmap &=
-				~(BIT(profile_hid_interval));
+			    ~(BIT(profile_hid_interval));
 
-			btrtl_coex.profile_refcount[profile_hid_interval]--;
-			if (btrtl_coex.
-				profile_refcount[profile_hid_interval] == 0)
-				btrtl_coex.profile_status &=
-					~(BIT(profile_hid));
+			phci_conn->profile_refcount[profile_hid_interval]--;
+			if (phci_conn->
+			    profile_refcount[profile_hid_interval] == 0)
+				phci_conn->profile_status &=
+				    ~(BIT(profile_hid));
 		}
 	}
 
-	if (need_update) {
+	if (need_update)
 		rtk_notify_profileinfo_to_fw();
-	}
 }
 
 static uint8_t handle_l2cap_con_req(uint16_t handle, uint16_t psm,
-									uint16_t scid, uint8_t direction)
+				    uint16_t scid, uint8_t direction)
 {
 	uint8_t status = FALSE;
 	rtk_prof_info *prof_info = NULL;
-	int8_t profile_index = psm_to_profile_index(psm);
+	uint8_t profile_index = psm_to_profile_index(psm);
 
-	if (profile_index < 0) {
+	if (profile_index == 0xFF) {
 		RTKBT_DBG("PSM(0x%04x) do not need parse", psm);
 		return status;
 	}
 
-	spin_lock(&btrtl_coex.spin_lock_profile);
+	mutex_lock(&btrtl_coex.profile_mutex);
 	if (direction)		//1: out
 		prof_info =
-			find_profile_by_handle_scid(&btrtl_coex, handle, scid);
+		    find_profile_by_handle_scid(&btrtl_coex, handle, scid);
 	else			// 0:in
 		prof_info =
-			find_profile_by_handle_dcid(&btrtl_coex, handle, scid);
+		    find_profile_by_handle_dcid(&btrtl_coex, handle, scid);
 
 	if (prof_info) {
 		RTKBT_DBG("%s: this profile is already exist!", __func__);
-		spin_unlock(&btrtl_coex.spin_lock_profile);
+		mutex_unlock(&btrtl_coex.profile_mutex);
 		return status;
 	}
 
-	if (direction) {	//1: out
+	if (direction)		//1: out
 		status = list_allocate_add(handle, psm, profile_index, 0, scid);
-	} else {		// 0:in
+	else			// 0:in
 		status = list_allocate_add(handle, psm, profile_index, scid, 0);
-	}
 
-	spin_unlock(&btrtl_coex.spin_lock_profile);
+	mutex_unlock(&btrtl_coex.profile_mutex);
 
-	if (!status) {
+	if (!status)
 		RTKBT_ERR("%s: list_allocate_add failed!", __func__);
-	}
 
 	return status;
 }
 
 static uint8_t handle_l2cap_con_rsp(uint16_t handle, uint16_t dcid,
-									uint16_t scid, uint8_t direction,
-									uint8_t result)
+				    uint16_t scid, uint8_t direction,
+				    uint8_t result)
 {
 	rtk_prof_info *prof_info = NULL;
 	rtk_conn_prof *phci_conn = NULL;
 
-	spin_lock(&btrtl_coex.spin_lock_profile);
+	mutex_lock(&btrtl_coex.profile_mutex);
 	if (!direction)		//0, in
 		prof_info =
-			find_profile_by_handle_scid(&btrtl_coex, handle, scid);
+		    find_profile_by_handle_scid(&btrtl_coex, handle, scid);
 	else			//1, out
 		prof_info =
-			find_profile_by_handle_dcid(&btrtl_coex, handle, scid);
+		    find_profile_by_handle_dcid(&btrtl_coex, handle, scid);
 
 	if (!prof_info) {
 		//RTKBT_DBG("handle_l2cap_con_rsp: prof_info Not Find!!");
-		spin_unlock(&btrtl_coex.spin_lock_profile);
+		mutex_unlock(&btrtl_coex.profile_mutex);
 		return FALSE;
 	}
 
 	if (!result) {		//success
 		RTKBT_DBG("l2cap connection success, update connection");
-		if (!direction) {	//0, in
+		if (!direction)	//0, in
 			prof_info->dcid = dcid;
-		} else {	//1, out
+		else		//1, out
 			prof_info->scid = dcid;
-		}
 
 		phci_conn = find_connection_by_handle(&btrtl_coex, handle);
 		if (phci_conn)
 			update_profile_connection(phci_conn,
-									  prof_info->profile_index,
-									  TRUE);
+						  prof_info->profile_index,
+						  TRUE);
+	} else if (result != 0x0001) {
+		delete_profile_from_hash(prof_info);
 	}
 
-	spin_unlock(&btrtl_coex.spin_lock_profile);
+	mutex_unlock(&btrtl_coex.profile_mutex);
 	return TRUE;
 }
 
 static uint8_t handle_l2cap_discon_req(uint16_t handle, uint16_t dcid,
-									   uint16_t scid, uint8_t direction)
+				       uint16_t scid, uint8_t direction)
 {
 	rtk_prof_info *prof_info = NULL;
 	rtk_conn_prof *phci_conn = NULL;
 	RTKBT_DBG("%s: handle 0x%04x, dcid 0x%04x, scid 0x%04x, dir %u",
-			  __func__, handle, dcid, scid, direction);
+			__func__, handle, dcid, scid, direction);
 
-	spin_lock(&btrtl_coex.spin_lock_profile);
+	mutex_lock(&btrtl_coex.profile_mutex);
 	if (!direction)		//0: in
 		prof_info =
-			find_profile_by_handle_dcid_scid(&btrtl_coex, handle,
-											 scid, dcid);
+		    find_profile_by_handle_dcid_scid(&btrtl_coex, handle,
+						     scid, dcid);
 	else			//1: out
 		prof_info =
-			find_profile_by_handle_dcid_scid(&btrtl_coex, handle,
-											 dcid, scid);
+		    find_profile_by_handle_dcid_scid(&btrtl_coex, handle,
+						     dcid, scid);
 
 	if (!prof_info) {
 		//LogMsg("handle_l2cap_discon_req: prof_info Not Find!");
-		spin_unlock(&btrtl_coex.spin_lock_profile);
+		mutex_unlock(&btrtl_coex.profile_mutex);
 		return 0;
 	}
 
 	phci_conn = find_connection_by_handle(&btrtl_coex, handle);
 	if (!phci_conn) {
-		spin_unlock(&btrtl_coex.spin_lock_profile);
+		mutex_unlock(&btrtl_coex.profile_mutex);
 		return 0;
 	}
 
 	update_profile_connection(phci_conn, prof_info->profile_index, FALSE);
 	if (prof_info->profile_index == profile_a2dp &&
-		(phci_conn->profile_bitmap & BIT(profile_sink))) {
+	    (phci_conn->profile_bitmap & BIT(profile_sink)))
 		update_profile_connection(phci_conn, profile_sink, FALSE);
-	}
 
 	delete_profile_from_hash(prof_info);
-	spin_unlock(&btrtl_coex.spin_lock_profile);
+	mutex_unlock(&btrtl_coex.profile_mutex);
 
 	return 1;
 }
@@ -970,37 +959,36 @@ static const char alloc_methods[2][12] = {
 
 static const uint8_t subbands[2] = { 4, 8 };
 
-void print_sbc_header(struct sbc_frame_hdr *hdr)
+static void print_sbc_header(struct sbc_frame_hdr *hdr)
 {
 	RTKBT_DBG("syncword: %02x", hdr->syncword);
 	RTKBT_DBG("freq %skHz", sample_freqs[hdr->sampling_frequency]);
 	RTKBT_DBG("blocks %u", sbc_blocks[hdr->blocks]);
 	RTKBT_DBG("channel mode %s", chan_modes[hdr->channel_mode]);
 	RTKBT_DBG("allocation method %s",
-			  alloc_methods[hdr->allocation_method]);
+		  alloc_methods[hdr->allocation_method]);
 	RTKBT_DBG("subbands %u", subbands[hdr->subbands]);
 }
 
 static void packets_count(uint16_t handle, uint16_t scid, uint16_t length,
-						  uint8_t direction, u8 *user_data)
+			  uint8_t direction, u8 *user_data)
 {
 	rtk_prof_info *prof_info = NULL;
 
 	rtk_conn_prof *hci_conn =
-		find_connection_by_handle(&btrtl_coex, handle);
-	if (NULL == hci_conn) {
+	    find_connection_by_handle(&btrtl_coex, handle);
+	if (NULL == hci_conn)
 		return;
-	}
 
 	if (0 == hci_conn->type) {
 		if (!direction)	//0: in
 			prof_info =
-				find_profile_by_handle_scid(&btrtl_coex, handle,
-											scid);
+			    find_profile_by_handle_scid(&btrtl_coex, handle,
+							scid);
 		else		//1: out
 			prof_info =
-				find_profile_by_handle_dcid(&btrtl_coex, handle,
-											scid);
+			    find_profile_by_handle_dcid(&btrtl_coex, handle,
+							scid);
 
 		if (!prof_info) {
 			//RTKBT_DBG("packets_count: prof_info Not Find!");
@@ -1009,20 +997,19 @@ static void packets_count(uint16_t handle, uint16_t scid, uint16_t length,
 
 		/* avdtp media data */
 		if (prof_info->profile_index == profile_a2dp &&
-			prof_info->flags == A2DP_MEDIA) {
-			if (!is_profile_busy(profile_a2dp)) {
+		    prof_info->flags == A2DP_MEDIA) {
+			if (!is_profile_busy(hci_conn, profile_a2dp)) {
 				struct sbc_frame_hdr *sbc_header;
 				struct rtp_header *rtph;
 				u8 bitpool;
 
-				update_profile_state(profile_a2dp, TRUE);
+				update_profile_state(hci_conn, profile_a2dp, TRUE);
 				if (!direction) {
 					if (!(hci_conn->profile_bitmap & BIT(profile_sink))) {
-						btrtl_coex.profile_bitmap |= BIT(profile_sink);
 						hci_conn->profile_bitmap |= BIT(profile_sink);
 						update_profile_connection(hci_conn, profile_sink, 1);
 					}
-					update_profile_state(profile_sink, TRUE);
+					update_profile_state(hci_conn, profile_sink, TRUE);
 				}
 
 				/* We assume it is SBC if the packet length
@@ -1033,10 +1020,10 @@ static void packets_count(uint16_t handle, uint16_t scid, uint16_t length,
 					rtph = (struct rtp_header *)user_data;
 
 					RTKBT_DBG("rtp: v %u, cc %u, pt %u",
-							  rtph->v, rtph->cc, rtph->pt);
+						  rtph->v, rtph->cc, rtph->pt);
 					/* move forward */
 					user_data += sizeof(struct rtp_header) +
-								 rtph->cc * 4 + 1;
+						rtph->cc * 4 + 1;
 
 					/* point to the sbc frame header */
 					sbc_header = (struct sbc_frame_hdr *)user_data;
@@ -1047,95 +1034,85 @@ static void packets_count(uint16_t handle, uint16_t scid, uint16_t length,
 					RTKBT_DBG("bitpool %u", bitpool);
 
 					rtk_vendor_cmd_to_fw(HCI_VENDOR_SET_BITPOOL,
-										 1, &bitpool);
+							1, &bitpool);
 				}
 			}
-			btrtl_coex.a2dp_packet_count++;
+			hci_conn->a2dp_packet_count++;
 		}
 
-		if (prof_info->profile_index == profile_pan) {
-			btrtl_coex.pan_packet_count++;
-		}
+		if (prof_info->profile_index == profile_pan)
+			hci_conn->pan_packet_count++;
 	}
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 14, 0)
-static void count_a2dp_packet_timeout(struct timer_list *unused)
-#else
-static void count_a2dp_packet_timeout(unsigned long data)
-#endif
+static void count_a2dp_packet_timeout(struct work_struct *work)
 {
-	if (btrtl_coex.a2dp_packet_count)
+	rtk_conn_prof *hci_conn = container_of(work, rtk_conn_prof,
+						a2dp_count_work.work);
+	if (hci_conn->a2dp_packet_count)
 		RTKBT_DBG("%s: a2dp_packet_count %d", __func__,
-				  btrtl_coex.a2dp_packet_count);
-	if (btrtl_coex.a2dp_packet_count == 0) {
-		if (is_profile_busy(profile_a2dp)) {
+			  hci_conn->a2dp_packet_count);
+	if (hci_conn->a2dp_packet_count == 0) {
+		if (is_profile_busy(hci_conn, profile_a2dp)) {
 			RTKBT_DBG("%s: a2dp busy->idle!", __func__);
-			update_profile_state(profile_a2dp, FALSE);
-			if (btrtl_coex.profile_bitmap & BIT(profile_sink)) {
-				update_profile_state(profile_sink, FALSE);
-			}
+			update_profile_state(hci_conn, profile_a2dp, FALSE);
+			if (hci_conn->profile_bitmap & BIT(profile_sink))
+				update_profile_state(hci_conn, profile_sink, FALSE);
 		}
 	}
-	btrtl_coex.a2dp_packet_count = 0;
-	mod_timer(&btrtl_coex.a2dp_count_timer,
-			  jiffies + msecs_to_jiffies(1000));
+	hci_conn->a2dp_packet_count = 0;
+
+	queue_delayed_work(btrtl_coex.timer_wq, &hci_conn->a2dp_count_work, msecs_to_jiffies(1000));
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 14, 0)
-static void count_pan_packet_timeout(struct timer_list *unused)
-#else
-static void count_pan_packet_timeout(unsigned long data)
-#endif
+static void count_pan_packet_timeout(struct work_struct *work)
 {
-	if (btrtl_coex.pan_packet_count)
+	rtk_conn_prof *hci_conn = container_of(work, rtk_conn_prof,
+						pan_count_work.work);
+	if (hci_conn->pan_packet_count)
 		RTKBT_DBG("%s: pan_packet_count %d", __func__,
-				  btrtl_coex.pan_packet_count);
-	if (btrtl_coex.pan_packet_count < PAN_PACKET_COUNT) {
-		if (is_profile_busy(profile_pan)) {
+			  hci_conn->pan_packet_count);
+	if (hci_conn->pan_packet_count < PAN_PACKET_COUNT) {
+		if (is_profile_busy(hci_conn, profile_pan)) {
 			RTKBT_DBG("%s: pan busy->idle!", __func__);
-			update_profile_state(profile_pan, FALSE);
+			update_profile_state(hci_conn, profile_pan, FALSE);
 		}
 	} else {
-		if (!is_profile_busy(profile_pan)) {
+		if (!is_profile_busy(hci_conn, profile_pan)) {
 			RTKBT_DBG("timeout_handler: pan idle->busy!");
-			update_profile_state(profile_pan, TRUE);
+			update_profile_state(hci_conn, profile_pan, TRUE);
 		}
 	}
-	btrtl_coex.pan_packet_count = 0;
-	mod_timer(&btrtl_coex.pan_count_timer,
-			  jiffies + msecs_to_jiffies(1000));
+	hci_conn->pan_packet_count = 0;
+	queue_delayed_work(btrtl_coex.timer_wq, &hci_conn->pan_count_work, msecs_to_jiffies(1000));
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 14, 0)
-static void count_hogp_packet_timeout(struct timer_list *unused)
-#else
-static void count_hogp_packet_timeout(unsigned long data)
-#endif
+static void count_hogp_packet_timeout(struct work_struct *work)
 {
-	if (btrtl_coex.hogp_packet_count)
+	rtk_conn_prof *hci_conn = container_of(work, rtk_conn_prof,
+						hogp_count_work.work);
+	if (hci_conn->hogp_packet_count)
 		RTKBT_DBG("%s: hogp_packet_count %d", __func__,
-				  btrtl_coex.hogp_packet_count);
-	if (btrtl_coex.hogp_packet_count == 0) {
-		if (is_profile_busy(profile_hogp)) {
+			  hci_conn->hogp_packet_count);
+	if (hci_conn->hogp_packet_count == 0) {
+		if (is_profile_busy(hci_conn, profile_hogp)) {
 			RTKBT_DBG("%s: hogp busy->idle!", __func__);
-			update_profile_state(profile_hogp, FALSE);
+			update_profile_state(hci_conn, profile_hogp, FALSE);
 		}
 	}
-	btrtl_coex.hogp_packet_count = 0;
+	hci_conn->hogp_packet_count = 0;
 
-	if (btrtl_coex.voice_packet_count)
+	if (hci_conn->voice_packet_count)
 		RTKBT_DBG("%s: voice_packet_count %d", __func__,
-				  btrtl_coex.voice_packet_count);
-	if (btrtl_coex.voice_packet_count == 0) {
-		if (is_profile_busy(profile_voice)) {
+			  hci_conn->voice_packet_count);
+	if (hci_conn->voice_packet_count == 0) {
+		if (is_profile_busy(hci_conn, profile_voice)) {
 			RTKBT_DBG("%s: voice busy->idle!", __func__);
-			update_profile_state(profile_voice, FALSE);
+			update_profile_state(hci_conn, profile_voice, FALSE);
 		}
 	}
-	btrtl_coex.voice_packet_count = 0;
-	mod_timer(&btrtl_coex.hogp_count_timer,
-			  jiffies + msecs_to_jiffies(1000));
+	hci_conn->voice_packet_count = 0;
+	queue_delayed_work(btrtl_coex.timer_wq, &hci_conn->hogp_count_work, msecs_to_jiffies(1000));
 }
 
 #ifdef RTB_SOFTWARE_MAILBOX
@@ -1173,9 +1150,8 @@ static int udpsocket_send(char *tx_msg, int msg_size)
 #endif
 		set_fs(oldfs);
 
-		if (error < 0) {
+		if (error < 0)
 			RTKBT_DBG("Error when sendimg msg, error:%d", error);
-		}
 	}
 
 	return error;
@@ -1225,7 +1201,7 @@ static int rtk_send_coexmsg2wifi(u8 *msg, u8 size)
 	if (!result) {
 		RTKBT_ERR("Couldnt send coex msg to WiFi");
 		return -1;
-	} else if (result == 1) {
+	} else if (result == 1){
 		/* successful to send message */
 		return 0;
 	} else {
@@ -1311,7 +1287,7 @@ static void create_udpsocket(void)
 	btrtl_coex.sock_open = 0;
 
 	err = sock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP,
-					  &btrtl_coex.udpsock);
+			&btrtl_coex.udpsock);
 	if (err < 0) {
 		RTKBT_ERR("%s: sock create error, err = %d", __func__, err);
 		return;
@@ -1328,12 +1304,12 @@ static void create_udpsocket(void)
 	btrtl_coex.wifi_addr.sin_port = htons(CONNECT_PORT_WIFI);
 
 	err =
-		btrtl_coex.udpsock->ops->bind(btrtl_coex.udpsock,
-									  (struct sockaddr *)&btrtl_coex.
-									  addr, sizeof(struct sockaddr));
+	    btrtl_coex.udpsock->ops->bind(btrtl_coex.udpsock,
+					     (struct sockaddr *)&btrtl_coex.
+					     addr, sizeof(struct sockaddr));
 	if (err < 0) {
 		sock_release(btrtl_coex.udpsock);
-		RTKBT_ERR("%s: sock bind error, err = %d", __func__,  err);
+		RTKBT_ERR("%s: sock bind error, err = %d",__func__,  err);
 		return;
 	}
 
@@ -1348,17 +1324,15 @@ static void rtk_notify_extension_version_to_wifi(void)
 	char p_buf[2 + HCI_CMD_PREAMBLE_SIZE];
 	char *p = p_buf;
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_HCI_EXTENSION_VERSION_NOTIFY);
 	*p++ = para_length;
 	UINT16_TO_STREAM(p, HCI_EXTENSION_VERSION);
 	RTKBT_DBG("extension version is 0x%x", HCI_EXTENSION_VERSION);
-	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
 static void rtk_notify_btpatch_version_to_wifi(void)
@@ -1367,21 +1341,19 @@ static void rtk_notify_btpatch_version_to_wifi(void)
 	char p_buf[para_length + HCI_CMD_PREAMBLE_SIZE];
 	char *p = p_buf;
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_HCI_BT_PATCH_VER_NOTIFY);
 	*p++ = para_length;
 	UINT16_TO_STREAM(p, btrtl_coex.hci_reversion);
 	UINT16_TO_STREAM(p, btrtl_coex.lmp_subversion);
 	RTKBT_DBG("btpatch ver: len %u, hci_rev 0x%04x, lmp_subver 0x%04x",
-			  para_length, btrtl_coex.hci_reversion,
-			  btrtl_coex.lmp_subversion);
+			para_length, btrtl_coex.hci_reversion,
+			btrtl_coex.lmp_subversion);
 
-	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
 static void rtk_notify_afhmap_to_wifi(void)
@@ -1391,9 +1363,8 @@ static void rtk_notify_afhmap_to_wifi(void)
 	char *p = p_buf;
 	uint8_t kk = 0;
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_HCI_BT_AFH_MAP_NOTIFY);
 	*p++ = para_length;
@@ -1403,14 +1374,13 @@ static void rtk_notify_afhmap_to_wifi(void)
 	memcpy(p, btrtl_coex.afh_map, 10);
 
 	RTKBT_DBG("afhmap, piconet_id is 0x%x, map type is 0x%x",
-			  btrtl_coex.piconet_id, btrtl_coex.mode);
+		  btrtl_coex.piconet_id, btrtl_coex.mode);
 	for (kk = 0; kk < 10; kk++)
 		RTKBT_DBG("afhmap data[%d] is 0x%x", kk,
-				  btrtl_coex.afh_map[kk]);
+			  btrtl_coex.afh_map[kk]);
 
-	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
 static void rtk_notify_btcoex_to_wifi(uint8_t opcode, uint8_t status)
@@ -1419,62 +1389,55 @@ static void rtk_notify_btcoex_to_wifi(uint8_t opcode, uint8_t status)
 	char p_buf[para_length + HCI_CMD_PREAMBLE_SIZE];
 	char *p = p_buf;
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_HCI_BT_COEX_NOTIFY);
 	*p++ = para_length;
 	*p++ = opcode;
-	if (!status) {
+	if (!status)
 		*p++ = 0;
-	} else {
+	else
 		*p++ = 1;
-	}
 
 	RTKBT_DBG("btcoex, opcode is 0x%x, status is 0x%x", opcode, status);
 
-	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
 static void rtk_notify_btoperation_to_wifi(uint8_t operation,
-		uint8_t append_data_length,
-		uint8_t *append_data)
+					   uint8_t append_data_length,
+					   uint8_t * append_data)
 {
 	uint8_t para_length = 3 + append_data_length;
 	char p_buf[para_length + HCI_CMD_PREAMBLE_SIZE];
 	char *p = p_buf;
 	uint8_t kk = 0;
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_BT_OPERATION_NOTIFY);
 	*p++ = para_length;
 	*p++ = operation;
 	*p++ = append_data_length;
-	if (append_data_length) {
+	if (append_data_length)
 		memcpy(p, append_data, append_data_length);
-	}
 
 	RTKBT_DBG("btoperation: op 0x%02x, append_data_length %u",
-			  operation, append_data_length);
+		  operation, append_data_length);
 	if (append_data_length) {
-		for (kk = 0; kk < append_data_length; kk++) {
+		for (kk = 0; kk < append_data_length; kk++)
 			RTKBT_DBG("append data is 0x%x", *(append_data + kk));
-		}
 	}
 
-	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
 static void rtk_notify_info_to_wifi(uint8_t reason, uint8_t length,
-									uint8_t *report_info)
+				    uint8_t *report_info)
 {
 	uint8_t para_length = 4 + length;
 	char buf[para_length + HCI_CMD_PREAMBLE_SIZE];
@@ -1485,14 +1448,13 @@ static void rtk_notify_info_to_wifi(uint8_t reason, uint8_t length,
 		RTKBT_DBG("bt info: cmd %2.2X", report->cmd);
 		RTKBT_DBG("bt info: len %2.2X", report->len);
 		RTKBT_DBG("bt info: data %2.2X %2.2X %2.2X %2.2X %2.2X %2.2X",
-				  report->data[0], report->data[1], report->data[2],
-				  report->data[3], report->data[4], report->data[5]);
+			  report->data[0], report->data[1], report->data[2],
+			  report->data[3], report->data[4], report->data[5]);
 	}
 	RTKBT_DBG("bt info: reason 0x%2x, length 0x%2x", reason, length);
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_HCI_BT_INFO_NOTIFY);
 	*p++ = para_length;
@@ -1501,29 +1463,26 @@ static void rtk_notify_info_to_wifi(uint8_t reason, uint8_t length,
 	*p++ = reason;
 	*p++ = length;
 
-	if (length) {
+	if (length)
 		memcpy(p, report_info, length);
-	}
 
 	RTKBT_DBG("para length %2x, polling_enable %u, poiiling_interval %u",
-			  para_length, btrtl_coex.polling_enable,
-			  btrtl_coex.polling_interval);
+	     para_length, btrtl_coex.polling_enable,
+	     btrtl_coex.polling_interval);
 	/* send BT INFO to Wi-Fi driver */
-	if (rtkbt_coexmsg_send(buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
-static void rtk_notify_regester_to_wifi(uint8_t *reg_value)
+static void rtk_notify_regester_to_wifi(uint8_t * reg_value)
 {
 	uint8_t para_length = 9;
 	char p_buf[para_length + HCI_CMD_PREAMBLE_SIZE];
 	char *p = p_buf;
 	hci_mailbox_register *reg = (hci_mailbox_register *) reg_value;
 
-	if (!btrtl_coex.wifi_on) {
+	if (!btrtl_coex.wifi_on)
 		return;
-	}
 
 	UINT16_TO_STREAM(p, HCI_OP_HCI_BT_REGISTER_VALUE_NOTIFY);
 	*p++ = para_length;
@@ -1533,9 +1492,8 @@ static void rtk_notify_regester_to_wifi(uint8_t *reg_value)
 	RTKBT_DBG("bt register, register offset is %x", reg->offset);
 	RTKBT_DBG("bt register, register value is %x", reg->value);
 
-	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0) {
+	if (rtkbt_coexmsg_send(p_buf, para_length + HCI_CMD_PREAMBLE_SIZE) < 0)
 		RTKBT_ERR("%s: sock send error", __func__);
-	}
 }
 
 #endif
@@ -1556,9 +1514,9 @@ void rtk_btcoex_parse_cmd(uint8_t *buffer, int count)
 			btrtl_coex.isinquirying = 1;
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("hci (periodic)inq, notify wifi "
-					  "inquiry start");
+				  "inquiry start");
 			rtk_notify_btoperation_to_wifi(BT_OPCODE_INQUIRY_START,
-										   0, NULL);
+						       0, NULL);
 #else
 			RTKBT_INFO("hci (periodic)inq start");
 #endif
@@ -1570,9 +1528,9 @@ void rtk_btcoex_parse_cmd(uint8_t *buffer, int count)
 			btrtl_coex.isinquirying = 0;
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("hci (periodic)inq cancel/exit, notify wifi "
-					  "inquiry stop");
+				  "inquiry stop");
 			rtk_notify_btoperation_to_wifi(BT_OPCODE_INQUIRY_END, 0,
-										   NULL);
+						       NULL);
 #else
 			RTKBT_INFO("hci (periodic)inq cancel/exit");
 #endif
@@ -1584,7 +1542,7 @@ void rtk_btcoex_parse_cmd(uint8_t *buffer, int count)
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("hci accept connreq, notify wifi page start");
 			rtk_notify_btoperation_to_wifi(BT_OPCODE_PAGE_START, 0,
-										   NULL);
+						       NULL);
 #else
 			RTKBT_INFO("hci accept conn req");
 #endif
@@ -1592,7 +1550,7 @@ void rtk_btcoex_parse_cmd(uint8_t *buffer, int count)
 		break;
 	case HCI_OP_DISCONNECT:
 		RTKBT_INFO("HCI Disconnect, handle %04x, reason 0x%02x",
-				   ((u16)buffer[4] << 8 | buffer[3]), buffer[5]);
+			   ((u16)buffer[4] << 8 | buffer[3]), buffer[5]);
 		break;
 	default:
 		break;
@@ -1664,7 +1622,7 @@ static void rtk_handle_link_key_notify(void)
 	}
 }
 
-static void rtk_handle_mode_change_evt(u8 *p)
+static void rtk_handle_mode_change_evt(u8 * p)
 {
 	u16 mode_change_handle, mode_interval;
 
@@ -1676,7 +1634,7 @@ static void rtk_handle_mode_change_evt(u8 *p)
 }
 
 #ifdef RTB_SOFTWARE_MAILBOX
-static void rtk_parse_vendor_mailbox_cmd_evt(u8 *p, u8 total_len)
+static void rtk_parse_vendor_mailbox_cmd_evt(u8 * p, u8 total_len)
 {
 	u8 status, subcmd;
 	u8 temp_cmd[10];
@@ -1688,13 +1646,13 @@ static void rtk_parse_vendor_mailbox_cmd_evt(u8 *p, u8 total_len)
 	}
 	subcmd = *p++;
 	RTKBT_DBG("receive mailbox cmd from fw, subcmd is 0x%x, status is 0x%x",
-			  subcmd, status);
+		  subcmd, status);
 
 	switch (subcmd) {
 	case HCI_VENDOR_SUB_CMD_BT_REPORT_CONN_SCO_INQ_INFO:
 		if (status == 0)	//success
 			rtk_notify_info_to_wifi(POLLING_RESPONSE,
-									RTL_BTINFO_LEN, (uint8_t *)p);
+					RTL_BTINFO_LEN, (uint8_t *)p);
 		break;
 
 	case HCI_VENDOR_SUB_CMD_WIFI_CHANNEL_AND_BANDWIDTH_CMD:
@@ -1734,7 +1692,7 @@ static void rtk_parse_vendor_mailbox_cmd_evt(u8 *p, u8 total_len)
 			temp_cmd[2] = btrtl_coex.piconet_id;
 			temp_cmd[3] = btrtl_coex.mode;
 			rtk_vendor_cmd_to_fw(HCI_VENDOR_MAILBOX_CMD, 4,
-								 temp_cmd);
+					     temp_cmd);
 		} else {
 			memset(btrtl_coex.afh_map, 0, 10);
 			rtk_notify_afhmap_to_wifi();
@@ -1749,7 +1707,7 @@ static void rtk_parse_vendor_mailbox_cmd_evt(u8 *p, u8 total_len)
 			temp_cmd[2] = btrtl_coex.piconet_id;
 			temp_cmd[3] = btrtl_coex.mode;
 			rtk_vendor_cmd_to_fw(HCI_VENDOR_MAILBOX_CMD, 4,
-								 temp_cmd);
+					     temp_cmd);
 		} else {
 			memset(btrtl_coex.afh_map, 0, 10);
 			rtk_notify_afhmap_to_wifi();
@@ -1757,19 +1715,17 @@ static void rtk_parse_vendor_mailbox_cmd_evt(u8 *p, u8 total_len)
 		break;
 
 	case HCI_VENDOR_SUB_CMD_GET_AFH_MAP_H:
-		if (status == 0) {
+		if (status == 0)
 			memcpy(btrtl_coex.afh_map + 8, p + 4, 2);
-		} else {
+		else
 			memset(btrtl_coex.afh_map, 0, 10);
-		}
 
 		rtk_notify_afhmap_to_wifi();
 		break;
 
 	case HCI_VENDOR_SUB_CMD_RD_REG_REQ:
-		if (status == 0) {
-			rtk_notify_regester_to_wifi(p + 3);    /* cmd_idx,length,regist type */
-		}
+		if (status == 0)
+			rtk_notify_regester_to_wifi(p + 3);	/* cmd_idx,length,regist type */
 		break;
 
 	case HCI_VENDOR_SUB_CMD_WR_REG_REQ:
@@ -1782,7 +1738,7 @@ static void rtk_parse_vendor_mailbox_cmd_evt(u8 *p, u8 total_len)
 }
 #endif /* RTB_SOFTWARE_MAILBOX */
 
-static void rtk_handle_cmd_complete_evt(u8 total_len, u8 *p)
+static void rtk_handle_cmd_complete_evt(u8 total_len, u8 * p)
 {
 	u16 opcode;
 
@@ -1795,9 +1751,9 @@ static void rtk_handle_cmd_complete_evt(u8 total_len, u8 *p)
 			btrtl_coex.isinquirying = 0;
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("hci period inq, start error, notify wifi "
-					  "inquiry stop");
+				  "inquiry stop");
 			rtk_notify_btoperation_to_wifi(BT_OPCODE_INQUIRY_END, 0,
-										   NULL);
+						       NULL);
 #else
 			RTKBT_INFO("hci period inquiry start error");
 #endif
@@ -1811,9 +1767,9 @@ static void rtk_handle_cmd_complete_evt(u8 total_len, u8 *p)
 			p += 3;
 			STREAM_TO_UINT16(btrtl_coex.lmp_subversion, p);
 			RTKBT_DBG("BTCOEX hci_rev 0x%04x",
-					  btrtl_coex.hci_reversion);
+				  btrtl_coex.hci_reversion);
 			RTKBT_DBG("BTCOEX lmp_subver 0x%04x",
-					  btrtl_coex.lmp_subversion);
+				  btrtl_coex.lmp_subversion);
 		}
 	}
 
@@ -1822,9 +1778,18 @@ static void rtk_handle_cmd_complete_evt(u8 total_len, u8 *p)
 		rtk_parse_vendor_mailbox_cmd_evt(p, total_len);
 	}
 #endif
+	if (opcode == HCI_VENDOR_SET_PROFILE_REPORT_COMMAND) {
+		//0x01-unknown hci command
+		if((*p++) == 0x01) {
+			//RTKBT_DBG("unknown hci command");
+			return;
+		} else {
+			profileinfo_cmd = 1;
+		}
+	}
 }
 
-static void rtk_handle_cmd_status_evt(u8 *p)
+static void rtk_handle_cmd_status_evt(u8 * p)
 {
 	u16 opcode;
 	u8 status;
@@ -1839,7 +1804,7 @@ static void rtk_handle_cmd_status_evt(u8 *p)
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("hci inq, start error, notify wifi inq stop");
 			rtk_notify_btoperation_to_wifi(BT_OPCODE_INQUIRY_END, 0,
-										   NULL);
+						       NULL);
 #else
 			RTKBT_INFO("hci inquiry start error");
 #endif
@@ -1852,7 +1817,7 @@ static void rtk_handle_cmd_status_evt(u8 *p)
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("hci create conn, notify wifi start page");
 			rtk_notify_btoperation_to_wifi(BT_OPCODE_PAGE_START, 0,
-										   NULL);
+						       NULL);
 #else
 			RTKBT_INFO("hci create connection, start paging");
 #endif
@@ -1860,7 +1825,7 @@ static void rtk_handle_cmd_status_evt(u8 *p)
 	}
 }
 
-static void rtk_handle_connection_complete_evt(u8 *p)
+static void rtk_handle_connection_complete_evt(u8 * p)
 {
 	u16 handle;
 	u8 status, link_type;
@@ -1879,7 +1844,7 @@ static void rtk_handle_connection_complete_evt(u8 *p)
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("notify wifi page success end");
 			rtk_notify_btoperation_to_wifi
-			(BT_OPCODE_PAGE_SUCCESS_END, 0, NULL);
+			    (BT_OPCODE_PAGE_SUCCESS_END, 0, NULL);
 #else
 			RTKBT_INFO("Page success");
 #endif
@@ -1890,46 +1855,45 @@ static void rtk_handle_connection_complete_evt(u8 *p)
 			hci_conn = allocate_connection_by_handle(handle);
 			if (hci_conn) {
 				add_connection_to_hash(&btrtl_coex,
-									   hci_conn);
+						       hci_conn);
 				hci_conn->profile_bitmap = 0;
+				hci_conn->profile_status = 0;
 				memset(hci_conn->profile_refcount, 0, 8);
 				if ((0 == link_type) || (2 == link_type)) {	//sco or esco
 					hci_conn->type = 1;
 					update_profile_connection(hci_conn,
-											  profile_sco,
-											  TRUE);
-				} else {
+								  profile_sco,
+								  TRUE);
+				} else
 					hci_conn->type = 0;
-				}
 			} else {
 				RTKBT_ERR("hci connection allocate fail");
 			}
 		} else {
 			RTKBT_DBG("hci conn handle 0x%04x already existed!",
-					  handle);
+				  handle);
 			hci_conn->profile_bitmap = 0;
 			memset(hci_conn->profile_refcount, 0, 8);
 			if ((0 == link_type) || (2 == link_type)) {	//sco or esco
 				hci_conn->type = 1;
 				update_profile_connection(hci_conn, profile_sco,
-										  TRUE);
-			} else {
+							  TRUE);
+			} else
 				hci_conn->type = 0;
-			}
 		}
 	} else if (btrtl_coex.ispaging) {
 		btrtl_coex.ispaging = 0;
 #ifdef RTB_SOFTWARE_MAILBOX
 		RTKBT_DBG("notify wifi page unsuccess end");
 		rtk_notify_btoperation_to_wifi(BT_OPCODE_PAGE_UNSUCCESS_END, 0,
-									   NULL);
+					       NULL);
 #else
 		RTKBT_INFO("Page failed");
 #endif
 	}
 }
 
-static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 *p)
+static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 * p)
 {
 	u16 handle, interval;
 	u8 status;
@@ -1937,15 +1901,14 @@ static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 *p)
 
 	status = *p++;
 	STREAM_TO_UINT16(handle, p);
-	if (!enhanced) {
-		p += 8;    /* role, address type, address */
-	} else {
-		p += (8 + 12);    /* plus two bluetooth addresses */
-	}
+	if (!enhanced)
+		p += 8;	/* role, address type, address */
+	else
+		p += (8 + 12); /* plus two bluetooth addresses */
 	STREAM_TO_UINT16(interval, p);
 
 	RTKBT_INFO("LE connected, handle %04x, status 0x%02x, interval %u",
-			   handle, status, interval);
+		   handle, status, interval);
 
 	if (status == 0) {
 		if (btrtl_coex.ispaging) {
@@ -1953,7 +1916,7 @@ static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 *p)
 #ifdef RTB_SOFTWARE_MAILBOX
 			RTKBT_DBG("notify wifi page success end");
 			rtk_notify_btoperation_to_wifi
-			(BT_OPCODE_PAGE_SUCCESS_END, 0, NULL);
+			    (BT_OPCODE_PAGE_SUCCESS_END, 0, NULL);
 #else
 			RTKBT_INFO("Page success end");
 #endif
@@ -1964,8 +1927,9 @@ static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 *p)
 			hci_conn = allocate_connection_by_handle(handle);
 			if (hci_conn) {
 				add_connection_to_hash(&btrtl_coex,
-									   hci_conn);
+						       hci_conn);
 				hci_conn->profile_bitmap = 0;
+				hci_conn->profile_status = 0;
 				memset(hci_conn->profile_refcount, 0, 8);
 				hci_conn->type = 2;
 				update_profile_connection(hci_conn, profile_hid, TRUE);	//for coex, le is the same as hid
@@ -1975,7 +1939,7 @@ static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 *p)
 			}
 		} else {
 			RTKBT_DBG("hci conn handle 0x%04x already existed!",
-					  handle);
+				  handle);
 			hci_conn->profile_bitmap = 0;
 			memset(hci_conn->profile_refcount, 0, 8);
 			hci_conn->type = 2;
@@ -1987,14 +1951,14 @@ static void rtk_handle_le_connection_complete_evt(u8 enhanced, u8 *p)
 #ifdef RTB_SOFTWARE_MAILBOX
 		RTKBT_DBG("notify wifi page unsuccess end");
 		rtk_notify_btoperation_to_wifi(BT_OPCODE_PAGE_UNSUCCESS_END, 0,
-									   NULL);
+					       NULL);
 #else
 		RTKBT_INFO("Page failed");
 #endif
 	}
 }
 
-static void rtk_handle_le_connection_update_complete_evt(u8 *p)
+static void rtk_handle_le_connection_update_complete_evt(u8 * p)
 {
 	u16 handle, interval;
 	/* u8 status; */
@@ -2007,9 +1971,134 @@ static void rtk_handle_le_connection_update_complete_evt(u8 *p)
 	update_hid_active_state(handle, interval);
 }
 
-static void rtk_handle_le_meta_evt(u8 *p)
+// #if HCI_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+static void rtk_handle_le_cis_established_evt(u8 *p)
+{
+	u16 handle;
+	u8 status;
+	rtk_conn_prof *hci_conn = NULL;
+
+	status = *p++;
+	STREAM_TO_UINT16(handle, p);
+	if (status) {
+		RTKBT_ERR("cis established evt err, status 0x%02x", status);
+		return;
+	}
+
+	hci_conn = find_connection_by_handle(&btrtl_coex, handle);
+	if (hci_conn) {
+		RTKBT_ERR("cis handle 0x%04x has already existed", handle);
+		return;
+	}
+
+	hci_conn = allocate_connection_by_handle(handle);
+	if (!hci_conn) {
+		RTKBT_ERR("cis conn (0x%04x) allocation failed", handle);
+		return;
+	}
+	add_connection_to_hash(&btrtl_coex, hci_conn);
+	hci_conn->profile_bitmap = 0;
+	hci_conn->profile_status = 0;
+	memset(hci_conn->profile_refcount, 0, profile_max);
+	hci_conn->type = HCI_CONN_TYPE_CIS;
+	update_profile_connection(hci_conn, profile_le_audio, TRUE);
+}
+
+static void big_conn_add(u16 handle)
+{
+	rtk_conn_prof *hci_conn = NULL;
+
+	hci_conn = find_connection_by_handle(&btrtl_coex, handle);
+	if (hci_conn) {
+		RTKBT_DBG("bis handle 0x%04x has already existed!", handle);
+		return;
+	}
+
+	hci_conn = allocate_connection_by_handle(handle);
+	if (hci_conn) {
+		add_connection_to_hash(&btrtl_coex, hci_conn);
+		hci_conn->profile_bitmap = 0;
+		hci_conn->profile_status = 0;
+		memset(hci_conn->profile_refcount, 0, profile_max);
+		hci_conn->type = HCI_CONN_TYPE_BIS;
+		update_profile_connection(hci_conn, profile_le_audio, TRUE);
+	} else {
+		RTKBT_DBG("bis conn allocation failed");
+	}
+}
+
+static void rtk_handle_le_create_big_complete_evt(u8 *p)
+{
+	u16 handle;
+	u8 status;
+
+	status = *p++;
+	if (status) {
+		RTKBT_ERR("big complete evt err, status 0x%02x", status);
+		return;
+	}
+
+	handle = *p++;
+	handle += HCI_CONN_HANDLE_UNSET_START;
+	big_conn_add(handle);
+}
+
+static void big_conn_remove(u16 handle)
+{
+	rtk_conn_prof *hci_conn = NULL;
+
+	hci_conn = find_connection_by_handle(&btrtl_coex, handle);
+	if (hci_conn) {
+		if (hci_conn->profile_bitmap & BIT(profile_le_audio))
+			update_profile_connection(hci_conn, profile_le_audio,
+						  FALSE);
+		delete_connection_from_hash(hci_conn);
+	} else {
+		RTKBT_DBG("big conn handle 0x%04x not found", handle);
+	}
+
+}
+
+static void rtk_handle_le_terminate_big_complete_evt(u8 *p)
+{
+	u16 handle;
+
+	handle = *p++;
+	handle += HCI_CONN_HANDLE_UNSET_START;
+	big_conn_remove(handle);
+}
+
+static void rtk_handle_le_big_sync_established_evt(u8 *p)
+{
+	u16 handle;
+	u8 status;
+
+	status = *p++;
+	if (status) {
+		RTKBT_ERR("big sync err, status 0x%02x", status);
+		return;
+	}
+
+	handle = *p++;
+	handle += HCI_CONN_HANDLE_UNSET_START;
+	big_conn_add(handle);
+}
+
+static void rtk_handle_le_big_sync_lost_evt(u8 *p)
+{
+	u16 handle;
+
+	handle = *p++;
+	handle += HCI_CONN_HANDLE_UNSET_START;
+	big_conn_remove(handle);
+}
+
+// #endif
+
+static void rtk_handle_le_meta_evt(u8 * p)
 {
 	u8 sub_event = *p++;
+
 	switch (sub_event) {
 	case HCI_EV_LE_CONN_COMPLETE:
 		rtk_handle_le_connection_complete_evt(0, p);
@@ -2017,11 +2106,26 @@ static void rtk_handle_le_meta_evt(u8 *p)
 	case HCI_EV_LE_ENHANCED_CONN_COMPLETE:
 		rtk_handle_le_connection_complete_evt(1, p);
 		break;
-
 	case HCI_EV_LE_CONN_UPDATE_COMPLETE:
 		rtk_handle_le_connection_update_complete_evt(p);
 		break;
-
+// #if HCI_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+	case HCI_EV_LE_CIS_EST:
+		rtk_handle_le_cis_established_evt(p);
+		break;
+	case HCI_EV_LE_CREATE_BIG_CPL:
+		rtk_handle_le_create_big_complete_evt(p);
+		break;
+	case HCI_EV_LE_TERM_BIG_CPL:
+		rtk_handle_le_terminate_big_complete_evt(p);
+		break;
+	case HCI_EV_LE_BIG_SYNC_EST:
+		rtk_handle_le_big_sync_established_evt(p);
+		break;
+	case HCI_EV_LE_BIG_SYNC_LOST:
+		rtk_handle_le_big_sync_lost_evt(p);
+		break;
+// #endif
 	default:
 		break;
 	}
@@ -2031,41 +2135,26 @@ static u8 disconn_profile(struct rtl_hci_conn *conn, u8 pfe_index)
 {
 	u8 need_update = 0;
 
-	if (!btrtl_coex.profile_refcount[pfe_index]) {
+	if (!conn->profile_refcount[pfe_index]) {
 		RTKBT_WARN("profile %u ref is 0", pfe_index);
 		return 0;
 	}
 
-	btrtl_coex.profile_refcount[pfe_index]--;
 	RTKBT_INFO("%s: profile_ref[%u] %u", __func__, pfe_index,
-			   btrtl_coex.profile_refcount[pfe_index]);
+		  conn->profile_refcount[pfe_index]);
 
-	if (!btrtl_coex.profile_refcount[pfe_index]) {
-		need_update = 1;
-		btrtl_coex.profile_bitmap &= ~(BIT(pfe_index));
-
-		/* if profile does not exist, status is meaningless */
-		btrtl_coex.profile_status &= ~(BIT(pfe_index));
-		rtk_check_del_timer(pfe_index);
-	}
-
-	if (conn->profile_refcount[pfe_index]) {
+	if (conn->profile_refcount[pfe_index])
 		conn->profile_refcount[pfe_index]--;
-	} else
+	else
 		RTKBT_INFO("%s: conn pfe ref[%u] is 0", __func__,
-				   conn->profile_refcount[pfe_index]);
+			   conn->profile_refcount[pfe_index]);
 	if (!conn->profile_refcount[pfe_index]) {
 		need_update = 1;
 		conn->profile_bitmap &= ~(BIT(pfe_index));
 
-		/* clear profile_hid_interval if need */
-		if ((profile_hid == pfe_index) &&
-			(conn->profile_bitmap & (BIT(profile_hid_interval)))) {
-			conn->profile_bitmap &= ~(BIT(profile_hid_interval));
-			if (btrtl_coex.profile_refcount[profile_hid_interval]) {
-				btrtl_coex.profile_refcount[profile_hid_interval]--;
-			}
-		}
+		/* if profile does not exist, status is meaningless */
+		conn->profile_status &= ~(BIT(pfe_index));
+		rtk_check_del_timer(pfe_index, conn);
 	}
 
 	return need_update;
@@ -2078,32 +2167,31 @@ static void disconn_acl(u16 handle, struct rtl_hci_conn *conn)
 	struct list_head *iter = NULL, *temp = NULL;
 	u8 need_update = 0;
 
-	spin_lock(&coex->spin_lock_profile);
+	mutex_lock(&coex->profile_mutex);
 
 	list_for_each_safe(iter, temp, &coex->profile_list) {
 		prof_info = list_entry(iter, rtk_prof_info, list);
 		if (handle == prof_info->handle) {
 			RTKBT_DBG("hci disconn, hndl %x, psm %x, dcid %x, "
-					  "scid %x, profile %u", prof_info->handle,
-					  prof_info->psm, prof_info->dcid,
-					  prof_info->scid, prof_info->profile_index);
+				  "scid %x, profile %u", prof_info->handle,
+				  prof_info->psm, prof_info->dcid,
+				  prof_info->scid, prof_info->profile_index);
 			//If both scid and dcid > 0, L2cap connection is exist.
 			need_update |= disconn_profile(conn,
-										   prof_info->profile_index);
+						      prof_info->profile_index);
 			if ((prof_info->flags & A2DP_MEDIA) &&
-				(conn->profile_bitmap & BIT(profile_sink)))
+			    (conn->profile_bitmap & BIT(profile_sink)))
 				need_update |= disconn_profile(conn,
-											   profile_sink);
+							       profile_sink);
 			delete_profile_from_hash(prof_info);
 		}
 	}
-	if (need_update) {
+	if (need_update)
 		rtk_notify_profileinfo_to_fw();
-	}
-	spin_unlock(&coex->spin_lock_profile);
+	mutex_unlock(&coex->profile_mutex);
 }
 
-static void rtk_handle_disconnect_complete_evt(u8 *p)
+static void rtk_handle_disconnect_complete_evt(u8 * p)
 {
 	u16 handle;
 	u8 status;
@@ -2125,7 +2213,7 @@ static void rtk_handle_disconnect_complete_evt(u8 *p)
 	reason = *p;
 
 	RTKBT_INFO("disconn cmpl evt: status 0x%02x, handle %04x, reason 0x%02x",
-			   status, handle, reason);
+		   status, handle, reason);
 
 	if (status == 0) {
 		RTKBT_DBG("process disconn complete event.");
@@ -2134,31 +2222,36 @@ static void rtk_handle_disconnect_complete_evt(u8 *p)
 			switch (hci_conn->type) {
 			case 0:
 				/* FIXME: If this is interrupted by l2cap rx,
-				 * there may be deadlock on spin_lock_profile */
+				 * there may be deadlock on profile_mutex */
 				disconn_acl(handle, hci_conn);
 				break;
 
 			case 1:
 				update_profile_connection(hci_conn, profile_sco,
-										  FALSE);
+							  FALSE);
 				break;
 
 			case 2:
 				update_profile_connection(hci_conn, profile_hid,
-										  FALSE);
+							  FALSE);
+				break;
+
+			case HCI_CONN_TYPE_CIS:
+				update_profile_connection(hci_conn,
+							  profile_le_audio,
+							  FALSE);
 				break;
 
 			default:
 				break;
 			}
 			delete_connection_from_hash(hci_conn);
-		} else {
+		} else
 			RTKBT_ERR("hci conn handle 0x%04x not found", handle);
-		}
 	}
 }
 
-static void rtk_handle_specific_evt(u8 *p)
+static void rtk_handle_specific_evt(u8 * p)
 {
 	u16 subcode;
 
@@ -2167,7 +2260,7 @@ static void rtk_handle_specific_evt(u8 *p)
 #ifdef RTB_SOFTWARE_MAILBOX
 		RTKBT_DBG("notify wifi driver with autoreport data");
 		rtk_notify_info_to_wifi(AUTO_REPORT, RTL_BTINFO_LEN,
-								(uint8_t *)p);
+			(uint8_t *)p);
 #else
 		RTKBT_INFO("auto report data");
 #endif
@@ -2175,7 +2268,7 @@ static void rtk_handle_specific_evt(u8 *p)
 }
 
 static void rtk_parse_event_data(struct rtl_coex_struct *coex,
-								 u8 *data, u16 len)
+		u8 *data, u16 len)
 {
 	u8 *p = data;
 	u8 event_code = *p++;
@@ -2239,11 +2332,11 @@ static void rtk_parse_event_data(struct rtl_coex_struct *coex,
 	}
 }
 
-const char l2_dir_str[][4] = {
+static const char l2_dir_str[][4] = {
 	"RX", "TX",
 };
 
-void rtl_process_l2_sig(struct rtl_l2_buff *l2)
+static void rtl_process_l2_sig(struct rtl_l2_buff *l2)
 {
 	/* u8 flag; */
 	u8 code;
@@ -2276,8 +2369,8 @@ void rtl_process_l2_sig(struct rtl_l2_buff *l2)
 		STREAM_TO_UINT16(psm, pp);
 		STREAM_TO_UINT16(scid, pp);
 		RTKBT_DBG("%s l2cap conn req, hndl 0x%04x, PSM 0x%04x, "
-				  "scid 0x%04x", l2_dir_str[l2->out], handle, psm,
-				  scid);
+			  "scid 0x%04x", l2_dir_str[l2->out], handle, psm,
+			  scid);
 		handle_l2cap_con_req(handle, psm, scid, l2->out);
 		break;
 
@@ -2292,8 +2385,8 @@ void rtl_process_l2_sig(struct rtl_l2_buff *l2)
 		/* STREAM_TO_UINT16(status, pp); */
 		pp += 2;
 		RTKBT_DBG("%s l2cap conn rsp, hndl 0x%04x, dcid 0x%04x, "
-				  "scid 0x%04x, result 0x%04x", l2_dir_str[l2->out],
-				  handle, dcid, scid, result);
+			  "scid 0x%04x, result 0x%04x", l2_dir_str[l2->out],
+			  handle, dcid, scid, result);
 		handle_l2cap_con_rsp(handle, dcid, scid, l2->out, result);
 		break;
 
@@ -2305,7 +2398,7 @@ void rtl_process_l2_sig(struct rtl_l2_buff *l2)
 		STREAM_TO_UINT16(dcid, pp);
 		STREAM_TO_UINT16(scid, pp);
 		RTKBT_DBG("%s l2cap disconn req, hndl 0x%04x, dcid 0x%04x, "
-				  "scid 0x%04x", l2_dir_str[l2->out], handle, dcid, scid);
+			  "scid 0x%04x", l2_dir_str[l2->out], handle, dcid, scid);
 		handle_l2cap_discon_req(handle, dcid, scid, l2->out);
 		break;
 	default:
@@ -2322,6 +2415,7 @@ static void rtl_l2_data_process(u8 *pp, u16 len, int dir)
 	/* u16 total_len; */
 	struct rtl_l2_buff *l2 = NULL;
 	u8 *hd = pp;
+	rtk_conn_prof *hci_conn = NULL;
 
 	/* RTKBT_DBG("l2 sig data %p, len %u, dir %d", pp, len, dir); */
 
@@ -2334,6 +2428,12 @@ static void rtl_l2_data_process(u8 *pp, u16 len, int dir)
 	STREAM_TO_UINT16(pdu_len, pp);
 	STREAM_TO_UINT16(channel_id, pp);
 
+	hci_conn =
+	    find_connection_by_handle(&btrtl_coex, handle);
+	if (NULL == hci_conn)
+		return;
+
+
 	if (channel_id == 0x0001) {
 		code = *pp++;
 		switch (code) {
@@ -2341,7 +2441,7 @@ static void rtl_l2_data_process(u8 *pp, u16 len, int dir)
 		case L2CAP_CONN_RSP:
 		case L2CAP_DISCONN_REQ:
 			RTKBT_DBG("l2cap op %u, len %u, out %d", code, len,
-					  dir);
+				  dir);
 			l2 = rtl_l2_node_get(&btrtl_coex);
 			if (l2) {
 				u16 n;
@@ -2350,10 +2450,10 @@ static void rtl_l2_data_process(u8 *pp, u16 len, int dir)
 				l2->out = dir;
 				rtl_l2_node_to_used(&btrtl_coex, l2);
 				queue_delayed_work(btrtl_coex.fw_wq,
-								   &btrtl_coex.l2_work, 0);
+						&btrtl_coex.l2_work, 0);
 			} else
 				RTKBT_ERR("%s: failed to get l2 node",
-						  __func__);
+					  __func__);
 			break;
 		case L2CAP_DISCONN_RSP:
 			break;
@@ -2361,12 +2461,12 @@ static void rtl_l2_data_process(u8 *pp, u16 len, int dir)
 			break;
 		}
 	} else {
-		if ((flag != 0x01) && (is_profile_connected(profile_a2dp) ||
-							   is_profile_connected(profile_pan)))
+		//RTKBT_DBG("%s: handle:%x, flag:%x, pan:%d, a2dp:%d", __func__, handle, flag,
+		//	is_profile_connected(profile_a2dp), is_profile_connected(profile_pan));
+		if ((flag != 0x01) && (is_profile_connected(hci_conn, profile_a2dp) ||
+				       is_profile_connected(hci_conn, profile_pan)))
 			/* Do not count the continuous packets */
-		{
 			packets_count(handle, channel_id, pdu_len, dir, pp);
-		}
 	}
 	return;
 }
@@ -2383,7 +2483,7 @@ static void rtl_l2_work(struct work_struct *work)
 	spin_lock_irqsave(&coex->buff_lock, flags);
 	while (!list_empty(&coex->l2_used_list)) {
 		l2 = list_entry(coex->l2_used_list.next, struct rtl_l2_buff,
-						list);
+				list);
 		list_del(&l2->list);
 
 		spin_unlock_irqrestore(&coex->buff_lock, flags);
@@ -2410,7 +2510,7 @@ static void rtl_ev_work(struct work_struct *work)
 	spin_lock_irqsave(&coex->buff_lock, flags);
 	while (!list_empty(&coex->ev_used_list)) {
 		ev = list_entry(coex->ev_used_list.next, struct rtl_hci_ev,
-						list);
+				list);
 		list_del(&ev->list);
 		spin_unlock_irqrestore(&coex->buff_lock, flags);
 
@@ -2433,6 +2533,7 @@ static inline int cmd_cmplt_filter_out(u8 *buf)
 #ifdef RTB_SOFTWARE_MAILBOX
 	case HCI_VENDOR_MAILBOX_CMD:
 #endif
+	case HCI_VENDOR_SET_PROFILE_REPORT_COMMAND:
 		return 0;
 	default:
 		return 1;
@@ -2453,7 +2554,7 @@ static inline int cmd_status_filter_out(u8 *buf)
 	}
 }
 
-int ev_filter_out(u8 *buf)
+static int ev_filter_out(u8 *buf)
 {
 	switch (buf[0]) {
 	case HCI_EV_INQUIRY_COMPLETE:
@@ -2475,6 +2576,11 @@ int ev_filter_out(u8 *buf)
 		case HCI_EV_LE_CONN_COMPLETE:
 		case HCI_EV_LE_ENHANCED_CONN_COMPLETE:
 		case HCI_EV_LE_CONN_UPDATE_COMPLETE:
+		case HCI_EV_LE_CIS_EST:
+		case HCI_EV_LE_CREATE_BIG_CPL:
+		case HCI_EV_LE_TERM_BIG_CPL:
+		case HCI_EV_LE_BIG_SYNC_EST:
+		case HCI_EV_LE_BIG_SYNC_LOST:
 			return 0;
 		}
 		return 1;
@@ -2490,10 +2596,8 @@ int ev_filter_out(u8 *buf)
 static void rtk_btcoex_evt_enqueue(__u8 *s, __u16 count)
 {
 	struct rtl_hci_ev *ev;
-
-	if (ev_filter_out(s)) {
+	if (ev_filter_out(s))
 		return;
-	}
 
 	ev = rtl_ev_node_get(&btrtl_coex);
 	if (!ev) {
@@ -2525,7 +2629,7 @@ void rtk_btcoex_parse_event(uint8_t *buffer, int count)
 	if (!test_bit(RTL_COEX_RUNNING, &btrtl_coex.flags)) {
 		/* RTKBT_INFO("%s: Coex is closed, ignore", __func__); */
 		RTKBT_INFO("%s: Coex is closed, ignore %x, %x",
-				   __func__, buffer[0], buffer[1]);
+			   __func__, buffer[0], buffer[1]);
 		return;
 	}
 
@@ -2738,31 +2842,30 @@ static void polling_bt_info(unsigned long data)
 		rtk_vendor_cmd_to_fw(HCI_VENDOR_MAILBOX_CMD, 1, temp_cmd);
 	}
 	mod_timer(&btrtl_coex.polling_timer,
-			  jiffies + msecs_to_jiffies(1000 * btrtl_coex.polling_interval));
+		  jiffies + msecs_to_jiffies(1000 * btrtl_coex.polling_interval));
 }
 
 static void rtk_handle_bt_info_control(uint8_t *p)
 {
 	uint8_t temp_cmd[20];
-	struct rtl_btinfo_ctl *ctl = (struct rtl_btinfo_ctl *)p;
+	struct rtl_btinfo_ctl *ctl = (struct rtl_btinfo_ctl*)p;
 	RTKBT_DBG("Received polling_enable %u, polling_time %u, "
-			  "autoreport_enable %u", ctl->polling_enable,
-			  ctl->polling_time, ctl->autoreport_enable);
+		  "autoreport_enable %u", ctl->polling_enable,
+		  ctl->polling_time, ctl->autoreport_enable);
 	RTKBT_DBG("coex: original polling_enable %u",
-			  btrtl_coex.polling_enable);
+		  btrtl_coex.polling_enable);
 
 	if (ctl->polling_enable && !btrtl_coex.polling_enable) {
 		/* setup polling timer for getting bt info from firmware */
 		btrtl_coex.polling_timer.expires =
-			jiffies + msecs_to_jiffies(ctl->polling_time * 1000);
+		    jiffies + msecs_to_jiffies(ctl->polling_time * 1000);
 		mod_timer(&btrtl_coex.polling_timer,
-				  btrtl_coex.polling_timer.expires);
+			  btrtl_coex.polling_timer.expires);
 	}
 
 	/* Close bt info polling timer */
-	if (!ctl->polling_enable && btrtl_coex.polling_enable) {
+	if (!ctl->polling_enable && btrtl_coex.polling_enable)
 		del_timer(&btrtl_coex.polling_timer);
-	}
 
 	if (btrtl_coex.autoreport != ctl->autoreport_enable) {
 		temp_cmd[0] = HCI_VENDOR_SUB_CMD_BT_AUTO_REPORT_ENABLE;
@@ -2778,11 +2881,11 @@ static void rtk_handle_bt_info_control(uint8_t *p)
 	rtk_notify_info_to_wifi(HOST_RESPONSE, 0, NULL);
 }
 
-static void rtk_handle_bt_coex_control(uint8_t *p)
+static void rtk_handle_bt_coex_control(uint8_t * p)
 {
 	uint8_t temp_cmd[20];
 	uint8_t opcode, opcode_len, value, power_decrease, psd_mode,
-			access_type;
+	    access_type;
 
 	opcode = *p++;
 	RTKBT_DBG("receive bt coex control event from wifi, op 0x%02x", opcode);
@@ -2856,14 +2959,14 @@ static void rtk_handle_bt_coex_control(uint8_t *p)
 			temp_cmd[2] = *p++;
 			memcpy(temp_cmd + 3, p, 4);
 			rtk_vendor_cmd_to_fw(HCI_VENDOR_MAILBOX_CMD, 7,
-								 temp_cmd);
+					     temp_cmd);
 		} else {	//write
 			temp_cmd[0] = HCI_VENDOR_SUB_CMD_RD_REG_REQ;
 			temp_cmd[1] = 5;
 			temp_cmd[2] = *p++;
 			memcpy(temp_cmd + 3, p, 8);
 			rtk_vendor_cmd_to_fw(HCI_VENDOR_MAILBOX_CMD, 11,
-								 temp_cmd);
+					     temp_cmd);
 		}
 		break;
 
@@ -2872,7 +2975,7 @@ static void rtk_handle_bt_coex_control(uint8_t *p)
 	}
 }
 
-static void rtk_handle_event_from_wifi(uint8_t *msg)
+static void rtk_handle_event_from_wifi(uint8_t * msg)
 {
 	uint8_t *p = msg;
 	uint8_t event_code = *p++;
@@ -2916,7 +3019,7 @@ static void rtk_handle_event_from_wifi(uint8_t *msg)
 		case RTK_HS_EXTENSION_EVENT_WIFI_SCAN:
 			operation = *p;
 			RTKBT_DBG("Recv WiFi scan notify event from WiFi, "
-					  "op 0x%02x", operation);
+				  "op 0x%02x", operation);
 			break;
 
 		case RTK_HS_EXTENSION_EVENT_HCI_BT_INFO_CONTROL:
@@ -2937,7 +3040,7 @@ static void rtk_handle_event_from_wifi(uint8_t *msg)
 		STREAM_TO_UINT16(wifi_opcode, p);
 		op_status = *p;
 		RTKBT_DBG("Recv cmd complete event from WiFi, op 0x%02x, "
-				  "status 0x%02x", wifi_opcode, op_status);
+			  "status 0x%02x", wifi_opcode, op_status);
 	}
 }
 #endif /* RTB_SOFTWARE_MAILBOX */
@@ -2954,6 +3057,19 @@ static inline void rtl_free_frags(struct rtl_coex_struct *coex)
 	spin_unlock_irqrestore(&coex->rxlock, flags);
 }
 
+static void check_profileinfo_cmd(void)
+{
+	//1 + 6 * handle_bumfer, handle_number = 0
+	uint8_t profileinfo_buf[] = {0x00};
+	rtk_vendor_cmd_to_fw(HCI_VENDOR_SET_PROFILE_REPORT_COMMAND, 1,
+				profileinfo_buf);
+}
+
+static void rtl_cmd_work(struct work_struct *work)
+{
+	check_profileinfo_cmd();
+}
+
 void rtk_btcoex_open(struct hci_dev *hdev)
 {
 	if (test_and_set_bit(RTL_COEX_RUNNING, &btrtl_coex.flags)) {
@@ -2967,6 +3083,7 @@ void rtk_btcoex_open(struct hci_dev *hdev)
 	//struct rtl_btinfo_ctl ctl;
 
 	INIT_DELAYED_WORK(&btrtl_coex.fw_work, (void *)rtl_ev_work);
+	INIT_DELAYED_WORK(&btrtl_coex.cmd_work, rtl_cmd_work);
 #ifdef RTB_SOFTWARE_MAILBOX
 #ifdef RTK_COEX_OVER_SYMBOL
 	INIT_WORK(&rtw_work, rtw_work_func);
@@ -2974,26 +3091,10 @@ void rtk_btcoex_open(struct hci_dev *hdev)
 	rtw_coex_on = 1;
 #else
 	INIT_DELAYED_WORK(&btrtl_coex.sock_work,
-					  (void *)udpsocket_recv_data);
+			  (void *)udpsocket_recv_data);
 #endif
 #endif /* RTB_SOFTWARE_MAILBOX */
 	INIT_DELAYED_WORK(&btrtl_coex.l2_work, (void *)rtl_l2_work);
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 14, 0)
-#ifdef RTB_SOFTWARE_MAILBOX
-	timer_setup(&btrtl_coex.polling_timer, polling_bt_info, 0);
-#endif
-	timer_setup(&btrtl_coex.a2dp_count_timer, count_a2dp_packet_timeout, 0);
-	timer_setup(&btrtl_coex.pan_count_timer, count_pan_packet_timeout, 0);
-	timer_setup(&btrtl_coex.hogp_count_timer, count_hogp_packet_timeout, 0);
-#else
-#ifdef RTB_SOFTWARE_MAILBOX
-	setup_timer(&btrtl_coex.polling_timer, polling_bt_info, 0);
-#endif
-	setup_timer(&btrtl_coex.a2dp_count_timer, count_a2dp_packet_timeout, 0);
-	setup_timer(&btrtl_coex.pan_count_timer, count_pan_packet_timeout, 0);
-	setup_timer(&btrtl_coex.hogp_count_timer, count_hogp_packet_timeout, 0);
-#endif
 
 	btrtl_coex.hdev = hdev;
 #ifdef RTB_SOFTWARE_MAILBOX
@@ -3014,7 +3115,8 @@ void rtk_btcoex_open(struct hci_dev *hdev)
 #endif
 	rtkbt_coexmsg_send(invite_req, sizeof(invite_req));
 #endif
-
+	queue_delayed_work(btrtl_coex.fw_wq, &btrtl_coex.cmd_work,
+			msecs_to_jiffies(10));
 	/* Just for test */
 	//ctl.polling_enable = 1;
 	//ctl.polling_time = 1;
@@ -3024,7 +3126,6 @@ void rtk_btcoex_open(struct hci_dev *hdev)
 
 void rtk_btcoex_close(void)
 {
-	int kk = 0;
 
 	if (!test_and_clear_bit(RTL_COEX_RUNNING, &btrtl_coex.flags)) {
 		RTKBT_WARN("RTL COEX is already closed.");
@@ -3035,9 +3136,8 @@ void rtk_btcoex_close(void)
 
 #ifdef RTB_SOFTWARE_MAILBOX
 	/* Close coex socket */
-	if (btrtl_coex.wifi_on) {
+	if (btrtl_coex.wifi_on)
 		rtkbt_coexmsg_send(bt_leave, sizeof(bt_leave));
-	}
 #ifdef RTK_COEX_OVER_SYMBOL
 	rtw_coex_on = 0;
 	skb_queue_purge(&rtw_q);
@@ -3058,22 +3158,17 @@ void rtk_btcoex_close(void)
 	}
 #endif /* RTB_SOFTWARE_MAILBOX */
 
-	del_timer_sync(&btrtl_coex.a2dp_count_timer);
-	del_timer_sync(&btrtl_coex.pan_count_timer);
-	del_timer_sync(&btrtl_coex.hogp_count_timer);
-
 	cancel_delayed_work_sync(&btrtl_coex.fw_work);
 	cancel_delayed_work_sync(&btrtl_coex.l2_work);
+	cancel_delayed_work_sync(&btrtl_coex.cmd_work);
 
 	flush_connection_hash(&btrtl_coex);
 	flush_profile_hash(&btrtl_coex);
 	btrtl_coex.profile_bitmap = 0;
 	btrtl_coex.profile_status = 0;
-	for (kk = 0; kk < 8; kk++) {
-		btrtl_coex.profile_refcount[kk] = 0;
-	}
 
 	rtl_free_frags(&btrtl_coex);
+	profileinfo_cmd = 0;
 	RTKBT_DBG("-x");
 }
 
@@ -3081,7 +3176,7 @@ void rtk_btcoex_probe(struct hci_dev *hdev)
 {
 	btrtl_coex.hdev = hdev;
 	spin_lock_init(&btrtl_coex.spin_lock_sock);
-	spin_lock_init(&btrtl_coex.spin_lock_profile);
+	mutex_init(&btrtl_coex.profile_mutex);
 }
 
 void rtk_btcoex_init(void)
@@ -3099,6 +3194,7 @@ void rtk_btcoex_init(void)
 #endif
 #endif /* RTB_SOFTWARE_MAILBOX */
 	btrtl_coex.fw_wq = create_workqueue("btfwwork");
+	btrtl_coex.timer_wq = create_workqueue("bttimerwork");
 	rtl_alloc_buff(&btrtl_coex);
 	spin_lock_init(&btrtl_coex.rxlock);
 }
@@ -3117,5 +3213,7 @@ void rtk_btcoex_exit(void)
 #endif
 	flush_workqueue(btrtl_coex.fw_wq);
 	destroy_workqueue(btrtl_coex.fw_wq);
+	flush_workqueue(btrtl_coex.timer_wq);
+	destroy_workqueue(btrtl_coex.timer_wq);
 	rtl_free_buff(&btrtl_coex);
 }

@@ -73,4 +73,6 @@ source "drivers/rtkdrivers/usb_phy/Kconfig"
 source "drivers/rtkdrivers/watchdog/Kconfig"
 
 
+source "drivers/rtkdrivers/bluetooth/Kconfig"
+
 endif

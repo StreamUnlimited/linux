@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 
 static struct wireless_dev *cfg80211_rtw_add_virtual_intf(struct wiphy *wiphy, const char *name,
@@ -27,10 +37,11 @@ static struct wireless_dev *cfg80211_rtw_add_virtual_intf(struct wiphy *wiphy, c
 
 static int cfg80211_rtw_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
-	struct net_device *ndev = wdev_to_ndev(wdev);
 	int ret = 0;
 
 #if defined (CONFIG_NAN)
+	struct net_device *ndev = wdev_to_ndev(wdev);
+
 	if (wdev->iftype == NL80211_IFTYPE_NAN) {
 		dev_info(global_idev.fullmac_dev, "%s: free nan.", __func__, FUNC_NDEV_ARG(ndev));
 		if (wdev == global_idev.pwdev_global[2]) {
@@ -74,16 +85,16 @@ static int cfg80211_rtw_del_station(struct wiphy *wiphy, struct net_device *ndev
 	}
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]:%s %x:%x:%x:%x:%x:%x", __func__,
 			params->mac[0], params->mac[1], params->mac[2], params->mac[3], params->mac[4], params->mac[5]);
-	mac_vir = dmam_alloc_coherent(global_idev.fullmac_dev, 6, &mac_phy, GFP_KERNEL);
+	mac_vir = rtw_malloc(6, &mac_phy);
 	if (!mac_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
 	}
 	memcpy(mac_vir, params->mac, 6);
-	ret = llhw_ipc_wifi_del_sta(wlan_idx, (u8 *) mac_phy);
+	ret = llhw_wifi_del_sta(wlan_idx, (u8 *) mac_phy);
 
 	if (mac_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, 6, mac_vir, mac_phy);
+		rtw_mfree(6, mac_vir, mac_phy);
 	}
 	return ret;
 }
@@ -163,7 +174,7 @@ static int cfg80211_rtw_set_txq_params(struct wiphy *wiphy, struct net_device *n
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Set TXQ params: aifsn=%d aci=%d ECWmin=%d, ECWmax=%d, TXOP=%d, AC_param=0x%x\n",
 			FUNC_NDEV_ARG(ndev), aifsn, aci, ECWMin, ECWMax, TXOP, AC_param);
 
-	ret = llhw_ipc_wifi_set_EDCA_params(&AC_param);
+	ret = llhw_wifi_set_EDCA_params(&AC_param);
 
 	return ret;
 }
@@ -191,7 +202,7 @@ static int cfg80211_rtw_channel_switch(struct wiphy *wiphy, struct net_device *d
 	dev_dbg(global_idev.fullmac_dev, "switch to freq: %d", params->chandef.chan->center_freq);
 	dev_dbg(global_idev.fullmac_dev, "channel switch count: %d", params->count);
 
-	csa_param_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(rtw_csa_parm_t), &csa_param_phy, GFP_KERNEL);
+	csa_param_vir = rtw_malloc(sizeof(rtw_csa_parm_t), &csa_param_phy);
 	if (!csa_param_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
@@ -205,10 +216,10 @@ static int cfg80211_rtw_channel_switch(struct wiphy *wiphy, struct net_device *d
 	csa_param_vir->bc_action_cnt = 5;
 	csa_param_vir->callback = NULL;
 
-	ret = llhw_ipc_wifi_channel_switch(csa_param_phy);
+	ret = llhw_wifi_channel_switch(csa_param_phy);
 
 	if (csa_param_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, sizeof(rtw_csa_parm_t), csa_param_vir, csa_param_phy);
+		rtw_mfree(sizeof(rtw_csa_parm_t), csa_param_vir, csa_param_phy);
 	}
 
 	return ret;
@@ -275,7 +286,7 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 			return -EPERM;
 		}
 
-		pwd_vir = dmam_alloc_coherent(global_idev.fullmac_dev, strlen(fake_pwd), &pwd_phy, GFP_KERNEL);
+		pwd_vir = rtw_malloc(strlen(fake_pwd), &pwd_phy);
 		if (!pwd_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			return -ENOMEM;
@@ -289,23 +300,27 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 		softAP_config.security_type = RTW_SECURITY_OPEN;
 	}
 
-	ret = llhw_ipc_wifi_start_ap(&softAP_config);
+	ret = llhw_wifi_start_ap(&softAP_config);
 
 	netif_carrier_on(ndev);
 
 	if (pwd_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, strlen(pwd_vir), pwd_vir, pwd_phy);
+		rtw_mfree(strlen(pwd_vir), pwd_vir, pwd_phy);
 	}
 
 	return ret;
 }
 
-static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
+static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2))
+								, unsigned int link_id
+#endif
+							   )
 {
 	int ret = 0;
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Stop Softap\n", FUNC_NDEV_ARG(ndev));
 
-	ret = llhw_ipc_wifi_stop_ap();
+	ret = llhw_wifi_stop_ap();
 
 	netif_carrier_off(ndev);
 	return ret;

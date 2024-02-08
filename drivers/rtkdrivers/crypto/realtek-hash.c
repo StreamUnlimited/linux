@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of Realtek Crypto driver for Linux.
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek Hash support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/clk.h>
 #include <linux/crypto.h>
@@ -43,7 +43,7 @@ static int realtek_hash_wait_ok(struct realtek_hash_dev *hdev)
 
 	ips_err = readl(hdev->io_base + RTK_ERRSR);
 	if (ips_err) {
-		dev_err(hdev->dev, "ips 0x1C err = 0x%08x\r\n", ips_err);
+		dev_err(hdev->dev, "RTK_ERRSR = 0x%08X\n", ips_err);
 		ret = -ETIMEDOUT;
 	}
 	return ret;
@@ -61,11 +61,11 @@ static void realtek_hash_mem_dump(struct device *dev, const u8 *start, u32 size,
 	buf = (u8 *)start;
 
 	if (strHeader) {
-		dev_dbg(dev, "%s addr:%08x, size:%d", strHeader, (u32)start, size);
+		dev_dbg(dev, "Dump %s addr = 0x%08X, size = %d\n", strHeader, (u32)start, size);
 	}
 
 	for (index = 0; index < size; index++) {
-		dev_dbg(dev, "%02x", buf[index]);
+		dev_dbg(dev, "Dump mem[%d] = 0x%02X\n", index, buf[index]);
 	}
 }
 
@@ -85,14 +85,14 @@ static void realtek_hash_set_src_desc(struct realtek_hash_dev *hdev, u32 sd1, dm
 	while (1) {
 		tmp_value = readl(hdev->io_base + RTK_SDSR);
 		if ((tmp_value & IPSEC_MASK_FIFO_EMPTY_CNT) > 0) {
-			dev_dbg(hdev->dev, "sd1=0x%x , sdpr=0x%x \r\n", sd1, sdpr);
+			dev_dbg(hdev->dev, "Set sd1 = 0x%08X , sdpr = 0x%08X\n", sd1, sdpr);
 			writel(sd1, hdev->io_base + RTK_SDFWR);
 			writel(sdpr, hdev->io_base + RTK_SDSWR);
 			break;
 		}
 		timeout--;
 		if (timeout == 0) {
-			dev_err(hdev->dev, "Timeout, src fifo is FULL \r\n");
+			dev_err(hdev->dev, "Timeout, src fifo is full\n");
 			break;
 		}
 	}
@@ -111,11 +111,11 @@ static void realtek_hash_set_dst_desc(struct realtek_hash_dev *hdev, u32 dd1, dm
 
 	tmp_value = readl(hdev->io_base + RTK_DDSR);
 	if ((tmp_value & IPSEC_MASK_FIFO_EMPTY_CNT) > 0) {
-		dev_dbg(hdev->dev, "dd1=0x%x , ddpr=0x%x \r\n", dd1, ddpr);
+		dev_dbg(hdev->dev, "Set dd1 = 0x%08X, ddpr = 0x%08X\n", dd1, ddpr);
 		writel(dd1, hdev->io_base + RTK_DDFWR);
 		writel(ddpr, hdev->io_base + RTK_DDSWR);
 	} else {
-		dev_err(hdev->dev, "dst fifo_cnt is not correct: %d \r\n", IPSEC_GET_FIFO_EMPTY_CNT(tmp_value));
+		dev_err(hdev->dev, "Destination fifo_cnt %d is not correct\n", IPSEC_GET_FIFO_EMPTY_CNT(tmp_value));
 	}
 }
 
@@ -287,10 +287,10 @@ static int realtek_hash_cmd_pad(struct ahash_request *req)
 		if (!(rctx->flags & HASH_FLAGS_MD5)) {
 			for (i = 0; i < (rctx->st_len / 4); i++) {
 				rctx->state[i] = ((u32)(
-									 (((u32)(rctx->state[i]) & (u32)0x000000ffUL) << 24) |
-									 (((u32)(rctx->state[i]) & (u32)0x0000ff00UL) <<  8) |
-									 (((u32)(rctx->state[i]) & (u32)0x00ff0000UL) >>  8) |
-									 (((u32)(rctx->state[i]) & (u32)0xff000000UL) >> 24)));
+									  (((u32)(rctx->state[i]) & (u32)0x000000ffUL) << 24) |
+									  (((u32)(rctx->state[i]) & (u32)0x0000ff00UL) <<  8) |
+									  (((u32)(rctx->state[i]) & (u32)0x00ff0000UL) >>  8) |
+									  (((u32)(rctx->state[i]) & (u32)0xff000000UL) >> 24)));
 			}
 		}
 	}
@@ -442,7 +442,7 @@ static int realtek_hash_process(struct ahash_request *req, u8 *message, u32 msgl
 	 *Polling mode, intr_mode = 0
 	 ********************************************/
 	if (realtek_hash_wait_ok(rctx->hdev)) {
-		dev_err(rctx->hdev->dev, "hash process timeout\n");
+		dev_err(rctx->hdev->dev, "Hash process timeout\n");
 		ret = -ETIMEDOUT;
 	}
 
@@ -567,8 +567,9 @@ static int realtek_hash_init(struct ahash_request *req)
 
 	memset(rctx, 0, sizeof(struct realtek_hash_request_ctx));
 
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -578,8 +579,9 @@ static int realtek_hash_init(struct ahash_request *req)
 	}
 	mutex_unlock(&realtek_hash.drv_mutex);
 
-	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+	if (mutex_lock_interruptible(&hdev->hdev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	rctx->hdev = hdev;
 	hdev->rctx = rctx;
@@ -676,7 +678,7 @@ static int realtek_hash_init(struct ahash_request *req)
 	rctx->hmac_seq_hash_last = 0;
 	rctx->hmac_seq_hash_total_len = 0;
 
-	dev_dbg(hdev->dev, "%s Flags %x\n", __func__, rctx->flags);
+	dev_dbg(hdev->dev, "Hash init flags = 0x%08X\n", rctx->flags);
 
 	rctx->hash_digest_result = (u8 *)dma_alloc_coherent(hdev->dev, rctx->digcnt, &rctx->dma_handle_dig, GFP_KERNEL);
 	if (!rctx->hash_digest_result) {
@@ -698,8 +700,9 @@ static int realtek_hash_update(struct ahash_request *req)
 	u8 *message;
 	int ret = 0;
 
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -709,12 +712,13 @@ static int realtek_hash_update(struct ahash_request *req)
 	}
 	mutex_unlock(&realtek_hash.drv_mutex);
 
-	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+	if (mutex_lock_interruptible(&hdev->hdev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	if (!req->nbytes) {
 		mutex_unlock(&hdev->hdev_mutex);
-		dev_dbg(hdev->dev, "update called with 0 data\n");
+		dev_dbg(hdev->dev, "Update called with 0 data\n");
 		return 0;
 	}
 
@@ -753,8 +757,9 @@ static int realtek_hash_final(struct ahash_request *req)
 	struct realtek_hash_dev *hdev = NULL;
 	int ret = 0;
 
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -764,8 +769,9 @@ static int realtek_hash_final(struct ahash_request *req)
 	}
 	mutex_unlock(&realtek_hash.drv_mutex);
 
-	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+	if (mutex_lock_interruptible(&hdev->hdev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	rctx->lasthash = 1;
 	ret = realtek_hash_process(req, (u8 *)(&rctx->hmac_seq_buf[0]), rctx->hmac_seq_buf_is_used_bytes, rctx->hash_digest_result);
@@ -812,8 +818,9 @@ static int realtek_hash_export(struct ahash_request *req, void *out)
 	struct realtek_hash_hw_context *octx = out;
 	struct realtek_hash_dev *hdev = NULL;
 
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -823,8 +830,9 @@ static int realtek_hash_export(struct ahash_request *req, void *out)
 	}
 	mutex_unlock(&realtek_hash.drv_mutex);
 
-	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+	if (mutex_lock_interruptible(&hdev->hdev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	octx->hdev = rctx->hdev;
 	octx->flags = rctx->flags;
@@ -838,7 +846,7 @@ static int realtek_hash_export(struct ahash_request *req, void *out)
 	octx->hmac_seq_buf_is_used_bytes = rctx->hmac_seq_buf_is_used_bytes;
 	octx->lasthash = rctx->lasthash;
 
-	memcpy(octx->buffer, rctx->hmac_seq_buf, 128);	
+	memcpy(octx->buffer, rctx->hmac_seq_buf, 128);
 	memcpy(octx->state, rctx->state, 64);
 
 	mutex_unlock(&hdev->hdev_mutex);
@@ -853,8 +861,9 @@ static int realtek_hash_import(struct ahash_request *req, const void *in)
 	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct realtek_hash_dev *hdev = NULL;
 
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -864,8 +873,9 @@ static int realtek_hash_import(struct ahash_request *req, const void *in)
 	}
 	mutex_unlock(&realtek_hash.drv_mutex);
 
-	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+	if (mutex_lock_interruptible(&hdev->hdev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	rctx->hdev = ictx->hdev;
 	rctx->flags = ictx->flags;
@@ -1033,7 +1043,7 @@ static int realtek_hash_key_process(struct realtek_hash_dev *hdev, struct crypto
 	 *Polling mode, intr_mode = 0
 	 ********************************************/
 	if (realtek_hash_wait_ok(hdev)) {
-		dev_err(hdev->dev, "hash process timeout\n");
+		dev_err(hdev->dev, "Hash process timeout\n");
 		ret = -ETIMEDOUT;
 	}
 
@@ -1069,8 +1079,9 @@ static int realtek_hash_setkey(struct crypto_ahash *tfm, const u8 *key, unsigned
 	u8 hash_digest_result[SHA512_DIGEST_SIZE];
 	struct realtek_hash_dev *hdev = NULL;
 
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -1080,8 +1091,9 @@ static int realtek_hash_setkey(struct crypto_ahash *tfm, const u8 *key, unsigned
 	}
 	mutex_unlock(&realtek_hash.drv_mutex);
 
-	if (mutex_lock_interruptible(&hdev->hdev_mutex))
+	if (mutex_lock_interruptible(&hdev->hdev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	if (keylen <= HASH_HMAC_MAX_KLEN) {
 		ctx->ipad = (u8 *)(&(ctx->g_IOPAD[0]));
@@ -1121,8 +1133,9 @@ static int realtek_hash_cra_init_algs(struct crypto_tfm *tfm,
 	struct realtek_hash_dev *hdev;
 
 	/* request to allocate a new hash device instance from crypto subsystem */
-	if (mutex_lock_interruptible(&realtek_hash.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_hash.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	hdev = realtek_hash_find_dev(ctx);
 	if (!hdev) {
@@ -1315,7 +1328,7 @@ static int realtek_hash_probe(struct platform_device *pdev)
 
 	realtek_hash.pdata = of_device_get_match_data(dev);
 	if (!realtek_hash.pdata) {
-		dev_err(dev, "no compatible OF match\n");
+		dev_err(dev, "No compatible OF match\n");
 		return -EINVAL;
 	}
 
@@ -1323,9 +1336,10 @@ static int realtek_hash_probe(struct platform_device *pdev)
 	realtek_hash_reset();
 
 	/* Register algos */
-	if (realtek_hash_register_algs())
+	if (realtek_hash_register_algs()) {
 		return -EIO;
-		
+	}
+
 	return 0;
 }
 
@@ -1335,7 +1349,7 @@ static int realtek_hash_remove(struct platform_device *pdev)
 
 	realtek_hash_unregister_algs();
 	list_for_each_entry(hdev, &realtek_hash.dev_list, list)
-		list_del(&hdev->list);
+	list_del(&hdev->list);
 
 	return 0;
 }
@@ -1381,5 +1395,6 @@ static struct platform_driver realtek_hash_driver = {
 
 builtin_platform_driver(realtek_hash_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_hash driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba Hash driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

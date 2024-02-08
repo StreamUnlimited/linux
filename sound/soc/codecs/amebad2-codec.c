@@ -1,17 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Realtek, LLC.
- * All rights reserved.
- *
- * Licensed under the Realtek License, Version 1.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License from Realtek
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Realtek ALSA support
+*
+* Copyright (C) 2021, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -70,6 +63,7 @@ struct ameba_priv {
 	unsigned int dai_fmt[MAX_DAI_NUM];
 
 	int gpio_index;
+	bool enable_dac_asrc;
 };
 
 #define codec_info(mask,dev, ...)						\
@@ -633,7 +627,8 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 		codec_init.codec_application = APP_LINE_OUT; //earphone and speaker can both use it.
 
 		audio_codec_params_init(&codec_init,codec_priv->digital_addr,codec_priv->analog_addr);
-		audio_codec_set_dac_asrc(false,codec_priv->digital_addr);
+		audio_codec_set_dac_asrc_rate(sample_rate, codec_priv->digital_addr);
+		audio_codec_set_dac_asrc(codec_priv->enable_dac_asrc, codec_priv->digital_addr);
 
 	}else{
 		switch(sample_rate){
@@ -996,6 +991,7 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	index = of_get_named_gpio_flags(pdev->dev.of_node, "ext_amp_gpio", 0, &flags);
 
 	codec_priv->gpio_index = index;
+	codec_priv->enable_dac_asrc = of_property_read_bool(pdev->dev.of_node, "enable-dac-asrc");
 
 	codec_priv->codec_debug = 0;
 	if (sysfs_create_group(&pdev->dev.kobj,&codec_debug_attr_grp))
@@ -1078,7 +1074,6 @@ static struct platform_driver amebad2_codec_driver = {
 
 module_platform_driver(amebad2_codec_driver);
 
-MODULE_DESCRIPTION("ASoC amebad2 codec driver");
-MODULE_AUTHOR("Anne Yu <anne.yu@realsil.com.cn>");
-MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:amebad2-codec");
+MODULE_DESCRIPTION("Realtek Ameba ALSA driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

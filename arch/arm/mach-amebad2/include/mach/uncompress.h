@@ -1,10 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/include/mach/uncompress.h:
- *
- * Copyright 2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek Uncompress support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _UNCOMPRESS_H_
 #define _UNCOMPRESS_H_
 //#ifndef CONFIG_AMEBAD2

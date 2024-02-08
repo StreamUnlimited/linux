@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of realtek captouch driver
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek Captouch support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -190,20 +190,20 @@ static irqreturn_t realtek_captouch_irq(int irq, void *dev_id)
 
 	for (i = 0; i < (CT_CHANNEL_NUM - 1); i++) {
 		if (IntStatus & CT_CHX_PRESS_INT(i)) {
-			printk("Key  %x press \n", i);
+			dev_info(captouch->dev, "Key %d press\n", i);
 			input_report_key(captouch->input, captouch->keycode[i], 1);
 		} else if (IntStatus & CT_CHX_RELEASE_INT(i)) {
-			printk("Key  %x release \n", i);
+			dev_info(captouch->dev, "Key %d release\n", i);
 			input_report_key(captouch->input, captouch->keycode[i], 0);
 		}
 	}
 
 	if (IntStatus & CT_BIT_AFIFO_OVERFLOW_INTR) {
-		dev_dbg(captouch->dev, "CT_BIT_AFIFO_OVERFLOW_INTR \n");
+		dev_dbg(captouch->dev, "CT_BIT_AFIFO_OVERFLOW_INTR\n");
 	}
 
 	if (IntStatus & CT_BIT_OVER_P_NOISE_TH_INTR) {
-		dev_dbg(captouch->dev, "CT_BIT_OVER_P_NOISE_TH_INTR \n");
+		dev_dbg(captouch->dev, "CT_BIT_OVER_P_NOISE_TH_INTR\n");
 		realtek_captouch_set_en(false);
 		realtek_captouch_set_en(true);
 
@@ -211,12 +211,12 @@ static irqreturn_t realtek_captouch_irq(int irq, void *dev_id)
 	}
 
 	if (IntStatus & CT_BIT_GUARD_PRESS_INTR) {
-		dev_dbg(captouch->dev, "Guard sensor press \n");
+		dev_dbg(captouch->dev, "Guard sensor press\n");
 		input_report_key(captouch->input, captouch->keycode[CT_CHANNEL_NUM - 1], 1);
 	}
 
 	if (IntStatus & CT_BIT_GUARD_RELEASE_INTR) {
-		dev_dbg(captouch->dev, "Guard sensor release \n");
+		dev_dbg(captouch->dev, "Guard sensor release\n");
 		input_report_key(captouch->input, captouch->keycode[CT_CHANNEL_NUM - 1], 0);
 	}
 
@@ -322,7 +322,7 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 	const struct clk_hw *hwclk;
 
 	if (!pdev->dev.of_node) {
-		dev_err(&pdev->dev, "%s: device tree node not found\n", __func__);
+		dev_err(&pdev->dev, "Device tree node not found\n");
 		return -EINVAL;
 	}
 
@@ -349,25 +349,25 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 
 	captouch->adc_clk = devm_clk_get(&pdev->dev, "rtk_adc_clk");
 	if (IS_ERR(captouch->adc_clk)) {
-		dev_err(&pdev->dev, "Fail to get adc clock\n");
+		dev_err(&pdev->dev, "Failed to get ADC clock\n");
 		return PTR_ERR(captouch->adc_clk);
 	}
 
 	captouch->ctc_clk = devm_clk_get(&pdev->dev, "rtk_ctc_clk");
 	if (IS_ERR(captouch->ctc_clk)) {
-		dev_err(&pdev->dev, "Fail to get ctc clock\n");
+		dev_err(&pdev->dev, "Failed to get CTC clock\n");
 		return PTR_ERR(captouch->ctc_clk);
 	}
 
 	ret = clk_prepare_enable(captouch->adc_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable adc clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable ADC clock %d\n", ret);
 		return ret;
 	}
 
 	ret = clk_prepare_enable(captouch->ctc_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable ctc clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable CTC clock %d\n", ret);
 		goto clk_fail;
 	}
 
@@ -378,17 +378,17 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 
 	captouch->pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR_OR_NULL(captouch->pinctrl)) {
-		dev_err(&pdev->dev, "%s: Pinctrl not defined\n", __func__);
+		dev_err(&pdev->dev, "Pinctrl not defined\n");
 		goto map_fail;
 	} else {
 		captouch->ctc_state_active  = pinctrl_lookup_state(captouch->pinctrl, PINCTRL_STATE_DEFAULT);
 		if (IS_ERR_OR_NULL(captouch->ctc_state_active)) {
-			dev_err(&pdev->dev, "Fail to lookup pinctrl default state %d\n", ret);
+			dev_err(&pdev->dev, "Failed to lookup pinctrl default state %d\n", ret);
 			goto map_fail;
 		}
 		captouch->ctc_state_sleep = pinctrl_lookup_state(captouch->pinctrl, PINCTRL_STATE_SLEEP);
 		if (IS_ERR_OR_NULL(captouch->ctc_state_sleep)) {
-			dev_err(&pdev->dev, "Fail to lookup pinctrl sleep state %d\n", ret);
+			dev_err(&pdev->dev, "Failed to lookup pinctrl sleep state %d\n", ret);
 			goto map_fail;
 		}
 	}
@@ -487,6 +487,7 @@ static int realtek_captouch_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 static int realtek_ctc_suspend(struct device *dev)
 {
 	struct realtek_captouch_data *captouch = dev_get_drvdata(dev);
@@ -520,6 +521,7 @@ static int realtek_ctc_resume(struct device *dev)
 static const struct dev_pm_ops realtek_amebad2_ctc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_ctc_suspend, realtek_ctc_resume)
 };
+#endif
 
 static const struct of_device_id realtek_captouch_match[] = {
 	{ .compatible = "realtek,amebad2-captouch"},
@@ -531,7 +533,9 @@ static struct platform_driver realtek_captouch_driver = {
 	.driver = {
 		.name	= "realtek-amebad2-captouch",
 		.of_match_table = realtek_captouch_match,
+#ifdef CONFIG_PM
 		.pm = &realtek_amebad2_ctc_pm_ops,
+#endif
 		.dev_groups = captouch_configs,
 	},
 	.probe		= realtek_captouch_probe,
@@ -540,5 +544,6 @@ static struct platform_driver realtek_captouch_driver = {
 
 builtin_platform_driver(realtek_captouch_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_captouch_data driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba Captouch driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

@@ -1,17 +1,12 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2019 Realtek Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- *****************************************************************************/
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <rtw_cfg80211_fullmac.h>
 
@@ -150,32 +145,32 @@ static struct notifier_block rtw_inetaddr_notifier = {
 	.notifier_call = rtw_inetaddr_notifier_call
 };
 
-static void rtw_inetaddr_notifier_register(void)
+void rtw_inetaddr_notifier_register(void)
 {
 	register_inetaddr_notifier(&rtw_inetaddr_notifier);
 }
 
-static void rtw_inetaddr_notifier_unregister(void)
+void rtw_inetaddr_notifier_unregister(void)
 {
 	unregister_inetaddr_notifier(&rtw_inetaddr_notifier);
 }
 
-static int rtw_dev_probe(struct platform_device *pdev)
+int rtw_netdev_probe(struct device *pdev)
 {
 	int ret = false;
 
-	dev_dbg(global_idev.fullmac_dev, "rtw_dev_probe start\n");
 	memset(&global_idev, 0, sizeof(struct inic_device));
 
 	/* Initialize axi_priv */
-	platform_device_init(pdev);
-	global_idev.fullmac_dev = &(pdev->dev);
+	global_idev.fullmac_dev = pdev;
+
+	dev_dbg(global_idev.fullmac_dev, "rtw_dev_probe start\n");
 
 	/*step1: alloc and init wiphy */
 	ret = rtw_wiphy_init();
 	if (ret == false) {
 		dev_err(global_idev.fullmac_dev, "wiphy init fail");
-		goto free_dvobj;
+		goto exit;
 	}
 
 	/*step3: register wiphy */
@@ -191,10 +186,10 @@ static int rtw_dev_probe(struct platform_device *pdev)
 		goto os_ndevs_deinit;
 	}
 
-	ret = llhw_ipc_init();
+	ret = llhw_init();
 	if (ret < 0) {
 		dev_err(global_idev.fullmac_dev, "ipc init fail");
-		goto free_dvobj;
+		goto exit;
 	}
 
 	rtw_regd_init();
@@ -206,12 +201,12 @@ os_ndevs_deinit:
 	rtw_ndev_unregister();
 	rtw_wiphy_deinit();
 
-free_dvobj:
-	platform_device_deinit(pdev);
+exit:
+
 	return -ENODEV;
 }
 
-static int rtw_dev_remove(struct platform_device *pdev)
+int rtw_netdev_remove(struct device *pdev)
 {
 	dev_dbg(global_idev.fullmac_dev, "rtw_dev_remove start.");
 
@@ -223,16 +218,37 @@ static int rtw_dev_remove(struct platform_device *pdev)
 	rtw_wiphy_deinit();
 	dev_dbg(global_idev.fullmac_dev, "unregister and deinit wiphy done.");
 
-	llhw_ipc_deinit();
+	llhw_deinit();
 	dev_dbg(global_idev.fullmac_dev, "remove ipc done.");
 
 	rtw_drv_proc_deinit();
 
-	platform_device_deinit(pdev);
-	dev_dbg(global_idev.fullmac_dev, "platform driver remove done.");
-
 	pr_info("-%s done\n", __func__);
 	memset(&global_idev, 0, sizeof(struct inic_device));
+
+	return 0;
+}
+
+#ifdef CONFIG_FULLMAC_HCI_IPC
+
+static int rtw_dev_probe(struct platform_device *pdev)
+{
+	int err = 0;
+
+	platform_device_init(pdev);
+
+	err = rtw_netdev_probe(&pdev->dev);
+	if (err != 0) {
+		platform_device_deinit(pdev);
+	}
+
+	return err;
+}
+
+static int rtw_dev_remove(struct platform_device *pdev)
+{
+	rtw_netdev_remove(&pdev->dev);
+	platform_device_deinit(pdev);
 
 	return 0;
 }
@@ -255,9 +271,9 @@ static int rtw_dev_suspend(struct platform_device *pdev, pm_message_t state)
 	}
 
 	/* staion mode */
-	if (llhw_ipc_wifi_is_connected_to_ap() == 0) {
+	if (llhw_wifi_is_connected_to_ap() == 0) {
 		/* wowlan */
-		ret = llhw_ipc_wifi_update_ip_addr_in_wowlan();
+		ret = llhw_wifi_update_ip_addr_in_wowlan();
 		if (ret == 0) {
 			/* update ip address success, to suspend */
 			/* set wowlan_state, to not schedule rx work */
@@ -273,8 +289,6 @@ static int rtw_dev_suspend(struct platform_device *pdev, pm_message_t state)
 
 static int rtw_dev_resume(struct platform_device *pdev)
 {
-	struct ipc_msg_q_priv *priv = &global_idev.msg_priv;
-
 	dev_dbg(global_idev.fullmac_dev, "%s", __func__);
 
 	netif_tx_start_all_queues(global_idev.pndev[0]);
@@ -283,8 +297,8 @@ static int rtw_dev_resume(struct platform_device *pdev)
 	global_idev.wowlan_state = 0;
 
 	/* wakeup recv work */
-	if (!work_pending(&(priv->msg_work))) {
-		schedule_work(&(priv->msg_work));
+	if (!work_pending(&(global_idev.msg_priv.msg_work))) {
+		schedule_work(&(global_idev.msg_priv.msg_work));
 	}
 
 	return 0;
@@ -303,7 +317,7 @@ static struct axi_drv_priv axi_drvpriv = {
 	},
 };
 
-static int __init rtw_drv_entry(void)
+int __init rtw_drv_entry(void)
 {
 	int ret = 0;
 
@@ -321,7 +335,7 @@ exit:
 	return ret;
 }
 
-static void __exit rtw_drv_halt(void)
+void __exit rtw_drv_halt(void)
 {
 	pr_info("Fullmac module exit start\n");
 	dev_dbg(global_idev.fullmac_dev, "%s", __func__);
@@ -331,3 +345,4 @@ static void __exit rtw_drv_halt(void)
 
 module_init(rtw_drv_entry);
 module_exit(rtw_drv_halt);
+#endif

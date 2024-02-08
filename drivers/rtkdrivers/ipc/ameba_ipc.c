@@ -1,17 +1,14 @@
-/* SPDX-License-Identifier:  GPL-2.0-or-later */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Derived from many drivers using ameba IPC device.
- *
- * Copyright (C) 2020-2021 Realsil <andrew_su@realsil.com.cn>
- *
- * RTK IPC(Inter Process Communication) driver for Ameba IPC.
- *
- */
+* Realtek IPC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #define __AMEBA_IPC_C__
 
 /* -------------------------------- Includes -------------------------------- */
-/* external head files */
+/* External head files */
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/init.h>
@@ -30,18 +27,15 @@
 #include <linux/jiffies.h>
 #include <linux/pm_wakeirq.h>
 
-/* internal head files */
+/* Internal head files */
 #include <ameba_ipc/ameba_ipc.h>
 #include "ameba_ipc_reg.h"
 
 /* -------------------------------- Defines --------------------------------- */
 #define MAX_NUM_AIPC_PORT (2)
 
-#define DRIVER_NAME "realtek,aipc"
-#define AIPC_DGB_INFO "ameba ipc"
-
 /**
- * the port and channel memory mapping is below:
+ * The port and channel memory mapping is below:
  * |<--8-->|<--8-->|<--8-->|<--8-->|<--8-->|<--8-->|
  * | AP2NP | AP2LP | NP2AP | NP2LP | LP2AP | LP2NP |
  * The unit is not byte, and is the size of ipc_msg_struct_t.
@@ -55,7 +49,7 @@
 struct aipc_ch_node;
 
 /*
- * structure to describe the ipc device of ameba.
+ * Structure to describe the ipc device of ameba.
  */
 struct aipc_device {
 	spinlock_t lock; /* list lock */
@@ -63,17 +57,17 @@ struct aipc_device {
 	struct aipc_port *pnp_port; /* pointer to NP port */
 	struct aipc_port *plp_port; /* pointer to LP port */
 	ipc_msg_struct_t *dev_mem; /* LP shared SRAM for IPC */
-	u32* preg_tx_data; /* mapping address of AIPC_REG_TX_DATA */
-	u32* preg_rx_data; /* mapping address of AIPC_REG_RX_DATA */
-	u32* preg_isr; /* mapping address of AIPC_REG_ISR */
-	u32* preg_imr; /* mapping address of AIPC_REG_IMR */
-	u32* preg_icr; /* mapping address of AIPC_REG_ICR */
+	u32 *preg_tx_data; /* mapping address of AIPC_REG_TX_DATA */
+	u32 *preg_rx_data; /* mapping address of AIPC_REG_RX_DATA */
+	u32 *preg_isr; /* mapping address of AIPC_REG_ISR */
+	u32 *preg_imr; /* mapping address of AIPC_REG_IMR */
+	u32 *preg_icr; /* mapping address of AIPC_REG_ICR */
 	u32 irq; /* irq number */
 	unsigned long irqflags; /* irq flags */
 };
 
 /*
- * structure to describe the ipc port of ameba. There may be tow ports in
+ * Structure to describe the ipc port of ameba. There may be tow ports in
  * ambebad2: from NP and from LP. But in mode case, there is only from NP.
  */
 struct aipc_port {
@@ -86,7 +80,7 @@ struct aipc_port {
 };
 
 /*
- * structure to describe the ipc channel. There are 8 channels in one port.
+ * Structure to describe the ipc channel. There are 8 channels in one port.
  */
 struct aipc_ch_node {
 	struct list_head list; /* list to add the channel list */
@@ -102,31 +96,31 @@ static int ameba_ipc_remove(struct platform_device *pdev);
 
 
 /* ---------------------------- Global Variables ---------------------------- */
-/* define the name of ipc port */
+/* Define the name of ipc port */
 const char NAME_OF_NP_PORT[] = "ipc np port";
 const char NAME_OF_LP_PORT[] = "ipc lp port";
 
 /* --------------------------- Private Variables ---------------------------- */
-/* set the compatible for driver to match the dtb */
+/* Set the compatible for driver to match the dtb */
 static const struct of_device_id of_aipc_device_match[] = {
-	{.compatible = DRIVER_NAME},
+	{.compatible = "realtek,aipc"},
 	{ /* sentinel */ },
 };
 
 MODULE_DEVICE_TABLE(of, of_aipc_device_match);
 
-/* set the platform_driver to associate the driver probe and remove */
+/* Set the platform_driver to associate the driver probe and remove */
 static struct platform_driver dameba_ipc_driver = {
 	.probe  = ameba_ipc_probe,
 	.remove = ameba_ipc_remove,
 	.driver = {
-		.name = DRIVER_NAME,
+		.name = "realtek-aipc",
 		.owner = THIS_MODULE,
 		.of_match_table = of_aipc_device_match,
 	},
 };
 
-/* local global pointer to describe the ipc port list */
+/* Local global pointer to describe the ipc port list */
 static struct aipc_device *pipc_dev = NULL;
 
 /* --------------------------- Private Functions ---------------------------- */
@@ -155,27 +149,27 @@ static int ameba_ipc_send_work(struct aipc_ch_node *chn, ipc_msg_struct_t *msg)
 	 * bit to 1.
 	 */
 	if (ch->port_id == AIPC_PORT_LP) {
-		/* check the TX data */
+		/* Check the TX data */
 		if (AIPC_GET_LP_CH_NR(ch->ch_id, reg_tx_data)) {
-			printk(KERN_ERR "%s: tx is busy!\n", AIPC_DGB_INFO);
+			dev_err(pdev->dev, "LP TX busy\n");
 			ret = -EBUSY;
 		} else {
-			/* copy data to the lp shared memory */
-			memcpy_toio((u8*)chn->ch_wmem, (u8*)msg, sizeof(ipc_msg_struct_t));
+			/* Copy data to the lp shared memory */
+			memcpy_toio((u8 *)chn->ch_wmem, (u8 *)msg, sizeof(ipc_msg_struct_t));
 			reg_tx_data = AIPC_SET_LP_CH_NR(ch->ch_id);
 		}
 	} else if (ch->port_id == AIPC_PORT_NP) {
-		/* check the TX data */
+		/* Check the TX data */
 		if (AIPC_GET_NP_CH_NR(ch->ch_id, reg_tx_data)) {
-			printk(KERN_ERR "%s: tx is busy!\n", AIPC_DGB_INFO);
+			dev_err(pdev->dev, "NP TX busy\n");
 			ret = -EBUSY;
 		} else {
-			/* copy data to the lp shared memory */
-			memcpy_toio((u8*)chn->ch_wmem, (u8*)msg, sizeof(ipc_msg_struct_t));
+			/* Copy data to the lp shared memory */
+			memcpy_toio((u8 *)chn->ch_wmem, (u8 *)msg, sizeof(ipc_msg_struct_t));
 			reg_tx_data = AIPC_SET_NP_CH_NR(ch->ch_id);
 		}
 	} else {
-		printk(KERN_ERR "%s: inavalib port id!\n", AIPC_DGB_INFO);
+		dev_err(pdev->dev, "Inavalib port id %d\n", ch->port_id);
 		ret = -EINVAL;
 	}
 
@@ -197,27 +191,25 @@ static u32 ameba_ipc_find_channel_id(struct aipc_port *pport)
 	struct aipc_ch_node *chn = NULL;
 
 	if (!pport) {
-		printk(KERN_ERR "%s: port is NULL.\n",
-		       AIPC_DGB_INFO);
+		dev_err(pport->dev->dev, "Invalid port\n");
 		goto func_exit;
 	}
 
-	/* assume is is 0 before polling the channel list */
+	/* Assume is is 0 before polling the channel list */
 	id = 0;
 	list_for_each_entry(chn, &pport->ch_list, list) {
-		if (id == chn->ch->ch_id)
-			id++; /* find same id, id++ and compare next channel */
-		else
-			goto func_exit;; /* this id is not used, break. */
+		if (id == chn->ch->ch_id) {
+			id++;    /* Find same id, id++ and compare next channel */
+		} else {
+			goto func_exit;
+		}; /* This id is not used, break. */
 
 		if (id >= AIPC_CH_MAX_NUM) {
 			id = AIPC_NOT_ASSIGNED_CH;
-			printk(KERN_ERR "%s: no valid channel.\n",
-			       AIPC_DGB_INFO);
+			dev_err(pport->dev->dev, "No valid channel\n");
 			goto func_exit;
 		}
 	}
-
 
 func_exit:
 	return id;
@@ -236,21 +228,17 @@ static void ameba_ipc_check_channel_id(struct aipc_port *pport, u32 *pid)
 	struct aipc_ch_node *chn = NULL;
 
 	if (!pport) {
-		printk(KERN_ERR "%s: port is NULL.\n",
-		       AIPC_DGB_INFO);
+		dev_err(pport->dev->dev, "Invalid port\n");
 		*pid = AIPC_NOT_ASSIGNED_CH;
-		goto func_exit;
+		return;
 	}
 
 	list_for_each_entry(chn, &pport->ch_list, list) {
 		if (*pid == chn->ch->ch_id) {
 			*pid = AIPC_CH_IS_ASSIGNED;
-			goto func_exit; /* this id is used, break. */
+			return; /* This id is used, break. */
 		}
 	}
-
-func_exit:
-	return;
 }
 
 /**
@@ -268,14 +256,15 @@ func_exit:
  */
 static inline \
 struct aipc_ch_node *ameba_ipc_find_int_ch(struct aipc_port *pport, \
-					   u32 reg_isr)
+		u32 reg_isr)
 {
 	struct aipc_ch_node *chn = NULL;
 	u32 reg_isr_empt = (reg_isr & ISR_EMPT_MASK) >> EMPT_OFFSET;
 	u32 reg_isr_full = (reg_isr & ISR_FULL_MASK) >> FULL_OFFSET;
 
-	if (list_empty(&pport->ch_list))
+	if (list_empty(&pport->ch_list)) {
 		goto func_exit;
+	}
 
 	if (pport->port_id == AIPC_PORT_LP) {
 		reg_isr_empt = reg_isr_empt >> LP_OFFSET;
@@ -287,11 +276,12 @@ struct aipc_ch_node *ameba_ipc_find_int_ch(struct aipc_port *pport, \
 
 	list_for_each_entry(chn, &pport->ch_list, list) {
 		if (reg_isr_empt && (chn->ch) \
-		    && (reg_isr_empt & (0x01 << chn->ch->ch_id)))
+			&& (reg_isr_empt & (0x01 << chn->ch->ch_id))) {
 			break;
-		else if (reg_isr_full && (chn->ch) \
-			 && (reg_isr_full & (0x01 << chn->ch->ch_id)))
+		} else if (reg_isr_full && (chn->ch) \
+				   && (reg_isr_full & (0x01 << chn->ch->ch_id))) {
 			break;
+		}
 	}
 
 func_exit:
@@ -303,8 +293,8 @@ func_exit:
  * @param  pport[inout]: the pointer to ipc port.
  * @return return the interrupt channel.
  */
-static inline void ameba_ipc_real_int_hdl(struct aipc_device *pipc,\
-					  struct aipc_port *pport, u32 isr)
+static inline void ameba_ipc_real_int_hdl(struct aipc_device *pipc, \
+		struct aipc_port *pport, u32 isr)
 {
 	struct aipc_ch_node *chn = NULL;
 	struct aipc_ch *ch = NULL;
@@ -322,7 +312,7 @@ static inline void ameba_ipc_real_int_hdl(struct aipc_device *pipc,\
 			if ((ch->ops) && (ch->ops->channel_empty_indicate)) {
 				ch->ops->channel_empty_indicate(ch);
 			}
-			/* empty interrupt  */
+			/* Empty interrupt  */
 			/**
 			 * reg_isr & 0x0000ffff means to get the empty bits in ISR. If
 			 * is not 0, this is a empty interrupt.
@@ -334,7 +324,7 @@ static inline void ameba_ipc_real_int_hdl(struct aipc_device *pipc,\
 			}
 		}
 
-		if (reg_isr & ISR_FULL_MASK) { /* full interrupt */
+		if (reg_isr & ISR_FULL_MASK) { /* Full interrupt */
 			if ((ch->ops) && (ch->ops->channel_recv)) {
 				memcpy_fromio((u8 *)&msg, (u8 *)(chn->ch_rmem), sizeof(ipc_msg_struct_t));
 				ch->ops->channel_recv(ch, &msg);
@@ -365,14 +355,13 @@ static irqreturn_t ameba_ipc_int_hdl(int irq, void *dev)
 	unsigned long flags = 0;
 
 	if (!pipc) {
-		printk(KERN_ERR "%s: aipc_device is null.\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc->dev, "Invalid device\n");
 		goto interrupt_exit;
 	}
 
 	spin_lock_irqsave(&pipc->lock, flags);
 	/**
-	 * read ISR register to distingish the type of interrupt.
+	 * Read ISR register to distingish the type of interrupt.
 	 * structure of ISP (unit bit):
 	 * |<------8------>|<------8------>|<------8------>|<------8------>|
 	 * |----LP_FULL----|----NP_FULL----|----LP_TMPT----|----NP_EMPT----|
@@ -408,8 +397,7 @@ static irqreturn_t ameba_ipc_int_hdl(int irq, void *dev)
 	}
 
 	if (pport == NULL) {
-		printk(KERN_ERR "%s: aipc_port is null, isr: 0x%08x, imr: 0x%08x.\n",
-		       AIPC_DGB_INFO, reg_isr, reg_imr);
+		dev_err(pipc->dev, "Invalid port, ISR: 0x%08X, IMR: 0x%08X\n", reg_isr, reg_imr);
 	}
 
 	spin_unlock_irqrestore(&pipc->lock, flags);
@@ -428,11 +416,11 @@ static int ameba_ipc_init_hw(struct aipc_device *pipc)
 {
 	int ret = 0;
 
-	/* request interrupt for ipc port. */
+	/* Request interrupt for IPC port. */
 	spin_lock(&pipc->lock);
 	if (request_irq(pipc->irq, ameba_ipc_int_hdl, 0, \
-			dev_name(pipc->dev), pipc)) {
-		printk(KERN_ERR "%s: request irq failed.\n", AIPC_DGB_INFO);
+					dev_name(pipc->dev), pipc)) {
+		dev_err(pipc->dev, "Failed to request IRQ\n");
 		ret = -EIO;
 		goto func_exit;
 	}
@@ -450,14 +438,15 @@ func_exit:
  * @param  pdev[inout]: the pointer to platform_device.
  * @return if is OK, return 0, failed return negative number.
  */
-static inline struct aipc_ch_node *ameba_ipc_find_ch(struct aipc_device *pipc,\
-						     struct aipc_ch *ch)
+static inline struct aipc_ch_node *ameba_ipc_find_ch(struct aipc_device *pipc, \
+		struct aipc_ch *ch)
 {
 	struct aipc_ch_node *chn = NULL;
 	struct aipc_port *pport = NULL;
 
-	if (!pipc || !ch)
+	if (!pipc || !ch) {
 		goto func_exit;
+	}
 
 	if (ch->port_id == AIPC_PORT_NP) {
 		pport = pipc->pnp_port;
@@ -466,13 +455,14 @@ static inline struct aipc_ch_node *ameba_ipc_find_ch(struct aipc_device *pipc,\
 	}
 
 	if (!pport) {
-		printk(KERN_ERR "%s: channel's pport is null .\n", AIPC_DGB_INFO);
+		dev_err(pipc->dev, "Invalid channel's pport\n");
 		goto func_exit;
 	}
 
 	list_for_each_entry(chn, &pport->ch_list, list) {
-		if ((chn->ch) && (chn->ch == ch))
+		if ((chn->ch) && (chn->ch == ch)) {
 			break;
+		}
 	}
 
 func_exit:
@@ -496,21 +486,19 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 	pipc_dev = kzalloc(sizeof(struct aipc_device), GFP_KERNEL);
 	if (!pipc_dev) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "%s: alloc ipc device filed (%d).\n",
-		       AIPC_DGB_INFO, ret);
+		dev_err(&pdev->dev, "Failed to alloc IPC device\n");
 		goto func_exit;
 	}
-	/* initialize the port list */
+	/* Initialize the port list */
 	spin_lock_init(&pipc_dev->lock);
 
 	pipc_dev->dev = &pdev->dev;
 	platform_set_drvdata(pdev, pipc_dev);
 
-	/* get the irq nember from device tree */
+	/* Get the IRQ nember from device tree */
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
-		printk(KERN_ERR "%s: get irq error (%d).\n", \
-		       AIPC_DGB_INFO, irq);
+		dev_err(&pdev->dev, "Failed to get IRQ\n");
 		ret = -ENXIO;
 		goto free_pipc;
 	}
@@ -519,26 +507,23 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 
 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res_mem) {
-		printk(KERN_ERR "%s: no LP shared SRAM for IPC.\n", \
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "No LP shared SRAM for IPC\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
 
 	if ((res_mem->end - res_mem->start + 1) < TOT_MEM_SZIE) {
-		printk(KERN_ERR "%s: LP shared SRAM for IPC is not enough.\n",
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "LP shared SRAM for IPC is not enough\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
-	/* mapping the LP shared SRAM for IPC */
+	/* Mapping the LP shared SRAM for IPC */
 	pipc_dev->dev_mem = (ipc_msg_struct_t *)devm_ioremap_resource(&pdev->dev, res_mem);
 
-	/* mapping the address of registers */
+	/* Mapping the address of registers */
 	res_reg = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res_reg) {
-		printk(KERN_ERR "%s: no TX REGISTER in the resources.\n", \
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "No TX REGISTER in the resources\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
@@ -546,8 +531,7 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 
 	res_reg = platform_get_resource(pdev, IORESOURCE_MEM, 2);
 	if (!res_reg) {
-		printk(KERN_ERR "%s: no RX REGISTER in the resources.\n", \
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "No RX REGISTER in the resources\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
@@ -555,8 +539,7 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 
 	res_reg = platform_get_resource(pdev, IORESOURCE_MEM, 3);
 	if (!res_reg) {
-		printk(KERN_ERR "%s: no INTERRUPT STATUS REGISTER in the resources.\n", \
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "No INTERRUPT STATUS REGISTER in the resources\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
@@ -564,8 +547,7 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 
 	res_reg = platform_get_resource(pdev, IORESOURCE_MEM, 4);
 	if (!res_reg) {
-		printk(KERN_ERR "%s: no INTERRUPT MASK REGISTER in the resources.\n", \
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "No INTERRUPT MASK REGISTER in the resources\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
@@ -573,67 +555,63 @@ static int ameba_ipc_probe(struct platform_device *pdev)
 
 	res_reg = platform_get_resource(pdev, IORESOURCE_MEM, 5);
 	if (!res_reg) {
-		printk(KERN_ERR "%s: no CLEAR TX REGISTER in the resources.\n", \
-		       AIPC_DGB_INFO);
+		dev_err(&pdev->dev, "No CLEAR TX REGISTER in the resources\n");
 		ret = -EINVAL;
 		goto free_pipc;
 	}
 	pipc_dev->preg_icr = (u32 *)devm_ioremap_resource(&pdev->dev, res_reg);
 
-	/* initialize the hardware of this ipc port. */
+	/* Initialize the hardware of this ipc port. */
 	ameba_ipc_init_hw(pipc_dev);
 
-	/* initialize NP port start */
+	/* Initialize NP port start */
 	pport = kzalloc(sizeof(struct aipc_port), GFP_KERNEL);
 	if (!pport) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "%s: alloc ipc port filed (%d).\n",
-		       AIPC_DGB_INFO, ret);
+		dev_err(&pdev->dev, "Failed to alloc IPC NP port\n");
 		goto free_pipc;
 	}
 	pipc_dev->pnp_port = pport;
 
-	/* initialize the channel list */
+	/* Initialize the channel list */
 	spin_lock_init(&pport->lock);
 	INIT_LIST_HEAD(&pport->ch_list);
 	pport->free_chnl_num = AIPC_CH_MAX_NUM;
 
-	/* associate the ipc device */
+	/* Associate the ipc device */
 	pport->dev = pipc_dev;
 
 	pport->port_id = AIPC_PORT_NP;
 	pport->name = NAME_OF_NP_PORT;
-	/* initialize NP port end */
+	/* Initialize NP port end */
+	dev_info(&pdev->dev, "IPC init NP port done, port id is %d\n", pport->port_id);
 
-	/* initialize LP port start */
+	/* Initialize LP port start */
 	pport = NULL;
 	pport = kzalloc(sizeof(struct aipc_port), GFP_KERNEL);
 	if (!pport) {
 		ret = -ENOMEM;
-		printk(KERN_ERR "%s: alloc ipc port filed (%d).\n",
-		       AIPC_DGB_INFO, ret);
+		dev_err(&pdev->dev, "Failed to alloc IPC LP port\n");
 		goto free_np_port;
 	}
 	pipc_dev->plp_port = pport;
 
-	/* initialize the channel list */
+	/* Initialize the channel list */
 	spin_lock_init(&pport->lock);
 	INIT_LIST_HEAD(&pport->ch_list);
 	pport->free_chnl_num = AIPC_CH_MAX_NUM;
 
-	/* associate the ipc device */
+	/* Associate the ipc device */
 	pport->dev = pipc_dev;
 
 	pport->port_id = AIPC_PORT_LP;
 	pport->name = NAME_OF_LP_PORT;
+	dev_info(&pdev->dev, "IPC init LP port done, port id is %d\n", pport->port_id);
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
 		device_init_wakeup(&pdev->dev, true);
 		dev_pm_set_wake_irq(&pdev->dev, pipc_dev->irq);
 	}
-
-	/* initialize LP port end */
-	printk(KERN_INFO "%s: probe successfully.\n", AIPC_DGB_INFO);
 
 	goto func_exit;
 
@@ -661,38 +639,38 @@ static int ameba_ipc_remove(struct platform_device *pdev)
 	pipc = platform_get_drvdata(pdev);
 	if (pipc) {
 		spin_lock(&pipc->lock);
-		/* disable interrupt */
+		/* Disable interrupt */
 		disable_irq(pipc->irq);
 		free_irq(pipc->irq, pipc);
 
-		/* free the ports */
-		/* free the resource of NP port */
+		/* Free the ports */
+		/* Free the resource of NP port */
 		if (pipc->pnp_port) {
 			if (!list_empty(&pipc->pnp_port->ch_list))
-				list_for_each_entry_safe(chn, tmp,\
-						    &pipc->pnp_port->ch_list, \
-						    list) {
-					spin_lock(&pipc->pnp_port->lock);
-					chn->ch = NULL;
-					list_del(&chn->list);
-					spin_unlock(&pipc->pnp_port->lock);
-					kfree(chn);
-				}
+				list_for_each_entry_safe(chn, tmp, \
+										 &pipc->pnp_port->ch_list, \
+										 list) {
+				spin_lock(&pipc->pnp_port->lock);
+				chn->ch = NULL;
+				list_del(&chn->list);
+				spin_unlock(&pipc->pnp_port->lock);
+				kfree(chn);
+			}
 			kfree(pipc->pnp_port);
 		}
 
-		/* free the resource of LP port */
+		/* Free the resource of LP port */
 		if (pipc->plp_port) {
 			if (!list_empty(&pipc->plp_port->ch_list))
-				list_for_each_entry_safe(chn, tmp,\
-						    &pipc->plp_port->ch_list, \
-						    list) {
-					spin_lock(&pipc->plp_port->lock);
-					chn->ch = NULL;
-					list_del(&chn->list);
-					spin_unlock(&pipc->plp_port->lock);
-					kfree(chn);
-				}
+				list_for_each_entry_safe(chn, tmp, \
+										 &pipc->plp_port->ch_list, \
+										 list) {
+				spin_lock(&pipc->plp_port->lock);
+				chn->ch = NULL;
+				list_del(&chn->list);
+				spin_unlock(&pipc->plp_port->lock);
+				kfree(chn);
+			}
 			kfree(pipc->plp_port);
 		}
 		ioport_unmap(pipc->dev_mem);
@@ -715,8 +693,7 @@ static int __init ameba_ipc_init(void)
 
 	ret = platform_driver_register(&dameba_ipc_driver);
 	if (ret) {
-		printk(KERN_ERR "%s: register platform driver error (%d).\n",
-		       AIPC_DGB_INFO, ret);
+		pr_err("Register IPC platform driver error: %d\n", ret);
 	}
 
 	return ret;
@@ -748,34 +725,30 @@ int ameba_ipc_channel_register(struct aipc_ch *ch)
 	int ret = 0;
 
 	if (!ch || !(ch->ops) || (!(ch->ops->channel_recv))) {
-		printk(KERN_ERR "%s: input parameter error!\n",
-		       AIPC_DGB_INFO);
+		pr_err("IPC register error: Input parameter error\n");
 		ret = -EINVAL;
 		goto func_exit;
 	}
 
 	if (!pipc_dev) {
-		printk(KERN_ERR "%s: ipc device is not valid!\n",
-		       AIPC_DGB_INFO);
+		pr_err("IPC register error: Invalid IPC device\n");
 		ret = -ENODEV;
 		goto func_exit;
 	}
 
-	/* find the port by port id */
+	/* Find the port by port id */
 	if (ch->port_id == AIPC_PORT_NP) {
 		pport = pipc_dev->pnp_port;
 	} else if (ch->port_id == AIPC_PORT_LP) {
 		pport = pipc_dev->plp_port;
 	} else {
-		printk(KERN_ERR "%s: no avalib port id!\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc_dev->dev, "No avalib port id\n");
 		ret = -EINVAL;
 		goto func_exit;
 	}
 
 	if (!pport) {
-		printk(KERN_ERR "%s: this port id is not initialized!\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc_dev->dev, "This port id is not initialized\n");
 		ret = -EINVAL;
 		goto func_exit;
 	}
@@ -785,35 +758,34 @@ int ameba_ipc_channel_register(struct aipc_ch *ch)
 	 * the interrupt.
 	 */
 	if (list_empty(&pipc_dev->plp_port->ch_list) \
-	    && list_empty(&pipc_dev->pnp_port->ch_list))
+		&& list_empty(&pipc_dev->pnp_port->ch_list)) {
 		enable_irq(pipc_dev->irq);
+	}
 
 	if (pport->free_chnl_num == 0) {
-		printk(KERN_ERR "%s: no channel to register!\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc_dev->dev, "No channel to register\n");
 		ret = -EBUSY;
 		goto func_exit;
 	}
 
 	chn = kzalloc(sizeof(struct aipc_ch_node), GFP_KERNEL);
 	if (!chn) {
-		printk(KERN_ERR "%s: alloc ipc channel enity filed.\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc_dev->dev, "Failed to alloc IPC channel enity\n");
 		ret = -EBUSY;
 		goto func_exit;
 	}
 
-	/* find valid channel and register the channel to the port */
-	if (ch->ch_id >= AIPC_CH_MAX_NUM)
+	/* Find valid channel and register the channel to the port */
+	if (ch->ch_id >= AIPC_CH_MAX_NUM) {
 		ch->ch_id = ameba_ipc_find_channel_id(pport);
-	else
+	} else {
 		ameba_ipc_check_channel_id(pport, &(ch->ch_id));
+	}
 
 	if (ch->ch_id >= AIPC_CH_MAX_NUM) {
-		printk(KERN_ERR "%s: to get channel id is wrong, %s.\n",\
-		       AIPC_DGB_INFO, (ch->ch_id == AIPC_CH_IS_ASSIGNED) ?\
-		       "channel is assgined, to choose another one" : \
-		       "no valid channel.");
+		dev_err(pipc_dev->dev, "Get channel id is wrong: %s\n", (ch->ch_id == AIPC_CH_IS_ASSIGNED) ? \
+				"channel is assgined, to choose another one" : \
+				"no valid channel");
 		ret = -EBUSY;
 		goto free_chn;
 	}
@@ -827,30 +799,29 @@ int ameba_ipc_channel_register(struct aipc_ch *ch)
 	pport->free_chnl_num--;
 
 	reg_imr = readl(pipc_dev->preg_imr);
-	/* set the hard ware interrupt */
+	/* Set the hard ware interrupt */
 	if (ch->port_id == AIPC_PORT_NP) {
 		chn->ch_rmem = pipc_dev->dev_mem + BUF_NP2AP_IDX(ch->ch_id);
 		chn->ch_wmem = pipc_dev->dev_mem + BUF_AP2NP_IDX(ch->ch_id);
-		printk(KERN_INFO "%s: NP channel rmem 0x%x, wmem 0x%x.\n",\
-		       AIPC_DGB_INFO, (u32)chn->ch_rmem, (u32)chn->ch_wmem);
+		dev_dbg(pipc_dev->dev, "NP channel rmem = 0x%08X, wmem = 0x%08X\n", (u32)chn->ch_rmem, (u32)chn->ch_wmem);
 		reg_imr = AIPC_SET_NP_CH_IR_FULL(ch->ch_id, reg_imr);
-		/* configure the empty interrupt */
-		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE)
+		/* Configure the empty interrupt */
+		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE) {
 			reg_imr = AIPC_SET_NP_CH_IR_EMPT(ch->ch_id, reg_imr);
+		}
 	} else if (ch->port_id == AIPC_PORT_LP) {
 		chn->ch_rmem = pipc_dev->dev_mem + BUF_LP2AP_IDX(ch->ch_id);
 		chn->ch_wmem = pipc_dev->dev_mem + BUF_AP2LP_IDX(ch->ch_id);
-		printk(KERN_INFO "%s: LP channel rmem 0x%x, wmem 0x%x.\n",\
-		       AIPC_DGB_INFO, (u32)chn->ch_rmem, (u32)chn->ch_wmem);
+		dev_dbg(pipc_dev->dev, "LP channel rmem = 0x%08X, wmem = 0x%08X\n", (u32)chn->ch_rmem, (u32)chn->ch_wmem);
 		reg_imr = AIPC_SET_LP_CH_IR_FULL(ch->ch_id, reg_imr);
-		/* configure the empty interrupt */
-		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE)
+		/* Configure the empty interrupt */
+		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE) {
 			reg_imr = AIPC_SET_LP_CH_IR_EMPT(ch->ch_id, reg_imr);
+		}
 	}
 	writel(reg_imr, pipc_dev->preg_imr);
 
-	printk(KERN_INFO "%s: regist channel successfully"\
-			 ", channel id is %d.\n", AIPC_DGB_INFO, ch->ch_id);
+	dev_dbg(pipc_dev->dev, "Register channel %d successfully\n", ch->ch_id);
 
 	goto func_exit;
 free_chn:
@@ -874,54 +845,48 @@ int ameba_ipc_channel_unregister(struct aipc_ch *ch)
 	int ret = 0;
 
 	if (!ch) {
-		printk(KERN_ERR "%s: input parameter error!\n",
-		       AIPC_DGB_INFO);
+		pr_err("IPC unregister error: Invalid parameter\n");
 		ret = -EINVAL;
 		goto func_exit;
 	}
-	printk(KERN_INFO "%s: unregist channel %d.\n",\
-	       AIPC_DGB_INFO, ch->ch_id);
+	pr_info("IPC unregister channel %d\n", ch->ch_id);
 
 	if (!pipc_dev) {
-		printk(KERN_ERR "%s: ipc device is not valid!\n",
-		       AIPC_DGB_INFO);
+		pr_err("IPC unregister error: Invalid IPC device\n");
 		ret = -ENODEV;
 		goto func_exit;
 	}
 
 	chn = ameba_ipc_find_ch(pipc_dev, ch);
 	if (!chn) {
-		printk(KERN_ERR "%s: no regisiting this channel!\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc_dev->dev, "Channel %d not registered\n", ch->ch_id);
 		ret = -EINVAL;
 		goto func_exit;
 	}
 	pport = chn->port;
 
 	reg_imr = readl(pipc_dev->preg_imr);
-	/* set the hard ware interrupt */
+	/* Set the HW interrupt */
 	if (ch->port_id == AIPC_PORT_NP) {
 		chn->ch_rmem = pipc_dev->dev_mem + BUF_NP2AP_IDX(ch->ch_id);
 		chn->ch_wmem = pipc_dev->dev_mem + BUF_AP2NP_IDX(ch->ch_id);
-		printk(KERN_INFO "%s: NP channel rmem 0x%x, wmem 0x%x.\n",\
-		       AIPC_DGB_INFO, (u32)chn->ch_rmem, (u32)chn->ch_wmem);
 		reg_imr = AIPC_CLR_NP_CH_IR_FULL(ch->ch_id, reg_imr);
-		/* configure the empty interrupt */
-		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE)
+		/* Configure the empty interrupt */
+		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE) {
 			reg_imr = AIPC_CLR_NP_CH_IR_EMPT(ch->ch_id, reg_imr);
+		}
 	} else if (ch->port_id == AIPC_PORT_LP) {
 		chn->ch_rmem = pipc_dev->dev_mem + BUF_LP2AP_IDX(ch->ch_id);
 		chn->ch_wmem = pipc_dev->dev_mem + BUF_AP2LP_IDX(ch->ch_id);
-		printk(KERN_INFO "%s: LP channel rmem 0x%x, wmem 0x%x.\n",\
-		       AIPC_DGB_INFO, (u32)chn->ch_rmem, (u32)chn->ch_wmem);
 		reg_imr = AIPC_CLR_LP_CH_IR_FULL(ch->ch_id, reg_imr);
-		/* configure the empty interrupt */
-		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE)
+		/* Configure the empty interrupt */
+		if (ch->ch_config & AIPC_CONFIG_HANDSAKKE) {
 			reg_imr = AIPC_CLR_LP_CH_IR_EMPT(ch->ch_id, reg_imr);
+		}
 	}
 	writel(reg_imr, pipc_dev->preg_imr);
 
-	/* unregister the channel from the port and disable the interrupt */
+	/* Unregister the channel from the port and disable the interrupt */
 	spin_lock(&pport->lock);
 	chn->ch = NULL;
 	list_del(&chn->list);
@@ -930,11 +895,12 @@ int ameba_ipc_channel_unregister(struct aipc_ch *ch)
 	kfree(chn);
 
 	/*
-	 * no channel in the channel list. disable the interrupt.
+	 * No channel in the channel list. disable the interrupt.
 	 */
 	if (list_empty(&pipc_dev->plp_port->ch_list) \
-	    && list_empty(&pipc_dev->pnp_port->ch_list))
+		&& list_empty(&pipc_dev->pnp_port->ch_list)) {
 		disable_irq(pipc_dev->irq);
+	}
 
 func_exit:
 	return ret;
@@ -948,29 +914,26 @@ EXPORT_SYMBOL(ameba_ipc_channel_unregister);
  * @return if is OK, return 0, failed return negative number.
  */
 int ameba_ipc_channel_send(struct aipc_ch *ch, \
-			   ipc_msg_struct_t *pmsg)
+						   ipc_msg_struct_t *pmsg)
 {
 	int ret = 0;
 	struct aipc_ch_node *chn = NULL;
 
 	if (!ch) {
-		printk(KERN_ERR "n%s: input parameter error!\n",
-		       AIPC_DGB_INFO);
+		pr_err("IPC send error: Invalid channel\n");
 		ret = -EINVAL;
 		goto func_exit;
 	}
 
 	if (!pipc_dev) {
-		printk(KERN_ERR "%s: ipc device is not valid!\n",
-		       AIPC_DGB_INFO);
+		pr_err("IPC send error: Invalid IPC device\n");
 		ret = -ENODEV;
 		goto func_exit;
 	}
 
 	chn = ameba_ipc_find_ch(pipc_dev, ch);
 	if (!chn) {
-		printk(KERN_ERR "%s: no regisiting this channel!\n",
-		       AIPC_DGB_INFO);
+		dev_err(pipc_dev->dev, "IPC channel unregistered\n");
 		ret = -EINVAL;
 		goto func_exit;
 	}
@@ -996,8 +959,7 @@ struct aipc_ch *ameba_ipc_alloc_ch(int size_of_priv)
 
 	ch = kzalloc(alloc_size, GFP_KERNEL);
 	if (!ch) {
-		printk(KERN_ERR "%s: alloc ipc reg channel filed.\n",
-		       AIPC_DGB_INFO);
+		pr_err("Failed to alloc IPC channel\n");
 		goto func_exit;
 	}
 	ch->ch_id = AIPC_NOT_ASSIGNED_CH;
@@ -1010,6 +972,6 @@ EXPORT_SYMBOL(ameba_ipc_alloc_ch);
 subsys_initcall(ameba_ipc_init);
 module_exit(ameba_ipc_exit);
 
-MODULE_AUTHOR("Andrew Su <andrew_su@realsil.com.cn>");
-MODULE_DESCRIPTION("Ameba IPC driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba IPC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

@@ -1,23 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
+* Realtek Bluetooth support
 *
-*  Realtek Bluetooth USB driver
-*
-*
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2 of the License, or
-*  (at your option) any later version.
-*
-*  This program is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*  GNU General Public License for more details.
-*
-*  You should have received a copy of the GNU General Public License
-*  along with this program; if not, write to the Free Software
-*  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
+
 #include <net/bluetooth/hci_core.h>
 #include <linux/list.h>
 
@@ -49,9 +36,16 @@
 #define HCI_EV_LE_CONN_UPDATE_COMPLETE	                0x03
 #define HCI_EV_LE_ENHANCED_CONN_COMPLETE    0x0a
 
+#define HCI_EV_LE_CIS_EST                 0x19
+#define HCI_EV_LE_CREATE_BIG_CPL          0x1b
+#define HCI_EV_LE_TERM_BIG_CPL            0x1c
+#define HCI_EV_LE_BIG_SYNC_EST            0x1d
+#define HCI_EV_LE_BIG_SYNC_LOST           0x1e
+
 //vendor cmd to fw
 #define HCI_VENDOR_ENABLE_PROFILE_REPORT_COMMAND        0xfc18
-#define HCI_VENDOR_SET_PROFILE_REPORT_COMMAND           0xfc1b
+#define HCI_VENDOR_SET_PROFILE_REPORT_LEGACY_COMMAND    0xfc19
+#define HCI_VENDOR_SET_PROFILE_REPORT_COMMAND		0xfc1B
 #define HCI_VENDOR_MAILBOX_CMD                          0xfc8f
 #define HCI_VENDOR_SET_BITPOOL				0xfc51
 
@@ -138,7 +132,7 @@
 #define PSM_AVDTP   0x0019
 #define PSM_FTP     0x1001
 #define PSM_BIP     0x1003
-#define PSM_OPP     0x1015
+#define PSM_OPP     0x1005
 //--add more if needed--//
 
 enum {
@@ -171,9 +165,17 @@ typedef struct {
 typedef struct rtl_hci_conn {
 	struct list_head list;
 	uint16_t handle;
+	struct delayed_work a2dp_count_work;
+	struct delayed_work pan_count_work;
+	struct delayed_work hogp_count_work;
+	uint32_t a2dp_packet_count;
+	uint32_t pan_packet_count;
+	uint32_t hogp_packet_count;
+	uint32_t voice_packet_count;
 	uint8_t type;		// 0:l2cap, 1:sco/esco, 2:le
-	uint8_t profile_bitmap;
-	int8_t profile_refcount[8];
+	uint16_t profile_bitmap;
+	uint16_t profile_status;
+	int8_t profile_refcount[profile_max];
 } rtk_conn_prof, *prtk_conn_prof;
 
 #ifdef RTB_SOFTWARE_MAILBOX
@@ -234,29 +236,24 @@ struct rtl_coex_struct {
 	struct sockaddr_in wifi_addr;
 	struct timer_list polling_timer;
 #endif
-	struct timer_list a2dp_count_timer;
-	struct timer_list pan_count_timer;
-	struct timer_list hogp_count_timer;
 #ifdef RTB_SOFTWARE_MAILBOX
 	struct workqueue_struct *sock_wq;
 	struct delayed_work sock_work;
 #endif
 	struct workqueue_struct *fw_wq;
+	struct workqueue_struct *timer_wq;
 	struct delayed_work fw_work;
 	struct delayed_work l2_work;
+	struct delayed_work cmd_work;
 #ifdef RTB_SOFTWARE_MAILBOX
 	struct sock *sk;
 #endif
 	struct urb *urb;
 	spinlock_t spin_lock_sock;
-	spinlock_t spin_lock_profile;
-	uint32_t a2dp_packet_count;
-	uint32_t pan_packet_count;
-	uint32_t hogp_packet_count;
-	uint32_t voice_packet_count;
-	uint8_t profile_bitmap;
-	uint8_t profile_status;
-	int8_t profile_refcount[8];
+	struct mutex profile_mutex;
+	uint16_t profile_bitmap;
+	uint16_t profile_status;
+	int8_t profile_refcount[profile_max];
 	uint8_t ispairing;
 	uint8_t isinquirying;
 	uint8_t ispaging;
@@ -275,6 +272,7 @@ struct rtl_coex_struct {
 	uint8_t wifi_on;
 	uint8_t sock_open;
 #endif
+
 	unsigned long cmd_last_tx;
 
 	/* hci ev buff */
@@ -304,62 +302,62 @@ struct rtl_coex_struct {
 
 #ifdef __LITTLE_ENDIAN
 struct sbc_frame_hdr {
-	uint8_t syncword: 8;		/* Sync word */
-	uint8_t subbands: 1;		/* Subbands */
-	uint8_t allocation_method: 1;	/* Allocation method */
-	uint8_t channel_mode: 2;		/* Channel mode */
-	uint8_t blocks: 2;		/* Blocks */
-	uint8_t sampling_frequency: 2;	/* Sampling frequency */
-	uint8_t bitpool: 8;		/* Bitpool */
-	uint8_t crc_check: 8;		/* CRC check */
-} __attribute__((packed));
+	uint8_t syncword:8;		/* Sync word */
+	uint8_t subbands:1;		/* Subbands */
+	uint8_t allocation_method:1;	/* Allocation method */
+	uint8_t channel_mode:2;		/* Channel mode */
+	uint8_t blocks:2;		/* Blocks */
+	uint8_t sampling_frequency:2;	/* Sampling frequency */
+	uint8_t bitpool:8;		/* Bitpool */
+	uint8_t crc_check:8;		/* CRC check */
+} __attribute__ ((packed));
 
 /* NOTE: The code is copied from pa.
  * only the bit field in 8-bit is affected by endian, not the 16-bit or 32-bit.
  * why?
  */
 struct rtp_header {
-	unsigned cc: 4;
-	unsigned x: 1;
-	unsigned p: 1;
-	unsigned v: 2;
+	unsigned cc:4;
+	unsigned x:1;
+	unsigned p:1;
+	unsigned v:2;
 
-	unsigned pt: 7;
-	unsigned m: 1;
+	unsigned pt:7;
+	unsigned m:1;
 
 	uint16_t sequence_number;
 	uint32_t timestamp;
 	uint32_t ssrc;
 	uint32_t csrc[0];
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 #else
 /* big endian */
 struct sbc_frame_hdr {
-	uint8_t syncword: 8;		/* Sync word */
-	uint8_t sampling_frequency: 2;	/* Sampling frequency */
-	uint8_t blocks: 2;		/* Blocks */
-	uint8_t channel_mode: 2;		/* Channel mode */
-	uint8_t allocation_method: 1;	/* Allocation method */
-	uint8_t subbands: 1;		/* Subbands */
-	uint8_t bitpool: 8;		/* Bitpool */
-	uint8_t crc_check: 8;		/* CRC check */
-} __attribute__((packed));
+	uint8_t syncword:8;		/* Sync word */
+	uint8_t sampling_frequency:2;	/* Sampling frequency */
+	uint8_t blocks:2;		/* Blocks */
+	uint8_t channel_mode:2;		/* Channel mode */
+	uint8_t allocation_method:1;	/* Allocation method */
+	uint8_t subbands:1;		/* Subbands */
+	uint8_t bitpool:8;		/* Bitpool */
+	uint8_t crc_check:8;		/* CRC check */
+} __attribute__ ((packed));
 
 struct rtp_header {
-	unsigned v: 2;
-	unsigned p: 1;
-	unsigned x: 1;
-	unsigned cc: 4;
+	unsigned v:2;
+	unsigned p:1;
+	unsigned x:1;
+	unsigned cc:4;
 
-	unsigned m: 1;
-	unsigned pt: 7;
+	unsigned m:1;
+	unsigned pt:7;
 
 	uint16_t sequence_number;
 	uint32_t timestamp;
 	uint32_t ssrc;
 	uint32_t csrc[0];
-} __attribute__((packed));
+} __attribute__ ((packed));
 #endif /* __LITTLE_ENDIAN */
 
 void rtk_btcoex_parse_event(uint8_t *buffer, int count);

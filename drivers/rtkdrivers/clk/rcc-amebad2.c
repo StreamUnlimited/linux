@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek RCC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/clk-provider.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -891,7 +898,7 @@ static void __init rtk_rcc_init(struct device_node *node)
 
 	base = of_iomap(node, 0);
 	if (NULL == base) {
-		pr_err("RCC: fail to map aon rcc resource\n");
+		pr_err("RCC: Failed to map AON RCC resource\n");
 		return;
 	}
 
@@ -900,7 +907,7 @@ static void __init rtk_rcc_init(struct device_node *node)
 	base = of_iomap(node, 1);
 	if (NULL == base) {
 		iounmap(aon_rcc_base);
-		pr_err("RCC: fail to map lsys rcc resource\n");
+		pr_err("RCC: Failed to map LSYS RCC resource\n");
 		return;
 	}
 
@@ -910,7 +917,7 @@ static void __init rtk_rcc_init(struct device_node *node)
 	if (NULL == base) {
 		iounmap(lsys_rcc_base);
 		iounmap(aon_rcc_base);
-		pr_err("RCC: fail to map apsys rcc resource\n");
+		pr_err("RCC: Failed to map APSYS RCC resource\n");
 		return;
 	}
 
@@ -921,7 +928,7 @@ static void __init rtk_rcc_init(struct device_node *node)
 		iounmap(lsys_rcc_base);
 		iounmap(aon_rcc_base);
 		iounmap(apsys_rcc_base);
-		pr_err("RCC: fail to map hsys rcc resource\n");
+		pr_err("RCC: Failed to map HSYS RCC resource\n");
 		return;
 	}
 
@@ -934,7 +941,7 @@ static void __init rtk_rcc_init(struct device_node *node)
 			if (hw) {
 				ret = of_clk_hw_register(node, hw);
 				if (ret) {
-					pr_err("RCC: fail to register clock %d - %s\n", i, hw->init->name);
+					pr_err("RCC: Failed to register clock %d - %s\n", i, hw->init->name);
 					goto fail_add_clk_hw_provider;
 				}
 			}
@@ -943,11 +950,11 @@ static void __init rtk_rcc_init(struct device_node *node)
 
 	ret = of_clk_add_hw_provider(node, rtk_clk_lookup, NULL);
 	if (ret) {
-		pr_err("RCC: fail to add clock provider\n");
+		pr_err("RCC: Failed to add clock provider\n");
 		goto fail_add_clk_hw_provider;
 	}
 
-	pr_info("RCC: clocks initialized\n");
+	pr_info("RCC: Clocks initialized\n");
 
 #ifdef CONFIG_RESET_CONTROLLER
 
@@ -968,7 +975,7 @@ static void __init rtk_rcc_init(struct device_node *node)
 		goto fail_register_reset;
 	}
 
-	pr_info("RCC: resets initialized\n");
+	pr_info("RCC: Resets initialized\n");
 
 #endif
 

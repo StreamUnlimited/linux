@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * Device Tree Structure
- *
- * Tony Wu (tonywu@realtek.com)
- */
+* Realtek DTS for on-chip peripherals
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/realtek/ameba_ipc/ameba_ipc_resource.h>
@@ -31,7 +30,7 @@
 			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
 			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
 			rtk,adc-mode = <1>;
-			rtk,adc-channels = <0>, <1>, <2>, <6>;
+			//rtk,adc-channels = <0>, <1>, <2>, <6>;
 			//rtk,adc-diff-channels = <4 5>;
 			nvmem-cells = <&adc_normal_cal>, <&adc_vbat_cal>;
 			nvmem-cell-names = "normal_cal", "vbat_cal";
@@ -74,7 +73,7 @@
 		};
 
 		dma: dma@400E0000 {
-			compatible = "realtek,amebad2-rtk-dmac";
+			compatible = "realtek,amebad2-dmac";
 			reg = <0x400E0000 0x000400>;
 			clocks = <&rcc RTK_CKE_GDMA>;
 			#dma-cells = <1>;
@@ -98,7 +97,7 @@
 		};
 
 		ir: ir@0x400EE000 {
-			compatible = "realtek,amebad2-rtk-ir";
+			compatible = "realtek,amebad2-ir";
 			reg = <0x400EE000 0x30>;
 			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_IRDA>;
@@ -109,11 +108,12 @@
 			rtk,ir-cnt-threshold = <30000>; // If hw receive no data for 30ms(set 30000 here), represents the end.
 			rtk,ir-rx-trigger-mode = <0>; // 0: fall edge; 1: rising edge; 2: both.
 			rtk,ir-idle-level = <0>; // 0: low level; 1: high level.
+			rtk,ir_rx_inverse = <0>; // 0: do not need software inverse; 1: need software inverse
 			status = "disabled";
 		};
 
 		i2c0: i2c0@4200F000 {
-			compatible = "realtek,amebad2-rtk-i2c";
+			compatible = "realtek,amebad2-i2c";
 			reg = <0x4200F000 0x100>;
 			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_I2C0>;
@@ -126,7 +126,7 @@
 		};
 
 		i2c1: i2c1@400EF000 {
-			compatible = "realtek,amebad2-rtk-i2c";
+			compatible = "realtek,amebad2-i2c";
 			reg = <0x400EF000 0x100>;
 			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_I2C1>;
@@ -139,7 +139,7 @@
 		};
 
 		i2c2: i2c2@400F0000 {
-			compatible = "realtek,amebad2-rtk-i2c";
+			compatible = "realtek,amebad2-i2c";
 			reg = <0x400F0000 0x100>;
 			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_I2C2>;
@@ -156,7 +156,7 @@
 		};
 
 		ledc: led-controller@41008000 {
-			compatible = "realtek,rtk-ws28xxx-led";
+			compatible = "realtek,amebad2-ws28xxx-led";
 			reg = <0x41008000 0x1000>;
 			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
 			#address-cells = <1>;
@@ -185,6 +185,7 @@
 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
 			reg-io-width = <1>;
+			clocks = <&rcc RTK_CKE_LOGUART>;
 			clock-frequency = <40000000>;
 		};
 
@@ -195,6 +196,10 @@
 			nvmem-cell-names = "uuid";
 		};
 
+		btctrl: btctrl@42008000 {
+			compatible = "realtek,amebad2-bt-ctrl";
+			reg = <0x42008000 0x1000>;
+		};
 
 
 		otp_phy: otp_phy@42000000 {
@@ -235,11 +240,11 @@
 			reg = <0x400D0000 0x8000>;
 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_SDH>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		spi0: spi0@0x400E8000 {
-			compatible = "realtek,amebad2-rtk-spi";
+			compatible = "realtek,amebad2-spi";
 			rtk,spi-index = <0>;
 			reg = <0x400E8000 0x100>,
 					<0x41000000 0x30>; // reg base for spi role setting.
@@ -256,12 +261,13 @@
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
 			rtk,max-cs-num = <2>;
+			//only master mode set SPI_CS to GPIO, so spi0_pins only set SPI0_CLK, SPI0_MOSI and SPI0_MISO.
 			rtk,spi-cs-gpios = <&gpiob 17 0>;
 			status = "disabled";
 		};
 
 		spi1: spi1@0x400E9000 {
-			compatible = "realtek,amebad2-rtk-spi";
+			compatible = "realtek,amebad2-spi";
 			rtk,spi-index = <1>;
 			reg = <0x400E9000 0x100>,
 					<0x41000000 0x30>; // reg base for spi role setting.
@@ -278,7 +284,7 @@
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
 			rtk,max-cs-num = <2>;
-			rtk,spi-cs-gpios = <&gpioa 2 0>;
+			//rtk,spi-cs-gpios = <&gpioa 2 0>;//only master mode set SPI_CS to GPIO.
 			status = "disabled";
 		};
 
@@ -418,7 +424,7 @@
 
 		// Watchdog4 is non-secure for linux system.
 		watchdog: wdg@410004C0 {
-			compatible = "realtek,amebad2-rtk-watchdog";
+			compatible = "realtek,amebad2-watchdog";
 			reg = <0x410004C0 0x000010>;
 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
 			rtk,wdg-index = <4>;

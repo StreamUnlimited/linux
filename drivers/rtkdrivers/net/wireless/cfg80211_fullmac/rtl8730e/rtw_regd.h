@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef __RTW_REGD_H__
 #define __RTW_REGD_H__
 
@@ -28,6 +38,11 @@
 
 #define RTL819x_5GHZ_ALL        (RTL819x_5GHZ_5150_5350, RTL819x_5GHZ_5470_5850)
 
+#define COUNTRY_CHPLAN_ENT(_alpha2, _chplan) \
+	{.alpha2 = (_alpha2), \
+	 .chplan = (_chplan) \
+	}
+
 enum country_code_type_t {
 	COUNTRY_CODE_FCC = 0,
 	COUNTRY_CODE_IC = 1,
@@ -46,6 +61,11 @@ enum country_code_type_t {
 
 	/*add new channel plan above this line */
 	COUNTRY_CODE_MAX
+};
+
+struct country_chplan {
+	char alpha2[2];
+	u8 chplan;
 };
 
 #endif //__RTW_REGD_H__

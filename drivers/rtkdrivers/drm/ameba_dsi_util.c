@@ -1,17 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Realtek, LLC.
- * All rights reserved.
- *
- * Licensed under the Realtek License, Version 1.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License from Realtek
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Realtek DSI support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <video/mipi_display.h>
@@ -21,23 +14,21 @@
 #include "ameba_drm_comm.h"
 
 //should remove this to mode params
-#define MIPI_DSI_RTNI		2//4
-#define MIPI_DSI_HSA		4
-#define MIPI_DSI_HBP		30
-#define MIPI_DSI_HFP		30
+#define MIPI_DSI_RTNI       2//4
+#define MIPI_DSI_HSA        4
+#define MIPI_DSI_HBP        30
+#define MIPI_DSI_HFP        30
 
-#define MIPI_DSI_VSA		5
-#define MIPI_DSI_VBP		20
-#define MIPI_DSI_VFP		15
+#define MIPI_DSI_VSA        5
+#define MIPI_DSI_VBP        20
+#define MIPI_DSI_VFP        15
 
-#define Mhz			1000000UL
-#define T_LPX		5
-#define T_HS_PREP	6
-#define T_HS_TRAIL	8
-#define T_HS_EXIT	7
-#define T_HS_ZERO	10
-
-#define DUMP_REG(a,b)   b,readl(a + b)
+#define Mhz                 1000000UL
+#define T_LPX               5
+#define T_HS_PREP           6
+#define T_HS_TRAIL          8
+#define T_HS_EXIT           7
+#define T_HS_ZERO           10
 
 /*
 *	mipi dsi apis
@@ -83,7 +74,7 @@ static u8 MIPI_LCDC_CheckLCDCReady(void __iomem *LCDCx)
 	}
 }
 
-static void mipi_lcdc_enable(void __iomem *address, u32 NewState)
+void mipi_lcdc_enable(void __iomem *address, u32 NewState)
 {
 	if (DISABLE == NewState) {
 		MIPI_LCDC_Cmd(address, DISABLE);
@@ -93,7 +84,7 @@ static void mipi_lcdc_enable(void __iomem *address, u32 NewState)
 		while (!MIPI_LCDC_CheckLCDCReady(address));
 	}
 }
-void lcdc_underflow_reset(void __iomem* plcdc_reg)
+void ameba_lcdc_reenable(void __iomem* plcdc_reg)
 {
 	mipi_lcdc_enable(plcdc_reg, DISABLE);
 	mipi_lcdc_enable(plcdc_reg, ENABLE);
@@ -152,11 +143,11 @@ void MIPI_InitStruct_Config(struct device *dev, MIPI_InitTypeDef *MIPI_InitStruc
 	MIPI_InitStruct->MIPI_BllpLen = MIPI_InitStruct->MIPI_LineTime / MIPI_InitStruct->MIPI_LaneNum ;
 
 	if (MIPI_DSI_HSA + MIPI_DSI_HBP + MIPI_HACT_g + MIPI_DSI_HFP < (512 + MIPI_DSI_RTNI * 16)) {
-		DRM_DEV_ERROR(dev, "!!ERROR!!, LCM NOT SUPPORT\n");
+		DRM_ERROR("!!ERROR!!, LCM NOT SUPPORT\n");
 	}
 
 	if (MIPI_InitStruct->MIPI_LineTime * MIPI_InitStruct->MIPI_LaneNum < total_bits / 8) {
-		DRM_DEV_ERROR(dev, "!!ERROR!!, LINE TIME TOO SHORT!\n");
+		DRM_ERROR("!!ERROR!!, LINE TIME TOO SHORT!\n");
 	}
 
 	//vo frequency , //output format is RGB888
@@ -172,7 +163,7 @@ void MIPI_InitStruct_Config(struct device *dev, MIPI_InitTypeDef *MIPI_InitStruc
 		*mipi_ckd = mipi_div;
 	}
 
-	DRM_DEV_DEBUG(dev, "DataLaneFreq: %d, LineTime: %d, vo_freq: %d[Mhz], mipi_ckd: %d\n", 
+	DRM_DEBUG_DRIVER("DataLaneFreq(%d)LineTime(%d)vo_freq(%d[Mhz])mipi_ckd(%d)\n", 
 		MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LineTime, vo_freq, mipi_div);
 }
 
@@ -201,10 +192,10 @@ static void MipiDsi_Send_DCS_Cmd(void __iomem *MIPIx, u8 cmd, u8 payload_len, u8
 
 static void MipiDsi_Send_Cmd(void __iomem *MIPIx, LCM_setting_table_t *table, u32 *initdone,u32 *rxcmd)
 {
-	static u8 send_cmd_idx_s = 0;
-	u32 payload_len;
-	u8 cmd, send_flag = false;
-	u8 *para_list;
+	static u8    send_cmd_idx_s = 0;
+	u32          payload_len;
+	u8           cmd, send_flag = false;
+	u8           *para_list;
 
 	while (1) {
 		cmd = table[send_cmd_idx_s].cmd;
@@ -275,37 +266,38 @@ void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u32
 void MipiDumpRegValue(struct device *dev, void __iomem *address)
 {
 	void __iomem *MIPIx = address;
+	(void)dev;
 
 	/*global register*/
-	DRM_DEV_INFO(dev, "Dump mipi register value baseaddr : 0x%08x\n", (u32)MIPIx);	
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_MAIN_CTRL_OFFSET,readl(MIPIx + MIPI_MAIN_CTRL_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_INTE_OFFSET,readl(MIPIx + MIPI_INTE_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_INTS_ACPU_OFFSET,readl(MIPIx + MIPI_INTS_ACPU_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_PAT_GEN_OFFSET,readl(MIPIx + MIPI_PAT_GEN_OFFSET));
-	DRM_DEV_INFO(dev, "\n");
+	DRM_INFO( "Dump mipi register value baseaddr : 0x%08x\n", (u32)MIPIx);	
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_MAIN_CTRL_OFFSET,readl(MIPIx + MIPI_MAIN_CTRL_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_INTE_OFFSET,readl(MIPIx + MIPI_INTE_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_INTS_ACPU_OFFSET,readl(MIPIx + MIPI_INTS_ACPU_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_PAT_GEN_OFFSET,readl(MIPIx + MIPI_PAT_GEN_OFFSET));
+	DRM_INFO( "\n");
 
 	/*Dphy register*/
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_CLOCK_GEN_OFFSET,readl(MIPIx + MIPI_CLOCK_GEN_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_WATCHDOG_OFFSET,readl(MIPIx + MIPI_WATCHDOG_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_DF_OFFSET,readl(MIPIx + MIPI_DF_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_SSC2_OFFSET,readl(MIPIx + MIPI_SSC2_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_SSC3_OFFSET,readl(MIPIx + MIPI_SSC3_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_MPLL_OFFSET,readl(MIPIx + MIPI_MPLL_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_1_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_1_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_2_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_2_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_3_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_3_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_CLK_0_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_CLK_0_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_6_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_6_OFFSET));
-	DRM_DEV_INFO(dev, "\n");
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_CLOCK_GEN_OFFSET,readl(MIPIx + MIPI_CLOCK_GEN_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_WATCHDOG_OFFSET,readl(MIPIx + MIPI_WATCHDOG_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_DF_OFFSET,readl(MIPIx + MIPI_DF_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_SSC2_OFFSET,readl(MIPIx + MIPI_SSC2_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_SSC3_OFFSET,readl(MIPIx + MIPI_SSC3_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_MPLL_OFFSET,readl(MIPIx + MIPI_MPLL_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_1_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_1_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_2_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_2_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_3_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_3_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_CLK_0_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_CLK_0_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_ESCAPE_TX_DATA_6_OFFSET,readl(MIPIx + MIPI_ESCAPE_TX_DATA_6_OFFSET));
+	DRM_INFO( "\n");
 
 	/*DSI register*/
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_TC0_OFFSET,readl(MIPIx + MIPI_TC0_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_TC1_OFFSET,readl(MIPIx + MIPI_TC1_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_TC2_OFFSET,readl(MIPIx + MIPI_TC2_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_TC3_OFFSET,readl(MIPIx + MIPI_TC3_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_TC4_OFFSET,readl(MIPIx + MIPI_TC4_OFFSET));
-	DRM_DEV_INFO(dev, "MIPIx[0x%x] = 0x%08x\n", MIPI_TC5_OFFSET,readl(MIPIx + MIPI_TC5_OFFSET));
-	DRM_DEV_INFO(dev, "\n");
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC0_OFFSET,readl(MIPIx + MIPI_TC0_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC1_OFFSET,readl(MIPIx + MIPI_TC1_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC2_OFFSET,readl(MIPIx + MIPI_TC2_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC3_OFFSET,readl(MIPIx + MIPI_TC3_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC4_OFFSET,readl(MIPIx + MIPI_TC4_OFFSET));
+	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC5_OFFSET,readl(MIPIx + MIPI_TC5_OFFSET));
+	DRM_INFO( "\n");
 }
 
 //afdsads

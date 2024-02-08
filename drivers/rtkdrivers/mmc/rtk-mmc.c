@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek MMC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/delay.h>
 #include <linux/ktime.h>
 #include <linux/highmem.h>
@@ -37,7 +44,7 @@ struct rtk_mmc_host {
 	struct platform_device	*pdev;  /*platform device*/
 
 	void __iomem		*ioaddr;   /*host base addr*/
-	struct clk * mmc_clk;
+	struct clk *mmc_clk;
 
 	int			bus_width;  /*current bus width*/
 	int			clock;		/* Current clock speed */
@@ -46,7 +53,7 @@ struct rtk_mmc_host {
 	int			irq;		/* Device IRQ */
 
 	bool use_bounce;      /*use bounce buffer?*/
-	u8 * bounce_buffer;   /*dma transfer buffer*/
+	u8 *bounce_buffer;    /*dma transfer buffer*/
 	u32 bounce_addr;         /*bounce buffer address */
 	u32 bounce_buffer_size;        /*dma transfer length*/
 
@@ -68,34 +75,34 @@ static u8 rtk_mmc_sdioh_get_response(struct mmc_host *mmc, u8 byte_index);
   */
 static u32 rtk_mmc_sdioh_busy(struct mmc_host *mmc)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	struct device *dev = &host->pdev->dev;
 	u8 idle_level = host->sdioh_idle_level;
 	u32 tmp;
 	u32 tmp_u8;
 
-	/* check the SD bus status. note that use register number other than macro because 
+	/* Check the SD bus status. note that use register number other than macro because
 	not all sdioh register is 4 bytes size but they must access 4 byte aligned on testchip
 	because of some design defect*/
 	tmp = readl(base + 0x584);
 	tmp_u8 = SDIOH_REG_GET_8(tmp); // 0x585
 	if ((tmp_u8  & idle_level) == idle_level) {
-		/* check the CMD & DATA state machine */
+		/* Check the CMD & DATA state machine */
 		if ((readb(base + SD_CMD_STATE) & SDIOH_CMD_FSM_IDLE) && (readb(base + SD_DATA_STATE) & SDIOH_DATA_FSM_IDLE)) {
-			/* check the SD card module state machine */
+			/* Check the SD card module state machine */
 			if ((readb(base + SD_TRANSFER) & SDIOH_SD_MODULE_FSM_IDLE)) {
 				return 0;
 			} else {
-				dev_err(dev, "SD card module state machine isn't in the idle state !\r\n");
+				dev_err(dev, "SD card module state machine isn't in the idle state\n");
 				return -EBUSY;
 			}
 		} else {
-			dev_err(dev, "CMD or DATA state machine isn't in the idle state !!\r\n");
+			dev_err(dev, "CMD or data state machine isn't in the idle state\n");
 			return -EBUSY;
 		}
 	} else {
-		dev_err(dev, "CMD or DAT[3:0] pin isn't in the idle state !!\r\n");
+		dev_err(dev, "CMD or DAT[3:0] pin isn't in the idle state\n");
 		return -EBUSY;
 	}
 
@@ -106,7 +113,7 @@ static u32 rtk_mmc_sdioh_busy(struct mmc_host *mmc)
   */
 static u32 rtk_mmc_sdioh_check_tx_error(struct mmc_host *mmc, u16 *status)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 tmp;
 	tmp = readl(base + 0x590);
@@ -127,7 +134,7 @@ static u32 rtk_mmc_sdioh_check_tx_error(struct mmc_host *mmc, u16 *status)
   */
 static u32 rtk_mmc_sdioh_wait_tx_done(struct mmc_host *mmc, u32 timeout_us)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 tmp;
 	u8 tmp_u8;
@@ -151,7 +158,7 @@ static u32 rtk_mmc_sdioh_wait_tx_done(struct mmc_host *mmc, u32 timeout_us)
   */
 static u32 rtk_mmc_sdioh_wait_dma_done(struct mmc_host *mmc, u32 timeout_us)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	struct device *dev = &host->pdev->dev;
 	u32 tmp;
@@ -169,7 +176,7 @@ static u32 rtk_mmc_sdioh_wait_dma_done(struct mmc_host *mmc, u32 timeout_us)
 		udelay(1);
 	} while (timeout_us-- != 0);
 
-	dev_err(dev,"dma timeout error\n");
+	dev_err(dev, "DMA timeout\n");
 	return -ETIMEDOUT;
 }
 
@@ -178,7 +185,7 @@ static u32 rtk_mmc_sdioh_wait_dma_done(struct mmc_host *mmc, u32 timeout_us)
   */
 static u32 rtk_mmc_sdioh_get_isr(struct mmc_host *mmc)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 
 	return readl(base + SD_ISR);
@@ -189,7 +196,7 @@ static u32 rtk_mmc_sdioh_get_isr(struct mmc_host *mmc)
   */
 static void rtk_mmc_sdioh_int_config(struct mmc_host *mmc, u8 SDIO_IT, u32 newState)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 
 	u32 reg = readl(base + SD_ISREN);
@@ -208,7 +215,7 @@ static void rtk_mmc_sdioh_int_config(struct mmc_host *mmc, u8 SDIO_IT, u32 newSt
   */
 static void rtk_mmc_sdioh_int_clear_pending_bit(struct mmc_host *mmc, u8 SDIO_IT)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 
 	writel(SDIO_IT, base + SD_ISR);
@@ -220,7 +227,7 @@ static void rtk_mmc_sdioh_int_clear_pending_bit(struct mmc_host *mmc, u8 SDIO_IT
   */
 static void rtk_mmc_sdioh_set_bus_Width(struct mmc_host *mmc, u8 width)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 tmp;
 
@@ -236,12 +243,12 @@ static void rtk_mmc_sdioh_set_bus_Width(struct mmc_host *mmc, u8 width)
   */
 static void rtk_mmc_sdioh_dma_config(struct mmc_host *mmc, SDIOH_DmaCtl *dma_ctl)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 tmp = 0;
 	u32 temp;
 
-	/* set block length and count */
+	/* Set block length and count */
 	if ((dma_ctl->type) == SDIOH_DMA_NORMAL) {
 		/* 512 bytes (one block size) */
 		temp = readl(base + 0x58C);
@@ -271,7 +278,7 @@ static void rtk_mmc_sdioh_dma_config(struct mmc_host *mmc, SDIOH_DmaCtl *dma_ctl
 			 ((((dma_ctl->blk_cnt) >> 8) & SDIOH_MASK_BLOCL_CNT_H) << 16));
 	writel(temp, base + 0x590);
 
-	/* set the DMA control register */
+	/* Set the DMA control register */
 	writel((dma_ctl->start_addr) & SDIOH_MASK_DRAM_SA, base + DMA_CRL1); /* DMA start address (unit: 8 Bytes) */
 	writel((dma_ctl->blk_cnt) & SDIOH_MASK_DMA_LEN, base + DMA_CRL2); /* DMA transfer length (unit: 512 Bytes) */
 
@@ -284,10 +291,10 @@ static void rtk_mmc_sdioh_dma_config(struct mmc_host *mmc, SDIOH_DmaCtl *dma_ctl
 	tmp |= (dma_ctl->op << SDIOH_SHIFT_DDR_WR);
 	writel(tmp, base + DMA_CRL3);
 
-	/* clear pending interrupt */
+	/* Clear pending interrupt */
 	rtk_mmc_sdioh_int_clear_pending_bit(mmc, SDIOH_DMA_TRANSFER_DONE | SDIOH_CARD_ERROR | SDIOH_CARD_END);
 
-	/* enable DMA transfer */
+	/* Enable DMA transfer */
 	tmp = readl(base + DMA_CRL3);
 	tmp |= SDIOH_DMA_XFER;
 	writel(tmp, base + DMA_CRL3);
@@ -299,7 +306,7 @@ static void rtk_mmc_sdioh_dma_config(struct mmc_host *mmc, SDIOH_DmaCtl *dma_ctl
   */
 static void rtk_mmc_sdioh_dma_reset(struct mmc_host *mmc)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 tmp;
 
@@ -312,7 +319,7 @@ static void rtk_mmc_sdioh_dma_reset(struct mmc_host *mmc)
 	writel(tmp, base + 0x590);
 
 	writel(0, base + DMA_CRL1);
-	writel(0, base + DMA_CRL2 );
+	writel(0, base + DMA_CRL2);
 	writel(0, base + DMA_CRL3);
 }
 
@@ -321,7 +328,7 @@ static void rtk_mmc_sdioh_dma_reset(struct mmc_host *mmc)
   */
 static u32 rtk_mmc_sdioh_send_command(struct mmc_host *mmc, SDIOH_CmdTypeDef *cmd_attrib, u32 timeout_us)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u8 cmd = cmd_attrib->idx, cmd_code;
 	u8 val0 = 0;
@@ -333,7 +340,7 @@ static u32 rtk_mmc_sdioh_send_command(struct mmc_host *mmc, SDIOH_CmdTypeDef *cm
 		return ret;
 	}
 
-	/* set SD_CONFIGURE2 (0x581) */
+	/* Set SD_CONFIGURE2 (0x581) */
 	val0 = SDIOH_CRC7_CAL_EN | (cmd_attrib->rsp_type);
 
 	if (cmd_attrib->rsp_crc_chk) {
@@ -365,7 +372,7 @@ static u32 rtk_mmc_sdioh_send_command(struct mmc_host *mmc, SDIOH_CmdTypeDef *cm
 	tmp |= (val0 << SDIOH_REG_SHIFT_8);
 	writel(tmp, base + 0x580);
 
-	/* set SD_CONFIGURE3 (0x582) */
+	/* Set SD_CONFIGURE3 (0x582) */
 	val0 = SDIOH_STOP_STA_WAIT_BUSY_EN | SDIOH_SD30_CLK_STOP_DIS | SDIOH_SD20_CLK_STOP_DIS | \
 		   SDIOH_SD_CMD_RESP_CHK_DIS | SDIOH_ADDR_MODE_SECTOR;
 
@@ -405,7 +412,7 @@ static u32 rtk_mmc_sdioh_send_command(struct mmc_host *mmc, SDIOH_CmdTypeDef *cm
 	tmp |= ((((cmd_attrib->arg) >> 8) & 0xFF) | (((cmd_attrib->arg) & 0xFF) << 8) | (0x0 << 16));
 	writel(tmp, base + 0x58C);
 
-	/* set the command code */
+	/* Set the command code */
 	switch (cmd) {
 	case MMC_SWITCH:
 	case MMC_SEND_STATUS:
@@ -440,7 +447,7 @@ static u32 rtk_mmc_sdioh_send_command(struct mmc_host *mmc, SDIOH_CmdTypeDef *cm
 	tmp |= (cmd_code << SDIOH_REG_SHIFT_24);
 	writel(tmp, base + 0x590);
 
-	/* start to transfer */
+	/* Start to transfer */
 	tmp = readl(base + 0x590);
 	tmp |= (SDIOH_START_TRANSFER << SDIOH_REG_SHIFT_24);
 	writel(tmp, base + 0x590);
@@ -457,7 +464,7 @@ static u32 rtk_mmc_sdioh_send_command(struct mmc_host *mmc, SDIOH_CmdTypeDef *cm
   */
 static u8 rtk_mmc_sdioh_get_response(struct mmc_host *mmc, u8 byte_index)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 tmp;
 	u8 tmp_u8 = 0;
@@ -490,7 +497,7 @@ static u8 rtk_mmc_sdioh_get_response(struct mmc_host *mmc, u8 byte_index)
   */
 static void rtk_mmc_sdioh_switch_speed(struct mmc_host *mmc, u8 clk_div, u8 mode)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 value32;
 	u32 tmp;
@@ -511,7 +518,7 @@ static void rtk_mmc_sdioh_switch_speed(struct mmc_host *mmc, u8 clk_div, u8 mode
   */
 static u32 rtk_mmc_sdioh_initial_mode_cmd(struct mmc_host *mmc, u8 NewState, u8 Level)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 value32;
 	u32 ret = 0;
@@ -568,21 +575,21 @@ static u32 rtk_mmc_sdioh_initial_mode_cmd(struct mmc_host *mmc, u8 NewState, u8 
   */
 static int rtk_mmc_sdioh_get_card_detect(struct mmc_host *mmc)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	struct device *dev = &host->pdev->dev;
 	u8 reg = readb(base + CARD_EXIST);
 
 	if (reg & SDIOH_SD_EXIST) {
 		if (reg & SDIOH_SD_WP) {
-			dev_dbg(dev, "Card Detect And Protect\n");
+			dev_dbg(dev, "Card detect and protect\n");
 			return CARD_DETECT_PROTECT;
 		} else {
-			dev_dbg(dev, "Card Detect\n");
+			dev_dbg(dev, "Card detect\n");
 			return CARD_DETECT;
 		}
 	} else {
-		dev_dbg(dev, "Card Remove\n");
+		dev_dbg(dev, "Card remove\n");
 		return CARD_REMOVE;
 	}
 }
@@ -593,7 +600,7 @@ static int rtk_mmc_sdioh_get_card_detect(struct mmc_host *mmc)
   */
 static u32 rtk_mmc_sdioh_init(struct mmc_host *mmc, u8 BusBitMode)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 	u32 ret = 0;
 	u32 tmp = 0;
@@ -644,20 +651,20 @@ static u32 rtk_mmc_sdioh_init(struct mmc_host *mmc, u8 BusBitMode)
   */
 static void rtk_mmc_sdioh_deinit(struct mmc_host *mmc)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	void __iomem *base = host->ioaddr;
 
-	/* disable interrupt & clear all pending interrupts */
+	/* Disable interrupt & clear all pending interrupts */
 	writeb(SDIOH_SDMMC_INT_PEND, base + CARD_INT_PEND);
 	writeb(SDIOH_SDMMC_INT_EN, base + CARD_INT_EN);
 	rtk_mmc_sdioh_int_clear_pending_bit(mmc, SDIOH_SD_ISR_ALL);
-	rtk_mmc_sdioh_int_config(mmc,SDIOH_SD_ISR_ALL, MMC_DISABLE);
+	rtk_mmc_sdioh_int_config(mmc, SDIOH_SD_ISR_ALL, MMC_DISABLE);
 }
 
 
 static u32 rtk_mmc_sdioh_check_resp(struct mmc_host *mmc)
 {
-	struct rtk_mmc_host * host = mmc_priv(mmc);
+	struct rtk_mmc_host *host = mmc_priv(mmc);
 	struct device *dev = &host->pdev->dev;
 	u32 ret = 0;
 	u16 err_status;
@@ -665,10 +672,10 @@ static u32 rtk_mmc_sdioh_check_resp(struct mmc_host *mmc)
 	ret = rtk_mmc_sdioh_check_tx_error(mmc, &err_status);
 	if (ret != 0) {
 		if (err_status & SDIOH_SD_CMD_RSP_TO_ERR) {
-			dev_err(dev, "to error\n");
+			dev_err(dev, "Check TX error: to error\n");
 			return -ETIMEDOUT;
 		} else if (err_status & SDIOH_SD_TUNNING_PAT_COMP_ERR) {
-			dev_err(dev, "comp err\n");
+			dev_err(dev, "Check TX error: comp error\n");
 			return -EIO;
 		} else {
 			return ret;
@@ -692,29 +699,33 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	mutex_lock(&host->mutex);
 
-	dev_dbg(dev, "request:%d\n", mrq->cmd->opcode);
+	dev_dbg(dev, "MMC request code: %d\n", mrq->cmd->opcode);
 
-	if (mrq->sbc)
+	if (mrq->sbc) {
 		mrq->sbc->error = 0;
-	if (mrq->cmd)
+	}
+	if (mrq->cmd) {
 		mrq->cmd->error = 0;
-	if (mrq->data)
+	}
+	if (mrq->data) {
 		mrq->data->error = 0;
-	if (mrq->stop)
+	}
+	if (mrq->stop) {
 		mrq->stop->error = 0;
+	}
 
-	if(mrq->cmd->opcode == MMC_SEND_CSD) {
-		dev_dbg(dev,"initial mode disable here\n");
+	if (mrq->cmd->opcode == MMC_SEND_CSD) {
+		/* Initial mode disable here */
 		ret = rtk_mmc_sdioh_initial_mode_cmd(mmc, MMC_DISABLE, SDIOH_SIG_VOL_33);
-		if(ret) {
+		if (ret) {
 			mrq->cmd->error = 1;
-			dev_err(dev, "initial mode disable err\n");
+			dev_err(dev, "Initial mode disable error\n");
 			goto exit;
 		}
 	}
 
-	/*===================send cmd23 if support(not support now)========================*/
-	if(mrq->sbc) {
+	/*===================Send CMD23 if support(not support now)========================*/
+	if (mrq->sbc) {
 		cmd_attr.arg = mrq->sbc->arg;
 		cmd_attr.idx = mrq->sbc->opcode;
 		cmd_attr.rsp_type = SDIOH_RSP_6B;
@@ -722,57 +733,54 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		cmd_attr.data_present = SDIOH_NO_DATA;
 
 		ret = rtk_mmc_sdioh_send_command(mmc, &cmd_attr, mrq->sbc->busy_timeout);
-		if(ret != 0) {
+		if (ret != 0) {
 			mrq->sbc->error = 1;
-			dev_err(dev, "send cmd23 fail: %d\n", ret);
+			dev_err(dev, "Failed to send CMD23 : %d\n", ret);
 			goto exit;
 		}
 
 		ret = rtk_mmc_sdioh_check_resp(mmc);
 		if (ret != 0) {
 			mrq->sbc->error = 1;
-			dev_err(dev, "cmd23 response error: %d\n", ret);
+			dev_err(dev, "CMD23 response error: %d\n", ret);
 			goto exit;
 		}
 	}
 
 	/*========================DMA setting============================*/
 
-	/*if response type is MMC_RSP_136, dedicated dma is required, prepare for dma*/
-	if(mrq->cmd->flags & MMC_RSP_136) {
-		dev_dbg(dev, "MMC_RSP_136\n");
+	/* If response type is MMC_RSP_136, dedicated DMA is required, prepare for DMA */
+	if (mrq->cmd->flags & MMC_RSP_136) {
 		dma_cfg.op = SDIOH_DMA_READ;
 		dma_cfg.blk_cnt = 1;
-		dma_cfg.start_addr = ((u32)host->dma_buf_addr)/8;
+		dma_cfg.start_addr = ((u32)host->dma_buf_addr) / 8;
 		dma_cfg.type = SDIOH_DMA_R2;
 
 		rtk_mmc_sdioh_dma_config(mmc, &dma_cfg);
-		timeout = (mrq->cmd->busy_timeout != 0) ? (mrq->cmd->busy_timeout*1000) : 80000;
+		timeout = (mrq->cmd->busy_timeout != 0) ? (mrq->cmd->busy_timeout * 1000) : 80000;
 
-		/*if there is data transfer, dedicated dma is required, prepare for dma*/
-	} else if(mrq->data) {
+		/* If there is data transfer, dedicated DMA is required, prepare for DMA */
+	} else if (mrq->data) {
 		data_length = mrq->data->blksz * mrq->data->blocks;
-		dev_dbg(dev,"blksz:%d, blocks:%d, datalen: %d\n",mrq->data->blksz,mrq->data->blocks, data_length);
-
-		if(mrq->data->flags & MMC_DATA_READ) {
+		if (mrq->data->flags & MMC_DATA_READ) {
 			dma_cfg.op = SDIOH_DMA_READ;
 		} else {
 			dma_cfg.op = SDIOH_DMA_WRITE;
-			if(host->use_bounce == 1) {
-				/*copy scatterlist to bounce buffer*/
+			if (host->use_bounce == 1) {
+				/* Copy scatterlist to bounce buffer */
 				sg_copy_to_buffer(mrq->data->sg,
 								  mrq->data->sg_len,
 								  host->bounce_buffer,
 								  data_length);
-				dma_cfg.start_addr = host->bounce_addr/8;
+				dma_cfg.start_addr = host->bounce_addr / 8;
 
 				dma_sync_single_for_device(&host->pdev->dev, host->bounce_addr,
 										   host->bounce_buffer_size, DMA_BIDIRECTIONAL);
 			}
 		}
 
-		/*acmd6 acmd13.. means sg_length==64*/
-		if(mrq->data->sg[0].length == 64) {
+		/* acmd6 acmd13.. means sg_length==64 */
+		if (mrq->data->sg[0].length == 64) {
 			dma_cfg.type = SDIOH_DMA_64B;
 		} else {
 			dma_cfg.type = SDIOH_DMA_NORMAL;
@@ -780,85 +788,82 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 		dma_cfg.blk_cnt = mrq->data->blocks;
 
-		/*if not use bounce buffer, seg number = 1*/
-		if(host->use_bounce == 1) {
-			dma_cfg.start_addr = host->bounce_addr/8;
+		/* If not use bounce buffer, seg number = 1 */
+		if (host->use_bounce == 1) {
+			dma_cfg.start_addr = host->bounce_addr / 8;
 		} else {
 			dma_cfg.start_addr = sg_dma_address(mrq->data->sg);
 		}
 
-		dev_dbg(dev, "dma_cfg: %d, %x, %d, %d\n", dma_cfg.op, dma_cfg.start_addr, dma_cfg.blk_cnt, dma_cfg.type);
-
 		rtk_mmc_sdioh_dma_config(mmc, &dma_cfg);
 	}
 
-	/*========================send normal cmd============================*/
+	/*========================Send normal cmd============================*/
 
 	cmd_attr.arg = mrq->cmd->arg;
 	cmd_attr.idx = mrq->cmd->opcode;
 
-	if(!(mrq->cmd->flags & MMC_RSP_PRESENT)) {
+	if (!(mrq->cmd->flags & MMC_RSP_PRESENT)) {
 		cmd_attr.rsp_type = SDIOH_NO_RESP;
-	} else if(mrq->cmd->flags & MMC_RSP_136) {
+	} else if (mrq->cmd->flags & MMC_RSP_136) {
 		cmd_attr.rsp_type = SDIOH_RSP_17B;
 	} else {
 		cmd_attr.rsp_type = SDIOH_RSP_6B;
 	}
 
-	if(mrq->cmd->flags & MMC_RSP_CRC) {
+	if (mrq->cmd->flags & MMC_RSP_CRC) {
 		cmd_attr.rsp_crc_chk = MMC_ENABLE;
 	} else {
 		cmd_attr.rsp_crc_chk = MMC_DISABLE;
 	}
 
-	/*SDIOH_DATA_EXIST means there is data to receive, include acmd6, acmd13, acmd51, cmd17...*/
-	if(mrq->data && (mrq->data->flags & MMC_DATA_READ)) {
+	/* SDIOH_DATA_EXIST means there is data to receive, include acmd6, acmd13, acmd51, cmd17... */
+	if (mrq->data && (mrq->data->flags & MMC_DATA_READ)) {
 		cmd_attr.data_present = SDIOH_DATA_EXIST;
 	} else {
 		cmd_attr.data_present = SDIOH_NO_DATA;
 	}
 
-	dev_dbg(dev, "cmd_attr:%d, %d, %d, %d, %d",cmd_attr.arg, cmd_attr.idx, cmd_attr.rsp_type, cmd_attr.rsp_crc_chk, cmd_attr.data_present);
-	/*send command*/
+	/* Send command */
 	ret = rtk_mmc_sdioh_send_command(mmc, &cmd_attr, SDIOH_CMD_CPLT_TIMEOUT);
-	if(ret != 0) {
+	if (ret != 0) {
 		mrq->cmd->error = 1;
-		dev_err(dev,"send cmd fail: %d, %d\n", ret, cmd_attr.idx);
+		dev_err(dev, "Failed to send CMD %d: %d\n", cmd_attr.idx, ret);
 		goto exit;
 	}
 
-	/*========================request done process============================*/
+	/*========================Request done process============================*/
 
-	/*use dedicated dma to receive response info, so copy is required*/
-	if(mrq->cmd->flags & MMC_RSP_136) {
+	/* Use dedicated DMA to receive response info, so copy is required */
+	if (mrq->cmd->flags & MMC_RSP_136) {
 		ret = rtk_mmc_sdioh_wait_dma_done(mmc, timeout);
 		if (ret != 0) {
-			dev_err(dev, "wait dma done fail(MMC_RSP_136): %d\n", ret);
+			dev_err(dev, "Wait DMA done fail(MMC_RSP_136): %d\n", ret);
 			mrq->cmd->error = 1;
 			goto exit;
 		}
 		dma_sync_single_for_device(&host->pdev->dev, host->dma_buf_addr, 64, DMA_FROM_DEVICE);
 
-		//resp data is reverse, real data is start at dma_buf[1]
-		mrq->cmd->resp[3] = host->dma_buf[13]<<24|host->dma_buf[14]<<16|host->dma_buf[15]<<8|host->dma_buf[16];
-		mrq->cmd->resp[2] = host->dma_buf[9]<<24|host->dma_buf[10]<<16|host->dma_buf[11]<<8|host->dma_buf[12];
-		mrq->cmd->resp[1] = host->dma_buf[5]<<24|host->dma_buf[6]<<16|host->dma_buf[7]<<8|host->dma_buf[8];
-		mrq->cmd->resp[0] = host->dma_buf[1]<<24|host->dma_buf[2]<<16|host->dma_buf[3]<<8|host->dma_buf[4];
+		//Resp data is reverse, real data is start at dma_buf[1]
+		mrq->cmd->resp[3] = host->dma_buf[13] << 24 | host->dma_buf[14] << 16 | host->dma_buf[15] << 8 | host->dma_buf[16];
+		mrq->cmd->resp[2] = host->dma_buf[9] << 24 | host->dma_buf[10] << 16 | host->dma_buf[11] << 8 | host->dma_buf[12];
+		mrq->cmd->resp[1] = host->dma_buf[5] << 24 | host->dma_buf[6] << 16 | host->dma_buf[7] << 8 | host->dma_buf[8];
+		mrq->cmd->resp[0] = host->dma_buf[1] << 24 | host->dma_buf[2] << 16 | host->dma_buf[3] << 8 | host->dma_buf[4];
 	}
 
-	/*use dedicated dma to transfer data, so copy is required*/
-	if(mrq->data) {
-		timeout = (mrq->data->timeout_ns/1000)? (mrq->data->timeout_ns/1000):80000;
+	/* Use dedicated DMA to transfer data, so copy is required */
+	if (mrq->data) {
+		timeout = (mrq->data->timeout_ns / 1000) ? (mrq->data->timeout_ns / 1000) : 80000;
 		ret = rtk_mmc_sdioh_wait_dma_done(mmc, timeout);
 		if (ret != 0) {
 			mrq->data->error = 1;
-			dev_err(dev, "wait dma done fail(data): %d\n", ret);
+			dev_err(dev, "Wait DMA done fail(data): %d\n", ret);
 			goto exit;
 		}
 
-		dma_sync_single_for_cpu(&host->pdev->dev, host->bounce_addr,host->bounce_buffer_size, DMA_BIDIRECTIONAL);
+		dma_sync_single_for_cpu(&host->pdev->dev, host->bounce_addr, host->bounce_buffer_size, DMA_BIDIRECTIONAL);
 
-		if(mrq->data->flags & MMC_DATA_READ) {
+		if (mrq->data->flags & MMC_DATA_READ) {
 			sg_copy_from_buffer(mrq->data->sg, mrq->data->sg_len,
 								host->bounce_buffer,
 								data_length);
@@ -867,27 +872,25 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		mrq->data->bytes_xfered = data_length;
 	}
 
-	/*========================check response============================*/
+	/*========================Check response============================*/
 
-	/*check response error*/
+	/* Check response error */
 	ret = rtk_mmc_sdioh_check_resp(mmc);
 	if (ret != 0) {
-		dev_err(dev, "normal cmd(%d) response error: %d\n", mrq->cmd->opcode, ret);
+		dev_err(dev, "Normal CMD %d response error: %d\n", mrq->cmd->opcode, ret);
 		mrq->cmd->error = 1;
 		goto exit;
 	}
 
-	/*deliver response value to resp[]*/
-	if(!(mrq->cmd->flags & MMC_RSP_136)) {
-		resp_byte1 = rtk_mmc_sdioh_get_response(mmc,SDIO_RESP1);
-		resp_byte2 = rtk_mmc_sdioh_get_response(mmc,SDIO_RESP2);
-		resp_byte3 = rtk_mmc_sdioh_get_response(mmc,SDIO_RESP3);
-		resp_byte4 = rtk_mmc_sdioh_get_response(mmc,SDIO_RESP4);
+	/* Deliver response value to resp[] */
+	if (!(mrq->cmd->flags & MMC_RSP_136)) {
+		resp_byte1 = rtk_mmc_sdioh_get_response(mmc, SDIO_RESP1);
+		resp_byte2 = rtk_mmc_sdioh_get_response(mmc, SDIO_RESP2);
+		resp_byte3 = rtk_mmc_sdioh_get_response(mmc, SDIO_RESP3);
+		resp_byte4 = rtk_mmc_sdioh_get_response(mmc, SDIO_RESP4);
 
-		/*return response information, such as cid, ocr ,cid...*/
-		mrq->cmd->resp[0] = resp_byte1<<24|resp_byte2<<16|resp_byte3<<8|resp_byte4;
-
-		dev_dbg(dev, "resp[0]:%x\n", mrq->cmd->resp[0]);
+		/* Return response information, such as cid, ocr ,cid... */
+		mrq->cmd->resp[0] = resp_byte1 << 24 | resp_byte2 << 16 | resp_byte3 << 8 | resp_byte4;
 	}
 
 exit:
@@ -904,12 +907,12 @@ static void rtk_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	mutex_lock(&host->mutex);
 
-	/*set bus speed*/
-	if((ios->clock != 0) && (ios->clock != host->clock) ) {
+	/* Set bus speed */
+	if ((ios->clock != 0) && (ios->clock != host->clock)) {
 		host->clock = ios->clock;
 
-		/*clk<=400k means it is initial mode now*/
-		if(ios->clock <= 400000) {
+		/* clk<=400k means it is initial mode now */
+		if (ios->clock <= 400000) {
 			switch (ios->clock) {
 			case 400000:
 				clk_div = SDIOH_CLK_DIV2;
@@ -940,10 +943,10 @@ static void rtk_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			tmp |= ini_clk_div;
 			writel(tmp, host->ioaddr + 0x580);
 
-			/*data transfer mode*/
+			/* Data transfer mode */
 		} else {
 
-			/*calculate divider to select correct SDIOH_CLK_DIV*/
+			/* Calculate divider to select correct SDIOH_CLK_DIV */
 			clk_div = DIV_ROUND_CLOSEST(host->max_clk, ios->clock);
 			switch (clk_div) {
 			case 0:
@@ -967,19 +970,19 @@ static void rtk_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	}
 
-	/*set bus width*/
-	if(ios->bus_width != host->bus_width) {
+	/* Set bus width */
+	if (ios->bus_width != host->bus_width) {
 
-		if(ios->bus_width == MMC_BUS_WIDTH_1) {
+		if (ios->bus_width == MMC_BUS_WIDTH_1) {
 			width = SDIOH_BUS_WIDTH_1BIT;
-		} else if(ios->bus_width == MMC_BUS_WIDTH_4) {
+		} else if (ios->bus_width == MMC_BUS_WIDTH_4) {
 			width = SDIOH_BUS_WIDTH_4BIT;
 		} else {
-			dev_err(dev, "bus width %d not support\n", ios->bus_width);
+			dev_err(dev, "Bus width %d not support\n", ios->bus_width);
 			return;
 		}
 
-		/*set bus width*/
+		/* Set bus width */
 		rtk_mmc_sdioh_set_bus_Width(mmc, width);
 		host->bus_width = ios->bus_width;
 	}
@@ -993,10 +996,11 @@ static int rtk_mmc_get_cd(struct mmc_host *mmc)
 
 	ret = rtk_mmc_sdioh_get_card_detect(mmc);
 
-	if(ret == CARD_REMOVE)
+	if (ret == CARD_REMOVE) {
 		return 0;
-	else
+	} else {
 		return 1;
+	}
 }
 
 static int rtk_mmc_get_ro(struct mmc_host *mmc)
@@ -1004,10 +1008,11 @@ static int rtk_mmc_get_ro(struct mmc_host *mmc)
 	int ret;
 	ret = rtk_mmc_sdioh_get_card_detect(mmc);
 
-	if(ret == CARD_DETECT_PROTECT)
+	if (ret == CARD_DETECT_PROTECT) {
 		return 1;
-	else
+	} else {
 		return 0;
+	}
 }
 
 
@@ -1025,10 +1030,8 @@ static irqreturn_t rtk_mmc_irq(int irq, void *dev_id)
 	struct rtk_mmc_host *host = dev_id;
 	u32 tmp1, tmp2, card_status;
 	void __iomem *base = host->ioaddr;
-	struct mmc_host * mmc = mmc_from_priv(host);
+	struct mmc_host *mmc = mmc_from_priv(host);
 	struct device *dev = &host->pdev->dev;
-
-	dev_dbg(dev, "sdioh irq\n");
 
 	spin_lock(&host->lock);
 
@@ -1048,12 +1051,12 @@ static irqreturn_t rtk_mmc_irq(int irq, void *dev_id)
 				card_status = CARD_DETECT;
 			}
 
-			dev_dbg(dev, "Card Detect\n");
+			dev_dbg(dev, "Card detect\n");
 
 		} else {
 			card_status = CARD_REMOVE;
 
-			dev_dbg(dev, "Card Remove\n");
+			dev_dbg(dev, "Card remove\n");
 		}
 
 		tmp2 = readl(base + 0x520);
@@ -1080,20 +1083,21 @@ static int rtk_mmc_allocate_bounce_buffer(struct rtk_mmc_host *host)
 
 	host->bounce_buffer = devm_kmalloc(mmc->parent, bounce_size, GFP_KERNEL);
 	if (!host->bounce_buffer) {
-		dev_dbg(dev, "failed to allocate %u bytes for bounce buffer, falling back to single segments\n", bounce_size);
+		dev_dbg(dev, "Failed to allocate %u bytes for bounce buffer, falling back to single segments\n", bounce_size);
 		mmc->max_segs = 1;
 		host->use_bounce = 0;
 		return -ENOMEM;
 	}
 
-	/*get physical addr of bounce_buffer*/
+	/* Get physical addr of bounce_buffer */
 	host->bounce_addr = dma_map_single(mmc->parent,
 									   host->bounce_buffer,
 									   bounce_size,
 									   DMA_BIDIRECTIONAL);
 	ret = dma_mapping_error(mmc->parent, host->bounce_addr);
-	if (ret)
+	if (ret) {
 		return ret;
+	}
 
 	host->bounce_buffer_size = bounce_size;
 	host->use_bounce = 1;
@@ -1101,9 +1105,9 @@ static int rtk_mmc_allocate_bounce_buffer(struct rtk_mmc_host *host)
 	mmc->max_req_size = host->bounce_buffer_size;
 	mmc->max_seg_size = mmc->max_req_size;
 
-	dev_dbg(dev, "bounce buffer addr: %x, dma addr: %x, buffer size:%d\n",
+	dev_dbg(dev, "Bounce buffer addr: 0x%08X, dma addr: 0x%08X, buffer size:%d\n",
 			(u32)host->bounce_buffer, (u32)host->bounce_addr, host->bounce_buffer_size);
-	dev_dbg(dev, "bounce up to %u segments into one, max segment size %u bytes\n",
+	dev_dbg(dev, "Bounce up to %u segments into one, max segment size %u bytes\n",
 			max_blocks, bounce_size);
 
 	return ret;
@@ -1121,15 +1125,15 @@ static int rtk_mmc_add_host(struct rtk_mmc_host *host)
 
 	mmc->max_busy_timeout = ~0 / (mmc->f_max / 1000);
 
-	dev_dbg(dev, "f_max %d, f_min %d, max_busy_timeout %d\n",
+	dev_dbg(dev, "Host params f_max = %d, f_min = %d, max_busy_timeout = %d\n",
 			mmc->f_max, mmc->f_min, mmc->max_busy_timeout);
 
-	/* host controller capabilities */
+	/* Host controller capabilities */
 	mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
 				 MMC_CAP_ERASE | MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25;
 	//MMC_CAP_4_BIT_DATA;// | MMC_CAP_NEEDS_POLL | MMC_CAP_CMD23;
 
-	mmc->caps2 |= MMC_CAP2_NO_WRITE_PROTECT | MMC_CAP2_NO_SDIO| MMC_CAP2_NO_MMC;
+	mmc->caps2 |= MMC_CAP2_NO_WRITE_PROTECT | MMC_CAP2_NO_SDIO | MMC_CAP2_NO_MMC;
 
 	mmc->max_blk_size = 512;             //block size
 	mmc->max_blk_count = 65535;          //0xffff of DMA_CRL2
@@ -1139,22 +1143,20 @@ static int rtk_mmc_add_host(struct rtk_mmc_host *host)
 	mmc->max_req_size = SZ_64K;
 	mmc->max_seg_size = mmc->max_req_size;
 
-	/* report supported voltage ranges */
+	/* Report supported voltage ranges */
 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
 
 	ret = rtk_mmc_allocate_bounce_buffer(host);
 	if (ret) {
-		dev_err(dev, "alloc bounce buffer fail\n");
+		dev_err(dev, "Failed to alloc bounce buffer\n");
 		return ret;
 	}
 
 	host->dma_buf_addr = dma_map_single(&host->pdev->dev, host->dma_buf, 64, DMA_FROM_DEVICE);
 
-	dev_dbg(dev, "dma_buf_addr:%x, dma_buf: %x\n", (u32)host->dma_buf_addr, (u32)host->dma_buf);
-
 	ret = mmc_add_host(mmc);
 	if (ret) {
-		dev_err(dev, "mmc_add_host fail: %d\n",ret);
+		dev_err(dev, "Failed to add mmc host: %d\n", ret);
 		return ret;
 	}
 
@@ -1171,8 +1173,9 @@ static int rtk_mmc_probe(struct platform_device *pdev)
 	int ret;
 
 	mmc = mmc_alloc_host(sizeof(*host), dev);
-	if (!mmc)
+	if (!mmc) {
 		return -ENOMEM;
+	}
 
 	mmc->ops = &rtk_mmc_ops;
 	host = mmc_priv(mmc);
@@ -1190,33 +1193,33 @@ static int rtk_mmc_probe(struct platform_device *pdev)
 	host->mmc_clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(host->mmc_clk)) {
 		ret =  PTR_ERR(host->mmc_clk);
-		dev_err(&pdev->dev, "Fail to get rcc clk: %d\n", ret);
+		dev_err(&pdev->dev, "Failed to get clock: %d\n", ret);
 		goto err;
 	}
 
 	ret = clk_prepare_enable(host->mmc_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable clock: %d\n", ret);
 		goto err;
 	}
 
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq <= 0) {
 		ret = -EINVAL;
-		dev_err(dev, "get irq error");
+		dev_err(dev, "Failed to get IRQ\n");
 		goto err;
 	}
 
 	ret = devm_request_irq(dev, host->irq, rtk_mmc_irq,
 						   0, mmc_hostname(mmc), host);
 	if (ret) {
-		dev_err(dev, "failed to request IRQ %d: %d\n", host->irq, ret);
+		dev_err(dev, "Failed to request IRQ %d: %d\n", host->irq, ret);
 		return ret;
 	}
 
 	ret = rtk_mmc_sdioh_init(mmc, SDIOH_BUS_WIDTH_1BIT);
 	if (ret) {
-		dev_err(dev, "SDIOH init fail: %d\n", ret);
+		dev_err(dev, "Failed to init SDIOH: %d\n", ret);
 		rtk_mmc_sdioh_deinit(mmc);
 		goto err;
 	}
@@ -1227,16 +1230,16 @@ static int rtk_mmc_probe(struct platform_device *pdev)
 
 	ret = rtk_mmc_add_host(host);
 	if (ret) {
-		dev_err(dev, "rtk_mmc_add_host fail: %d\n", ret);
+		dev_err(dev, "Failed to add host: %d\n", ret);
 		goto err;
 	}
+	dev_info(dev, "MMC init done\n");
 
 	platform_set_drvdata(pdev, host);
 
 	return 0;
 
 err:
-	dev_err(dev, "%s -> err %d\n", __func__, ret);
 	mmc_free_host(mmc);
 
 	return ret;
@@ -1253,15 +1256,13 @@ MODULE_DEVICE_TABLE(of, rtk_mmc_match);
 static struct platform_driver rtk_mmc_driver = {
 	.probe      = rtk_mmc_probe,
 	.driver     = {
-		.name		= "amebad2-sdiohost",
+		.name		= "realtek-amebad2-sdiohost",
 		.of_match_table	= rtk_mmc_match,
 	},
 };
 
 builtin_platform_driver(rtk_mmc_driver);
 
-
-MODULE_DESCRIPTION("realtek AmebaD2 SDIO Host driver");
+MODULE_DESCRIPTION("Realtek Ameba MMC driver");
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-
+MODULE_AUTHOR("Realtek Corporation");

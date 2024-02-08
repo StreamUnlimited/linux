@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/include/entry-macro-gic.S
- *
- * Copyright 2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek GIC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <asm/hardware/gic.h>
 

@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Driver for Realtek IPCam RTS39XX SPI Controller
- *
- * Copyright (C) 2015 Darcy Lu, Realtek <darcy_lu@realsil.com.cn>
- * Copyright (C) 2016 Jim Cao, Realtek <jim_cao@realsil.com.cn>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License verqspiion 2 as
- * published by the Free Software Foundation.
- */
+* Realtek SPIC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/clk.h>
@@ -119,7 +116,7 @@ static void rts_user_mode_En(struct rts_qspi *rqspi, u8 enable)
 	u32 reg;
 	u32 BusyCheck = 0;
 
-	/* Wait spic busy done before switch mode */
+	/* Wait SPIC busy done before switch mode */
 	do {
 		BusyCheck = (rts_readl(rqspi, REG_SR) & BIT_BUSY);
 
@@ -198,7 +195,7 @@ static int rts_qspi_read_xfer(struct spi_nor *nor,
 
 	ret = rts_qspi_controller_ready(rqspi);
 	if (ret) {
-		dev_err(nor->dev, "controller busy\n");
+		dev_err(nor->dev, "Controller is busy\n");
 		goto end;
 	}
 
@@ -206,7 +203,7 @@ end:
 	rts_user_mode_En(rqspi, 0);
 
 	if (ret != 0) {
-		dev_err(nor->dev, "%s() failed, ret = %d\n", __func__, ret);
+		dev_err(nor->dev, "Read failed: %d\n", ret);
 	}
 
 	return ret;
@@ -231,7 +228,7 @@ static int rts_qspi_write_xfer(struct spi_nor *nor,
 	reg |= TMOD(cfg->mode) | ADDR_CH(cfg->addr_pins >> 1) | DATA_CH(cfg->mode_pins >> 1) | CMD_CH(cfg->cmd_pins >> 1);
 	rts_writel(rqspi, REG_CTRLR0, reg);
 
-	/* when transmited bytes are not greater than 4, use ADDR_LENGTH
+	/* When transmited bytes are not greater than 4, use ADDR_LENGTH
 	 * to indicate non-cmd bytes. When len equals zero, we don't
 	 * push data into FIFO, just ignore it.
 	 */
@@ -276,7 +273,7 @@ static int rts_qspi_write_xfer(struct spi_nor *nor,
 
 	ret = rts_qspi_controller_ready(rqspi);
 	if (ret) {
-		dev_err(nor->dev, "controller busy\n");
+		dev_err(nor->dev, "Controller is busy\n");
 		goto end;
 	}
 
@@ -284,7 +281,7 @@ end:
 	rts_user_mode_En(rqspi, 0);
 
 	if (ret != 0) {
-		dev_err(nor->dev, "%s() failed, errno = %d\n", __func__, ret);
+		dev_err(nor->dev, "Write failed: %d\n", ret);
 	}
 
 	return ret;
@@ -347,7 +344,7 @@ static ssize_t rts_qspi_read(struct spi_nor *nor, loff_t from,
 	u8 dum_en = 0, db_cycles = 0;
 	int ret;
 
-	/* set channel */
+	/* Set channel */
 	switch (nor->read_proto) {
 	case SNOR_PROTO_4_4_4:
 		cmd_pins = 4;
@@ -384,7 +381,7 @@ static ssize_t rts_qspi_read(struct spi_nor *nor, loff_t from,
 		mode_pins = 1;
 		break;
 	default:
-		dev_err(nor->dev, "Invalid read opcode!\n");
+		dev_err(nor->dev, "Invalid read opcode\n");
 		return -EINVAL;
 	}
 
@@ -448,7 +445,7 @@ static ssize_t rts_qspi_write(struct spi_nor *nor, loff_t to,
 		mode_pins = 4;
 		break;
 	default:
-		dev_err(nor->dev, "Invalid Page Program opcode\n");
+		dev_err(nor->dev, "Invalid page program opcode\n");
 		return -EINVAL;
 	}
 
@@ -485,7 +482,7 @@ static ssize_t rts_qspi_write(struct spi_nor *nor, loff_t to,
 	return len;
 
 FAIL:
-	dev_err(nor->dev, "%s() failed, ret = %d\n", __func__, ret);
+	dev_err(nor->dev, "Write failed: %d\n", ret);
 	return ret;
 }
 
@@ -540,7 +537,7 @@ static int rts_qspi_erase(struct spi_nor *nor, loff_t offs)
 	return 0;
 
 FAIL:
-	dev_err(nor->dev, "%s() failed, ret = %d\n", __func__, ret);
+	dev_err(nor->dev, "Erase failed: %d\n", ret);
 	return ret;
 }
 
@@ -557,7 +554,7 @@ static int rts_qspi_setup(struct rts_qspi *rqspi)
 	 */
 	rts_writel(rqspi, REG_SSIENR, 0);	/* Disable SPIC */
 
-	/* spi mode */
+	/* SPI mode */
 	reg = 0;
 	if (bi->mode & SPI_CPOL) {
 		reg |= BIT_SCPOL;
@@ -604,20 +601,20 @@ static int rts_qspi_setup(struct rts_qspi *rqspi)
 	reg &= ~(BIT_DUM_EN);
 	rts_writel(rqspi, REG_VALID_CMD, reg);
 #endif
-	/* pin route */
+	/* Pin route */
 	reg = rts_readl(rqspi, REG_CTRLR2);
 	reg &= ~(BIT_SO_DNUM | BIT_WPN_DNUM);
 	reg |= BIT_SO_DNUM;
 	rts_writel(rqspi, REG_CTRLR2, reg);
 
 #ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	rts_writel(rqspi, REG_IMR, BIT_ACEIM | BIT_ACSIM);	/* enable ACSIM interrupt */
+	rts_writel(rqspi, REG_IMR, BIT_ACEIM | BIT_ACSIM);	/* Enable ACSIM interrupt */
 	rqspi->timeout_ms = 5000;
 #endif
 #ifdef CONFIG_SPI_RTS_QUADSPI_POLLING
 	rts_writel(rqspi, REG_IMR, 0);	/* Disable all interrupt */
 #endif
-	rts_writel(rqspi, REG_SER, 1);	/* cs actived */
+	rts_writel(rqspi, REG_SER, 1);	/* CS actived */
 
 	rts_writel(rqspi, REG_WRITE_SINGLE, 0xBB);
 
@@ -674,8 +671,6 @@ static irqreturn_t rtsx_qspi_isr(int irq, void *dev_id)
 	}
 	rts_writel(rqspi, REG_ICR, 0); /* clear ICR */
 
-	dev_dbg(&(rqspi->pdev->dev), "----- IRQ: 0x%08x -----\n", int_reg);
-
 	if (int_reg & (BIT_ACEIS | BIT_ACSIS)) {
 		if (int_reg & BIT_ACEIS) {
 			rqspi->auto_check_status = STATUS_TIMEOUT;
@@ -701,7 +696,7 @@ static int rtsx_qspi_acquire_irq(struct rts_qspi *rqspi)
 	err = request_irq(rqspi->irq, rtsx_qspi_isr, IRQF_SHARED,
 					  RTSX_QSPI_DRV_NAME, rqspi);
 	if (err)
-		dev_err(&(rqspi->pdev->dev), "request IRQ %d failed\n",
+		dev_err(&(rqspi->pdev->dev), "Failed to request IRQ %d\n",
 				rqspi->irq);
 
 	return err;
@@ -709,7 +704,7 @@ static int rtsx_qspi_acquire_irq(struct rts_qspi *rqspi)
 #endif
 
 static const struct of_device_id rts_qspi_dt_ids[] = {
-	{ .compatible = "realtek,rxi312-spi-nor" },
+	{ .compatible = "realtek,rxi312-nor" },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, rts_qspi_dt_ids);
@@ -763,20 +758,19 @@ static int rts_qspi_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
-		dev_err(&pdev->dev, "get resource failed!\n");
+		dev_err(&pdev->dev, "Failed to get resource\n");
 		return -EINVAL;
 	}
 
 	regs = devm_ioremap_resource(&pdev->dev, res);
 	if (!regs) {
-		dev_err(&pdev->dev, "ioremap failed, phy address:%x\n",
-				res->start);
+		dev_err(&pdev->dev, "Failed to ioremap address\n");
 		return -ENOMEM;
 	}
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
-		dev_err(&pdev->dev, "get irq failed!\n");
+		dev_err(&pdev->dev, "Failed to get IRQ\n");
 		return -ENXIO;
 	}
 
@@ -786,14 +780,14 @@ static int rts_qspi_probe(struct platform_device *pdev)
 	clk = devm_clk_get(&pdev->dev, "spi_ck");
 
 	if (IS_ERR(clk)) {
-		dev_err(&pdev->dev, "get clock failed!\n");
+		dev_err(&pdev->dev, "Failed to get clock\n");
 		return PTR_ERR(clk);
 	}
 
 	spiclk_hz = clk_get_rate(clk);
 	if (!spiclk_hz)  {
 		dev_err(&pdev->dev,
-				"get invalid clock rate: %d\n", spiclk_hz);
+				"Invalid clock rate: %d\n", spiclk_hz);
 		return -EINVAL;
 	}
 #else
@@ -803,20 +797,20 @@ static int rts_qspi_probe(struct platform_device *pdev)
 	board_info = rts_spi_board_info;
 	data = board_info->platform_data;
 	if (!(data && data->type)) {
-		dev_err(&pdev->dev, "get invalid flash data info\n");
+		dev_err(&pdev->dev, "Invalid flash data info\n");
 		return -EINVAL;
 	}
 	rqspi->bi = board_info;
 	mode = (int) board_info->controller_data;
 	if (mode <= 0 || mode > SNOR_PROTO_4_4_4) {
-		dev_err(&pdev->dev, "get invalid spi channel info\n");
+		dev_err(&pdev->dev, "Invalid SPI channel info\n");
 		return -EINVAL;
 	}
 
 	ret = of_property_read_u32(np, "spi-max-frequency",
 							   &(rqspi->bi->max_speed_hz));
 	if (ret) {
-		dev_err(&pdev->dev, "There's no spi-max-frequency propert.\n");
+		dev_err(&pdev->dev, "No spi-max-frequency property in DTS\n");
 		return -EINVAL;
 	}
 
@@ -832,18 +826,18 @@ static int rts_qspi_probe(struct platform_device *pdev)
 
 		channel_mode = rts_channel_map(channels, channel_str);
 		if (channel_mode <= 0) {
-			dev_info(&pdev->dev,
-					 "invalid channel parameter: %s\n", channels);
+			dev_err(&pdev->dev,
+					"Invalid channel parameter: %s\n", channels);
 			return -EINVAL;
 		} else if (channel_mode != mode) {
 			dev_info(&pdev->dev,
-					 "force to set channels from %s mode to %s mode\n",
+					 "Force to set channels from %s mode to %s mode\n",
 					 channel_str[mode], channel_str[channel_mode]);
 			mode = channel_mode;
 		}
 	}
 
-	/* work around for spi_nor_scan check */
+	/* Work around for spi_nor_scan check */
 	pdev->dev.platform_data = (struct flash_platform_data *)data;
 
 	platform_set_drvdata(pdev, rqspi);
@@ -883,7 +877,7 @@ static int rts_qspi_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* fill the hooks */
+	/* Fill the hooks */
 	nor->read_reg = rts_qspi_read_reg;
 	nor->write_reg = rts_qspi_write_reg;
 	nor->read = rts_qspi_read;
@@ -904,11 +898,8 @@ static int rts_qspi_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* restore platform_data */
+	/* Restore platform_data */
 	pdev->dev.platform_data = board_info;
-
-	dev_info(&pdev->dev, "Realtek QSPI Controller at 0x%08lx (irq %d)\n",
-			 (unsigned long)res->start, irq);
 
 	return 0;
 }
@@ -926,7 +917,7 @@ static int rts_qspi_remove(struct platform_device *pdev)
 
 static struct platform_driver rts_qspi_driver = {
 	.driver = {
-		.name	= "rts-quadspi",
+		.name	= "realtek-rxi312-nor",
 		.owner	= THIS_MODULE,
 		.of_match_table = rts_qspi_dt_ids,
 	},
@@ -935,7 +926,7 @@ static struct platform_driver rts_qspi_driver = {
 };
 module_platform_driver(rts_qspi_driver);
 
-MODULE_ALIAS("platform:rts-quadspi");
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("QuadSPI flash controller driver for realtek IoT-control soc");
-MODULE_AUTHOR("Realsil");
+MODULE_ALIAS("platform:realtek-rxi312-nor");
+MODULE_DESCRIPTION("Realtek Ameba Quad SPIC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

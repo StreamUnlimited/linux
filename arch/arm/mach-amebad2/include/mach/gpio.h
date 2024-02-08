@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/include/mach/io.h:
- *
- * Copyright 2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek GPIO support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #ifndef _GPIO_H_
 #define _GPIO_H_

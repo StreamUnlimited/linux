@@ -1,7 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * MIPI-DSI Synaptics R63353 panel driver. This is a 1280*720
- */
+* Realtek Panel support
+*
+* MIPI-DSI Synaptics R63353 panel driver. This is a 1280*720
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <drm/drm_modes.h>
 #include <drm/drm_mipi_dsi.h>
@@ -40,7 +44,7 @@ static struct drm_display_mode r63353_mode = {
 	.vsync_start = 1280 + 2,
 	.vsync_end = 1280 + 2 + 4,
 	.vtotal = 1280 + 2 + 4 + 0,
-	.vrefresh = 60,
+	.vrefresh = 30,
 };
 
 static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
@@ -195,7 +199,7 @@ static int dsi_gpio_reset(int iod,int value,int flag)
 	if(flag == 0) {
 		req_status = gpio_request(gpio_index, NULL);
 		if (req_status != 0) {
-			DRM_WARN("gpio request failed!\n");
+			DRM_ERROR("Gpio request failed!\n");
 			return -EINVAL;
 		}
 		gpio_set_value(gpio_index,value);
@@ -203,7 +207,7 @@ static int dsi_gpio_reset(int iod,int value,int flag)
 
 	set_direct_status = gpio_direction_output(gpio_index,value);
 	if (IS_ERR_VALUE(set_direct_status)) {
-		DRM_WARN("set gpio direction output failed\n");
+		DRM_ERROR("Set gpio direction output failed\n");
 		return -EINVAL;
 	}
 	if(flag){
@@ -237,7 +241,7 @@ static int r63353_enable(struct drm_panel *panel)
 	ret |= dsi_gpio_reset(handle->gpio_pwm,1,1);
 //		mdelay(1000);
 	if (ret) {
-		DRM_DEV_ERROR(dev, "Failed to set dsi spio\n");
+		DRM_ERROR("Failed to set dsi gpio\n");
 		return ret ;
 	}
 
@@ -257,7 +261,7 @@ static int r63353_get_modes(struct drm_panel *panel)
 
 	mode = drm_mode_duplicate(panel->drm, &r63353_mode);
 	if (!mode) {
-		DRM_ERROR("bad mode or failed to add mode\n");
+		DRM_ERROR("Bad mode or fail to add mode\n");
 		return -EINVAL;
 	}
 	drm_mode_set_name(mode);
@@ -286,24 +290,24 @@ static int r63353_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	//gpio
 	r63353_data->gpio_reset = of_get_named_gpio_flags(np, "mipi-reset", 0, &flags);
 	if (!gpio_is_valid(r63353_data->gpio_reset)) {
-		pr_err("drm mipi dsi node failed to get mipi-reset\n");
+		DRM_ERROR("Drm mipi dsi node fail to get mipi-reset\n");
 		return -ENODEV;
 	}
 
 	r63353_data->gpio_v01 = of_get_named_gpio_flags(np, "mipi-v01", 0, &flags);
 	if (!gpio_is_valid(r63353_data->gpio_v01)) {
-		pr_err("drm mipi dsi node failed to get mipi-v01\n");
+		DRM_ERROR("Drm mipi dsi node fail to get mipi-v01\n");
 		return -ENODEV;
 	}
 	r63353_data->gpio_v02 = of_get_named_gpio_flags(np, "mipi-v02", 0, &flags);
 	if (!gpio_is_valid(r63353_data->gpio_v02)) {
-		pr_err("drm mipi dsi node failed to get mipi-v02\n");
+		DRM_ERROR("Drm mipi dsi node fail to get mipi-v02\n");
 		return -ENODEV;
 	}
 
 	r63353_data->gpio_pwm = of_get_named_gpio_flags(np, "mipi-pwm", 0, &flags);
 	if (!gpio_is_valid(r63353_data->gpio_pwm)) {
-		pr_err("drm mipi dsi node failed to get mipi-pwm\n");
+		DRM_ERROR("Drm mipi dsi node fail to get mipi-pwm\n");
 		return -ENODEV;
 	}
 

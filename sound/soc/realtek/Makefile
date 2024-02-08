@@ -7,5 +7,4 @@ obj-$(CONFIG_SND_SOC_SPORT_RTK_AMEBA) += snd-soc-realtek-clock.o
 obj-$(CONFIG_SND_SOC_SPORT_RTK_AMEBA) += snd-soc-realtek-i2s.o
 obj-$(CONFIG_SND_SOC_DMA_RTK_AMEBA) += snd-soc-realtek-dma.o
 obj-$(CONFIG_SND_SOC_RTK_AMEBA) += snd-soc-realtek-rtl8730e-machine.o
-obj-$(CONFIG_SND_SOC_RTK_CAPTURE_TIMER) += ameba-captimer.o
 

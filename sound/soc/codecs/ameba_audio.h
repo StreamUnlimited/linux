@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek ALSA support
+*
+* Copyright (C) 2021, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _AMEBAD2_AUDIO_H_
 #define _AMEBAD2_AUDIO_H_
 
@@ -5194,6 +5201,7 @@ void audio_codec_set_dac_volume(u32 channel, u32 Gain, void __iomem	* audio_base
 u32  audio_codec_get_dac_volume(u32 channel, void __iomem	* audio_base_addr);
 void audio_codec_set_dac_mute(u32 channel, bool mute, void __iomem	* audio_base_addr);
 bool  audio_codec_get_dac_mute(u32 channel, void __iomem	* audio_base_addr);
+void audio_codec_set_dac_asrc_rate(int rate, void __iomem *audio_base_addr);
 void audio_codec_set_dac_asrc(bool NewState, void __iomem	* audio_base_addr);
 void audio_codec_set_adc_mode(u32 adc_sel, u32 powermode,void __iomem * aud_analog);
 void audio_codec_set_hpo_diff(void __iomem * aud_analog);

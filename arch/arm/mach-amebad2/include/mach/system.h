@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/include/mach/system.h:
- *
- * Copyright 2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek System support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #ifndef _SYSTEM_H_
 #define _SYSTEM_H_

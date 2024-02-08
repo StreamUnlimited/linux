@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek LEDC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/leds.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -667,6 +674,7 @@ struct rtk_ws28xxx_led_priv {
 	struct rtk_ws28xxx_ledc_init	ledc_params;
 	struct rtk_ledc_dmac_parameters	dma_params;
 	struct rtk_ledc_cpu_parameters	cpu_params;
+	struct device *dev;
 };
 
 #ifndef ENABLE

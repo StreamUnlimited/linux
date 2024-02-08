@@ -1,32 +1,19 @@
-/**
-  ******************************************************************************
-  * @file    i2c-realtek.c
-  * @author
-  * @version V2.0.0
-  * @date    2022-04-24
-  * @brief   This file contains all the functions prototypes for the I2C firmware
-  *          library, including the following functionalities of theIntel-Integrated
-  *             Circuit (I2C) peripheral:
-  *           - I2C Master mode:
-  *             1) rtk_i2c_xfer: to send or receive i2c messages as i2c master.
-  *           - I2C Slave mode:
-  *             1) rtk_i2c_reg_slave: to register an i2c slave,
-  *             2) rtk_i2c_unreg_slave: to unregister an i2c slave.
-  *
-  *  @verbatim
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek I2C support
+*
+*       - I2C Master mode:
+*             1) rtk_i2c_xfer: to send or receive i2c messages as i2c master.
+*       - I2C Slave mode:
+*             1) rtk_i2c_reg_slave: to register an i2c slave,
+*             2) rtk_i2c_unreg_slave: to unregister an i2c slave.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "i2c-realtek.h"
 
-/*below parameters are used for I2C speed fine-tune*/
+/*Below parameters are used for I2C speed fine-tune*/
 u32 IC_SS_SCL_HCNT_TRIM = 0;
 u32 IC_SS_SCL_LCNT_TRIM = 0;
 u32 IC_FS_SCL_HCNT_TRIM = 0;
@@ -54,17 +41,8 @@ void rtk_i2c_reg_update(void __iomem *ptr, u32 reg, u32 mask, u32 value)
 	rtk_i2c_writel(ptr, reg, temp);
 }
 
-static void assert_param(u8 check_result)
-{
-	if (!check_result) {
-		pr_err("i2c-realtek.c: assert_param illegal parameter.");
-	}
-}
-
 void rtk_i2c_enable_cmd(struct rtk_i2c_hw_params *i2c_param, u8 new_state)
 {
-	pr_debug("%s, new_state = %d", __FUNCTION__, new_state);
-
 	if (new_state == ENABLE) {
 		/* Enable the selected I2C peripheral */
 		rtk_i2c_reg_update(i2c_param->i2c_dev->base, IC_ENABLE, I2C_BIT_ENABLE, I2C_BIT_ENABLE);
@@ -84,13 +62,13 @@ static void rtk_get_dts_info(
 {
 	int nr_requests, ret;
 
-	/* get dts params. */
+	/* Get DTS params. */
 	ret = of_property_read_u32(np, dts_name, &nr_requests);
 	if (ret) {
-		dev_err(i2c_dev->dev, "can't get %s", dts_name);
+		dev_warn(i2c_dev->dev, "Can't get DTS property %s, set it to default value %d\n", dts_name, default_value);
 		*param_to_set = default_value;
 	} else {
-		dev_dbg(i2c_dev->dev, "%s = %d", dts_name, nr_requests);
+		dev_dbg(i2c_dev->dev, "Get DTS property %s = %d\n", dts_name, nr_requests);
 		*param_to_set = nr_requests;
 	}
 }
@@ -117,9 +95,9 @@ static void rtk_i2c_struct_init(
 		i2c_dev->i2c_manage.operation_type = I2C_INTR_TYPE;
 	}
 	rtk_get_dts_info(i2c_dev, np, &i2c_dev->nr_slaves, 0, s5);
-    if (i2c_dev->nr_slaves > 2) {
-        dev_err(i2c_dev->dev, "Realtek i2c slave only support no more than 2 devices.");
-    }
+	if (i2c_dev->nr_slaves > 2) {
+		dev_warn(i2c_dev->dev, "Realtek I2C slave only support no more than 2 devices\n");
+	}
 
 	/* Load HAL initial data structure default value */
 	i2c_param->i2c_master = I2C_MASTER_MODE;
@@ -147,12 +125,12 @@ static void rtk_i2c_struct_init(
 	rtk_get_dts_info(i2c_dev, np, &i2c_param->i2c_clk, 100, s2);
 
 	if (i2c_param->i2c_clk > i2c_dev->i2c_param.i2c_ip_clk) {
-		dev_err(i2c_dev->dev, "Invalid clock for i2c-%d.", i2c_param->i2c_index);
+		dev_warn(i2c_dev->dev, "Invalid clock for I2C %d\n", i2c_param->i2c_index);
 		i2c_param->i2c_clk = i2c_dev->i2c_param.i2c_ip_clk;
 	}
 
 	if ((i2c_param->i2c_index == 0) && (i2c_param->i2c_clk >= 400000)) {
-		dev_err(i2c_dev->dev, "This speed is too large for i2c-0. May try i2c-1 or i2c-2 for this slave. Speed will be cut down to 400K.");
+		dev_warn(i2c_dev->dev, "This speed is too large for I2C0. May try I2C1 or I2C2 for this slave. Speed will be cut down to 400K\n");
 		i2c_param->i2c_clk = 400000;
 		if (i2c_param->i2c_clk >= 400000) {
 			i2c_param->i2c_speed_mode = I2C_FS_MODE;
@@ -162,12 +140,12 @@ static void rtk_i2c_struct_init(
 	}
 
 	if ((i2c_param->i2c_index != 0) && (i2c_param->i2c_clk > 4000000)) {
-		dev_err(i2c_dev->dev, "This speed is too large for i2c-%d. Speed will be cut down to 4M.", i2c_param->i2c_index);
+		dev_warn(i2c_dev->dev, "This speed is too large for I2C%d. Speed will be cut down to 4M\n", i2c_param->i2c_index);
 		i2c_param->i2c_clk = 4000000;
 		if (i2c_param->i2c_clk >= 1700000) {
-			dev_err(i2c_dev->dev, "Only <one-master-and-one-slave> mode is supported by this speed.");
-			dev_err(i2c_dev->dev, "Please confirm your devices and delete hs_lock in code manually to use HS Mode.");
-			dev_err(i2c_dev->dev, "Otherwise, the speed will be cut down to 1M.");
+			dev_warn(i2c_dev->dev, "Only <one-master-and-one-slave> mode is supported by this speed\n");
+			dev_warn(i2c_dev->dev, "Please confirm your devices and delete hs_lock in code manually to use HS Mode\n");
+			dev_warn(i2c_dev->dev, "Otherwise, the speed will be cut down to 1M\n");
 			if (hs_lock) {
 				i2c_param->i2c_speed_mode = I2C_HS_MODE;
 			} else {
@@ -227,7 +205,7 @@ static void rtk_i2c_set_hw_speed(
 	}
 
 	case I2C_HS_MODE: {
-		/*set Fast mode count for Master code*/
+		/* Set fast mode count for master code */
 		ichl_cnt = (ich_cnt * I2C_FS_MIN_SCL_LTIME) / (I2C_FS_MIN_SCL_HTIME + I2C_FS_MIN_SCL_LTIME);
 		ichh_cnt = (ich_cnt * I2C_FS_MIN_SCL_HTIME) / (I2C_FS_MIN_SCL_HTIME + I2C_FS_MIN_SCL_LTIME);
 
@@ -261,24 +239,20 @@ static void rtk_i2c_set_hw_speed(
 		break;
 	}
 
-	dev_dbg(i2c_param->i2c_dev->dev, "current mode = %d", speed_mode);
-	dev_dbg(i2c_param->i2c_dev->dev, "high level count = %d", ichh_cnt);
-	dev_dbg(i2c_param->i2c_dev->dev, "low level count = %d", ichl_cnt + 1);
+	dev_dbg(i2c_param->i2c_dev->dev, "Set current mode = %d\n", speed_mode);
+	dev_dbg(i2c_param->i2c_dev->dev, "Set high level count = %d\n", ichh_cnt);
+	dev_dbg(i2c_param->i2c_dev->dev, "Set low level count = %d\n", ichl_cnt + 1);
 }
 
 u8 rtk_i2c_check_flag_state(struct rtk_i2c_hw_params *i2c_param, u32 i2c_flag)
 {
 	u8 bit_status = 0;
 
-	/* Poll i2c flag state! */
+	/* Poll I2C flag state! */
 	if ((rtk_i2c_readl(i2c_param->i2c_dev->base, IC_STATUS) & i2c_flag) != 0) {
 		/* I2C_FLAG is set */
 		bit_status = 1;
 	}
-
-#if RTK_I2C_DEBUG_EXTEND
-	pr_debug("%s: bit [0x%x] result %x", __FUNCTION__, i2c_flag, bit_status);
-#endif // RTK_I2C_DEBUG_EXTEND
 
 	/* Return the I2C_FLAG status */
 	return  bit_status;
@@ -289,8 +263,6 @@ void rtk_i2c_interrupt_config(
 	u32 i2c_interrupt, u32 new_state)
 {
 	u32 temp_val;
-
-	pr_debug("%s, %s", __FUNCTION__, new_state ? "enable" : "disable");
 
 	temp_val = rtk_i2c_readl(i2c_param->i2c_dev->base, IC_INTR_MASK);
 	if (new_state == ENABLE) {
@@ -369,10 +341,12 @@ void rtk_i2c_init_hw(struct rtk_i2c_hw_params *i2c_param)
 	u8 specical;
 
 	/* Check the parameters */
-	assert_param(IS_I2C_ADDR_MODE(i2c_param->i2c_addr_mode));
-	assert_param(IS_I2C_SPEED_MODE(i2c_param->i2c_speed_mode));
+	if (!IS_I2C_ADDR_MODE(i2c_param->i2c_addr_mode) || !IS_I2C_SPEED_MODE(i2c_param->i2c_speed_mode)) {
+		dev_err(i2c_param->i2c_dev->dev, "Init HW with illegal parameter\n");
+		return;
+	}
 
-	/* Disable the IC first */
+	/* Disable the I2C first */
 	rtk_i2c_enable_cmd(i2c_param, DISABLE);
 
 	/* Master case*/
@@ -458,9 +432,6 @@ u8 rtk_i2c_receive_data(
 	u8 data_recved;
 
 	data_recved = rtk_i2c_readl(i2c_param->i2c_dev->base, IC_DATA_CMD);
-#if RTK_I2C_DEBUG_EXTEND
-	pr_debug("rtk i2c received data = %x", data_recved);
-#endif // RTK_I2C_DEBUG_EXTEND
 
 	/* Return the data in the DR register */
 	return data_recved;
@@ -523,8 +494,7 @@ static void rtk_i2c_isr_handle_tx_abort(
 
 hal_status rtk_i2c_flow_init(struct rtk_i2c_dev *i2c_dev)
 {
-	dev_dbg(i2c_dev->dev, "%s, mode = %d (0: slave, 1: master)", __FUNCTION__,
-			i2c_dev->i2c_param.i2c_master);
+	dev_dbg(i2c_dev->dev, "I2C mode = %s\n", i2c_dev->i2c_param.i2c_master ? "master" : "slave");
 
 	/* I2C Device Status Update */
 	i2c_dev->i2c_manage.dev_status = I2C_STS_INITIALIZED;
@@ -562,11 +532,8 @@ static void rtk_i2c_isr_handle_tx_over(struct rtk_i2c_dev *i2c_dev)
 static void rtk_i2c_isr_handle_rx_full(struct rtk_i2c_dev *i2c_dev)
 {
 	if (i2c_dev->i2c_param.i2c_master == I2C_MASTER_MODE) {
-#if RTK_I2C_DEBUG_EXTEND
-		pr_debug(" rx full by fifo data len = %d", i2c_dev->i2c_manage.rx_info.data_len);
-#endif // RTK_I2C_DEBUG_EXTEND
 		rtk_i2c_isr_master_handle_rx_full(i2c_dev);
-    } else {
+	} else {
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_isr_slave_handle_rx_full(i2c_dev);
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
@@ -580,16 +547,15 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 
 	/* Time-Out check */
 	if (i2c_dev->i2c_param.i2c_master == I2C_MASTER_MODE) {
-        if (rtk_i2c_master_irq_wait_timeout(i2c_dev)) {
-		    return IRQ_HANDLED;
-        }
+		if (rtk_i2c_master_irq_wait_timeout(i2c_dev)) {
+			return IRQ_HANDLED;
+		}
 	}
 
 	intr_status = rtk_i2c_get_interrupt(&i2c_dev->i2c_param);
 	/* I2C ADDR MATCH Intr*/
 	if (intr_status & I2C_BIT_R_LP_WAKE_2) {
 		/* Clear I2C interrupt */
-		pr_debug("I2C_BIT_R_LP_WAKE_2 \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
 			rtk_i2c_isr_slave_handle_sar2_wake(i2c_dev);
@@ -600,7 +566,6 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 	/* I2C ADDR MATCH Intr*/
 	if (intr_status & I2C_BIT_R_LP_WAKE_1) {
 		/* Clear I2C interrupt */
-		pr_debug("I2C_BIT_R_LP_WAKE_1 \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
 			rtk_i2c_isr_slave_handle_sar1_wake(i2c_dev);
@@ -621,39 +586,29 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 
 	/* I2C START DET Intr */
 	if (intr_status & I2C_BIT_R_START_DET) {
-#if RTK_I2C_DEBUG_EXTEND
-		pr_debug("I2C_BIT_R_START_DET \n");
-#endif // RTK_I2C_DEBUG_EXTEND
 		/* Clear I2C interrupt */
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_START_DET);
 	}
 
 	/* I2C STOP DET Intr */
 	if (intr_status & I2C_BIT_R_STOP_DET) {
-#if RTK_I2C_DEBUG_EXTEND
-		pr_debug("I2C_BIT_R_STOP_DET \n");
-#endif // RTK_I2C_DEBUG_EXTEND
 		/* Clear I2C interrupt */
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_STOP_DET);
 	}
 
 	/* I2C Activity Intr */
 	if (intr_status & I2C_BIT_R_ACTIVITY) {
-#if RTK_I2C_DEBUG_EXTEND
-		pr_debug("I2C_BIT_R_ACTIVITY \n");
-#endif // RTK_I2C_DEBUG_EXTEND
 		/* Clear I2C interrupt */
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_ACTIVITY);
 	}
 
 	/* I2C RX Done Intr */
 	if (intr_status & I2C_BIT_R_RX_DONE) {
-		//slave-transmitter and master not ACK it, This occurs on the last byte of
+		//Slave-transmitter and master not ACK it, This occurs on the last byte of
 		//the transmission, indicating that the transmission is done.
-		pr_debug("I2C_BIT_R_RX_DONE \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
-        		rkt_i2c_isr_slave_handle_res_done(i2c_dev);
+			rkt_i2c_isr_slave_handle_res_done(i2c_dev);
 		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RX_DONE);
@@ -661,10 +616,9 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 
 	/* I2C STOP DET Intr */
 	if (intr_status & I2C_BIT_M_STOP_DET) {
-		pr_debug("I2C_BIT_M_STOP_DET \n");
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 		if (i2c_dev->i2c_param.i2c_master == I2C_SLAVE_MODE) {
-        		rkt_i2c_isr_slave_handle_res_done(i2c_dev);
+			rkt_i2c_isr_slave_handle_res_done(i2c_dev);
 		}
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_M_STOP_DET);
@@ -672,13 +626,12 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 
 	/* I2C TX Abort Intr */
 	if (intr_status & I2C_BIT_R_TX_ABRT) {
-		pr_debug("TX_ABRT = %x\n", rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE));
 #if RTK_I2C_AUTO_RE_RECV
-		/* For xperi, if not recv enough bytes, trigger i2c recv agian automatically by driver.*/
+		/* For xperi, if not recv enough bytes, trigger I2C recv agian automatically by driver.*/
 		if ((rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE)) & I2C_BIT_ABRT_7B_ADDR_NOACK) {
 			/* Read mode: trigger hw retry. */
 			if (((i2c_dev->i2c_manage.dev_status == I2C_STS_RX_ING)
-				|| (i2c_dev->i2c_manage.dev_status == I2C_STS_RX_READY))
+				 || (i2c_dev->i2c_manage.dev_status == I2C_STS_RX_READY))
 				&& (i2c_dev->i2c_manage.rx_info.data_len)) {
 				rtk_i2c_receive_master(i2c_dev);
 			}
@@ -712,9 +665,6 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 
 	/* I2C TX Empty Intr */
 	if (intr_status & I2C_BIT_R_TX_EMPTY) {
-#if RTK_I2C_DEBUG_EXTEND
-		pr_debug("I2C_BIT_R_TX_EMPTY \n");
-#endif // RTK_I2C_DEBUG_EXTEND
 		rtk_i2c_isr_handle_tx_empty(i2c_dev);
 	}
 
@@ -739,9 +689,7 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RX_UNDER);
 	}
 
-#if RTK_I2C_DEBUG_EXTEND
-	pr_debug("REG IC_INTR_MASK 0x30 : %x", rtk_i2c_readl(i2c_dev->base, IC_INTR_MASK));
-#endif // RTK_I2C_DEBUG_EXTEND
+	dev_dbg(i2c_dev->dev, "REG IC_INTR_MASK = 0x%08X\n", rtk_i2c_readl(i2c_dev->base, IC_INTR_MASK));
 
 	return IRQ_HANDLED;
 }
@@ -751,7 +699,7 @@ static int rtk_i2c_probe(struct platform_device *pdev)
 	struct rtk_i2c_dev		*i2c_dev;
 	struct resource			*res;
 	struct device_node		*np = pdev->dev.of_node;
-    struct                  i2c_adapter *adap;
+	struct                  i2c_adapter *adap;
 	int ret;
 
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(struct rtk_i2c_dev), GFP_KERNEL);
@@ -767,13 +715,13 @@ static int rtk_i2c_probe(struct platform_device *pdev)
 
 	i2c_dev->clock = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(i2c_dev->clock)) {
-		dev_err(&pdev->dev, "Error: Missing controller clock\n");
+		dev_err(&pdev->dev, "Failed to get clock\n");
 		return PTR_ERR(i2c_dev->clock);
 	}
 
 	ret = clk_prepare_enable(i2c_dev->clock);
 	if (ret) {
-		dev_err(&pdev->dev, "Failed to prepare_enable clock\n");
+		dev_err(&pdev->dev, "Failed to enable clock\n");
 		return ret;
 	}
 
@@ -793,19 +741,19 @@ static int rtk_i2c_probe(struct platform_device *pdev)
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
 	adap->nr = i2c_dev->i2c_param.i2c_index;
-    i2c_dev->i2c_param.i2c_dev = i2c_dev;
-    i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
+	i2c_dev->i2c_param.i2c_dev = i2c_dev;
+	i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
 
-    if (i2c_dev->nr_slaves) {
+	if (i2c_dev->nr_slaves) {
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
-        ret = rtk_i2c_slave_probe(pdev, i2c_dev, adap);
+		ret = rtk_i2c_slave_probe(pdev, i2c_dev, adap);
 #endif // IS_ENABLED(CONFIG_I2C_SLAVE)
-    } else {
-        ret = rtk_i2c_master_probe(pdev, i2c_dev, adap);
-    }
-    if (ret < 0) {
-        goto clk_free;
-    }
+	} else {
+		ret = rtk_i2c_master_probe(pdev, i2c_dev, adap);
+	}
+	if (ret < 0) {
+		goto clk_free;
+	}
 
 #if RTK_I2C_TODO
 	pm_runtime_set_autosuspend_delay(i2c_dev->dev, RTK_AUTOSUSPEND_DELAY);
@@ -820,7 +768,7 @@ static int rtk_i2c_probe(struct platform_device *pdev)
 		goto pm_disable;
 	}
 
-	dev_info(i2c_dev->dev, "RTK I2C-%d bus adapter registered.\n", adap->nr);
+	dev_info(i2c_dev->dev, "I2C %d adapter registered\n", adap->nr);
 
 #if RTK_I2C_TODO
 	pm_runtime_mark_last_busy(i2c_dev->dev);
@@ -877,14 +825,14 @@ static const struct dev_pm_ops rtk_i2c_pm_ops = {
 #endif // RTK_I2C_TODO
 
 static const struct of_device_id rtk_i2c_match[] = {
-	{ .compatible = "realtek,amebad2-rtk-i2c"},
+	{ .compatible = "realtek,amebad2-i2c"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, rtk_i2c_match);
 
 static struct platform_driver rtk_i2c_driver = {
 	.driver = {
-		.name = "rtk-i2c",
+		.name = "realtek-amebad2-i2c",
 		.of_match_table = rtk_i2c_match,
 #if RTK_I2C_TODO
 		.pm = &rtk_i2c_pm_ops,
@@ -896,6 +844,6 @@ static struct platform_driver rtk_i2c_driver = {
 
 module_platform_driver(rtk_i2c_driver);
 
-MODULE_AUTHOR("realtek");
-MODULE_DESCRIPTION("RTK I2C driver");
+MODULE_DESCRIPTION("Realtek Ameba I2C driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

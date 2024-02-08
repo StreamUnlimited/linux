@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek ALSA support
+*
+* Copyright (C) 2021, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/delay.h>
@@ -1855,3 +1862,21 @@ void audio_codec_amic_deinit(void __iomem	* audio_base_addr,void __iomem	* aud_a
 }
 
 
+void audio_codec_set_dac_asrc_rate(int rate, void __iomem *audio_base_addr)
+{
+	u32 tmp;
+	u32 sel;
+
+	if (rate < 60000) {
+		sel = 0;
+	} else if (rate < 120000) {
+		sel = 1;
+	} else {
+		sel = 2;
+	}
+
+	tmp = readl(audio_base_addr + CODEC_ASRC_CONTROL_0);
+	tmp &= ~AUD_MASK_ASRC_RATE_SEL_TX;
+	tmp |= AUD_ASRC_RATE_SEL_TX(sel);
+	writel(tmp, audio_base_addr + CODEC_ASRC_CONTROL_0);
+}

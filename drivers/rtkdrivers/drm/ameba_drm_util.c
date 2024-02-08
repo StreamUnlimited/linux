@@ -1,17 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Realtek, LLC.
- * All rights reserved.
- *
- * Licensed under the Realtek License, Version 1.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License from Realtek
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Realtek DRM support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <video/mipi_display.h>
@@ -21,24 +14,24 @@
 #include "ameba_drm_comm.h"
 
 //should remove this to mode params
-#define MIPI_DSI_RTNI		2//4
+#define MIPI_DSI_RTNI         2//4
 
-#define MIPI_DSI_HSA		4  //hsw mode->hsync_end - mode->hsync_start;
-#define MIPI_DSI_HBP		30 //hbp mode->htotal - mode->hsync_end;
-#define MIPI_DSI_HFP		30 //hfp hsync_start - mode->hdisplay;
+#define MIPI_DSI_HSA          4  //hsw mode->hsync_end - mode->hsync_start;
+#define MIPI_DSI_HBP          30 //hbp mode->htotal - mode->hsync_end;
+#define MIPI_DSI_HFP          30 //hfp hsync_start - mode->hdisplay;
 
-#define MIPI_DSI_VSA		5  //vsw mode->vsync_end - mode->vsync_start;
-#define MIPI_DSI_VBP		20 //vbp mode->vtotal - mode->vsync_end;
-#define MIPI_DSI_VFP		15 //vfp mode->vsync_start - mode->vdisplay;
+#define MIPI_DSI_VSA          5  //vsw mode->vsync_end - mode->vsync_start;
+#define MIPI_DSI_VBP          20 //vbp mode->vtotal - mode->vsync_end;
+#define MIPI_DSI_VFP          15 //vfp mode->vsync_start - mode->vdisplay;
 
-#define Mhz			1000000UL
-#define T_LPX		5
-#define T_HS_PREP	6
-#define T_HS_TRAIL	8
-#define T_HS_EXIT	7
-#define T_HS_ZERO	10
+#define Mhz                   1000000UL
+#define T_LPX                 5
+#define T_HS_PREP             6
+#define T_HS_TRAIL            8
+#define T_HS_EXIT             7
+#define T_HS_ZERO             10
 
-#define DUMP_REG(a,b)   b,readl(a + b)
+#define DUMP_REG(a,b)         b,readl(a + b)
 
 /*
 	struct define
@@ -56,8 +49,8 @@ typedef struct {
 */
 static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u32 bgcolor, u16 widht, u16 height)
 {
-	u8 idx ;
-	rgb888_t bg_color;
+	u8                    idx ;
+	rgb888_t              bg_color;
 	if (NULL == plcdc_initstruct) {
 		return ;
 	}
@@ -84,29 +77,29 @@ static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u3
 //lcdc global register APIs
 void LcdcDumpRegValue(struct device *dev, void __iomem *address, const char *filename)
 {
-	void __iomem  *pLCDCx =  address;
-	void __iomem  *LCDC_Layerx;
-	u32 idx ;
+	void __iomem              *pLCDCx =  address;
+	void __iomem              *LCDC_Layerx;
+	u32                       idx ;
 
 	/*global register*/
-	DRM_DEV_INFO(dev, "[%s]Dump lcdc register value baseaddr : 0x%08x\n", filename, (u32)pLCDCx);
+	DRM_INFO("[%s]Dump lcdc register value baseaddr : 0x%08x\n", filename, (u32)pLCDCx);
 	
-	DRM_DEV_INFO(dev, "pLCDCx CTRL[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CTRL_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx PLANE_SIZE[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_PLANE_SIZE_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx UNDFLW_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_UNDFLW_CFG_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx DMA_MODE_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_DMA_MODE_CFG_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx SHW_RLD_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_SHW_RLD_CFG_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx BKG_COLOR[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_BKG_COLOR_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx DEBUG_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_DEBUG_STATUS_OFFSET));
+	DRM_INFO("pLCDCx CTRL[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CTRL_OFFSET));
+	DRM_INFO("pLCDCx PLANE_SIZE[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_PLANE_SIZE_OFFSET));
+	DRM_INFO("pLCDCx UNDFLW_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_UNDFLW_CFG_OFFSET));
+	DRM_INFO("pLCDCx DMA_MODE_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_DMA_MODE_CFG_OFFSET));
+	DRM_INFO("pLCDCx SHW_RLD_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_SHW_RLD_CFG_OFFSET));
+	DRM_INFO("pLCDCx BKG_COLOR[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_BKG_COLOR_OFFSET));
+	DRM_INFO("pLCDCx DEBUG_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_DEBUG_STATUS_OFFSET));
 
 	//interrupt related register
-	DRM_DEV_INFO(dev, "pLCDCx IRQ_EN[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_EN_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx IRQ_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_STATUS_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx IRQ_RAW[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_RAW_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx LINE_INT_POS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_LINE_INT_POS_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx CUR_POS_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CUR_POS_STATUS_OFFSET));
-	DRM_DEV_INFO(dev, "pLCDCx STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_STATUS_OFFSET));
-	DRM_DEV_INFO(dev, "\n");
+	DRM_INFO("pLCDCx IRQ_EN[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_EN_OFFSET));
+	DRM_INFO("pLCDCx IRQ_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_STATUS_OFFSET));
+	DRM_INFO("pLCDCx IRQ_RAW[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_IRQ_RAW_OFFSET));
+	DRM_INFO("pLCDCx LINE_INT_POS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_LINE_INT_POS_OFFSET));
+	DRM_INFO("pLCDCx CUR_POS_STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CUR_POS_STATUS_OFFSET));
+	DRM_INFO("pLCDCx STATUS[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_STATUS_OFFSET));
+	DRM_INFO("\n");
 
 	for (idx = 0; idx < LCDC_LAYER_MAX_NUM; idx++) {
 		switch (idx) {
@@ -122,13 +115,13 @@ void LcdcDumpRegValue(struct device *dev, void __iomem *address, const char *fil
 			break;
 		}
 		/*Layerx related register*/
-		DRM_DEV_INFO(dev, "pLCDCx->LCDC_LAYER%x_CTRL = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_CTRL_OFFSET));
-		DRM_DEV_INFO(dev, "pLCDCx->LCDC_LAYER%x_BASE_ADDR = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_BASE_ADDR_OFFSET));
-		DRM_DEV_INFO(dev, "pLCDCx->LCDC_LAYER%x_WIN_XPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_XPOS_OFFSET));
-		DRM_DEV_INFO(dev, "pLCDCx->LCDC_LAYER%x_WIN_YPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_YPOS_OFFSET));
-		DRM_DEV_INFO(dev, "pLCDCx->LCDC_LAYER%x_COLOR_KEY = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_COLOR_KEY_OFFSET));
-		DRM_DEV_INFO(dev, "pLCDCx->LCDC_LAYER%x_ALPHA = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_ALPHA_OFFSET));
-		DRM_DEV_INFO(dev, "\n");
+		DRM_INFO("pLCDCx->LCDC_LAYER%x_CTRL = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_CTRL_OFFSET));
+		DRM_INFO("pLCDCx->LCDC_LAYER%x_BASE_ADDR = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_BASE_ADDR_OFFSET));
+		DRM_INFO("pLCDCx->LCDC_LAYER%x_WIN_XPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_XPOS_OFFSET));
+		DRM_INFO("pLCDCx->LCDC_LAYER%x_WIN_YPOS = 0x%08x\n", idx, readl(LCDC_Layerx + LCDC_LAYERx_WIN_YPOS_OFFSET));
+		DRM_INFO("pLCDCx->LCDC_LAYER%x_COLOR_KEY = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_COLOR_KEY_OFFSET));
+		DRM_INFO("pLCDCx->LCDC_LAYER%x_ALPHA = 0x%08x\n", idx, readl(LCDC_Layerx+LCDC_LAYERx_ALPHA_OFFSET));
+		DRM_INFO("\n");
 	}
 }
 
@@ -170,7 +163,7 @@ void ameba_lcdc_set_planesize(LCDC_InitTypeDef *LCDC_InitStruct, u16 widht, u16 
 }
 void ameba_lcdc_set_background_color(LCDC_InitTypeDef *LCDC_InitStruct, u32 bgcolor)
 {
-	rgb888_t bg_color;
+	rgb888_t               bg_color;
 	if (NULL == LCDC_InitStruct) {
 		return ;
 	}
@@ -294,19 +287,19 @@ void ameba_lcdc_layer_alpha_value(LCDC_InitTypeDef *LCDC_InitStruct, u8 idx, u8 
 /*handle for underflow issue*/
 static u32 LCDC_MIPI_DSI_INTS_ACPU_Get(void __iomem *MIPIx_)
 {
-	u32 MIPIx = (u32) MIPIx_ ;
+	u32     MIPIx = (u32) MIPIx_ ;
 	return readl((void*)(MIPIx + MIPI_INTS_ACPU_OFFSET));
 }
 static void LCDC_MIPI_DSI_INTS_ACPU_Clr(void __iomem *MIPIx_, u32 DSI_INTS)
 {
-	u32 MIPIx = (u32) MIPIx_ ;
+	u32     MIPIx = (u32) MIPIx_ ;
 	/*clear the specified interrupt*/
 	writel(DSI_INTS, (void*)(MIPIx + MIPI_INTS_ACPU_OFFSET));
 }
 static void LCDC_MIPI_DSI_INT_Config(void __iomem *MIPIx_, u8 AcpuEn, u8 ScpuEN, u8 IntSelAnS)
 {
-	u32 Value32;
-	u32 MIPIx = (u32) MIPIx_ ;
+	u32     Value32;
+	u32     MIPIx = (u32) MIPIx_ ;
 
 	Value32 = readl((void*)(MIPIx + MIPI_INTE_OFFSET));
 	Value32 &= ~(MIPI_BIT_INTP_EN_ACPU | MIPI_BIT_INTP_EN | MIPI_BIT_SEL);
@@ -322,11 +315,11 @@ static void LCDC_MIPI_DSI_INT_Config(void __iomem *MIPIx_, u8 AcpuEn, u8 ScpuEN,
 	}
 	writel(Value32, (void*)(MIPIx + MIPI_INTE_OFFSET));
 }
-static void LCDC_MIPI_DSI_Mode_Switch(void __iomem *MIPIx_, u32 MIPI_VideoNCmdMode)
+static void LCDC_MIPI_DSI_Mode_Switch(void __iomem *MIPIx_, u32 video)
 {
-	u32 MIPIx = (u32) MIPIx_ ;
-	u32 Value32 = readl((void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET)) ;
-	if (MIPI_VideoNCmdMode) {
+	u32     MIPIx = (u32) MIPIx_ ;
+	u32     Value32 = readl((void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET)) ;
+	if (video) {
 		Value32 |= MIPI_BIT_DSI_MODE;
 		writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
 	} else {
@@ -345,6 +338,6 @@ void mipi_dsi_underflow_reset(void __iomem *pmipi_reg)
 /*
 *	1) lcdc get the underflow interrupt
 *	2) send msg to dsi : (i)enable acpu (ii)switch mode
-*	3) dis get the interrupt,  (i) send msg to lcdc (ii) switch mode
+*	3) dsi get the interrupt,  (i) send msg to lcdc (ii) switch mode
 *	4) lcdc disable/enable lcdc
 */

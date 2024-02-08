@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * Device Tree Structure
- */
+* Realtek DTS for recovery
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 /dts-v1/;
 
@@ -243,7 +244,7 @@
 
 		// Watchdog4 is non-secure for linux system.
 		watchdog: wdg@410004C0 {
-			compatible = "realtek,amebad2-rtk-watchdog";
+			compatible = "realtek,amebad2-watchdog";
 			reg = <0x410004C0 0x000010>;
 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
 			rtk,wdg-index = <4>;
@@ -284,7 +285,7 @@
 		};
 
 		spic: spi@44000000 {
-			compatible = "realtek,rxi312-spi-nand";
+			compatible = "realtek,rxi312-nand";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			bus_num = <2>;

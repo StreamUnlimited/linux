@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (C) Maxime Coquelin 2015
- * Copyright (C) STMicroelectronics 2017
- * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
- *
- * Heavily based on Mediatek's pinctrl driver
- */
+* Realtek GPIO support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/clk.h>
 #include <linux/gpio/driver.h>
 #include <linux/hwspinlock.h>
@@ -340,7 +339,7 @@ static void realtek_gpio_irq_handler(struct irq_desc *desc)
 	chained_irq_enter(chip, desc);
 
 	if (irq != bank->irq) {
-		pr_err("irq number not match!\n");
+		dev_err(bank->gpio_chip.parent, "GPIO irq number not match\n");
 	}
 
 	pending = readl(bank->reg_base + GPIO_INT_STATUS);
@@ -412,12 +411,12 @@ int realtek_gpio_probe(struct platform_device *pdev)
 	const struct clk_hw *hwclk;
 
 	if (of_property_read_u32(np, "rtk,gpio-bank", &id)) {
-		dev_err(&pdev->dev, "realtek,gpio-bank property not found\n");
+		dev_err(&pdev->dev, "No realtek,gpio-bank property\n");
 		return -EINVAL;
 	}
 
 	if (id >= ARRAY_SIZE(realtek_gpio_banks)) {
-		dev_err(&pdev->dev, "invalid realtek,gpio-bank property\n");
+		dev_err(&pdev->dev, "Invalid realtek,gpio-bank property\n");
 		return -EINVAL;
 	}
 
@@ -433,7 +432,7 @@ int realtek_gpio_probe(struct platform_device *pdev)
 
 	bank->irq = platform_get_irq(pdev, 0);
 	if (bank->irq < 0) {
-		dev_err(&pdev->dev, "irq get failed\n");
+		dev_err(&pdev->dev, "Failed to get IRQ\n");
 		return bank->irq;
 	}
 
@@ -441,7 +440,7 @@ int realtek_gpio_probe(struct platform_device *pdev)
 	bank->gpio_chip.of_node = np;
 	ret = gpiochip_add_data(&bank->gpio_chip, bank);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to add GPIO chip %u: %d\n",
+		dev_err(&pdev->dev, "Failed to add gpiochip %d: %d\n",
 				id, ret);
 		return ret;
 	}
@@ -465,9 +464,11 @@ int realtek_gpio_probe(struct platform_device *pdev)
 	bank->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(bank->clk)) {
 		ret =  PTR_ERR(bank->clk);
-		dev_err(&pdev->dev, "Fail to get rcc clk: %d\n", ret);
+		dev_err(&pdev->dev, "Failed to get rcc clk: %d\n", ret);
 		return ret;
 	}
+
+	dev_info(&pdev->dev, "GPIO bank %d initialized\n", id);
 
 	bank->clk_sl = clk_get_parent(bank->clk);
 	hwclk = __clk_get_hw(bank->clk_sl);
@@ -479,7 +480,7 @@ int realtek_gpio_probe(struct platform_device *pdev)
 	return 0;
 }
 
-
+#ifdef CONFIG_PM
 static int realtek_gpio_suspend(struct device *dev)
 {
 	struct realtek_gpio_bank *bank = (struct realtek_gpio_bank *) dev->driver_data;
@@ -506,7 +507,7 @@ static int realtek_gpio_resume(struct device *dev)
 static const struct dev_pm_ops realtek_amebad2_gpio_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_gpio_suspend, realtek_gpio_resume)
 };
-
+#endif
 
 static const struct of_device_id realtek_amebad2_gpio_of_match[] = {
 	{ .compatible = "realtek,amebad2-gpio", },
@@ -514,12 +515,14 @@ static const struct of_device_id realtek_amebad2_gpio_of_match[] = {
 };
 
 static struct platform_driver realtek_amebad2_gpio_driver = {
+	.probe = realtek_gpio_probe,
 	.driver = {
 		.name = "realtek-amebad2-gpio",
 		.of_match_table = realtek_amebad2_gpio_of_match,
+#ifdef CONFIG_PM
 		.pm = &realtek_amebad2_gpio_pm_ops,
+#endif
 	},
-	.probe = realtek_gpio_probe,
 };
 
 static int __init realtek_amebad2_gpio_register(void)

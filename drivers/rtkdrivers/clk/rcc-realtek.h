@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek RCC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _RCC_REALTEK_H
 #define _RCC_REALTEK_H
 

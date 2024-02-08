@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of realtek ADC driver
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek ADC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/delay.h>
 #include <linux/iio/iio.h>
@@ -22,7 +22,6 @@
 #include <linux/clk-provider.h>
 #include <linux/mfd/rtk-timer.h>
 #include <linux/nvmem-consumer.h>
-#include <misc/realtek-otp-core.h>
 
 #include "realtek-adc.h"
 
@@ -273,22 +272,22 @@ static int realtek_adc_single_read(struct iio_dev *indio_dev,
 static int realtek_adc_read_efuse_caldata(struct iio_dev *indio_dev, u16 otp_addr)
 {
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
-	otp_ipc_host_req_t otp_req = {0};
 	u16 K_A, K_B, K_C;
 	u8 *EfuseBuf = NULL;
 	int ret = 0;
 	int len = 0;
 	struct nvmem_cell *cell;
 
-	if (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR)
+	if (otp_addr == ADC_NORMAL_CH_CAL_OTPADDR) {
 		cell = nvmem_cell_get(&indio_dev->dev, "normal_cal");
-	else
+	} else {
 		cell = nvmem_cell_get(&indio_dev->dev, "vbat_cal");
+	}
 
 	if (IS_ERR(cell)) {
 		adc->k_coeff_normal[0] = adc->k_coeff_normal[1] = adc->k_coeff_normal[2] = 0;
 		adc->k_coeff_vbat[0] = adc->k_coeff_vbat[1] = adc->k_coeff_vbat[2] = 0;
-		dev_err(&indio_dev->dev, "otp read fail\n");
+		dev_err(&indio_dev->dev, "OTP read fail\n");
 		ret = (int)PTR_ERR(cell);
 		return ret;
 	}
@@ -365,7 +364,7 @@ static int realtek_adc_find_cal_offset(struct iio_dev *indio_dev, int raw_adc_cn
 				(s64)(((s64)adc->k_coeff_vbat[1] * (s64)raw_adc_cnt) / OTP_CALIB_BCOEFF_DIVISOR) +
 				(s64)((s64)adc->k_coeff_vbat[2] / OTP_CALIB_CCOEFF_DIVISOR);
 
-			dev_dbg(&indio_dev->dev, "Channel[%d]: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
+			dev_dbg(&indio_dev->dev, "Channel %d: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
 					channel_num, raw_adc_cnt, y);
 
 			tmp = div_s64((s64)adc->k_coeff_vbat[1] * POWER_OF_TEN_MULTIPLIER, OTP_CALIB_BCOEFF_DIVISOR);
@@ -378,7 +377,7 @@ static int realtek_adc_find_cal_offset(struct iio_dev *indio_dev, int raw_adc_cn
 				(s64)((s64)adc->k_coeff_normal[2] / OTP_CALIB_CCOEFF_DIVISOR);
 			y = is_differential ? (y - adc->diff_ch_offset) : y;
 
-			dev_dbg(&indio_dev->dev, "Channel[%d]: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
+			dev_dbg(&indio_dev->dev, "Channel %d: X (raw ADC cnt) = %d, Y (calibrated ADC cnt) = %lld\n",
 					channel_num, raw_adc_cnt, y);
 
 			tmp = div_s64((s64)adc->k_coeff_normal[1] * POWER_OF_TEN_MULTIPLIER, OTP_CALIB_BCOEFF_DIVISOR);
@@ -403,12 +402,12 @@ static int realtek_adc_read_raw(struct iio_dev *indio_dev,
 	if (adc->is_calibdata_read == false) {
 		adc->is_calibdata_read = true;
 		if (realtek_adc_read_efuse_caldata(indio_dev, ADC_NORMAL_CH_CAL_OTPADDR)) {
-			dev_err(&indio_dev->dev, "failed to read calibration data from OTP for normal channels, no calibration supported\n");
+			dev_err(&indio_dev->dev, "Failed to read calibration data from OTP for normal channels, no calibration supported\n");
 			adc->is_calibdata_read = false;
 		}
 
 		if (realtek_adc_read_efuse_caldata(indio_dev, ADC_VBAT_CH_CAL_OTPADDR)) {
-			dev_err(&indio_dev->dev, "failed to read calibration data from OTP for VBAT channel, no calibration supported\n");
+			dev_err(&indio_dev->dev, "Failed to read calibration data from OTP for VBAT channel, no calibration supported\n");
 			adc->is_calibdata_read = false;
 		}
 	}
@@ -496,7 +495,7 @@ static int realtek_adc_update_scan_mode(struct iio_dev *indio_dev,
 			return -EINVAL;
 		}
 
-		dev_info(&indio_dev->dev, "%s chan %d to seq%d\n", __func__, chan->channel, i);
+		dev_info(&indio_dev->dev, "Update scan mode chan %d to seq %d\n", chan->channel, i);
 
 		if (i > 8) {
 			reg_value = readl(adc->base + RTK_ADC_CHSW_LIST_1);
@@ -604,7 +603,7 @@ static irqreturn_t realtek_adc_isr(int irq, void *data)
 
 		return IRQ_HANDLED;
 	} else if (status & ADC_BIT_FIFO_OVER_STS) {
-		dev_dbg(&indio_dev->dev, "fifo overflow\n");
+		dev_dbg(&indio_dev->dev, "FIFO overflow\n");
 		return IRQ_HANDLED;
 	}
 
@@ -703,7 +702,7 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 
 	ret = of_property_count_u32_elems(node, "rtk,adc-channels");
 	if (ret > RTK_ADC_CH_NUM) {
-		dev_err(&indio_dev->dev, "Bad adc-channels?\n");
+		dev_err(&indio_dev->dev, "Bad adc-channels\n");
 		return -EINVAL;
 	} else if (ret > 0) {
 		num_channels += ret;
@@ -712,7 +711,7 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 	ret = of_property_count_elems_of_size(node, "rtk,adc-diff-channels",
 										  sizeof(*diff));
 	if (ret > RTK_ADC_MAX_DIFF_CHAN_PAIRS) {
-		dev_err(&indio_dev->dev, "Bad adc-diff-channels?\n");
+		dev_err(&indio_dev->dev, "Bad adc-diff-channels\n");
 		return -EINVAL;
 	} else if (ret > 0) {
 		int size = ret * sizeof(*diff) / sizeof(u32);
@@ -747,7 +746,7 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 		for (i = 0; i < num_diff; i++) {
 			if (val == diff[i].vinp) {
 				dev_err(&indio_dev->dev,
-						"channel %d miss-configured\n",	val);
+						"Channel %d miss-configured\n",	val);
 				return -EINVAL;
 			}
 		}
@@ -811,14 +810,14 @@ static int realtek_adc_buffer_predisable(struct iio_dev *indio_dev)
 
 	ret = iio_triggered_buffer_predisable(indio_dev);
 	if (ret < 0) {
-		dev_err(&indio_dev->dev, "predisable failed\n");
+		dev_err(&indio_dev->dev, "Predisable failed\n");
 	}
 
 	spin_lock_irqsave(&adc->lock, flags);
 	realtek_adc_auto_cmd(adc, false);
 
 	for (i = 0; i < RTK_ADC_BUF_SIZE; i++) {
-		dev_dbg(&indio_dev->dev, "data: %x\n", adc->buffer[i]);
+		dev_dbg(&indio_dev->dev, "Dump data[%d] = 0x%04X\n", i, adc->buffer[i]);
 	}
 
 	spin_unlock_irqrestore(&adc->lock, flags);
@@ -835,8 +834,6 @@ static irqreturn_t realtek_adc_trigger_handler(int irq, void *private)
 	struct iio_poll_func *pf = private;
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
-
-	dev_dbg(&indio_dev->dev, "%s(irq=%d)\n", __func__, irq);
 
 	adc->buf_index = 0;
 
@@ -877,7 +874,7 @@ static int realtek_adc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, adc);
 
 	if (of_property_read_u32(pdev->dev.of_node, "rtk,adc-mode", &adc->mode)) {
-		dev_err(&pdev->dev, "adc mode property not found\n");
+		dev_err(&pdev->dev, "ADC mode property not found\n");
 		return -EINVAL;
 	}
 
@@ -895,25 +892,25 @@ static int realtek_adc_probe(struct platform_device *pdev)
 
 	adc->adc_clk = devm_clk_get(&pdev->dev, "rtk_adc_clk");
 	if (IS_ERR(adc->adc_clk)) {
-		dev_err(&pdev->dev, "Fail to get adc clock\n");
+		dev_err(&pdev->dev, "Failed to get ADC clock\n");
 		return PTR_ERR(adc->adc_clk);
 	}
 
 	adc->ctc_clk = devm_clk_get(&pdev->dev, "rtk_ctc_clk");
 	if (IS_ERR(adc->ctc_clk)) {
-		dev_err(&pdev->dev, "Fail to get ctc clock\n");
+		dev_err(&pdev->dev, "Failed to get CTC clock\n");
 		return PTR_ERR(adc->ctc_clk);
 	}
 
 	ret = clk_prepare_enable(adc->adc_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable adc clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable ADC clock %d\n", ret);
 		return ret;
 	}
 
 	ret = clk_prepare_enable(adc->ctc_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable ctc clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable CTC clock %d\n", ret);
 		goto clk_fail;
 	}
 
@@ -921,6 +918,8 @@ static int realtek_adc_probe(struct platform_device *pdev)
 	if (IS_ERR(adc->path_base)) {
 		goto err_fail;
 	}
+
+	dev_info(&pdev->dev, "ADC mode %d\n", adc->mode);
 
 	if (adc->mode != ADC_COMP_ASSIST_MODE) {
 		adc->irq = platform_get_irq(pdev, 0);
@@ -930,7 +929,7 @@ static int realtek_adc_probe(struct platform_device *pdev)
 
 		ret = devm_request_irq(&pdev->dev, adc->irq, realtek_adc_isr, 0, pdev->name, adc);
 		if (ret) {
-			dev_err(&pdev->dev, "failed to request IRQ\n");
+			dev_err(&pdev->dev, "Failed to request IRQ\n");
 			goto map_fail;
 		}
 
@@ -948,7 +947,7 @@ static int realtek_adc_probe(struct platform_device *pdev)
 		ret = iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time, &realtek_adc_trigger_handler,
 										 &realtek_adc_buffer_setup_ops);
 		if (ret) {
-			dev_err(&pdev->dev, "buffer setup failed\n");
+			dev_err(&pdev->dev, "Buffer setup failed\n");
 			goto map_fail;
 		}
 
@@ -956,14 +955,14 @@ static int realtek_adc_probe(struct platform_device *pdev)
 	}
 	ret = iio_device_register(indio_dev);
 	if (ret) {
-		dev_err(&pdev->dev, "iio dev register failed\n");
+		dev_err(&pdev->dev, "IIO device register failed\n");
 		goto map_fail;
 	}
 
 	if (adc->mode == ADC_COMP_ASSIST_MODE) {
 		ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 		if (ret < 0) {
-			dev_err(&pdev->dev, "failed to populate DT children\n");
+			dev_err(&pdev->dev, "Failed to populate DT children\n");
 			goto err_dev_register;
 		}
 	}
@@ -1017,5 +1016,6 @@ static struct platform_driver realtek_adc_driver = {
 
 builtin_platform_driver(realtek_adc_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_adc_data driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba ADC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

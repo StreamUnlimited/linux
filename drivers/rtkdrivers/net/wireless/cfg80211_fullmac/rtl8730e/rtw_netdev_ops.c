@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 
 #define DRIVERVERSION "v1.15.12-27-g7f6d5a49a.20220627"
@@ -10,11 +20,6 @@ typedef struct rtw_priv_ioctl {
 	unsigned char __user *data;
 	unsigned short len;
 } rtw_priv_ioctl;
-
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
-MODULE_AUTHOR("Realtek Semiconductor Corp.");
-MODULE_VERSION(DRIVERVERSION);
 
 /*
  * Set wlan0 mac address: 1) ip link set dev wlan0 down, 2) ip link set dev wlan0 address 86:EF:EB:92:A2:FF, 3) ip link set dev wlan0 up
@@ -36,12 +41,12 @@ static int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *p)
 			*(u8 *)(addr->sa_data), *(u8 *)(addr->sa_data + 1), *(u8 *)(addr->sa_data + 2), *(u8 *)(addr->sa_data + 3), *(u8 *)(addr->sa_data + 4),
 			*(u8 *)(addr->sa_data + 5));
 
-	ret = llhw_ipc_wifi_set_mac_addr(rtw_netdev_idx(pnetdev), addr->sa_data);
+	ret = llhw_wifi_set_mac_addr(rtw_netdev_idx(pnetdev), addr->sa_data);
 
 	if (ret == 0) {
 		/* Set mac address success, then change the dev_addr inside net_device. */
-		memset(global_idev.pndev[rtw_netdev_idx(pnetdev)]->dev_addr, 0, ETH_ALEN);
-		memcpy(global_idev.pndev[rtw_netdev_idx(pnetdev)]->dev_addr, addr->sa_data, ETH_ALEN);
+		memset((void *)global_idev.pndev[rtw_netdev_idx(pnetdev)]->dev_addr, 0, ETH_ALEN);
+		memcpy((void *)global_idev.pndev[rtw_netdev_idx(pnetdev)]->dev_addr, addr->sa_data, ETH_ALEN);
 	}
 
 	return ret;
@@ -154,14 +159,14 @@ int rtw_ndev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd_id)
 		goto out;
 	}
 
-	cmd_buf = dmam_alloc_coherent(global_idev.fullmac_dev, cmd.len, &cmd_buf_phy, GFP_KERNEL);
+	cmd_buf = rtw_malloc(cmd.len, &cmd_buf_phy);
 	if (!cmd_buf) {
 		dev_err(global_idev.fullmac_dev, "%s: allloc cmd buffer failed.\n", __func__);
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	user_buf = dmam_alloc_coherent(global_idev.fullmac_dev, WIFI_MP_MSG_BUF_SIZE, &user_buf_phy, GFP_KERNEL);
+	user_buf = rtw_malloc(WIFI_MP_MSG_BUF_SIZE, &user_buf_phy);
 	if (!user_buf) {
 		dev_err(global_idev.fullmac_dev, "%s: allloc user buffer failed.\n", __func__);
 		ret = -ENOMEM;
@@ -176,10 +181,10 @@ int rtw_ndev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd_id)
 
 	switch (cmd_id) {
 	case RTW_PRIV_DGB_CMD:
-		ret = llhw_ipc_wifi_iwpriv_cmd(cmd_buf_phy, cmd.len, user_buf_phy);
+		ret = llhw_wifi_iwpriv_cmd(cmd_buf_phy, cmd.len, user_buf_phy);
 		break;
 	case RTW_PRIV_MP_CMD:
-		ret = llhw_ipc_wifi_mp_cmd(cmd_buf_phy, cmd.len, user_buf_phy);
+		ret = llhw_wifi_mp_cmd(cmd_buf_phy, cmd.len, user_buf_phy);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
@@ -187,27 +192,28 @@ int rtw_ndev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd_id)
 	}
 
 	cmd.len = strlen(user_buf);
+	user_buf[cmd.len] = '\0';
 	if (cmd.len > 0) {
 		if (copy_to_user(&wrq_data->len, &cmd.len, sizeof(unsigned short))) {
 			ret = -EFAULT;
 			goto free_user_buf;
 		}
 
-		if (copy_to_user(cmd.data, user_buf, cmd.len)) {
+		if (copy_to_user(cmd.data, user_buf, cmd.len + 1)) {
 			ret = -EFAULT;
 		}
 	}
 
 free_user_buf:
 	if (user_buf) {
-		dma_free_coherent(global_idev.fullmac_dev, WIFI_MP_MSG_BUF_SIZE, user_buf, user_buf_phy);
+		rtw_mfree(WIFI_MP_MSG_BUF_SIZE, user_buf, user_buf_phy);
 		cmd_buf = NULL;
 	}
 
 
 free_cmd_buf:
 	if (cmd_buf) {
-		dma_free_coherent(global_idev.fullmac_dev, cmd.len, cmd_buf, cmd_buf_phy);
+		rtw_mfree(cmd.len, cmd_buf, cmd_buf_phy);
 		cmd_buf = NULL;
 	}
 out:
@@ -256,7 +262,7 @@ int rtw_ndev_open_ap(struct net_device *pnetdev)
 
 	rtw_netdev_priv_is_on(pnetdev) = true;
 	/* if2 init(SW + part of HW) */
-	llhw_ipc_wifi_init_ap();
+	llhw_wifi_init_ap();
 
 	netif_tx_start_all_queues(pnetdev);
 	netif_tx_wake_all_queues(pnetdev);
@@ -272,7 +278,7 @@ static int rtw_ndev_close_ap(struct net_device *pnetdev)
 	netif_carrier_off(pnetdev);
 
 	/* if2 deinit (SW) */
-	llhw_ipc_wifi_deinit_ap();
+	llhw_wifi_deinit_ap();
 	rtw_netdev_priv_is_on(pnetdev) = false;
 
 	return 0;
@@ -290,7 +296,7 @@ static enum netdev_tx rtw_xmit_entry(struct sk_buff *skb, struct net_device *pne
 		goto func_exit;
 	}
 
-	ret = llhw_ipc_xmit_entry(wlan_idx, skb);
+	ret = llhw_xmit_entry(wlan_idx, skb);
 
 func_exit:
 	return ret;
@@ -392,7 +398,7 @@ int rtw_nan_iface_alloc(struct wiphy *wiphy,
 	netif_carrier_on(global_idev.pndev[2]);
 	netif_tx_start_all_queues(global_idev.pndev[2]);
 
-	llhw_ipc_wifi_init_nan();
+	llhw_wifi_init_nan();
 	return ret;
 
 exit:
@@ -422,7 +428,7 @@ void rtw_nan_iface_free(struct wiphy *wiphy)
 	kfree((u8 *)global_idev.pwdev_global[2]);
 	global_idev.pwdev_global[2] = NULL;
 
-	llhw_ipc_wifi_deinit_nan();
+	llhw_wifi_deinit_nan();
 
 exit:
 	return;
@@ -518,3 +524,8 @@ void rtw_ndev_unregister(void)
 		dev_dbg(global_idev.fullmac_dev, "free netdev %d ok.", i);
 	}
 }
+
+MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");
+MODULE_VERSION(DRIVERVERSION);

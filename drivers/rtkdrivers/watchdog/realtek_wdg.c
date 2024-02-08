@@ -1,28 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    realtek_wdg.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-10-25
-  * @brief   This file contains all the functions prototypes for the WDG firmware
-  *          library.
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  ******************************************************************************
-  * @note
-  *
-  * To use watchdog, we need trigger it in user space first.
-  * Refer to package\testcase\watchdog\watchdog_test.c if needed.
-  * Refer to package\testcase\watchdog\readme.txt if needed.
-  *
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek Watchdog support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -159,13 +140,6 @@ struct rtk_wdg {
 	struct rtk_wdg_params		wdg_params;
 };
 
-static void assert_param(u8 check_result)
-{
-	if (!check_result) {
-		pr_info("Error: illegal parameter.\n");
-	}
-}
-
 static void rtk_wdg_writel(
 	void __iomem *ptr, u32 reg, u32 value)
 {
@@ -202,7 +176,7 @@ static void rtk_wdg_wait_busy_check(struct rtk_wdg *wdg)
 	while (rtk_wdg_readl(wdg->base, WDG_CR) & (WDG_BIT_RVU | WDG_BIT_EVU)) {
 		times++;
 		if (times > 1000) {
-			dev_warn(wdg->dev, "Check busy timeout CR=0x%08X", rtk_wdg_readl(wdg->base, WDG_CR) & (WDG_BIT_RVU | WDG_BIT_EVU));
+			dev_warn(wdg->dev, "Check busy timeout CR = 0x%08X\n", rtk_wdg_readl(wdg->base, WDG_CR) & (WDG_BIT_RVU | WDG_BIT_EVU));
 			break;
 		}
 	}
@@ -212,59 +186,58 @@ static void rtk_wdg_struct_init(struct rtk_wdg *wdg, struct device_node *np)
 {
 	int nr_requests, ret;
 
-	/* Load HAL initial data structure default value from dts. */
+	/* Load HAL initial data structure default value from DTS. */
 
 	ret = of_property_read_u32(np, "rtk,wdg-index", &nr_requests);
 	if (ret) {
 		wdg->wdg_index = 1;
 		dev_warn(wdg->dev, "No rtk,wdg-index property specified in DTS, set it to %d as default\n", wdg->wdg_index);
 	} else {
-		dev_dbg(wdg->dev, "rtk,wdg-index = %d\n", nr_requests);
 		wdg->wdg_index = nr_requests;
+	}
+
+	if (!IS_WDG_ALL_PERIPH(wdg->wdg_index)) {
+		wdg->wdg_index = 1;
+		dev_warn(wdg->dev, "Invalid rtk,wdg-index %d specified in DTS, set it to %d as default\n", wdg->wdg_index);
 	}
 
 	ret = of_property_read_u32(np, "rtk,wdg-max-timeout-ms", &nr_requests);
 	if (ret) {
 		wdg->wdg_params.max_timeout_ms = 0xFFFF;
-		dev_warn(wdg->dev, "No rtk,wdg-max-timeout property specified in DTS, set it to 0x%X as default\n", wdg->wdg_params.max_timeout_ms);
+		dev_warn(wdg->dev, "No rtk,wdg-max-timeout property specified in DTS, set it to 0x%04X as default\n", wdg->wdg_params.max_timeout_ms);
 	} else {
-		dev_dbg(wdg->dev, "rtk,wdg-max-timeout = %d\n", nr_requests);
 		wdg->wdg_params.max_timeout_ms = nr_requests;
 	}
 
 	ret = of_property_read_u32(np, "rtk,wdg-timeout", &nr_requests);
 	if (ret) {
 		wdg->wdg_params.timeout = wdg->wdg_params.max_timeout_ms / 1000;
-		dev_warn(wdg->dev, "No rtk,wdg-timeout property specified in DTS, set it to 0x%X as default\n", wdg->wdg_params.timeout);
+		dev_warn(wdg->dev, "No rtk,wdg-timeout property specified in DTS, set it to 0x%04X as default\n", wdg->wdg_params.timeout);
 	} else {
-		dev_dbg(wdg->dev, "rtk,wdg-timeout = %d\n", nr_requests);
 		wdg->wdg_params.timeout = nr_requests;
 	}
 
 	ret = of_property_read_u32(np, "rtk,wdg-window-protection-ms", &nr_requests);
 	if (ret) {
 		wdg->wdg_params.window_ms = 0xFFFF;
-		dev_warn(wdg->dev, "No rtk,wdg-window-protection property specified in DTS, set it to 0x%X as default\n", wdg->wdg_params.window_ms);
+		dev_warn(wdg->dev, "No rtk,wdg-window-protection property specified in DTS, set it to 0x%04X as default\n", wdg->wdg_params.window_ms);
 	} else {
-		dev_dbg(wdg->dev, "rtk,wdg-window-protection = %d\n", nr_requests);
 		wdg->wdg_params.window_ms = nr_requests;
 	}
 
 	ret = of_property_read_u32(np, "rtk,wdg-int-trigger-threshold-ms", &nr_requests);
 	if (ret) {
 		wdg->wdg_params.early_int_cnt_ms = 0;
-		dev_warn(wdg->dev, "No rtk,wdg-int-trigger-threshold property specified in DTS, set it to 0x%X as default\n", wdg->wdg_params.early_int_cnt_ms);
+		dev_warn(wdg->dev, "No rtk,wdg-int-trigger-threshold property specified in DTS, set it to 0x%04X as default\n", wdg->wdg_params.early_int_cnt_ms);
 	} else {
-		dev_dbg(wdg->dev, "rtk,wdg-int-trigger-threshold = %d\n", nr_requests);
 		wdg->wdg_params.early_int_cnt_ms = nr_requests;
 	}
 
 	ret = of_property_read_u32(np, "rtk,wdg-interrupt-mode", &nr_requests);
 	if (ret) {
 		wdg->wdg_params.early_int_mode = 0;
-		dev_warn(wdg->dev, "No get rtk,wdg-interrupt-mode property specified in DTS, set it to 0x%X as default\n", wdg->wdg_params.early_int_mode);
+		dev_warn(wdg->dev, "No rtk,wdg-interrupt-mode property specified in DTS, set it to 0x%04X as default\n", wdg->wdg_params.early_int_mode);
 	} else {
-		dev_dbg(wdg->dev, "rtk,wdg-interrupt-mode = %d\n", nr_requests);
 		wdg->wdg_params.early_int_mode = nr_requests;
 	}
 }
@@ -274,7 +247,6 @@ static void rtk_wdg_init_hw(struct rtk_wdg *wdg)
 	u32 prescaler = 0;
 	u32 timeout;
 
-	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
 	if (IS_IWDG_PERIPH(wdg->wdg_index)) {
 		prescaler = 0x63;
 	} else {
@@ -285,7 +257,7 @@ static void rtk_wdg_init_hw(struct rtk_wdg *wdg)
 
 	rtk_wdg_wait_busy_check(wdg);
 
-	/*Enable Register access*/
+	/* Enable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_ACCESS_EN);
 
 	if (wdg->wdg_params.early_int_mode) {
@@ -297,23 +269,19 @@ static void rtk_wdg_init_hw(struct rtk_wdg *wdg)
 	rtk_wdg_writel(wdg->base, WDG_RLR, WDG_PRER(prescaler) | WDG_RELOAD(timeout));
 	rtk_wdg_writel(wdg->base, WDG_WINR, wdg->wdg_params.window_ms);
 
-	/*Disable Register access*/
+	/* Disable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
 
 }
 
 static void rtk_wdg_enable(struct rtk_wdg *wdg)
 {
-	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
-
 	rtk_wdg_wait_busy_check(wdg);
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_FUNC_EN);
 }
 
 static void rtk_wdg_refresh(struct rtk_wdg *wdg)
 {
-	dev_dbg(wdg->dev, "Watchdog refresh\n");
-	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
 	rtk_wdg_wait_busy_check(wdg);
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_REFRESH);
 }
@@ -323,12 +291,9 @@ static void rtk_wdg_interrupt_config(
 	u32 wdg_interrupt,
 	u32 new_state)
 {
-	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
-	assert_param(wdg_interrupt == WDG_BIT_EIE);
-
 	rtk_wdg_wait_busy_check(wdg);
 
-	/*Enable Register access*/
+	/* Enable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_ACCESS_EN);
 
 	if (new_state == 1) {
@@ -337,24 +302,21 @@ static void rtk_wdg_interrupt_config(
 		rtk_wdg_reg_update(wdg->base, WDG_CR, WDG_BIT_EIE, ~wdg_interrupt);
 	}
 
-	/*Disable Register access*/
+	/* Disable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
 }
 
 static void rtk_wdg_clear_interrupt(struct rtk_wdg *wdg, u32 interrupt_bit)
 {
-	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
-	assert_param(interrupt_bit == WDG_BIT_EIC);
-
 	rtk_wdg_wait_busy_check(wdg);
 
-	/*Enable Register access*/
+	/* Enable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_ACCESS_EN);
 
 	/* Clear ISR */
 	rtk_wdg_reg_update(wdg->base, WDG_CR, WDG_BIT_EIC, interrupt_bit);
 
-	/*Disable Register access*/
+	/* Disable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
 }
 
@@ -362,11 +324,13 @@ static void rtk_wdg_clear_interrupt(struct rtk_wdg *wdg, u32 interrupt_bit)
 /* Low power mode, whether wdg keep running in sleep mode. */
 static void rtk_iwdg_lp_enable(struct rtk_wdg *wdg, u32 new_state)
 {
-	assert_param(IS_IWDG_PERIPH(wdg->wdg_index));
-
+	if (IS_IWDG_PERIPH(wdg->wdg_index)) {
+		dev_err(wdg->dev, "Invalid IWDG index\n");
+		return;
+	}
 	rtk_wdg_wait_busy_check(wdg);
 
-	/*Enable Register access*/
+	/* Enable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_ACCESS_EN);
 
 	if (new_state == 1) {
@@ -375,7 +339,7 @@ static void rtk_iwdg_lp_enable(struct rtk_wdg *wdg, u32 new_state)
 		rtk_wdg_reg_update(wdg->base, WDG_CR, WDG_BIT_LPEN, ~WDG_BIT_LPEN);
 	}
 
-	/*Disable Register access*/
+	/* Disable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
 }
 #endif // RTK_WDG_TODO
@@ -386,7 +350,7 @@ static irqreturn_t rtk_wdg_isr_event(int irq, void *data)
 
 	rtk_wdg_refresh(wdg);
 	rtk_wdg_clear_interrupt(wdg, WDG_BIT_EIC);
-	dev_dbg(wdg->dev, "WDG-%d early interrupt.\n", wdg->wdg_index);
+	dev_dbg(wdg->dev, "WDG%d early interrupt\n", wdg->wdg_index);
 
 	return IRQ_HANDLED;
 }
@@ -406,7 +370,8 @@ static int rtk_wdg_start(struct watchdog_device *wdd)
 
 static int rtk_wdg_stop(struct watchdog_device *wdd)
 {
-	pr_info("%s: Stop watchdog is not supported by realtek-wdg.\n", __FUNCTION__);
+	struct rtk_wdg *wdg = to_rtk_wdg(wdd);
+	dev_info(wdg->dev, "Stop watchdog is not supported by realtek-wdg\n");
 
 	return 0;
 }
@@ -424,18 +389,17 @@ static int rtk_wdg_ping(struct watchdog_device *wdd)
 static int rtk_wdg_set_timeout(struct watchdog_device *wdd,
 							   unsigned int timeout)
 {
-#ifdef RTK_WDG_SUPPORT
 	struct rtk_wdg *wdg = to_rtk_wdg(wdd);
+#ifdef RTK_WDG_SUPPORT
 	u32 actual; // seconds
 	u32 prescaler = 0;
 #endif
 
-	pr_info("%s: RTK-WDG timeout-value cannot be refreshed once the wdg is enabled.", __FUNCTION__);
-	pr_info("%s: If needed, set watchdog timeout in dts rtk,wdg-timeout.", __FUNCTION__);
+	dev_info(wdg->dev, "RTK-WDG timeout-value cannot be refreshed once the WDG is enabled\n");
+	dev_info(wdg->dev, "If needed, set watchdog timeout rtk,wdg-timeout in DTS\n");
 
 #ifdef RTK_WDG_SUPPORT
 	dev_dbg(wdg->dev, "Try to set watchdog timeout to %d\n", timeout);
-	assert_param(IS_WDG_ALL_PERIPH(wdg->wdg_index));
 
 	actual = clamp_t(unsigned int, timeout, wdd->min_timeout, wdd->max_hw_heartbeat_ms / 1000);
 
@@ -451,12 +415,12 @@ static int rtk_wdg_set_timeout(struct watchdog_device *wdd,
 
 	rtk_wdg_wait_busy_check(wdg);
 
-	/*Enable Register access*/
+	/* Enable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_ACCESS_EN);
 
 	rtk_wdg_writel(wdg->base, WDG_RLR, WDG_PRER(prescaler) | WDG_RELOAD(actual * 1000));
 
-	/*Disable Register access*/
+	/* Disable Register access */
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
 #endif
 
@@ -468,7 +432,7 @@ static int rtk_wdg_restart(struct watchdog_device *wdd,
 {
 	struct rtk_wdg *wdg = to_rtk_wdg(wdd);
 
-	pr_info("%s: Restart watchdog is not supported by realtek-wdg, restart will only refresh the watchdog.\n", __FUNCTION__);
+	dev_info(wdg->dev, "Restart watchdog is not supported by realtek-wdg, restart will only refresh the watchdog\n");
 
 	rtk_wdg_refresh(wdg);
 	rtk_wdg_clear_interrupt(wdg, WDG_BIT_EIC);
@@ -493,7 +457,7 @@ static const struct watchdog_info rtk_wdg_info = {
 };
 
 static const struct of_device_id rtk_wdg_of_table[] = {
-	{.compatible = "realtek,amebad2-rtk-watchdog"},
+	{.compatible = "realtek,amebad2-watchdog"},
 	{},
 };
 
@@ -540,9 +504,12 @@ static int rtk_wdg_probe(struct platform_device *pdev)
 	}
 
 	watchdog_init_timeout(&wdg->wdd, 0, dev);
-	rtk_wdg_init_hw(wdg); /* init to reset mode */
+	rtk_wdg_init_hw(wdg); /* Init to reset mode */
 
 	dev_set_drvdata(dev, wdg);
+
+	dev_info(dev, "Init with timeout %ds\n", wdg->wdd.timeout);
+
 	return devm_watchdog_register_device(dev, &wdg->wdd);
 }
 
@@ -556,5 +523,6 @@ static struct platform_driver rtk_watchdog_driver = {
 
 module_platform_driver(rtk_watchdog_driver);
 
-MODULE_DESCRIPTION("Realtek Watchdog Driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba Watchdog driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

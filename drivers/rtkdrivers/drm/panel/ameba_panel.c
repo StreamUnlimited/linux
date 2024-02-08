@@ -1,12 +1,17 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * MIPI-DSI ameba_panel_desc panel driver. This is a 480*800
- */
+* Realtek Panel support
+*
+* MIPI-DSI ameba_panel_desc panel driver. This is a 480*800
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <drm/drm_modes.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
+#include <drm/drm_drv.h>
 #include <video/mipi_display.h>
 #include <linux/component.h>
 #include <linux/of_gpio.h>
@@ -22,12 +27,12 @@
 //components
 static int panel_bind(struct device *dev, struct device *master, void *data)
 {
-	AMEBA_DRM_DEBUG
+	DRM_INFO("Panel Bind Success!\n");
 	return 0;
 }
 static void panel_unbind(struct device *dev, struct device *master, void *data)
 {
-	AMEBA_DRM_DEBUG
+	DRM_INFO("Run Panel Unbind\n");
 }
 
 static const struct component_ops panel_ops = {
@@ -60,7 +65,8 @@ static int ameba_panel_probe(struct platform_device *pdev)
 	struct ameba_drm_panel_struct   *ameba_panel;
 	int                             ret = 0;
 
-	AMEBA_DRM_DEBUG
+	DRM_DEBUG_DRIVER("Run panel probe!\n");
+
 	id = of_match_node(ameba_panel_match, pdev->dev.of_node);
 	if (!id)
 		return -ENODEV;
@@ -94,7 +100,9 @@ static int ameba_panel_remove(struct platform_device *pdev)
 	struct device           *dev = &pdev->dev;
 	struct ameba_panel_desc *priv_data;
 	const struct of_device_id *id;
-	AMEBA_DRM_DEBUG
+
+	DRM_DEBUG_DRIVER("Run panel remove!\n");
+
 	id = of_match_node(ameba_panel_match, pdev->dev.of_node);
 	if (!id)
 		return -ENOMEM;
@@ -115,7 +123,7 @@ static struct platform_driver ameba_panel_driver = {
 	.probe = ameba_panel_probe,
 	.remove = ameba_panel_remove,
 	.driver = {
-		.name = "amebad2-drm-panel",
+		.name = "realtek-amebad2-drm-panel",
 		.of_match_table = ameba_panel_match,
 	},
 };
@@ -139,7 +147,6 @@ static void __exit rtk_panel_exit(void)
 }
 module_exit(rtk_panel_exit);
 
-
-MODULE_AUTHOR("Chunlin.Yi <chunlin.yi@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek AmebaD2 SoCs' Panel driver");
+MODULE_DESCRIPTION("Realtek Ameba Panel driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

@@ -1,11 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/bspcpu.h
- *     bsp cpu and memory configuration file
- *
- * Copyright (C) 2006-2012 Tony Wu (tonywu@realtek.com)
- */
+* Realtek CPU support
+*
+* bsp/bspcpu.h
+*     bsp cpu and memory configuration file
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _BSPCPU_H_
 #define _BSPCPU_H_
 

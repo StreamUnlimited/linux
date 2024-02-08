@@ -1,7 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * MIPI-DSI st7701s panel driver. This is a 480*800
- */
+* Realtek Panel support
+*
+* MIPI-DSI st7701s panel driver. This is a 480*800
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <drm/drm_modes.h>
 #include <drm/drm_mipi_dsi.h>
@@ -119,13 +123,13 @@ static int dsi_gpio_reset(int iod)
 
 	req_status = gpio_request(gpio_index, NULL);
 	if (req_status != 0) {
-		DRM_WARN("gpio request failed!\n");
+		DRM_ERROR("Gpio request fail!\n");
 		return -EINVAL;
 	}
 
 	set_direct_status = gpio_direction_output(gpio_index,0);
 	if (IS_ERR_VALUE(set_direct_status)) {
-		DRM_WARN("set gpio direction output failed\n");
+		DRM_ERROR("Set gpio direction output fail!\n");
 		return -EINVAL;
 	}
 
@@ -151,7 +155,7 @@ static int st7701s_enable(struct drm_panel *panel)
 
 	ret = dsi_gpio_reset(handle->gpio);
 	if (ret) {
-		DRM_DEV_ERROR(dev, "Failed to set dis spio\n");
+		DRM_ERROR("Fail to set dis spio\n");
 		return ret ;
 	}
 
@@ -171,7 +175,7 @@ static int st7701s_get_modes(struct drm_panel *panel)
 
 	mode = drm_mode_duplicate(panel->drm, &st7701s_mode);
 	if (!mode) {
-		DRM_ERROR("bad mode or failed to add mode\n");
+		DRM_ERROR("Bad mode or fail to add mode\n");
 		return -EINVAL;
 	}
 	drm_mode_set_name(mode);
@@ -200,7 +204,7 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	//gpio
 	st7701s_data->gpio = of_get_named_gpio_flags(np, "mipi-gpios", 0, &flags);
 	if (!gpio_is_valid(st7701s_data->gpio)) {
-		DRM_DEV_ERROR(dev, "drm mipi dis node failed to get mipi-gpios\n");
+		DRM_ERROR("Panel fail to get mipi-gpios\n");
 		return -ENODEV;
 	}
 

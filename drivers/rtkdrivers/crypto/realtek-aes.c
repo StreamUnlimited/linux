@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of Realtek Crypto driver for Linux.
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek AES support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/clk.h>
 #include <linux/crypto.h>
@@ -43,7 +43,7 @@ static int realtek_aes_wait_ok(struct realtek_aes_dev *adev)
 
 	ips_err = readl(adev->io_base + RTK_ERRSR);
 	if (ips_err) {
-		dev_err(adev->dev, "ips 0x1C err = 0x%08x\r\n", ips_err);
+		dev_err(adev->dev, "RTK_ERRSR = 0x%08X\n", ips_err);
 		ret = -ETIMEDOUT;
 	}
 
@@ -62,11 +62,11 @@ void realtek_aes_mem_dump(struct device *dev, const u8 *start, u32 size, char *s
 	buf = (u8 *)start;
 
 	if (strHeader) {
-		dev_dbg(dev, "%s addr:%08x, size:%d", strHeader, (u32)start, size);
+		dev_dbg(dev, "Dump %s addr = 0x%08X, size = %d\n", strHeader, (u32)start, size);
 	}
 
 	for (index = 0; index < size; index++) {
-		dev_dbg(dev, "%02x", buf[index]);
+		dev_dbg(dev, "Dump buf[%d] = 0x%02X\n", index, buf[index]);
 	}
 }
 
@@ -86,14 +86,14 @@ static void realtek_aes_set_src_desc(struct realtek_aes_dev *adev, u32 sd1, dma_
 	while (1) {
 		tmp_value = readl(adev->io_base + RTK_SDSR);
 		if ((tmp_value & IPSEC_MASK_FIFO_EMPTY_CNT) > 0) {
-			dev_dbg(adev->dev, "sd1=0x%x , sdpr=0x%x \r\n", sd1, sdpr);
+			dev_dbg(adev->dev, "Set sd1 = 0x%08X, sdpr = 0x%08X\n", sd1, sdpr);
 			writel(sd1, adev->io_base + RTK_SDFWR);
 			writel(sdpr, adev->io_base + RTK_SDSWR);
 			break;
 		}
 		timeout--;
 		if (timeout == 0) {
-			dev_err(adev->dev, "Timeout, src fifo is FULL \r\n");
+			dev_err(adev->dev, "Timeout, src fifo is full\n");
 			break;
 		}
 	}
@@ -112,11 +112,11 @@ static void realtek_aes_set_dst_desc(struct realtek_aes_dev *adev, u32 dd1, dma_
 
 	tmp_value = readl(adev->io_base + RTK_DDSR);
 	if ((tmp_value & IPSEC_MASK_FIFO_EMPTY_CNT) > 0) {
-		dev_dbg(adev->dev, "dd1=0x%x , ddpr=0x%x \r\n", dd1, ddpr);
+		dev_dbg(adev->dev, "Set dd1 = 0x%08X, ddpr = 0x%08X\n", dd1, ddpr);
 		writel(dd1, adev->io_base + RTK_DDFWR);
 		writel(ddpr, adev->io_base + RTK_DDSWR);
 	} else {
-		dev_err(adev->dev, "dst fifo_cnt is not correct: %d \r\n", IPSEC_GET_FIFO_EMPTY_CNT(tmp_value));
+		dev_err(adev->dev, "Destination fifo_cnt %d is not correct\n", IPSEC_GET_FIFO_EMPTY_CNT(tmp_value));
 	}
 }
 
@@ -349,14 +349,14 @@ static int realtek_aes_process(struct ablkcipher_request *req, struct aead_reque
 		tag_len = crypto_aead_authsize((crypto_aead_reqtfm(areq)));
 		a2eo = areq->assoclen;
 		if (a2eo > 1008) {
-			dev_err(ctx->adev->dev, "aes AAD length error, aad_len <= (63 * 16) bytes\n");
+			dev_err(ctx->adev->dev, "AES AAD length error, aad_len <= (63 * 16) bytes\n");
 			return -EINVAL;
 		}
 		enl = areq->cryptlen;
 	}
 
 	if (!enl) {
-		dev_err(ctx->adev->dev, "aes message length error, msg_len is 0\n");
+		dev_err(ctx->adev->dev, "AES message length error, msg_len is 0\n");
 		return -EINVAL;
 	}
 
@@ -526,7 +526,7 @@ static int realtek_aes_process(struct ablkcipher_request *req, struct aead_reque
 	 *Polling mode, intr_mode = 0
 	 ********************************************/
 	if (realtek_aes_wait_ok(ctx->adev)) {
-		dev_err(ctx->adev->dev, "aes process timeout\n");
+		dev_err(ctx->adev->dev, "AES process timeout\n");
 		ret = -ETIMEDOUT;
 	}
 
@@ -578,8 +578,9 @@ static int realtek_aes_ecb_encrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -589,8 +590,9 @@ static int realtek_aes_ecb_encrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_ECB;
 	ctx->isDecrypt = 0;
@@ -608,8 +610,9 @@ static int realtek_aes_ecb_decrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -619,8 +622,9 @@ static int realtek_aes_ecb_decrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_ECB;
 	ctx->isDecrypt = 1;
@@ -639,8 +643,9 @@ static int realtek_aes_cbc_encrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -650,8 +655,9 @@ static int realtek_aes_cbc_encrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_CBC;
 	ctx->isDecrypt = 0;
@@ -671,8 +677,9 @@ static int realtek_aes_cbc_decrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -682,8 +689,9 @@ static int realtek_aes_cbc_decrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_CBC;
 	ctx->isDecrypt = 1;
@@ -703,8 +711,9 @@ static int realtek_aes_ctr_encrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -714,8 +723,9 @@ static int realtek_aes_ctr_encrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_CTR;
 	ctx->isDecrypt = 0;
@@ -735,8 +745,9 @@ static int realtek_aes_ctr_decrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -746,8 +757,9 @@ static int realtek_aes_ctr_decrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_CTR;
 	ctx->isDecrypt = 1;
@@ -767,8 +779,9 @@ static int realtek_aes_cfb_encrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -778,8 +791,9 @@ static int realtek_aes_cfb_encrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_CFB;
 	ctx->isDecrypt = 0;
@@ -799,8 +813,9 @@ static int realtek_aes_cfb_decrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -810,8 +825,9 @@ static int realtek_aes_cfb_decrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_CFB;
 	ctx->isDecrypt = 1;
@@ -831,8 +847,9 @@ static int realtek_aes_ofb_encrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -842,8 +859,9 @@ static int realtek_aes_ofb_encrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_OFB;
 	ctx->isDecrypt = 0;
@@ -863,8 +881,9 @@ static int realtek_aes_ofb_decrypt(struct ablkcipher_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -874,8 +893,9 @@ static int realtek_aes_ofb_decrypt(struct ablkcipher_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_OFB;
 	ctx->isDecrypt = 1;
@@ -893,8 +913,9 @@ static int realtek_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key, unsi
 	struct realtek_aes_dev *adev = NULL;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -904,8 +925,9 @@ static int realtek_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key, unsi
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 
 	if (keylen != AES_KEYSIZE_128 && keylen != AES_KEYSIZE_192 && keylen != AES_KEYSIZE_256) {
@@ -926,8 +948,9 @@ static int realtek_aes_cra_init(struct crypto_tfm *tfm)
 	struct realtek_aes_dev *adev;
 
 	/* request to allocate a new aes device instance from crypto subsystem */
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -939,7 +962,7 @@ static int realtek_aes_cra_init(struct crypto_tfm *tfm)
 			return -ENOMEM;
 		}
 		mutex_init(&adev->adev_mutex);
-	
+
 		/* add this adev in the global driver list */
 		list_add_tail(&adev->list, &realtek_aes.dev_list);
 	}
@@ -961,8 +984,9 @@ static int realtek_aes_gcm_setkey(struct crypto_aead *tfm, const u8 *key, unsign
 	struct realtek_aes_dev *adev = NULL;
 
 
-	if ( mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
 		mutex_unlock(&realtek_aes.drv_mutex);
@@ -971,8 +995,9 @@ static int realtek_aes_gcm_setkey(struct crypto_aead *tfm, const u8 *key, unsign
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	if (keylen != AES_KEYSIZE_128 && keylen != AES_KEYSIZE_192 && keylen != AES_KEYSIZE_256) {
 		mutex_unlock(&adev->adev_mutex);
@@ -999,8 +1024,9 @@ static int realtek_aes_gcm_encrypt(struct aead_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -1010,8 +1036,9 @@ static int realtek_aes_gcm_encrypt(struct aead_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if ( mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_GCM;
 	ctx->isDecrypt = 0;
@@ -1033,8 +1060,9 @@ static int realtek_aes_gcm_decrypt(struct aead_request *req)
 	int ret;
 
 
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -1044,8 +1072,9 @@ static int realtek_aes_gcm_decrypt(struct aead_request *req)
 	}
 	mutex_unlock(&realtek_aes.drv_mutex);
 
-	if (mutex_lock_interruptible(&adev->adev_mutex))
+	if (mutex_lock_interruptible(&adev->adev_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	ctx->cipher_type = AES_TYPE_GCM;
 	ctx->isDecrypt = 1;
@@ -1065,8 +1094,9 @@ static int realtek_aes_gcm_init(struct crypto_aead *tfm)
 	struct realtek_aes_dev *adev;
 
 	/* request to allocate a new aes device instance from crypto subsystem */
-	if (mutex_lock_interruptible(&realtek_aes.drv_mutex))
+	if (mutex_lock_interruptible(&realtek_aes.drv_mutex)) {
 		return -ERESTARTSYS;
+	}
 
 	adev = realtek_aes_find_dev(ctx);
 	if (!adev) {
@@ -1078,7 +1108,7 @@ static int realtek_aes_gcm_init(struct crypto_aead *tfm)
 			return -ENOMEM;
 		}
 		mutex_init(&adev->adev_mutex);
-	
+
 		/* add this adev in the global driver list */
 		list_add_tail(&adev->list, &realtek_aes.dev_list);
 	}
@@ -1211,7 +1241,7 @@ static int realtek_aes_remove(struct platform_device *pdev)
 	crypto_unregister_algs(realtek_aes_algs, ARRAY_SIZE(realtek_aes_algs));
 
 	list_for_each_entry(adev, &realtek_aes.dev_list, list)
-		list_del(&adev->list);
+	list_del(&adev->list);
 
 	return 0;
 }
@@ -1234,5 +1264,6 @@ static struct platform_driver realtek_aes_driver = {
 
 builtin_platform_driver(realtek_aes_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_aes driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba AES driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

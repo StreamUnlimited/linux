@@ -1,4 +1,10 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek Clocksource support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef __TIMER_OF_H__
 #define __TIMER_OF_H__
 

@@ -1,17 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021 Realtek, LLC.
- * All rights reserved.
- *
- * Licensed under the Realtek License, Version 1.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License from Realtek
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Realtek DRM support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/of_platform.h>
 #include <linux/component.h>
@@ -24,7 +16,6 @@
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_cma_helper.h>
-//#include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_of.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
@@ -33,11 +24,10 @@
 #include "ameba_lcdc.h"
 #include "ameba_drm_drv.h"
 
+#define to_ameba_crtc(crtc)                 container_of(crtc, struct ameba_crtc, base)
+#define to_ameba_plane(plane)               container_of(plane, struct ameba_plane, base)
 
-#define to_ameba_crtc(crtc) container_of(crtc, struct ameba_crtc, base)
-#define to_ameba_plane(plane) container_of(plane, struct ameba_plane, base)
-
-#define  LCDC_LAYER_IMG_FORMAT_NOT_SUPPORT (LCDC_LAYER_IMG_FORMAT_ARGB8666+1)
+#define LCDC_LAYER_IMG_FORMAT_NOT_SUPPORT   (LCDC_LAYER_IMG_FORMAT_ARGB8666+1)
 
 
 /* ameba-format translate table */
@@ -99,7 +89,7 @@ static int ameba_drm_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	 */
 	port = of_get_child_by_name(dev->dev->of_node, "port");
 	if (!port) {
-		DRM_DEV_ERROR(dev->dev, "no port node found in %pOF\n", dev->dev->of_node);
+		DRM_ERROR("No port node found in %pOF\n", dev->dev->of_node);
 		return -EINVAL;
 	}
 	of_node_put(port);
@@ -108,7 +98,7 @@ static int ameba_drm_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	ret = drm_crtc_init_with_planes(dev, crtc, plane, NULL,
 									driver_data->crtc_funcs, NULL);
 	if (ret) {
-		DRM_DEV_ERROR(dev->dev, "failed to init crtc.\n");
+		DRM_ERROR("Fail to init crtc.\n");
 		return ret;
 	}
 
@@ -128,10 +118,9 @@ static int ameba_drm_plane_init(struct drm_device *dev, struct drm_plane *plane,
 								data->channel_formats_cnt,
 								NULL, type, NULL);
 	if (ret) {
-		DRM_DEV_ERROR(dev->dev, "fail to init plane\n");
+		DRM_ERROR("Fail to init plane\n");
 		return ret;
 	}
-
 
 	drm_plane_helper_add(plane, data->plane_helper_funcs);
 
@@ -169,13 +158,13 @@ static int ameba_drm_private_init(struct drm_device *drm,
 
 	ameba_priv = devm_kzalloc(drm->dev, sizeof(*ameba_priv), GFP_KERNEL);
 	if (!ameba_priv) {
-		DRM_DEV_ERROR(drm->dev, "failed to alloc ameba_drm_private\n");
+		DRM_ERROR("Fail to alloc ameba_drm_private\n");
 		return -ENOMEM;
 	}
 
 	ctx = driver_data->alloc_hw_ctx(pdev, &ameba_priv->crtc.base);
 	if (IS_ERR(ctx)) {
-		DRM_DEV_ERROR(drm->dev, "failed to initialize ameba_priv hw ctx\n");
+		DRM_ERROR("Fail to initialize ameba_priv hw ctx\n");
 		return -EINVAL;
 	}
 	ameba_priv->lcdc_hw_ctx = ctx;
@@ -235,14 +224,14 @@ static int ameba_drm_kms_init(struct drm_device *dev,
 	/* bind and init sub drivers */
 	ret = component_bind_all(dev->dev, dev);
 	if (ret) {
-		DRM_DEV_ERROR(dev->dev, "failed to bind all component.\n");
+		DRM_ERROR("Fail to bind all component.\n");
 		goto err_private_cleanup;
 	}
 
 	/* vblank init */
 	ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
 	if (ret) {
-		DRM_DEV_ERROR(dev->dev, "failed to initialize vblank.\n");
+		DRM_ERROR("Fail to initialize vblank.\n");
 		goto err_unbind_all;
 	}
 	/* with irq_enabled = true, we can use the vblank feature. */
@@ -313,6 +302,8 @@ static int ameba_drm_bind(struct device *dev)
 		goto err_kms_cleanup;
 	}
 
+	DRM_INFO("DRM Bind Success!\n");
+
 	return 0;
 
 err_kms_cleanup:
@@ -331,8 +322,8 @@ static void ameba_destroy_crtc(struct drm_device *drm_dev)
 	struct ameba_drm_struct             *ameba_struct = drm_dev->dev_private;
 	struct ameba_drm_private            *ameba_priv = ameba_struct->ameba_drm_priv;
 
-	struct drm_crtc *crtc = &(ameba_priv->crtc.base);
-	struct drm_plane *plane, *tmp;
+	struct drm_crtc                     *crtc = &(ameba_priv->crtc.base);
+	struct drm_plane                    *plane, *tmp;
 
 	drm_crtc_vblank_off(crtc);
 
@@ -362,7 +353,8 @@ static void ameba_destroy_crtc(struct drm_device *drm_dev)
 static void ameba_drm_unbind(struct device *dev)
 {
 	struct drm_device           *drm = dev_get_drvdata(dev);
-	AMEBA_DRM_DEBUG
+
+	DRM_INFO("Run DRM Unbind\n");
 
 	drm_dev_unregister(drm);
 	ameba_destroy_crtc(drm);
@@ -396,7 +388,9 @@ static int ameba_drm_probe(struct platform_device *pdev)
 	struct device           *dev = &pdev->dev;
 	struct device_node      *np = dev->of_node;
 	int i;
-	AMEBA_DRM_DEBUG
+
+	drm_debug = DRM_UT_DRIVER;
+	DRM_DEBUG_DRIVER("Run Drm Probe!\n");
 
 	for (i = 0; i<LCDC_MAX_REMOTE_DEV; i++) {
 		remote = of_graph_get_remote_node(np,0,i);
@@ -414,12 +408,12 @@ static int ameba_drm_probe(struct platform_device *pdev)
 	}
 
 	if (i == 0) {
-		dev_err(dev, "missing 'ports' property\n");
+		DRM_ERROR("Missing 'ports' property\n");
 		return -ENODEV;
 	}
 
 	if (!match) {
-		dev_err(dev, "No available vop found for component-subsystem.\n");
+		DRM_ERROR("No available vop found for component-subsystem.\n");
 		return -ENODEV;
 	}
 
@@ -428,8 +422,11 @@ static int ameba_drm_probe(struct platform_device *pdev)
 
 static int ameba_drm_remove(struct platform_device *pdev)
 {
-	AMEBA_DRM_DEBUG
+	DRM_DEBUG_DRIVER("Run Drm Remove!\n");
+
 	component_master_del(&pdev->dev, &ameba_drm_ops);
+
+	drm_debug = 0;
 	
 	return 0;
 }
@@ -444,16 +441,16 @@ static const struct of_device_id ameba_drm_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, ameba_drm_dt_ids);
 
 static struct platform_driver ameba_drm_platform_driver = {
-	.probe = ameba_drm_probe,
+	.probe  = ameba_drm_probe,
 	.remove = ameba_drm_remove,
 	.driver = {
-		.name = "amebad2-drm",
+		.name = "realtek-amebad2-drm",
 		.of_match_table = ameba_drm_dt_ids,
 	},
 };
 
 module_platform_driver(ameba_drm_platform_driver);
 
-MODULE_AUTHOR("Chunlin.Yi <chunlin.yi@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek AmebaD2 SoCs' DRM driver");
+MODULE_DESCRIPTION("Realtek Ameba DRM driver");
 MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");
