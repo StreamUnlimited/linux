@@ -223,9 +223,7 @@
 	};
 };
 
-&spi0 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&spi0_pins>;
+&sdioh {
 	status = "disabled";
 };
 
