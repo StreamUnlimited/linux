@@ -60,8 +60,8 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&i2c1_gpio_pins>;
 
-		// SDA and SCL
-		gpios = <&gpiob 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN) &gpiob 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		sda-gpios = <&gpiob 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&gpiob 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
 		i2c-gpio,delay-us = <2>;
 
 		status = "okay";
