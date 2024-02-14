@@ -61,6 +61,7 @@ struct axg_spdifin {
 	unsigned int irq;
 	struct snd_soc_card *card;
 	struct snd_kcontrol *ctrl_sample_rate;
+	struct snd_pcm_hw_constraint_list constraint_rates;
 };
 
 /*
@@ -115,6 +116,35 @@ static int axg_spdifin_prepare(struct snd_pcm_substream *substream,
 			   SPDIFIN_CTRL0_RST_OUT, SPDIFIN_CTRL0_RST_OUT);
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
 			   SPDIFIN_CTRL0_RST_IN,  SPDIFIN_CTRL0_RST_IN);
+
+	return 0;
+}
+
+static void axg_spdifin_hw_constraints(struct axg_spdifin *priv,
+				  struct snd_pcm_substream *substream)
+{
+	/* using static here because snd_pcm_hw_constraint_list does not copy */
+	static unsigned int axg_spdifin_rates[1];
+	unsigned int rate = axg_spdifin_get_rate(priv);
+	struct snd_pcm_hw_constraint_list *constraint;
+
+	if (rate) {
+		constraint = &priv->constraint_rates;
+		axg_spdifin_rates[0] = rate;
+		constraint->list	= axg_spdifin_rates;
+		constraint->mask	= 0;
+		constraint->count = 1;
+		snd_pcm_hw_constraint_list(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_RATE, constraint);
+	}
+}
+
+int axg_spdifin_dai_startup(struct snd_pcm_substream *substream,
+			      struct snd_soc_dai *dai)
+{
+	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
+
+	axg_spdifin_hw_constraints(priv, substream);
 
 	return 0;
 }
@@ -333,6 +363,7 @@ static const struct snd_soc_dai_ops axg_spdifin_ops = {
 	.probe		= axg_spdifin_dai_probe,
 	.remove		= axg_spdifin_dai_remove,
 	.prepare	= axg_spdifin_prepare,
+	.startup	= axg_spdifin_dai_startup,
 };
 
 static int axg_spdifin_iec958_info(struct snd_kcontrol *kcontrol,
