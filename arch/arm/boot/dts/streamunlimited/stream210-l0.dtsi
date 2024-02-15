@@ -33,6 +33,10 @@
 		device_type = "memory";
 		reg = <0x60800000 0xF800000>;  // 256MB -- exclude 8 MiB secure memory
 	};
+
+	otp_core {
+		compatible = "realtek,amebad2-otp-core";
+	};
 };
 
 &axi_wlan {
