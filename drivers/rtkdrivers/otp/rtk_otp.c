@@ -16,6 +16,8 @@
 #include <linux/of_address.h>
 #include <linux/nvmem-provider.h>
 
+#include <misc/realtek-otp-core.h>
+
 #define READONLY					0
 #define RETRY_COUNT					3
 
@@ -62,6 +64,13 @@
 #define RTK_OTP_GET_LTYP2_OFFSET(x)	((u32)(((x >> 0) & 0x00000FFF)))
 
 #define RTK_OTP_GET_LTYP3_OFFSET(x)	((u32)(((x >> 0) & 0x0FFFFFFF)))
+
+// Accessing fuses in these region does not seem to work from the non-secure (Linux)
+// world, so in this range we have to use the IPC mechanism to read/write the fuses
+// through the KM4 firmware running in secure world. Hopefully later there will be
+// a better way to achieve this.
+#define RTK_OTP_PHYS_SEC_START	0x200
+#define RTK_OTP_PHYS_SEC_END	0x400
 
 enum rtk_otp_opmode {
 	RTK_OTP_USER_MODE = 0,
@@ -160,6 +169,29 @@ static void rtk_otp_power_switch(struct rtk_otp *rtk_otp, bool bwrite, bool psta
 	rtk_otp_access_cmd(rtk_otp, bwrite);
 }
 
+static int rtk_otp_readb_sec(struct rtk_otp *rtk_otp, u32 addr, u8 *data)
+{
+	int ret = 0;
+	u8 result[OPT_REQ_MSG_PARAM_NUM];
+	otp_ipc_host_req_t req = {0};
+
+	req.otp_id = LINUX_IPC_OTP_PHY_READ8;
+	req.addr = addr;
+	req.len = 1;
+	req.write_lock = 0;
+
+	ret = rtk_otp_process(&req, result);
+	if (ret < 0)
+		return ret;
+
+	data[0] = result[0];
+
+	// rtk_otp_process() will return 1 on success
+	ret = 0;
+
+	return ret;
+}
+
 static int rtk_otp_readb(struct rtk_otp *rtk_otp, u32 addr, u8 *data, int mode)
 {
 	int ret = 0;
@@ -179,6 +211,9 @@ static int rtk_otp_readb(struct rtk_otp *rtk_otp, u32 addr, u8 *data, int mode)
 		ret = -1;
 		goto exit;
 	}
+
+	if (addr >= RTK_OTP_PHYS_SEC_START && addr < RTK_OTP_PHYS_SEC_END)
+		return rtk_otp_readb_sec(rtk_otp, addr, data);
 
 	otp_as_addr = (volatile void __iomem *)(rtk_otp->mem_base + RTK_OTPC_OTP_AS);
 
@@ -329,6 +364,29 @@ exit:
 	return ret;
 }
 
+static int rtk_otp_writeb_sec(struct rtk_otp *rtk_otp, u32 addr, u8 data)
+{
+	int ret = 0;
+	u8 result[OPT_REQ_MSG_PARAM_NUM];
+	otp_ipc_host_req_t req = {0};
+
+	req.otp_id = LINUX_IPC_OTP_PHY_WRITE8;
+	req.addr = addr;
+	req.len = 1;
+	req.write_lock = 0;
+	req.param_buf[0] = data;
+
+	ret = rtk_otp_process(&req, result);
+
+	if (ret < 0)
+		return ret;
+
+	// rtk_otp_process() will return 1 on success
+	ret = 0;
+
+	return ret;
+}
+
 static int rtk_otp_writeb(struct rtk_otp *rtk_otp, u32 addr, u8 data)
 {
 	int ret = 0;
@@ -350,6 +408,9 @@ static int rtk_otp_writeb(struct rtk_otp *rtk_otp, u32 addr, u8 data)
 		ret = -1;
 		goto exit;
 	}
+
+	if (addr >= RTK_OTP_PHYS_SEC_START && addr < RTK_OTP_PHYS_SEC_END)
+		return rtk_otp_writeb_sec(rtk_otp, addr, data);
 
 	otp_as_addr = (volatile void __iomem *)(rtk_otp->mem_base + RTK_OTPC_OTP_AS);
 
