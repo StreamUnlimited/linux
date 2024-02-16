@@ -146,11 +146,6 @@
 	};
 };
 
-&hash {
-	// TODO: Enable it and figure out if it works nicely
-	status = "disabled";
-};
-
 &ledc {
 	pinctrl-names = "default";
 	pinctrl-0 = <&ledc_pin>;
