@@ -39,6 +39,10 @@
 	};
 };
 
+&aes {
+	status = "okay";
+};
+
 &axi_wlan {
 	// According to Realtek these pins are supposedly to be used for antenna
 	// switching, etc. However they are currently not handeled by the driver
@@ -64,6 +68,10 @@
 		output-high;
 		line-name = "USB_DRVVBUS";
 	};
+};
+
+&hash {
+	status = "okay";
 };
 
 &loguart {
