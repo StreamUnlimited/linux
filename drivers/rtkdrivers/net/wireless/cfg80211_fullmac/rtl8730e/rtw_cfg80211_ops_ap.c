@@ -250,7 +250,8 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	char fake_pwd[] = "12345678";
 	u8 *pwd_vir = NULL;
 	dma_addr_t pwd_phy;
-	const struct element *elem;
+	u8 elem_num = 0;
+	const struct element *elem, **pelem;
 
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Start Softap\n", FUNC_NDEV_ARG(ndev));
 
@@ -309,13 +310,35 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 		rtw_mfree(strlen(pwd_vir), pwd_vir, pwd_phy);
 	}
 
+
+
 	if (settings->beacon.beacon_ies_len) {
 		llhw_wifi_del_custom_ie(1);
+
+		/* to get the number of EID_VENDOR_SPECIFIC from beacon_ies */
+		elem_num = 0;
 		for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
-				    settings->beacon.beacon_ies,
-				    settings->beacon.beacon_ies_len) {
-			llhw_wifi_add_custom_ie(elem);
+							settings->beacon.beacon_ies,
+							settings->beacon.beacon_ies_len) {
+			elem_num++;
 		}
+		/* allocate an array to store the pointor of struct element */
+		pelem = kmalloc(sizeof(struct element *) * elem_num, GFP_KERNEL);
+		if (!pelem) {
+			dev_dbg(global_idev.fullmac_dev, "%s: malloc pelem failed.", __func__);
+			return -ENOMEM;
+		}
+
+		elem_num = 0;
+		for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
+							settings->beacon.beacon_ies,
+							settings->beacon.beacon_ies_len) {
+			pelem[elem_num] = elem;
+			elem_num++;
+		}
+		llhw_wifi_add_custom_ie(pelem, elem_num);
+
+		kfree(pelem);
 	}
 
 	return ret;

@@ -58,7 +58,7 @@ u64 llhw_wifi_get_tsft(u8 iface_type);
 void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
 int rtw_regd_init(void);
 void rtw_ethtool_ops_init(void);
-int llhw_wifi_add_custom_ie(const struct element *elem);
+int llhw_wifi_add_custom_ie(const struct element **elem, u8 num);
 int llhw_wifi_del_custom_ie(unsigned char wlan_idx);
 int llhw_wifi_update_custom_ie(u8 *ie, int ie_index);
 
