@@ -62,6 +62,11 @@ typedef enum {
 	RTW_NOMEM                        = -27,  /**< No Memory */
 } rtw_result_t;
 
+#if defined(__IAR_SYSTEMS_ICC__) || defined (__GNUC__) || defined(__CC_ARM) || (defined(__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050))
+/* SET pack mode 1-alignment for the following area. */
+#pragma pack(1)
+#endif
+
 /**
   * @brief  The structure is used to describe the SSID.
   */
@@ -91,6 +96,38 @@ typedef struct {
 	rtw_802_11_band_t       band;             /**< Radio band                                                                */
 } rtw_scan_result_t;
 
+typedef struct {
+	unsigned short		active_scan_time;      /**< active scan time per channel, units: millisecond, default is 100ms */
+	unsigned short		passive_scan_time;     /**< passive scan time per channel, units: millisecond, default is 110ms */
+} rtw_channel_scan_time_t;
+
+/* DO NOT define or use any rtw_result_t in linux. Use asm-generic/errno.h instead. */
+typedef rtw_result_t (*scan_user_callback_t)(unsigned int ap_num, void *user_data);
+typedef rtw_result_t (*scan_report_each_mode_user_callback_t)(rtw_scan_result_t *scanned_ap_info, void *user_data);
+
+/**
+  * @brief  The structure is used to describe the scan parameters used for scan,
+  * @note  The data length of string pointed by ssid should not exceed 32,
+  *        and the data length of string pointed by password should not exceed 64.
+  */
+typedef struct {
+	//rtw_scan_option_t 					options;
+	u8									options;
+	char									*ssid;
+	unsigned char							*channel_list;
+	unsigned char							channel_list_num;
+	rtw_channel_scan_time_t 				chan_scan_time;
+	unsigned short						max_ap_record_num;	   /**< config the max number of recorded AP, when set to 0, use default value 64 */
+	void									*scan_user_data;
+	scan_user_callback_t					scan_user_callback;   /**< used for normal asynchronized mode */
+	scan_report_each_mode_user_callback_t	scan_report_each_mode_user_callback; /*used for RTW_SCAN_REPORT_EACH mode */
+} rtw_scan_param_t;
+
+#if defined(__IAR_SYSTEMS_ICC__) || defined (__GNUC__) || defined(__CC_ARM) || (defined(__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050))
+/* REMOVE pack mode 1-alignment for the next definitions, use DEFAULT. */
+#pragma pack()
+#endif
+
 /**
   * @brief  The structure is used for fullmac to get wpa_supplicant's info for STA connect,
   */
@@ -113,32 +150,6 @@ typedef struct rtw_softap_info {
 	unsigned char		channel;
 } rtw_softap_info_t;
 
-typedef struct {
-	unsigned short		active_scan_time;      /**< active scan time per channel, units: millisecond, default is 100ms */
-	unsigned short		passive_scan_time;     /**< passive scan time per channel, units: millisecond, default is 110ms */
-} rtw_channel_scan_time_t;
-
-/* DO NOT define or use any rtw_result_t in linux. Use asm-generic/errno.h instead. */
-typedef rtw_result_t (*scan_user_callback_t)(unsigned int ap_num, void *user_data);
-typedef rtw_result_t (*scan_report_each_mode_user_callback_t)(rtw_scan_result_t *scanned_ap_info, void *user_data);
-
-/**
-  * @brief  The structure is used to describe the scan parameters used for scan,
-  * @note  The data length of string pointed by ssid should not exceed 32,
-  *        and the data length of string pointed by password should not exceed 64.
-  */
-typedef struct {
-	rtw_scan_option_t						options;
-	char									*ssid;
-	unsigned char							*channel_list;
-	unsigned char							channel_list_num;
-	rtw_channel_scan_time_t 				chan_scan_time;
-	unsigned short							max_ap_record_num;     /**< config the max number of recorded AP, when set to 0, use default value 64 */
-	void									*scan_user_data;
-	scan_user_callback_t					scan_user_callback;   /**< used for normal asynchronized mode */
-	scan_report_each_mode_user_callback_t	scan_report_each_mode_user_callback; /*used for RTW_SCAN_REPORT_EACH mode */
-} rtw_scan_param_t;
-
 typedef struct raw_data_desc {
 	unsigned char		wlan_idx;      /**< index of wlan interface which will transmit */
 	unsigned char		*buf;          /**< poninter of buf where raw data is stored*/
@@ -159,6 +170,9 @@ struct rtw_crypt_info {
 	u8 driver_cipher;
 	u8 transition_disable_exist;
 	u8 transition_disable_bitmap;
+	u8 camid: 7;	/**< camid is valid only when force_camid=1*/
+	u8 force_camid: 1;
+	u8 rpt_mode;
 };
 
 /**
@@ -191,7 +205,8 @@ struct wpa_sae_param_t {
   * @brief  The structure is used to describe the phy statistics
   */
 typedef struct {
-	signed char	rssi;          /*!<average rssi in 1 sec (for STA mode) */
+	signed char	rssi;          /*!<average mixed rssi in 1 sec (for STA mode) */
+	signed char	data_rssi;          /*!<average data rssi in 1 sec (for STA mode) */
 	signed char	beacon_rssi;          /*!<average beacon rssi in 1 sec (for STA mode) */
 	signed char	snr;          /*!< average snr in 1 sec (not include cck rate, for STA mode)*/
 	/* todo*/
@@ -253,7 +268,7 @@ typedef void (*rtw_joinstatus_callback_t)(rtw_join_status_t join_status);
 typedef struct {
 	rtw_ssid_t					ssid;
 	rtw_mac_t					bssid;
-	rtw_security_t				security_type;
+	u32						security_type;	/* because rtw_security_t type would occupy 8 bytes on PC/Raspi, so use u32 instead of enum to keep structure consistent */
 	unsigned char				*password;
 	int 						password_len;
 	int 						key_id;
@@ -444,7 +459,7 @@ struct  wifi_user_conf {
 	unsigned char rtw_tx_pwr_by_rate;	///< 0: disable, 1: enable, 2: Depend on efuse(flash)
 	unsigned char rtw_trp_tis_cert_en;
 
-	rtw_wpa_mode wifi_wpa_mode;
+	rtw_wpa_mode wifi_wpa_mode_force;
 	unsigned char tdma_dig_enable;	///0:bb tdma dig on off, 1:bb tdma dig on
 
 	unsigned char g_user_ap_sta_num;
@@ -492,6 +507,7 @@ struct  wifi_user_conf {
 	unsigned char ap_polling_sta;
 
 	unsigned char channel_plan;
+	unsigned char bw_40_enable;
 
 	unsigned char rtw_802_11d_en;
 
@@ -538,15 +554,6 @@ typedef struct _pwr_lmt_regu_remap {
   * @brief  The structure is used to describe the sw statistics
   */
 typedef struct { /* software statistics for tx and rx*/
-	unsigned long   rx_packets;             /*!< total packets received       */
-	unsigned long   tx_packets;             /*!<total packets transmitted    */
-	unsigned long   rx_dropped;             /*!< no space in buffers    */
-	unsigned long   tx_dropped;             /*!< no space available  */
-	unsigned long   rx_bytes;               /*!< total bytes received         */
-	unsigned long   tx_bytes;               /*!< total bytes transmitted      */
-	unsigned long   rx_overflow;            /*!< rx fifo overflow count       */
-	unsigned int    tx_tp_kbps;
-	unsigned int    rx_tp_kbps;
 	unsigned int    max_skbbuf_used_number; /*!< max skb buffer used number       */
 	unsigned int    skbbuf_used_number;     /*!< current used skbbuf number       */
 	unsigned int    max_skbdata_used_number;/*!< max skb data used number       */
@@ -628,6 +635,7 @@ typedef struct {
 	unsigned char data_bw;
 	unsigned char mac_addr[6];
 	unsigned char multi_type;  /* 0&1 for multi sta CSI */
+	unsigned char trig_flag;  /* indicate source of role for triggering csi: 4bits >> 1 ~ 15 */
 } rtw_csi_action_parm_t;
 
 /**
@@ -744,7 +752,7 @@ typedef struct {
 	unsigned int		rx_busy;
 	unsigned char		enable;
 	unsigned char		mac[6];
-	_sema			netif_rx_sema;	/* prevent race condition on .skb in rltk_netif_rx() */
+	rtos_sema_t			netif_rx_sema;	/* prevent race condition on .skb in rltk_netif_rx() */
 } Rltk_wlan_t;
 
 extern Rltk_wlan_t rltk_wlan_info[NET_IF_NUM];

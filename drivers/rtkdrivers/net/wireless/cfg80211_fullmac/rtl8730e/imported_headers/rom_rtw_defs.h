@@ -293,28 +293,16 @@ enum channel_width {
 #define WPA_KEY_MGMT_DPP BIT(23)
 
 typedef enum _NDIS_802_11_AUTHENTICATION_MODE {
-	Ndis802_11AuthModeOpen,
-	Ndis802_11AuthModeShared,
-	Ndis802_11AuthModeAutoSwitch,
-	Ndis802_11AuthModeWPA,
-	Ndis802_11AuthModeWPAPSK,
-	Ndis802_11AuthModeWPANone,
-	Ndis802_11AuthModeWAPI,
-	Ndis802_11AuthModeWPA2,
-	Ndis802_11AuthModeWPA2PSK,
-	Ndis802_11AuthModeWPA3,
-	Ndis802_11AuthModeWPA3PSK,
+	Ndis802_11AuthModeWPA = 3,
+	Ndis802_11AuthModeWPAPSK = 4,
+	Ndis802_11AuthModeWPA2 = 7,
+	Ndis802_11AuthModeWPA2PSK = 8,
+	Ndis802_11AuthModeWPA3 = 9,
+	Ndis802_11AuthModeWPA3PSK = 10,
 	Ndis802_11AuthModeMax               // Not a real mode, defined as upper bound
 } NDIS_802_11_AUTHENTICATION_MODE, *PNDIS_802_11_AUTHENTICATION_MODE;
 
 #define MAX_IE_SZ	768 //384//
-
-enum {
-	RTW_ROAM_ON_EXPIRED = BIT(0),
-	RTW_ROAM_ON_RESUME = BIT(1),
-	RTW_ROAM_ACTIVE = BIT(2),
-	RTW_ROAM_ON_BTM = BIT(3),
-};
 
 /* Extended Capabilities: n bytes */
 #define GET_EXT_CAP_MBSSID(_pEleStart)					LE_BITS_TO_1BYTE(((u8 *)(_pEleStart) + 2), 6, 1)
@@ -338,18 +326,34 @@ typedef enum {
 	DOT11_PortStatus_Guest
 } DOT11_PORT_STATUS;
 
-#define _NO_PRIVACY_		0x0
-#define _WEP40_				0x1
-#define _TKIP_				0x2
-#define _TKIP_WTMIC_		0x3
-#define _AES_				0x4
-#define _WEP104_			0x5
-#define _WEP_WPA_MIXED_		0x07  // WEP + WPA
-#define _SMS4_				0x06
-#define _BIP_				0x8
-#define _GCMP_ 0x07
-#define _GCMP_256_ (_GCMP_ | BIT(3))
-#define _CCMP_256_ (_AES_ | BIT(3))
+/* SECCAM sec_type define */
+#if defined(CONFIG_AMEBAZ6)	/* AMEBAZ6_TODO */
+#define _NO_PRIVACY_	0x0
+#define _AES_		0x1	//_CCMP_128_
+#define _GCMP_		0x2	//_GCMP_128_
+#define _GCM_WAPI_	0x3	//_GCM_WAPI_
+#define _CCMP_256_	(_AES_ | BIT(2))	//0x5
+#define _GCMP_256_	(_GCMP_ | BIT(2))	//0x6
+#define _SMS4_		(_GCM_WAPI_ | BIT(2))	//_WAPI_, 0x7
+/* costdown HW not support WEP & TKIP, following define is used for SW */
+#define _WEP40_		0x9
+#define _TKIP_		0xa
+#define _TKIP_WTMIC_	0xb
+#define _WEP104_	0xc
+#else
+#define _NO_PRIVACY_	0x0
+#define _WEP40_		0x1
+#define _TKIP_		0x2
+#define _TKIP_WTMIC_	0x3
+#define _AES_		0x4	//_CCMP_128_
+#define _WEP104_	0x5
+#define _SMS4_		0x6	//_WAPI_
+#define _GCMP_		0x7
+#define _GCMP_256_	(_GCMP_ | BIT(3))
+#define _CCMP_256_	(_AES_ | BIT(3))
+#define _GCM_WAPI_	(_SMS4_ | BIT(3))		//_GCM_WAPI_
+#endif
+#define _BIP_		0x8
 
 #define BW_CAP_5M		BIT0
 #define BW_CAP_10M		BIT1
@@ -357,7 +361,7 @@ typedef enum {
 #define BW_CAP_40M		BIT3
 #define BW_CAP_80M		BIT4
 #define BW_CAP_160M		BIT5
-#define BW_CAP_80_80M	BIT6
+#define BW_CAP_80_80M		BIT6
 
 enum chan_offset {
 	CHAN_OFFSET_NO_EXT = 0,	/*SCN - no secondary channel*/
@@ -397,13 +401,10 @@ enum mfp_options {
 
 enum dot11AuthAlgrthmNum {
 	dot11AuthAlgrthm_Open = 0,
-	dot11AuthAlgrthm_Shared,
-	dot11AuthAlgrthm_8021X,
-	dot11AuthAlgrthm_SAE,
-	dot11AuthAlgrthm_Auto,
-	dot11AuthAlgrthm_WAPI,
-	dot11AuthAlgrthm_FT_PSK,
-	dot11AuthAlgrthm_MaxNum
+	dot11AuthAlgrthm_Shared = 1,
+	dot11AuthAlgrthm_8021X = 2,
+	dot11AuthAlgrthm_SAE = 3,
+	dot11AuthAlgrthm_MaxNum = 7
 };
 
 enum channel_group {

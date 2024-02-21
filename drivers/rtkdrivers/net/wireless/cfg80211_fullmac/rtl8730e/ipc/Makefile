@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 ccflags-y += -DCONFIG_FULLMAC -DCONFIG_FULLMAC_HCI_IPC
-ccflags-y += -I$(srctree)/../../firmware/component/wifi/driver/include
-ccflags-y += -I$(srctree)/../../firmware/component/wifi/api
-ccflags-y += -I$(srctree)/../../firmware/component/wifi/inic/ipc
-ccflags-y += -I$(srctree)/../../firmware/component/wifi/inic
+ccflags-y += -I$(srctree)/$(src)
 ccflags-y += -I$(srctree)/$(src)/..
+ccflags-y += -I$(srctree)/$(src)/../imported_headers
 
 llhw-ipc-y := rtw_llhw_hci.o \
 		rtw_llhw_ops.o \
