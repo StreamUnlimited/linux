@@ -1,6 +1,8 @@
 #ifndef __RTW_NETDEV_OPS_H__
 #define __RTW_NETDEV_OPS_H__
 
+#define WIFI_MP_MSG_BUF_SIZE (4096)
+
 struct netdev_priv_t {
 	u32				wlan_idx;
 	bool				priv_is_on;

@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #define __INIC_IPC_MSG_QUEUE_C__
 
 #include <rtw_cfg80211_fullmac.h>
@@ -33,7 +43,7 @@ static struct ipc_msg_node *dequeue_ipc_msg_node(struct ipc_msg_q_priv *priv)
 	return p_node;
 }
 
-static void inic_ipc_msg_q_task(struct work_struct *data)
+static void inic_msg_q_task(struct work_struct *data)
 {
 	struct ipc_msg_q_priv *priv = &global_idev.msg_priv;
 	struct ipc_msg_node *p_node = NULL;
@@ -61,7 +71,7 @@ static void inic_ipc_msg_q_task(struct work_struct *data)
 	mutex_unlock(&(priv->msg_work_lock));
 }
 
-int inic_ipc_msg_q_init(struct device *pdev, void (*task_hdl)(struct inic_ipc_ex_msg *))
+int inic_msg_q_init(struct device *pdev, void (*task_hdl)(struct inic_ipc_ex_msg *))
 {
 	int i = 0;
 	struct ipc_msg_q_priv *msg_priv = &global_idev.msg_priv;
@@ -87,7 +97,7 @@ int inic_ipc_msg_q_init(struct device *pdev, void (*task_hdl)(struct inic_ipc_ex
 
 	mutex_init(&(msg_priv->msg_work_lock));
 	/* initialize message tasklet */
-	INIT_WORK(&(msg_priv->msg_work), inic_ipc_msg_q_task);
+	INIT_WORK(&(msg_priv->msg_work), inic_msg_q_task);
 
 	/* sign the queue is working */
 	msg_priv->b_queue_working = 1;
@@ -95,7 +105,7 @@ int inic_ipc_msg_q_init(struct device *pdev, void (*task_hdl)(struct inic_ipc_ex
 	return 0;
 }
 
-int inic_ipc_msg_enqueue(struct inic_ipc_ex_msg *p_ipc_msg)
+int inic_msg_enqueue(struct inic_ipc_ex_msg *p_ipc_msg)
 {
 	struct ipc_msg_q_priv *priv = &global_idev.msg_priv;
 	struct ipc_msg_node *p_node = NULL;
@@ -144,7 +154,7 @@ func_out:
 	return ret;
 }
 
-void inic_ipc_msg_q_deinit(void)
+void inic_msg_q_deinit(void)
 {
 	struct ipc_msg_q_priv *msg_priv = &global_idev.msg_priv;
 

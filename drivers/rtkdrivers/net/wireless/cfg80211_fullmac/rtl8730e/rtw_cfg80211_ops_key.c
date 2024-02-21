@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 
 /* Cipher suite type: params->cipher in add key. */
@@ -7,23 +17,23 @@
  * 00-0F-AC	1		WEP-40
  * 00-0F-AC	2		TKIP
  * 00-0F-AC	3		Reserved
- * 00-0F-AC	4		CCMP – default in an RSNA
+ * 00-0F-AC	4		CCMP - default in an RSNA
  * 00-0F-AC	5		WEP-104
- * 00-0F-AC	6–255		Reserved
+ * 00-0F-AC	6-255		Reserved
  * Vendor OUI	Other		Vendor specific
 */
 
 /* AKM suites: crypto.akm_suites while connect. */
 /* OUI		Suite type	Authentication type					Key management type
  * 00-0F-AC	0		Reserved						Reserved
- * 00-0F-AC	1		IEEE 802.1X or using PMKSA caching – RSNA default	RSNA key management or using PMKSA caching – RSNA default
+ * 00-0F-AC	1		IEEE 802.1X or using PMKSA caching - RSNA default	RSNA key management or using PMKSA caching - RSNA default
  * 00-0F-AC	2		PSK							RSNA key management, using PSK
- * 00-0F-AC	3–255		Reserved						Reserved
+ * 00-0F-AC	3-255		Reserved						Reserved
  * Vendor OUI	Any		Vendor specific						Vendor specific
 */
 
 static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 								, int link_id
 #endif
 								, u8 key_index
@@ -70,14 +80,14 @@ static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
 		memcpy(crypt.mac_addr, mac_addr, 6);
 	}
 
-	ret = llhw_ipc_wifi_add_key(&crypt);
+	ret = llhw_wifi_add_key(&crypt);
 exit:
 
 	return ret;
 }
 
 static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 								, int link_id
 #endif
 								, u8 keyid
@@ -90,7 +100,7 @@ static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev
 }
 
 static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 								, int link_id
 #endif
 								, u8 key_index, bool pairwise, const u8 *mac_addr)
@@ -101,7 +111,7 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 										, int link_id
 #endif
 										, u8 key_index, bool unicast, bool multicast)
@@ -111,7 +121,7 @@ static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *
 }
 
 static int cfg80211_rtw_set_default_mgmt_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
 		, int link_id
 #endif
 		, u8 key_index)
@@ -135,7 +145,7 @@ static int cfg80211_rtw_set_pmksa(struct wiphy *wiphy, struct net_device *ndev, 
 
 	dev_dbg(global_idev.fullmac_dev, "--- %s ---", __func__);
 
-	pmksa_ops_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy, GFP_KERNEL);
+	pmksa_ops_vir = rtw_malloc(sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy);
 	if (!pmksa_ops_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
@@ -153,10 +163,10 @@ static int cfg80211_rtw_set_pmksa(struct wiphy *wiphy, struct net_device *ndev, 
 
 	pmksa_ops_vir->wlan_idx = rtw_netdev_idx(ndev);
 	pmksa_ops_vir->ops_id = PMKSA_SET;
-	llhw_ipc_wifi_pmksa_ops(pmksa_ops_phy);
+	llhw_wifi_pmksa_ops(pmksa_ops_phy);
 
 	if (pmksa_ops_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
+		rtw_mfree(sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
 	}
 
 	return 0;
@@ -169,7 +179,7 @@ static int cfg80211_rtw_del_pmksa(struct wiphy *wiphy, struct net_device *ndev, 
 
 	dev_dbg(global_idev.fullmac_dev, "--- %s ---", __func__);
 
-	pmksa_ops_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy, GFP_KERNEL);
+	pmksa_ops_vir = rtw_malloc(sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy);
 	if (!pmksa_ops_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
@@ -186,10 +196,10 @@ static int cfg80211_rtw_del_pmksa(struct wiphy *wiphy, struct net_device *ndev, 
 
 	pmksa_ops_vir->wlan_idx = rtw_netdev_idx(ndev);
 	pmksa_ops_vir->ops_id = PMKSA_DEL;
-	llhw_ipc_wifi_pmksa_ops(pmksa_ops_phy);
+	llhw_wifi_pmksa_ops(pmksa_ops_phy);
 
 	if (pmksa_ops_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
+		rtw_mfree(sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
 	}
 
 	return 0;
@@ -202,7 +212,7 @@ static int cfg80211_rtw_flush_pmksa(struct wiphy *wiphy, struct net_device *ndev
 
 	dev_dbg(global_idev.fullmac_dev, "--- %s --- ", __func__);
 
-	pmksa_ops_vir = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy, GFP_KERNEL);
+	pmksa_ops_vir = rtw_malloc(sizeof(struct rtw_pmksa_ops_t), &pmksa_ops_phy);
 	if (!pmksa_ops_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
@@ -210,10 +220,10 @@ static int cfg80211_rtw_flush_pmksa(struct wiphy *wiphy, struct net_device *ndev
 
 	pmksa_ops_vir->wlan_idx = rtw_netdev_idx(ndev);
 	pmksa_ops_vir->ops_id = PMKSA_FLUSH;
-	llhw_ipc_wifi_pmksa_ops(pmksa_ops_phy);
+	llhw_wifi_pmksa_ops(pmksa_ops_phy);
 
 	if (pmksa_ops_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
+		rtw_mfree(sizeof(struct rtw_pmksa_ops_t), pmksa_ops_vir, pmksa_ops_phy);
 	}
 
 	return 0;

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek DTS for SPI NOR flash
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 / {
 	ocp {
 		spic: spi@44000000 {
-			compatible = "realtek,rxi312-spi-nor";
+			compatible = "realtek,rxi312-nor";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			bus_num = <2>;

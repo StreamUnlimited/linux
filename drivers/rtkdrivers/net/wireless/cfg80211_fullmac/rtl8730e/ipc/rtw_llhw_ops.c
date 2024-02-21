@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <rtw_cfg80211_fullmac.h>
 
@@ -32,7 +41,7 @@ int llhw_ipc_send_msg(u32 id, u32 *param_buf, u32 buf_len)
 		dev_err(global_idev.fullmac_dev, "LINUX IPC SEND FAIL!!!! ret = %d", ret);
 	}
 
-	while (event_priv->preq_msg->api_id != IPC_WIFI_API_PROCESS_DONE) {
+	while (event_priv->preq_msg->api_id != INIC_API_PROCESS_DONE) {
 		udelay(10);
 	}
 
@@ -44,16 +53,16 @@ func_exit:
 	return ret;
 }
 
-void llhw_ipc_wifi_on(void)
+void llhw_wifi_on(void)
 {
 	u32 param_buf[1];
 
 	param_buf[0] = 0;
 
-	llhw_ipc_send_msg(IPC_API_WIFI_ON, param_buf, 1);
+	llhw_ipc_send_msg(INIC_API_WIFI_ON, param_buf, 1);
 }
 
-int llhw_ipc_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
+int llhw_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
 {
 	dma_addr_t phy_addr;
 	u32 param_buf[3];
@@ -71,13 +80,13 @@ int llhw_ipc_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
 	/* Set mac address to ram . */
 	param_buf[2] = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_MAC_ADDR, param_buf, 3);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_MAC_ADDR, param_buf, 3);
 	dma_unmap_single(pdev, phy_addr, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
+int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 {
 	int ret = 0;
 	u32 param_buf[3];
@@ -94,7 +103,7 @@ int llhw_ipc_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 	param_buf[1] = block;
 	param_buf[2] = ssid_length;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SCAN_NETWROKS, param_buf, 3);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_NETWROKS, param_buf, 3);
 	dma_unmap_single(pdev, dma_addr_scan_param, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
 
 	return ret;
@@ -104,12 +113,12 @@ int llhw_wifi_scan_abort(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SCAN_ABORT, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_ABORT, NULL, 0);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
+int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
 {
 	int ret = 0;
 	internal_join_block_param_t *block_param = NULL;
@@ -150,7 +159,7 @@ int llhw_ipc_wifi_connect(rtw_network_info_t *connect_param, unsigned char block
 	}
 	param_buf[0] = (u32)dma_addr_connect_param;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_CONNECT, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CONNECT, param_buf, 1);
 	dma_unmap_single(pdev, dma_addr_connect_param, sizeof(rtw_network_info_t), DMA_TO_DEVICE);
 
 	/* step4: wait connect finished for synchronous connection*/
@@ -164,7 +173,7 @@ int llhw_ipc_wifi_connect(rtw_network_info_t *connect_param, unsigned char block
 			ret = -EINVAL;
 			goto error;
 		} else {
-			is_connected = llhw_ipc_wifi_is_connected_to_ap();
+			is_connected = llhw_wifi_is_connected_to_ap();
 			if (is_connected != 0) {
 				ret = -EINVAL;
 				global_idev.mlme_priv.rtw_join_status = RTW_JOINSTATUS_FAIL;
@@ -187,24 +196,24 @@ error:
 	return ret;
 }
 
-int llhw_ipc_wifi_disconnect(void)
+int llhw_wifi_disconnect(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_DISCONNECT, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_DISCONNECT, NULL, 0);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_is_connected_to_ap(void)
+int llhw_wifi_is_connected_to_ap(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_IS_CONNECTED_TO_AP, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_IS_CONNECTED_TO_AP, NULL, 0);
 	return ret;
 }
 
-int llhw_ipc_wifi_get_channel(u32 wlan_idx, u8 *ch)
+int llhw_wifi_get_channel(u32 wlan_idx, u8 *ch)
 {
 	int ret = -1;
 	u32 param_buf[2];
@@ -226,7 +235,7 @@ int llhw_ipc_wifi_get_channel(u32 wlan_idx, u8 *ch)
 	param_buf[0] = wlan_idx;
 	param_buf[1] = dma_addr;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_GET_CHANNEL, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_CHANNEL, param_buf, 2);
 	/* need do cache invalidate before get value */
 	dma_unmap_single(pdev, dma_addr, sizeof(u8), DMA_FROM_DEVICE);
 	*ch = *channel_temp;
@@ -238,23 +247,23 @@ func_exit:
 	return ret;
 }
 
-int llhw_ipc_wifi_init_ap(void)
+int llhw_wifi_init_ap(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_INIT_AP, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_INIT_AP, NULL, 0);
 	return ret;
 }
 
-int llhw_ipc_wifi_deinit_ap(void)
+int llhw_wifi_deinit_ap(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_DEINIT_AP, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_DEINIT_AP, NULL, 0);
 	return ret;
 }
 
-int llhw_ipc_wifi_del_sta(u8 wlan_idx, u8 *mac)
+int llhw_wifi_del_sta(u8 wlan_idx, u8 *mac)
 {
 	int ret = 0;
 	u32 param_buf[2];
@@ -262,11 +271,11 @@ int llhw_ipc_wifi_del_sta(u8 wlan_idx, u8 *mac)
 	param_buf[0] = (u32)wlan_idx;
 	param_buf[1] = (u32)mac;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_DEL_STA, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_DEL_STA, param_buf, 2);
 	return ret;
 }
 
-int llhw_ipc_wifi_start_ap(rtw_softap_info_t *softAP_config)
+int llhw_wifi_start_ap(rtw_softap_info_t *softAP_config)
 {
 	int ret = 0;
 	u32 param_buf[1];
@@ -282,23 +291,23 @@ int llhw_ipc_wifi_start_ap(rtw_softap_info_t *softAP_config)
 
 	param_buf[0] = (u32)dma_addr_softap_config;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_START_AP, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_START_AP, param_buf, 1);
 
 	dma_unmap_single(pdev, dma_addr_softap_config, sizeof(rtw_softap_info_t), DMA_FROM_DEVICE);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_stop_ap(void)
+int llhw_wifi_stop_ap(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_STOP_AP, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_STOP_AP, NULL, 0);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_set_EDCA_params(unsigned int *AC_param)
+int llhw_wifi_set_EDCA_params(unsigned int *AC_param)
 {
 	int ret = 0;
 	dma_addr_t dma_addr_ac_param = 0;
@@ -312,13 +321,13 @@ int llhw_ipc_wifi_set_EDCA_params(unsigned int *AC_param)
 	}
 	param_buf[0] = (u32)dma_addr_ac_param;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_EDCA_PARAM, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_EDCA_PARAM, param_buf, 1);
 	dma_unmap_single(pdev, dma_addr_ac_param, sizeof(unsigned int), DMA_TO_DEVICE);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_add_key(struct rtw_crypt_info *crypt)
+int llhw_wifi_add_key(struct rtw_crypt_info *crypt)
 {
 	int ret = 0;
 	u32 param_buf[1];
@@ -333,13 +342,13 @@ int llhw_ipc_wifi_add_key(struct rtw_crypt_info *crypt)
 
 	param_buf[0] = (u32)dma_addr_crypt;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_ADD_KEY, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_ADD_KEY, param_buf, 1);
 
 	dma_unmap_single(pdev, dma_addr_crypt, sizeof(struct rtw_crypt_info), DMA_FROM_DEVICE);
 	return ret;
 }
 
-int llhw_ipc_wifi_get_chplan(u8 *chplan)
+int llhw_wifi_get_chplan(u8 *chplan)
 {
 	int ret = -1;
 	u32 param_buf[1];
@@ -360,7 +369,7 @@ int llhw_ipc_wifi_get_chplan(u8 *chplan)
 	}
 	param_buf[0] = dma_addr;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_GET_CHPLAN, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_CHPLAN, param_buf, 1);
 	/* need do cache invalidate before get value */
 	dma_unmap_single(pdev, dma_addr, sizeof(u8), DMA_FROM_DEVICE);
 	*chplan = *chplan_temp;
@@ -372,7 +381,7 @@ func_exit:
 	return ret;
 }
 
-int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
+int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 {
 	int ret = 0;
 	u32 param_buf[1];
@@ -399,7 +408,7 @@ int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 	}
 
 	param_buf[0] = (u32)dma_addr_desc;
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SEND_MGNT, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SEND_MGNT, param_buf, 1);
 
 	dma_unmap_single(pdev, dma_addr_desc, sizeof(raw_data_desc_t), DMA_FROM_DEVICE);
 	dma_unmap_single(pdev, dma_addr_buf, buf_len, DMA_FROM_DEVICE);
@@ -407,7 +416,7 @@ int llhw_ipc_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 	return ret;
 }
 
-int llhw_ipc_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr)
+int llhw_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr)
 {
 	int ret = 0;
 	u32 param_buf[3];
@@ -428,7 +437,7 @@ int llhw_ipc_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr)
 		param_buf[2] = NULL;
 	}
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SAE_STATUS, param_buf, 3);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SAE_STATUS, param_buf, 3);
 
 	if (mac_addr) {
 		dma_unmap_single(pdev, dma_addr_mac_addr, 6, DMA_TO_DEVICE);
@@ -437,7 +446,7 @@ int llhw_ipc_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr)
 	return ret;
 }
 
-u32 llhw_ipc_wifi_update_ip_addr_in_wowlan(void)
+u32 llhw_wifi_update_ip_addr_in_wowlan(void)
 {
 	int ret = 0;
 	struct event_priv_t *event_priv = &global_idev.event_priv;
@@ -461,7 +470,7 @@ u32 llhw_ipc_wifi_update_ip_addr_in_wowlan(void)
 	mutex_lock(&(event_priv->iiha_send_mutex));
 
 	memset((u8 *)(event_priv->preq_msg), 0, sizeof(struct inic_ipc_host_req_msg));
-	event_priv->preq_msg->api_id = IPC_API_WIFI_IP_UPDATE;
+	event_priv->preq_msg->api_id = INIC_API_WIFI_IP_UPDATE;
 	event_priv->preq_msg->ret = -1;
 	memcpy(event_priv->preq_msg->param_buf, param_buf, sizeof(u32));
 
@@ -473,7 +482,7 @@ u32 llhw_ipc_wifi_update_ip_addr_in_wowlan(void)
 	ameba_ipc_channel_send(global_idev.event_ch, &(event_priv->api_ipc_msg));
 
 	while (try_cnt) {
-		if (event_priv->preq_msg->api_id != IPC_WIFI_API_PROCESS_DONE) {
+		if (event_priv->preq_msg->api_id != INIC_API_PROCESS_DONE) {
 			try_cnt --;
 			udelay(2);
 		} else {
@@ -495,7 +504,7 @@ u32 llhw_ipc_wifi_update_ip_addr_in_wowlan(void)
 	return ret;
 }
 
-int llhw_ipc_wifi_get_statistics(u32 statistic_phy)
+int llhw_wifi_get_statistics(dma_addr_t statistic_phy)
 {
 	int ret = 0;
 	u32 param_buf[1];
@@ -503,46 +512,46 @@ int llhw_ipc_wifi_get_statistics(u32 statistic_phy)
 	/* ptr of statistics to fullfill. */
 	param_buf[0] = (u32)statistic_phy;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_GET_PHY_STATISTIC, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_PHY_STATISTIC, param_buf, 1);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_channel_switch(u32 csa_param_phy)
+int llhw_wifi_channel_switch(dma_addr_t csa_param_phy)
 {
 	int ret = 0;
 	u32 param_buf[1];
 
 	param_buf[0] = (u32)csa_param_phy;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_AP_CH_SWITCH, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_AP_CH_SWITCH, param_buf, 1);
 	return ret;
 }
 
-int llhw_ipc_wifi_pmksa_ops(u32 pmksa_ops_phy)
+int llhw_wifi_pmksa_ops(dma_addr_t pmksa_ops_phy)
 {
 	int ret = 0;
 	u32 param_buf[1];
 
 	param_buf[0] = (u32)pmksa_ops_phy;
 
-	ret = llhw_ipc_send_msg(IPC_API_WPA_PMKSA_OPS, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WPA_PMKSA_OPS, param_buf, 1);
 
 	return ret;
 }
 
-int llhw_ipc_wifi_set_lps_enable(u8 enable)
+int llhw_wifi_set_lps_enable(u8 enable)
 {
 	int ret = 0;
 	u32 param_buf[1];
 
 	param_buf[0] = (u32)enable;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_LPS_EN, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_LPS_EN, param_buf, 1);
 	return ret;
 }
 
-int llhw_ipc_wifi_mp_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy)
+int llhw_wifi_mp_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy)
 {
 	u32 param_buf[4];
 
@@ -551,10 +560,10 @@ int llhw_ipc_wifi_mp_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t us
 	param_buf[2] = (u32)1;
 	param_buf[3] = (u32)user_phy;
 
-	return llhw_ipc_send_msg(IPC_API_WIFI_MP_CMD, param_buf, 4);
+	return llhw_ipc_send_msg(INIC_API_WIFI_MP_CMD, param_buf, 4);
 }
 
-int llhw_ipc_wifi_iwpriv_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy)
+int llhw_wifi_iwpriv_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_t user_phy)
 {
 	u32 param_buf[3];
 
@@ -562,10 +571,10 @@ int llhw_ipc_wifi_iwpriv_cmd(dma_addr_t cmd_phy, unsigned int cmd_len, dma_addr_
 	param_buf[1] = (u32)cmd_len;
 	param_buf[2] = (u32)1;
 
-	return llhw_ipc_send_msg(IPC_API_WIFI_IWPRIV_INFO, param_buf, 3);
+	return llhw_ipc_send_msg(INIC_API_WIFI_IWPRIV_INFO, param_buf, 3);
 }
 
-void llhw_ipc_send_packet(struct inic_ipc_ex_msg *p_ipc_msg)
+void llhw_send_packet(struct inic_ipc_ex_msg *p_ipc_msg)
 {
 	struct ipc_msg_q_priv *msg_priv = &global_idev.msg_priv;
 	struct inic_ipc_ex_msg *pmsg = msg_priv->p_inic_ipc_msg;
@@ -631,23 +640,23 @@ u64 llhw_wifi_get_tsft(u8 iface_type)
 }
 
 #ifdef CONFIG_NAN
-int llhw_ipc_wifi_init_nan(void)
+int llhw_wifi_init_nan(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_INIT, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_INIT, NULL, 0);
 	return ret;
 }
 
-int llhw_ipc_wifi_deinit_nan(void)
+int llhw_wifi_deinit_nan(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_DEINIT, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_DEINIT, NULL, 0);
 	return ret;
 }
 
-int llhw_ipc_wifi_start_nan(u8 master_pref, u8 band_support)
+int llhw_wifi_start_nan(u8 master_pref, u8 band_support)
 {
 	int ret = 0;
 	u32 param_buf[2];
@@ -655,19 +664,19 @@ int llhw_ipc_wifi_start_nan(u8 master_pref, u8 band_support)
 	param_buf[0] = (u32)master_pref;
 	param_buf[1] = (u32)band_support;
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_START, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_START, param_buf, 2);
 	return ret;
 }
 
-int llhw_ipc_wifi_stop_nan(void)
+int llhw_wifi_stop_nan(void)
 {
 	int ret = 0;
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_STOP, NULL, 0);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_STOP, NULL, 0);
 	return ret;
 }
 
-int llhw_ipc_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
+int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 {
 	int ret = 0;
 	u32 param_buf[2];
@@ -683,12 +692,12 @@ int llhw_ipc_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer
 	param_buf[0] = (u32)dma_addr_func;
 	param_buf[1] = (u32)nan_func_pointer;
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_ADD_FUNC, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_ADD_FUNC, param_buf, 2);
 	dma_unmap_single(pdev, dma_addr_func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
 	return ret;
 }
 
-int llhw_ipc_wifi_del_nan_func(u64 cookie)
+int llhw_wifi_del_nan_func(u64 cookie)
 {
 	int ret = 0;
 	u32 param_buf[2];
@@ -696,11 +705,11 @@ int llhw_ipc_wifi_del_nan_func(u64 cookie)
 	param_buf[0] = (u32)(cookie & 0xFFFFFFFF);
 	param_buf[1] = (u32)((cookie >> 32) & 0xFFFFFFFF);
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_DEL_FUNC, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_DEL_FUNC, param_buf, 2);
 	return ret;
 }
 
-int llhw_ipc_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len)
+int llhw_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len)
 {
 	int ret = 0;
 	u32 param_buf[3];
@@ -717,38 +726,82 @@ int llhw_ipc_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len)
 	param_buf[1] = (u32)dma_data;
 	param_buf[2] = (u32)len;
 
-	ret = llhw_ipc_send_msg(IPC_API_NAN_CFGVENFOR, param_buf, 3);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_CFGVENFOR, param_buf, 3);
 	dma_unmap_single(pdev, dma_data, len, DMA_TO_DEVICE);
 	return ret;
 }
 
 #if NAN_TODO
-int llhw_ipc_cfgvendor_nandow_entry(const void *data, int len)
+int llhw_cfgvendor_nandow_entry(const void *data, int len)
 {
 
 }
 #endif
 #endif
 
-int llhw_ipc_wifi_set_pmf_mode(u8 pmf_mode)
+int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 {
 	int ret = 0;
 	u32 param_buf[1];
 
 	param_buf[0] = (u32)pmf_mode;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_SET_PMF_MODE, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_PMF_MODE, param_buf, 1);
 	return ret;
 }
 
-static void *rtw_malloc(size_t size, dma_addr_t *dma_addr)
+int llhw_wifi_set_ch_plan(u8 ch_plan)
 {
-	return dma_alloc_coherent(global_idev.fullmac_dev, size, dma_addr, GFP_KERNEL);
+	int ret = 0;
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)ch_plan;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHPLAN, param_buf, 1);
+	return ret;
 }
 
-static void rtw_mfree(size_t size, void *ptr, dma_addr_t dma_addr)
+int llhw_wifi_set_wps_phase(u8 enable)
 {
-	dma_free_coherent(global_idev.fullmac_dev, size, ptr, dma_addr);
+	int ret = 0;
+	u32 param_buf[1];
+	param_buf[0] = (u32)enable;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_WPS_PHASE, param_buf, 1);
+	return ret;
+}
+
+int llhw_wifi_set_wpa_mode(rtw_wpa_mode wpa_mode)
+{
+	int ret = 0;
+	u32 param_buf[1];
+	param_buf[0] = (u32)wpa_mode;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_WPA_MODE, param_buf, 1);
+	return ret;
+}
+
+int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16 flags)
+{
+	int ret = 0;
+	u32 param_buf[4];
+	dma_addr_t dma_data = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	dma_data = dma_map_single(pdev, buf, buf_len, DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_data)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		return -1;
+	}
+
+	param_buf[0] = (u32)wlan_idx;
+	param_buf[1] = (u32)dma_data;
+	param_buf[2] = (u32)buf_len;
+	param_buf[3] = (u32)flags;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_GEN_IE, param_buf, 4);
+	dma_unmap_single(pdev, dma_data, buf_len, DMA_TO_DEVICE);
+	return ret;
 }
 
 int llhw_wifi_add_custom_ie(const struct element *elem)
@@ -781,7 +834,7 @@ int llhw_wifi_add_custom_ie(const struct element *elem)
 	param_buf[1] = (u32)ie_phy;
 	param_buf[2] = (u32)1;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_CUS_IE, param_buf, 3);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 3);
 
 	rtw_mfree(elem->datalen, sub_ie_vir, sub_ie_phy);
 	rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie, ie_phy);
@@ -796,7 +849,7 @@ int llhw_wifi_del_custom_ie(unsigned char wlan_idx)
 
 	param_buf[0] = (u32)2;
 	param_buf[1] = (u32)wlan_idx;
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_CUS_IE, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 2);
 
 	return ret;
 }
@@ -829,7 +882,7 @@ int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
 	param_buf[1] = (u32)ie_phy;
 	param_buf[2] = (u32)ie_index;
 
-	ret = llhw_ipc_send_msg(IPC_API_WIFI_CUS_IE, param_buf, 3);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 3);
 
 	rtw_mfree(ie[1] + 2, sub_ie_vir, sub_ie_phy);
 	rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie, ie_phy);

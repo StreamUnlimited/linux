@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek UART support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/init.h>
@@ -12,6 +19,9 @@
 #include <linux/serial_core.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/pm_wakeirq.h>
+#include <linux/suspend.h>
+#include <linux/clk-provider.h>
 
 #define DLL					0x000				  /*UART DIVISOR LENGTH REGISTER*/
 #define IER					0x004				  /*UART INTERRUPT ENABLE REGISTER*/
@@ -305,10 +315,20 @@
 #define RUART_GET_DBNC_CYC(x)             ((u32)(((x >> 1) & 0x00007FFF)))
 #define RUART_BIT_DBNC_FEN                ((u32)0x00000001 << 0)
 
+#define XTAL_40M 40000000
+#define OSC_2M 2000000
 
 #define RTK_NR_UARTS	4
-static struct uart_port serial_ports[RTK_NR_UARTS];
+struct realtek_serial {
+	struct uart_port port;
+	struct clk *clk;
+	struct clk *clk_sl;
+	struct clk *parent_xtal_40m;
+	struct clk *parent_osc_2m;
+};
 
+static struct realtek_serial serial_ports[RTK_NR_UARTS];
+unsigned int baud_pm;
 
 static inline unsigned int rtk_uart_readl(struct uart_port *port,
 		unsigned int offset)
@@ -324,7 +344,7 @@ static inline void rtk_uart_writel(struct uart_port *port,
 
 
 /*
- * serial core request to check if uart tx fifo is empty
+ * Serial core request to check if UART TX FIFO is empty
  */
 static unsigned int rtk_uart_tx_empty(struct uart_port *port)
 {
@@ -335,7 +355,7 @@ static unsigned int rtk_uart_tx_empty(struct uart_port *port)
 }
 
 /*
- * serial core request to set RTS and DTR pin state and loopback mode
+ * Serial core request to set RTS and DTR pin state and loopback mode
  */
 static void rtk_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
@@ -359,7 +379,7 @@ static void rtk_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
 }
 
 /*
- * serial core request to return RI, CTS, DCD and DSR pin state
+ * Serial core request to return RI, CTS, DCD and DSR pin state
  */
 static unsigned int rtk_uart_get_mctrl(struct uart_port *port)
 {
@@ -384,7 +404,7 @@ static unsigned int rtk_uart_get_mctrl(struct uart_port *port)
 }
 
 /*
- * serial core request to disable tx ASAP (used for flow control)
+ * Serial core request to disable TX ASAP (used for flow control)
  */
 static void rtk_uart_stop_tx(struct uart_port *port)
 {
@@ -397,20 +417,20 @@ static void rtk_uart_stop_tx(struct uart_port *port)
 }
 
 /*
- * serial core request to (re)enable tx
+ * Serial core request to (re)enable TX
  */
 static void rtk_uart_start_tx(struct uart_port *port)
 {
 	unsigned int val;
 
-	/*enable tx fifo empty interrupt*/
+	/* Enable TX FIFO empty interrupt*/
 	val = rtk_uart_readl(port, IER);
 	val |= RUART_BIT_ETBEI;
 	rtk_uart_writel(port, val, IER);
 }
 
 /*
- * serial core request to stop rx, called before port shutdown
+ * Serial core request to stop RX, called before port shutdown
  */
 static void rtk_uart_stop_rx(struct uart_port *port)
 {
@@ -422,7 +442,7 @@ static void rtk_uart_stop_rx(struct uart_port *port)
 }
 
 /*
- * serial core request to enable modem status interrupt reporting
+ * Serial core request to enable modem status interrupt reporting
  */
 static void rtk_uart_enable_ms(struct uart_port *port)
 {
@@ -434,7 +454,7 @@ static void rtk_uart_enable_ms(struct uart_port *port)
 }
 
 /*
- * enable or disalbe ctl
+ * Enable or disalbe ctl
  */
 static void rtk_uart_break_ctl(struct uart_port *port, int ctl)
 {
@@ -454,7 +474,7 @@ static void rtk_uart_break_ctl(struct uart_port *port, int ctl)
 }
 
 /*
- * return port type in string format
+ * Return port type in string format
  */
 static const char *rtk_uart_type(struct uart_port *port)
 {
@@ -462,7 +482,7 @@ static const char *rtk_uart_type(struct uart_port *port)
 }
 
 /*
- * some interrupt need to clear
+ * Some interrupt need to clear
  */
 static void rtk_uart_clear_flag(struct uart_port *port, u32 flag)
 {
@@ -474,8 +494,8 @@ static void rtk_uart_clear_flag(struct uart_port *port, u32 flag)
 }
 
 /*
- * read all chars in rx fifo and send them to core
- * do not process rx error, should add later
+ * Read all chars in RX FIFO and send them to core
+ * do not process RX error, should add later
  */
 static void rtk_uart_do_rx(struct uart_port *port)
 {
@@ -496,8 +516,9 @@ static void rtk_uart_do_rx(struct uart_port *port)
 		if (unlikely((lsr & RUART_BIT_BREAK_INT))) {
 			port->icount.brk++;
 			rtk_uart_clear_flag(port, RUART_BIT_RLSICF);
-			if (uart_handle_break(port))
+			if (uart_handle_break(port)) {
 				continue;
+			}
 		}
 
 		if (unlikely(lsr & RUART_BIT_PAR_ERR)) {
@@ -510,29 +531,34 @@ static void rtk_uart_do_rx(struct uart_port *port)
 			rtk_uart_clear_flag(port, RUART_BIT_RLSICF);
 		}
 
-		/* update flag wrt read_status_mask */
+		/* Update flag wrt read_status_mask */
 		lsr &= port->read_status_mask;
 
-		if (lsr & RUART_BIT_BREAK_INT)
+		if (lsr & RUART_BIT_BREAK_INT) {
 			flag = TTY_BREAK;
-		if (lsr & RUART_BIT_FRM_ERR)
+		}
+		if (lsr & RUART_BIT_FRM_ERR) {
 			flag = TTY_FRAME;
-		if (lsr & RUART_BIT_PAR_ERR)
+		}
+		if (lsr & RUART_BIT_PAR_ERR) {
 			flag = TTY_PARITY;
+		}
 
-		if (!(lsr & RUART_BIT_DRDY))
+		if (!(lsr & RUART_BIT_DRDY)) {
 			break;
+		}
 
 		c = rtk_uart_readl(port, RBR_OR_UART_THR) & 0xff;
 		port->icount.rx++;
 		flag = TTY_NORMAL;
 
-		/*this is not console, so no need to handle sysrq.*/
+		/*This is not console, so no need to handle sysrq.*/
 		//if (uart_handle_sysrq_char(port, c))
 		//	continue;
 
-		if ((lsr & port->ignore_status_mask) == 0)
+		if ((lsr & port->ignore_status_mask) == 0) {
 			tty_insert_flip_char(&port->state->port, c, flag);
+		}
 
 	} while (--max_count);
 
@@ -542,7 +568,7 @@ static void rtk_uart_do_rx(struct uart_port *port)
 }
 
 /*
- * fill tx fifo with chars to send, stop when fifo is about to be full
+ * Fill TX FIFO with chars to send, stop when FIFO is about to be full
  * or when all chars have been sent.
  */
 static void rtk_uart_do_tx(struct uart_port *port)
@@ -584,10 +610,10 @@ static void rtk_uart_do_tx(struct uart_port *port)
 }
 
 /*
- * process uart interrupt
- * only support rx full and tx empty interrupt
- * rx:FIFO drops below trigger level, do not need to clean the interrupt
- * tx: Writing to the Tx FIFO of path, do not need to clean the interrupt
+ * Process UART interrupt
+ * only support RX full and TX empty interrupt
+ * RX:FIFO drops below trigger level, do not need to clean the interrupt
+ * TX: Writing to the TX FIFO of path, do not need to clean the interrupt
  */
 static irqreturn_t rtk_uart_interrupt(int irq, void *dev_id)
 {
@@ -600,11 +626,11 @@ static irqreturn_t rtk_uart_interrupt(int irq, void *dev_id)
 	irqstat = rtk_uart_readl(port, LSR);
 	ier = rtk_uart_readl(port, IER);
 
-	if(port == &serial_ports[3]) {		//amebasmart bt uart
+	if (port == &serial_ports[3].port) {		//Amebasmart BT UART
 		if ((irqstat & RUART_BIT_RXFIFO_INT) && (ier & RUART_BIT_ERBI)) {
 			rtk_uart_do_rx(port);
 		}
-	} else {							//other uart
+	} else {							//Other UART
 		if ((irqstat & RUART_BIT_DRDY) && (ier & RUART_BIT_ERBI)) {
 			rtk_uart_do_rx(port);
 		}
@@ -618,15 +644,15 @@ static irqreturn_t rtk_uart_interrupt(int irq, void *dev_id)
 	}
 
 	if (((irqstat & RUART_BIT_TX_EMPTY) && (ier & RUART_BIT_ETBEI)) || \
-			(ier & RUART_BIT_ELSI)) {
+		(ier & RUART_BIT_ELSI)) {
 		rtk_uart_do_tx(port);
 	}
 
 	if ((irqstat & RUART_BIT_MODEM_INT) && (ier & RUART_BIT_EDSSI)) {
-		/*clear interrupt*/
+		/* Clear interrupt*/
 		rtk_uart_clear_flag(port, RUART_BIT_MICF);
 
-		/*only care CTS because DCD, RI, DSR are not supported */
+		/* Only care CTS because DCD, RI, DSR are not supported */
 		val = !!(rtk_uart_readl(port, MSR) & RUART_BIT_R_CTS);
 		uart_handle_cts_change(port, val);
 	}
@@ -636,7 +662,7 @@ static irqreturn_t rtk_uart_interrupt(int irq, void *dev_id)
 }
 
 /*
- * enable rx & tx operation on uart
+ * Enable RX & TX operation on UART
  */
 static void rtk_uart_enable(struct uart_port *port)
 {
@@ -644,10 +670,11 @@ static void rtk_uart_enable(struct uart_port *port)
 
 	val = rtk_uart_readl(port, FCR);
 	val &= ~RUART_MASK_RECVTRG;
-	if(port == &serial_ports[3])			//amebasmart bt uart
+	if (port == &serial_ports[3].port) {		//Amebasmart BT UART
 		val |= UART_RX_FIFOTRIG_LEVEL_16BYTES;
-	else								//other uart
+	} else {							//Other UART
 		val |= UART_RX_FIFOTRIG_LEVEL_1BYTES;
+	}
 	rtk_uart_writel(port, val, FCR);
 
 	val = rtk_uart_readl(port, IER);
@@ -662,7 +689,7 @@ static void rtk_uart_enable(struct uart_port *port)
 }
 
 /*
- * disable rx & tx operation on uart
+ * Disable RX & TX operation on UART
  */
 static void rtk_uart_disable(struct uart_port *port)
 {
@@ -680,16 +707,16 @@ static void rtk_uart_disable(struct uart_port *port)
 
 
 /*
- * serial core request to initialize uart and start rx operation
+ * Serial core request to initialize uart and start RX operation
  */
 static int rtk_uart_startup(struct uart_port *port)
 {
 	int ret;
 
-	/* mask all irq and flush port */
+	/* Mask all IRQ and flush port */
 	rtk_uart_disable(port);
 
-	/* register irq and enable rx interrupts */
+	/* Register IRQ and enable RX interrupts */
 	ret = request_irq(port->irq, rtk_uart_interrupt, 0,
 					  dev_name(port->dev), port);
 	if (ret) {
@@ -701,7 +728,7 @@ static int rtk_uart_startup(struct uart_port *port)
 }
 
 /*
- * serial core request to flush & disable uart
+ * Serial core request to flush & disable UART
  */
 static void rtk_uart_shutdown(struct uart_port *port)
 {
@@ -711,97 +738,140 @@ static void rtk_uart_shutdown(struct uart_port *port)
 
 
 /**
-  * get ovsr & ovsr_adj parameters according to the given baudrate and UART IP clock.
+  * Get ovsr & ovsr_adj parameters according to the given baudrate and UART IP clock.
   */
-static void rtk_uart_baudparagetfull(unsigned int IPclk, unsigned int baudrate,
+static void rtk_uart_baudparagetfull(unsigned int clk, unsigned int baudrate,
 									 unsigned int *ovsr, unsigned int *ovsr_adj)
 {
 	unsigned int i;
-	unsigned int Remainder;
-	unsigned int TempAdj = 0;
-	unsigned int TempMultly;
+	unsigned int remainder;
+	unsigned int temp_adj = 0;
+	unsigned int temp_multly;
 
-	/*obtain the ovsr parameter*/
-	*ovsr = IPclk / baudrate;
+	/* Obtain the ovsr parameter */
+	*ovsr = clk / baudrate;
 
-	/*get the remainder related to the ovsr_adj parameter*/
-	Remainder = IPclk % baudrate;
+	/* Get the remainder related to the ovsr_adj parameter */
+	remainder = clk % baudrate;
 
-	/*calculate the ovsr_adj parameter*/
+	/* Calculate the ovsr_adj parameter */
 	for (i = 0; i < 11; i++) {
-		TempAdj = TempAdj << 1;
-		TempMultly = (Remainder * (12 - i));
-		TempAdj |= ((TempMultly / baudrate - (TempMultly - Remainder) / baudrate) ? 1 : 0);
+		temp_adj = temp_adj << 1;
+		temp_multly = (remainder * (12 - i));
+		temp_adj |= ((temp_multly / baudrate - (temp_multly - remainder) / baudrate) ? 1 : 0);
 	}
 
-	/*obtain the ovsr_adj parameter*/
-	*ovsr_adj = TempAdj;
+	/* Obtain the ovsr_adj parameter */
+	*ovsr_adj = temp_adj;
 
 }
 
 /**
+  * @brief    set uart baud rate of low power RX path
+  * @param  UARTx: where x can be 0/1/2.
+  * @param  BaudRate: the desired baud rate
+  * @param  RxIPClockHz: the uart RX clock. unit: [Hz]
+  * @note    according to the baud rate calculation formlula in low power RX path, method
+  *              implemented is as follows:
+  *          - cyc_perbit = round( fpclock/BaudRate)
+  * @retval  None
+  */
+static void rtk_uart_lp_rx_setbaud(struct uart_port *port, u32 bandrate)
+{
+	u32 cyc_perbit = 0;
+	u32 val = 0;
+
+	/*Calculate the r_cycnum_perbit field of REG_MON_BAUD_STS,
+	   according to clock and the desired baud rate*/
+	if ((OSC_2M % bandrate) >= (bandrate + 1) / 2) {
+		cyc_perbit = OSC_2M / bandrate + 1;
+	} else {
+		cyc_perbit = OSC_2M / bandrate;
+	}
+
+	/* Average clock cycle number of one bit. MON_BAUD_STS[19:0] */
+	val = rtk_uart_readl(port, MON_BAUD_STS);
+	val &= (~RUART_MASK_R_CYCNUM_PERBIT_XTAL);
+	val |= (cyc_perbit & RUART_MASK_R_CYCNUM_PERBIT_XTAL);
+	/* Set cyc_perbit */
+	rtk_uart_writel(port, val, MON_BAUD_STS);
+
+
+	/* Average clock cycle number of one bit OSC. REG_MON_BAUD_CTRL[28:9] */
+	val = rtk_uart_readl(port, MON_BAUD_CTRL);
+	val &= (~ RUART_MASK_R_CYCNUM_PERBIT_OSC);
+	val |= ((cyc_perbit << 9) & RUART_MASK_R_CYCNUM_PERBIT_OSC);
+	/* Set the OSC cyc_perbit*/
+	rtk_uart_writel(port, val, MON_BAUD_CTRL);
+
+	val = rtk_uart_readl(port, RX_PATH_CTRL);
+	val &= (~ RUART_MASK_RXBAUD_ADJ_10_0);
+	rtk_uart_writel(port, val, RX_PATH_CTRL);
+}
+
+/**
   * @brief    Set Uart Baud Rate use baudrate val.
-  * @param  UARTx: where x can be 0/1/3.
+  * @param  UARTx: where x can be 0/1/2.
   * @param  BaudRate: Baud Rate Val, like 115200 (unit is HZ).
   * @retval  None
   */
 static void rtk_uart_setbaud(struct uart_port *port, unsigned int bandrate)
 {
-	unsigned int Ovsr;
-	unsigned int Ovsr_adj;
+	unsigned int ovsr;
+	unsigned int ovsr_adj;
 	unsigned int val;
 
-	/* get baud rate parameter based on baudrate */
-	rtk_uart_baudparagetfull(port->uartclk, bandrate, &Ovsr, &Ovsr_adj);
+	/* Get baud rate parameter based on baudrate */
+	rtk_uart_baudparagetfull(port->uartclk, bandrate, &ovsr, &ovsr_adj);
 
 	/* Set DLAB bit to 1 to access DLL/DLM */
 	val = rtk_uart_readl(port, LCR);
 	val |= RUART_BIT_DLAB;
 	rtk_uart_writel(port, val, LCR);
 
-	/*Clean Rx break signal interrupt status at initial stage*/
+	/*Clean RX break signal interrupt status at initial stage*/
 	val = rtk_uart_readl(port, SCR);
 	val |= RUART_BIT_SCRATCH_7;
 	rtk_uart_writel(port, val, SCR);
 
-	/* Set OVSR(xfactor) */
+	/* Set ovsr(xfactor) */
 	val = rtk_uart_readl(port, STS);
 	val &= ~(RUART_MASK_XFACTOR);
-	val |= ((Ovsr << 4) & RUART_MASK_XFACTOR);
+	val |= ((ovsr << 4) & RUART_MASK_XFACTOR);
 	rtk_uart_writel(port, val, STS);
 
 	/* Set OVSR_ADJ[10:0] (xfactor_adj[26:16]) */
 	val = rtk_uart_readl(port, SCR);
 	val &= ~(RUART_MASK_XFACTOR_ADJ);
-	val |= ((Ovsr_adj << 16) & RUART_MASK_XFACTOR_ADJ);
+	val |= ((ovsr_adj << 16) & RUART_MASK_XFACTOR_ADJ);
 	rtk_uart_writel(port, val, SCR);
 
-	/* clear DLAB bit */
+	/* Clear DLAB bit */
 	val = rtk_uart_readl(port, LCR);
 	val &= ~(RUART_BIT_DLAB);
 	rtk_uart_writel(port, val, LCR);
 
 
-	/*rx baud rate configureation*/
+	/* RX baud rate configureation*/
 	val = rtk_uart_readl(port, MON_BAUD_STS);
 	val &= (~RUART_MASK_R_CYCNUM_PERBIT_XTAL);
-	val |= Ovsr;
+	val |= ovsr;
 	rtk_uart_writel(port, val, MON_BAUD_STS);
 
 	val = rtk_uart_readl(port, MON_BAUD_CTRL);
 	val &= (~RUART_MASK_R_CYCNUM_PERBIT_OSC);
-	val |= (Ovsr << 9);
+	val |= (ovsr << 9);
 	rtk_uart_writel(port, val, MON_BAUD_CTRL);
 
 	val = rtk_uart_readl(port, RX_PATH_CTRL);
 	val &= (~RUART_MASK_RXBAUD_ADJ_10_0);
-	val |= (Ovsr_adj << 3);
+	val |= (ovsr_adj << 3);
 	rtk_uart_writel(port, val, RX_PATH_CTRL);
 
 }
 
 /*
- * serial core request to change current uart setting
+ * Serial core request to change current UART setting
  */
 static void rtk_uart_set_termios(struct uart_port *port,
 								 struct ktermios *new,
@@ -818,15 +888,15 @@ static void rtk_uart_set_termios(struct uart_port *port,
 		mdelay(10);
 	}
 
-	/* disable uart while changing speed */
+	/* Disable UART while changing speed */
 	rtk_uart_disable(port);
 	//rtk_uart_flush(port);
 
-	/* update Control register */
+	/* Update control register */
 	ctl = rtk_uart_readl(port, LCR);
 
 	switch (new->c_cflag & CSIZE) {
-	/*only support 7 and 8 bits*/
+	/* Only support 7 and 8 bits*/
 	case CS7:
 		ctl &= ~RUART_BIT_WLS0;
 		break;
@@ -853,12 +923,13 @@ static void rtk_uart_set_termios(struct uart_port *port,
 	}
 	rtk_uart_writel(port, ctl, LCR);
 
-	/* update Baudword register. support max baudrate 40M/5 = 8MHz, min 110Hz */
-	baud = uart_get_baud_rate(port, new, old, 110, port->uartclk/5);
+	/* Update baudword register. support max baudrate 40M/5 = 8MHz, min 110Hz */
+	baud = uart_get_baud_rate(port, new, old, 110, port->uartclk / 5);
+	baud_pm = baud;
 
 	rtk_uart_setbaud(port, baud);
 
-	/* update Interrupt register */
+	/* Update interrupt register */
 	val = rtk_uart_readl(port, IER);
 
 	val &= ~RUART_BIT_EDSSI;
@@ -877,24 +948,28 @@ static void rtk_uart_set_termios(struct uart_port *port,
 
 	}
 
-	/* update read/ignore mask */
+	/* Update read/ignore mask */
 	port->read_status_mask = RUART_BIT_DRDY;
 	if (new->c_iflag & INPCK) {
 		port->read_status_mask |= RUART_BIT_FRM_ERR;
 		port->read_status_mask |= RUART_BIT_PAR_ERR;
 	}
-	if (new->c_iflag & (IGNBRK | BRKINT))
+	if (new->c_iflag & (IGNBRK | BRKINT)) {
 		port->read_status_mask |= RUART_BIT_BREAK_INT;
+	}
 
 	port->ignore_status_mask = 0;
-	if (new->c_iflag & IGNPAR)
+	if (new->c_iflag & IGNPAR) {
 		port->ignore_status_mask |= RUART_BIT_PAR_ERR;
-	if (new->c_iflag & IGNBRK)
+	}
+	if (new->c_iflag & IGNBRK) {
 		port->ignore_status_mask |= RUART_BIT_BREAK_INT;
+	}
 
 	/* Ignore all characters if CREAD is set.*/
-	if (!(new->c_cflag & CREAD))
+	if (!(new->c_cflag & CREAD)) {
 		port->ignore_status_mask |= RUART_BIT_DRDY;
+	}
 
 	uart_update_timeout(port, new->c_cflag, baud);
 	rtk_uart_enable(port);
@@ -903,7 +978,7 @@ static void rtk_uart_set_termios(struct uart_port *port,
 }
 
 /*
- * serial core request to claim uart iomem
+ * Serial core request to claim UART iomem
  */
 static int rtk_uart_request_port(struct uart_port *port)
 {
@@ -912,7 +987,7 @@ static int rtk_uart_request_port(struct uart_port *port)
 }
 
 /*
- * serial core request to release uart iomem
+ * Serial core request to release UART iomem
  */
 static void rtk_uart_release_port(struct uart_port *port)
 {
@@ -921,7 +996,7 @@ static void rtk_uart_release_port(struct uart_port *port)
 }
 
 /*
- * serial core request to do any port required autoconfiguration
+ * Serial core request to do any port required autoconfiguration
  */
 static void rtk_uart_config_port(struct uart_port *port, int flags)
 {
@@ -935,7 +1010,7 @@ static void rtk_uart_config_port(struct uart_port *port, int flags)
 }
 
 /*
- * serial core request to check that port information in serinfo are
+ * Serial core request to check that port information in serinfo are
  * suitable
  */
 static int rtk_uart_verify_port(struct uart_port *port,
@@ -959,7 +1034,7 @@ static int rtk_uart_verify_port(struct uart_port *port,
 }
 
 
-/* serial core callbacks */
+/* Serial core callbacks */
 static const struct uart_ops rtk_uart_ops = {
 	.tx_empty	= rtk_uart_tx_empty,
 	.get_mctrl	= rtk_uart_get_mctrl,
@@ -971,7 +1046,7 @@ static const struct uart_ops rtk_uart_ops = {
 	.break_ctl	= rtk_uart_break_ctl,
 	.startup	= rtk_uart_startup,
 	.shutdown	= rtk_uart_shutdown,
-	.set_termios	= rtk_uart_set_termios, //change later
+	.set_termios	= rtk_uart_set_termios, //Change later
 	.type		= rtk_uart_type,
 	.release_port	= rtk_uart_release_port,
 	.request_port	= rtk_uart_request_port,
@@ -991,30 +1066,33 @@ static struct uart_driver rtk_uart_driver = {
 };
 
 /*
- * platform driver probe/remove callback
+ * Platform driver probe/remove callback
  */
 static int rtk_uart_probe(struct platform_device *pdev)
 {
 	struct resource *res_mem;
 	struct uart_port *port;
-	struct clk *clk;
+	struct realtek_serial *serial;
+	const struct clk_hw *hwclk;
 	int ret, irq;
 
 	if (pdev->dev.of_node) {
 		pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
 	} else {
-		dev_err(&pdev->dev, "of_node is NULL\n");
+		dev_err(&pdev->dev, "Invalid node\n");
 		return -ENODEV;
 	}
 
 	if (pdev->id < 0 || pdev->id >= RTK_NR_UARTS) {
-		dev_err(&pdev->dev, "Wrong device id\n");
+		dev_err(&pdev->dev, "Invalid device id\n");
 		return -EINVAL;
 	}
 
-	port = &serial_ports[pdev->id];
+	serial = &serial_ports[pdev->id];
+	port = &serial->port;
+
 	if (!port) {
-		dev_err(&pdev->dev, "Fail to get uart port\n");
+		dev_err(&pdev->dev, "Failed to get UART port\n");
 		return -EBUSY;
 	}
 
@@ -1022,33 +1100,33 @@ static int rtk_uart_probe(struct platform_device *pdev)
 
 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res_mem) {
-		dev_err(&pdev->dev, "Fail to get resource\n");
+		dev_err(&pdev->dev, "Failed to get resource\n");
 		return -ENODEV;
 	}
 
 	port->mapbase = res_mem->start;
 	port->membase = devm_ioremap_resource(&pdev->dev, res_mem);
 	if (IS_ERR(port->membase)) {
-		dev_err(&pdev->dev, "Fail to get ioremap resource\n");
+		dev_err(&pdev->dev, "Failed to ioremap resource\n");
 		return PTR_ERR(port->membase);
 	}
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
-		dev_err(&pdev->dev, "Fail to get irq\n");
+		dev_err(&pdev->dev, "Failed to get IRQ\n");
 		return irq;
 	}
 
-	clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(clk)) {
-		ret =  PTR_ERR(clk);
-		dev_err(&pdev->dev, "Fail to get rcc clk: %d\n", ret);
+	serial->clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(serial->clk)) {
+		ret =  PTR_ERR(serial->clk);
+		dev_err(&pdev->dev, "Failed to get clock: %d\n", ret);
 		return ret;
 	}
 
-	ret = clk_prepare_enable(clk);
+	ret = clk_prepare_enable(serial->clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable clock: %d\n", ret);
 		return ret;
 	}
 
@@ -1060,36 +1138,79 @@ static int rtk_uart_probe(struct platform_device *pdev)
 	port->fifosize = 16;
 	port->line = pdev->id;
 	port->type = PORT_RTK;
-	port->uartclk = 40000000; //40M xtal
+	port->uartclk = XTAL_40M;
 
 	spin_lock_init(&port->lock);
 
 	ret = uart_add_one_port(&rtk_uart_driver, port);
 	if (ret) {
-		dev_err(&pdev->dev, "Fail to add port: %d\n", ret);
-		serial_ports[pdev->id].membase = NULL;
+		dev_err(&pdev->dev, "Failed to add port: %d\n", ret);
+		port->membase = NULL;
 		return ret;
 	}
 
-	platform_set_drvdata(pdev, port);
+	platform_set_drvdata(pdev, serial);
+
+	if (pdev->id < RTK_NR_UARTS - 1) { /*UARTx: where x can be 0/1/2*/
+		if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
+			device_init_wakeup(&pdev->dev, true);
+			dev_pm_set_wake_irq(&pdev->dev, irq);
+		}
+
+		serial->clk_sl = clk_get_parent(serial->clk);
+		hwclk = __clk_get_hw(serial->clk_sl);
+		serial->parent_xtal_40m = clk_hw_get_parent_by_index(hwclk, 0)->clk;
+		serial->parent_osc_2m = clk_hw_get_parent_by_index(hwclk, 1)->clk;
+	}
 
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int realtek_uart_suspend(struct device *dev)
+{
+	struct realtek_serial *serial = dev_get_drvdata(dev);
 
+	if (serial->port.line < RTK_NR_UARTS - 1) {
+		if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+			clk_set_parent(serial->clk_sl, serial->parent_osc_2m);
+			rtk_uart_lp_rx_setbaud(&serial->port, baud_pm);
+		}
+	}
+	return 0;
+}
+
+static int realtek_uart_resume(struct device *dev)
+{
+	struct realtek_serial *serial = dev_get_drvdata(dev);
+
+	if (serial->port.line < RTK_NR_UARTS - 1) {
+		if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+			clk_set_parent(serial->clk_sl, serial->parent_xtal_40m);
+			rtk_uart_setbaud(&serial->port, baud_pm);
+		}
+	}
+	return 0;
+}
+
+static const struct dev_pm_ops realtek_amebad2_uart_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(realtek_uart_suspend, realtek_uart_resume)
+};
+#endif
 
 static const struct of_device_id rtk_uart_of_match[] = {
 	{ .compatible = "realtek,amebad2-uart" },
 	{ /* end node */ }
 };
 
-
-
 static struct platform_driver rtk_uart_platform_driver = {
 	.probe	= rtk_uart_probe,
 	.driver	= {
-		.name  = "rtk-uart",
+		.name  = "realtek-amebad2-uart",
 		.of_match_table = rtk_uart_of_match,
+#ifdef CONFIG_PM
+		.pm = &realtek_amebad2_uart_pm_ops,
+#endif
 	},
 };
 
@@ -1119,8 +1240,6 @@ static void __exit rtk_uart_exit(void)
 module_init(rtk_uart_init);
 module_exit(rtk_uart_exit);
 
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek UART driver");
+MODULE_DESCRIPTION("Realtek Ameba UART driver");
 MODULE_LICENSE("GPL v2");
-
-
+MODULE_AUTHOR("Realtek Corporation");

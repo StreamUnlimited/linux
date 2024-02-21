@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * Device Tree Structure
- */
+* Realtek DTS for RTL8730E chip
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 /dts-v1/;
 

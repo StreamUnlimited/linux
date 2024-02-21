@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek CPU frequency support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/cpufreq.h>
@@ -43,14 +50,14 @@ static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int 
 	/* Reparent mux clock to NP PLL clock*/
 	ret = clk_set_parent(rtk_data->mux_clk, rtk_data->npll_clk);
 	if (ret) {
-		pr_err("cpu%d: failed to re-parent cpu clock!\n", policy->cpu);
+		pr_err("CPU%d: Failed to re-parent CPU clock\n", policy->cpu);
 		return ret;
 	}
 
 	/* Set the AP PLL to target rate */
 	ret = clk_set_rate(rtk_data->apll_clk, new_freq * 1000);
 	if (ret) {
-		pr_err("cpu%d: failed to scale cpu clock rate!\n", policy->cpu);
+		pr_err("CPU%d: Failed to scale CPU clock rate\n", policy->cpu);
 		clk_set_parent(rtk_data->mux_clk, rtk_data->apll_clk);
 		return ret;
 	}
@@ -58,7 +65,7 @@ static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int 
 	/* Set parent of mux clock back to the AP PLL clock */
 	ret = clk_set_parent(rtk_data->mux_clk, rtk_data->apll_clk);
 	if (ret) {
-		pr_err("cpu%d: failed to re-parent cpu clock!\n", policy->cpu);
+		pr_err("CPU%d: Failed to re-parent CPU clock\n", policy->cpu);
 		return ret;
 	}
 
@@ -87,7 +94,7 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 
 	np = of_node_get(cpu->of_node);
 	if (!np) {
-		pr_err("No cpu node found\n");
+		pr_err("No CPU node found\n");
 		ret = -ENODEV;
 		goto out1;
 	}
@@ -219,7 +226,7 @@ static int rtk_cpufreq_resume(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver rtk_cpufreq_driver = {
-	.name         = "cpufreq-rtk",
+	.name         = "realtek-amebad2-cpufreq",
 	.flags        = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.init         = rtk_cpufreq_init,
 	.get          = cpufreq_generic_get,
@@ -237,7 +244,7 @@ static int __init rtk_cpufreq_initcall(void)
 
 	ret = cpufreq_register_driver(&rtk_cpufreq_driver);
 	if (ret) {
-		pr_err("Failed register driver\n");
+		pr_err("CPUFFREQ: Failed register driver\n");
 	}
 
 	return ret;
@@ -254,8 +261,6 @@ static void __exit rtk_cpufreq_exitcall(void)
 module_init(rtk_cpufreq_initcall);
 module_exit(rtk_cpufreq_exitcall);
 
-
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek cpufreq driver");
+MODULE_DESCRIPTION("Realtek Ameba CPU frequency driver");
 MODULE_LICENSE("GPL v2");
-
+MODULE_AUTHOR("Realtek Corporation");

@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 #ifdef CONFIG_NAN
 void dump_cfg80211_nan_func_filter(u8 num,
@@ -94,7 +104,7 @@ static int cfg80211_rtw_start_nan(struct wiphy *wiphy,
 	band_support = ((conf->bands & BIT(NL80211_BAND_2GHZ)) ? BAND_CAP_2G : 0)
 				   | ((conf->bands & BIT(NL80211_BAND_5GHZ)) ? BAND_CAP_5G : 0);
 
-	if (llhw_ipc_wifi_start_nan(conf->master_pref, band_support) == -1) {
+	if (llhw_wifi_start_nan(conf->master_pref, band_support) == -1) {
 		ret = -ENOTCONN;
 	}
 exit:
@@ -105,7 +115,7 @@ void cfg80211_rtw_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 	printk(" => %s\n", __func__);
 
-	llhw_ipc_wifi_stop_nan();
+	llhw_wifi_stop_nan();
 }
 
 static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
@@ -124,7 +134,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 	memcpy(&nan_param, func, sizeof(rtw_nan_func_info_t));
 
 	if (func->serv_spec_info) {
-		serv_spec_info_vir = dmam_alloc_coherent(global_idev.fullmac_dev, func->serv_spec_info_len, &serv_spec_info_phy, GFP_KERNEL);
+		serv_spec_info_vir = rtw_malloc(func->serv_spec_info_len, &serv_spec_info_phy);
 		if (!serv_spec_info_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			return -ENOMEM;
@@ -135,7 +145,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 	}
 
 	if (func->srf_bf) {
-		srf_bf_vir = dmam_alloc_coherent(global_idev.fullmac_dev, func->srf_bf_len, &srf_bf_phy, GFP_KERNEL);
+		srf_bf_vir = rtw_malloc(func->srf_bf_len, &srf_bf_phy);
 		if (!srf_bf_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			ret = -ENOMEM;
@@ -146,8 +156,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 	}
 
 	if (func->srf_macs) {
-		srf_macs_vir = dmam_alloc_coherent(global_idev.fullmac_dev,
-										   func->srf_num_macs * sizeof(struct mac_address), &srf_macs_phy, GFP_KERNEL);
+		srf_macs_vir = rtw_malloc(func->srf_num_macs * sizeof(struct mac_address), &srf_macs_phy);
 		if (!srf_macs_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			ret = -ENOMEM;
@@ -158,8 +167,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 	}
 
 	if (func->rx_filters) {
-		rx_filters_vir = dmam_alloc_coherent(global_idev.fullmac_dev,
-											 func->num_rx_filters * sizeof(struct cfg80211_nan_func_filter), &rx_filters_phy, GFP_KERNEL);
+		rx_filters_vir = rtw_malloc(func->num_rx_filters * sizeof(struct cfg80211_nan_func_filter), &rx_filters_phy);
 		if (!rx_filters_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			ret = -ENOMEM;
@@ -170,8 +178,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 	}
 
 	if (func->tx_filters) {
-		tx_filters_vir = dmam_alloc_coherent(global_idev.fullmac_dev,
-											 func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter), &tx_filters_phy, GFP_KERNEL);
+		tx_filters_vir = rtw_malloc(func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter), &tx_filters_phy);
 		if (!tx_filters_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			ret = -ENOMEM;
@@ -181,7 +188,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 		nan_param.tx_filters = tx_filters_phy;
 	}
 
-	if (llhw_ipc_wifi_add_nan_func(&nan_param, func) < 0) {
+	if (llhw_wifi_add_nan_func(&nan_param, func) < 0) {
 		ret = -ENOTCONN;
 	}
 
@@ -189,19 +196,19 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 
 exit:
 	if (serv_spec_info_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, func->serv_spec_info_len, serv_spec_info_vir, serv_spec_info_phy);
+		rtw_mfree(func->serv_spec_info_len, serv_spec_info_vir, serv_spec_info_phy);
 	}
 	if (srf_bf_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, func->srf_bf_len, srf_bf_vir, srf_bf_phy);
+		rtw_mfree(func->srf_bf_len, srf_bf_vir, srf_bf_phy);
 	}
 	if (srf_macs_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, func->srf_num_macs, srf_macs_vir, srf_macs_phy);
+		rtw_mfree(func->srf_num_macs, srf_macs_vir, srf_macs_phy);
 	}
 	if (rx_filters_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, func->num_rx_filters, rx_filters_vir, rx_filters_phy);
+		rtw_mfree(func->num_rx_filters, rx_filters_vir, rx_filters_phy);
 	}
 	if (tx_filters_vir) {
-		dma_free_coherent(global_idev.fullmac_dev, func->num_tx_filters, tx_filters_vir, tx_filters_phy);
+		rtw_mfree(func->num_tx_filters, tx_filters_vir, tx_filters_phy);
 	}
 
 	return ret;
@@ -214,7 +221,7 @@ void cfg80211_rtw_del_nan_func(struct wiphy *wiphy,
 
 	printk("%s =>\n", __func__);
 
-	llhw_ipc_wifi_del_nan_func(cookie);
+	llhw_wifi_del_nan_func(cookie);
 }
 
 static int cfg80211_rtw_nan_change_conf(struct wiphy *wiphy,

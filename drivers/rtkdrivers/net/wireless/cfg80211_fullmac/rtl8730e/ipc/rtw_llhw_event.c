@@ -1,6 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 
-static void llhw_ipc_event_scan_report_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_scan_report_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
 	u32 channel = p_ipc_msg->param_buf[0];
@@ -27,7 +37,7 @@ func_exit:
 	return;
 }
 
-static void llhw_ipc_event_join_status_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_join_status_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	rtw_event_indicate_t event = (rtw_event_indicate_t)p_ipc_msg->param_buf[0];
 	char *buf = km4_phys_to_virt(p_ipc_msg->param_buf[1]);
@@ -90,7 +100,7 @@ func_exit:
 	return;
 }
 
-static void llhw_ipc_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
 	int idx = (u32)p_ipc_msg->param_buf[0];
@@ -133,11 +143,11 @@ func_exit:
 	return;
 }
 
-static void llhw_ipc_event_get_network_info(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_get_network_info(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
 	uint32_t type = (uint32_t)p_ipc_msg->param_buf[0];
-	/* input is used for IPC_WLAN_IS_VALID_IP, not used now. */
+	/* input is used for INIC_WLAN_IS_VALID_IP, not used now. */
 	/* uint8_t *input = (uint8_t *)phys_to_virt(p_ipc_msg->param_buf[1]); */
 	int idx = p_ipc_msg->param_buf[2];
 	uint32_t *rsp_ptr = NULL;
@@ -158,7 +168,7 @@ static void llhw_ipc_event_get_network_info(struct event_priv_t *event_priv, ini
 	}
 
 	switch (type) {
-	case IPC_WLAN_GET_IP:
+	case INIC_WLAN_GET_IP:
 		rcu_read_lock();
 		in_dev_for_each_ifa_rcu(ifa, global_idev.pndev[idx]->ip_ptr)
 		memcpy(&inic_ip_addr[idx], &ifa->ifa_address, 4);
@@ -166,10 +176,10 @@ static void llhw_ipc_event_get_network_info(struct event_priv_t *event_priv, ini
 		rsp_ptr = &inic_ip_addr[idx];
 		rsp_len = 4;
 		break;
-	case IPC_WLAN_GET_GW:
-		dev_warn(global_idev.fullmac_dev, "IPC_WLAN_GET_GW is not supported. Add into global_idev if needed.");
+	case INIC_WLAN_GET_GW:
+		dev_warn(global_idev.fullmac_dev, "INIC_WLAN_GET_GW is not supported. Add into global_idev if needed.");
 		break;
-	case IPC_WLAN_GET_GWMSK:
+	case INIC_WLAN_GET_GWMSK:
 		rcu_read_lock();
 		in_dev_for_each_ifa_rcu(ifa, global_idev.pndev[idx]->ip_ptr)
 		memcpy(&inic_ip_mask[idx], &ifa->ifa_mask, 4);
@@ -177,11 +187,11 @@ static void llhw_ipc_event_get_network_info(struct event_priv_t *event_priv, ini
 		rsp_ptr = &inic_ip_mask[idx];
 		rsp_len = 4;
 		break;
-	case IPC_WLAN_GET_HW_ADDR:
+	case INIC_WLAN_GET_HW_ADDR:
 		rsp_ptr = (uint32_t *)global_idev.pndev[idx]->dev_addr;
 		rsp_len = ETH_ALEN;
 		break;
-	case IPC_WLAN_IS_VALID_IP:
+	case INIC_WLAN_IS_VALID_IP:
 		/* todo in future */
 		return;
 	}
@@ -194,7 +204,7 @@ func_exit:
 }
 
 #ifdef CONFIG_NAN
-static void llhw_ipc_event_nan_match_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_nan_match_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
 	u8 type = p_ipc_msg->param_buf[0];
@@ -217,7 +227,7 @@ func_exit:
 	return;
 }
 
-static void llhw_ipc_event_nan_cfgvendor_event_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_nan_cfgvendor_event_indicate(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
 	u8 event_id = p_ipc_msg->param_buf[0];
@@ -236,7 +246,7 @@ func_exit:
 	return;
 }
 
-static void llhw_ipc_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
+static void llhw_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_priv, inic_ipc_dev_req_t *p_ipc_msg)
 {
 	struct device *pdev = NULL;
 	unsigned char *data_addr = km4_phys_to_virt(p_ipc_msg->param_buf[0]);
@@ -256,7 +266,7 @@ func_exit:
 
 #endif
 
-void llhw_ipc_event_task(unsigned long data)
+void llhw_event_task(unsigned long data)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
 	struct device *pdev = NULL;
@@ -279,54 +289,53 @@ void llhw_ipc_event_task(unsigned long data)
 		dev_err(global_idev.fullmac_dev, "%s: Invalid device message!\n", "event");
 		goto func_exit;
 	}
-
 	p_recv_msg = km4_phys_to_virt(event_priv->recv_ipc_msg.msg);
 
 	switch (p_recv_msg->enevt_id) {
 	/* receive callback indication */
-	case IPC_WIFI_EVT_SCAN_USER_CALLBACK:
+	case INIC_API_SCAN_USER_CALLBACK:
 		/* If user callback provided as NULL, param_buf[1] appears NULL here. Do not make ptr. */
 		spin_lock_bh(&event_priv->event_lock);
 		/* https://jira.realtek.com/browse/AMEBAD2-1543 */
 		cfg80211_rtw_scan_done_indicate(p_recv_msg->param_buf[0], NULL);
 		spin_unlock_bh(&event_priv->event_lock);
 		break;
-	case IPC_WIFI_EVT_SCAN_EACH_REPORT_USER_CALLBACK:
+	case INIC_API_SCAN_EACH_REPORT_USER_CALLBACK:
 		//iiha_scan_each_report_cb_hdl(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_AUTO_RECONNECT:
+	case INIC_API_AUTO_RECONNECT:
 		//iiha_autoreconnect_hdl(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_AP_CH_SWITCH:
+	case INIC_API_AP_CH_SWITCH:
 		//iiha_ap_ch_switch_hdl(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_HDL:
-		llhw_ipc_event_join_status_indicate(event_priv, p_recv_msg);
+	case INIC_API_HDL:
+		llhw_event_join_status_indicate(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_PROMISC_CALLBACK:
+	case INIC_API_PROMISC_CALLBACK:
 		//iiha_wifi_promisc_hdl(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_GET_LWIP_INFO:
-		llhw_ipc_event_get_network_info(event_priv, p_recv_msg);
+	case INIC_API_GET_LWIP_INFO:
+		llhw_event_get_network_info(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_SET_NETIF_INFO:
-		llhw_ipc_event_set_netif_info(event_priv, p_recv_msg);
+	case INIC_API_SET_NETIF_INFO:
+		llhw_event_set_netif_info(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_CFG80211_SCAN_REPORT:
-		llhw_ipc_event_scan_report_indicate(event_priv, p_recv_msg);
+	case INIC_API_CFG80211_SCAN_REPORT:
+		llhw_event_scan_report_indicate(event_priv, p_recv_msg);
 		break;
 #ifdef CONFIG_NAN
-	case IPC_WIFI_EVT_CFG80211_NAN_REPORT_MATCH_EVENT:
-		llhw_ipc_event_nan_match_indicate(event_priv, p_recv_msg);
+	case INIC_API_CFG80211_NAN_REPORT_MATCH_EVENT:
+		llhw_event_nan_match_indicate(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_CFG80211_NAN_DEL_FUNC:
+	case INIC_API_CFG80211_NAN_DEL_FUNC:
 		cfg80211_rtw_nan_func_free(p_recv_msg->param_buf[0]);
 		break;
-	case IPC_WIFI_EVT_CFG80211_NAN_CFGVENDOR_EVENT:
-		llhw_ipc_event_nan_cfgvendor_event_indicate(event_priv, p_recv_msg);
+	case INIC_API_CFG80211_NAN_CFGVENDOR_EVENT:
+		llhw_event_nan_cfgvendor_event_indicate(event_priv, p_recv_msg);
 		break;
-	case IPC_WIFI_EVT_CFG80211_NAN_CFGVENDOR_CMD_REPLY:
-		llhw_ipc_event_nan_cfgvendor_event_indicate(event_priv, p_recv_msg);
+	case INIC_API_CFG80211_NAN_CFGVENDOR_CMD_REPLY:
+		llhw_event_nan_cfgvendor_event_indicate(event_priv, p_recv_msg);
 		break;
 #endif
 	default:
@@ -335,7 +344,7 @@ void llhw_ipc_event_task(unsigned long data)
 	}
 
 	/*set enevt_id to 0 to notify NP that event is finished*/
-	p_recv_msg->enevt_id = IPC_WIFI_EVT_PROCESS_DONE;
+	p_recv_msg->enevt_id = INIC_API_PROCESS_DONE;
 
 func_exit:
 	return;
@@ -359,7 +368,7 @@ func_exit:
 	return ret;
 }
 
-int llhw_ipc_event_init(struct inic_device *idev)
+int llhw_event_init(struct inic_device *idev)
 {
 	struct event_priv_t	*event_priv = &global_idev.event_priv;
 	aipc_ch_t		*event_ch = global_idev.event_ch;
@@ -382,12 +391,12 @@ int llhw_ipc_event_init(struct inic_device *idev)
 	}
 
 	/* initialize event tasklet */
-	tasklet_init(&(event_priv->api_tasklet), llhw_ipc_event_task, (unsigned long)event_priv);
+	tasklet_init(&(event_priv->api_tasklet), llhw_event_task, (unsigned long)event_priv);
 
 	return 0;
 }
 
-void llhw_ipc_event_deinit(void)
+void llhw_event_deinit(void)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
 

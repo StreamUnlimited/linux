@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of realtek thermal driver
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek Thermal support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -23,7 +23,7 @@
 
 #include "realtek-thermal.h"
 
-/* thermal configuration data */
+/* Thermal configuration data */
 static const struct realtek_thermal_info realtek_thermal_cfg = {
 	.down_rate = 0,
 	.clk_div = 1,
@@ -38,15 +38,15 @@ static irqreturn_t realtek_thermal_alarm_irq_thread(int irq, void *sdata)
 
 	spin_lock(&thermal->lock);
 
-	/* read IT reason in SR and clear flags */
+	/* Read IT reason in SR and clear flags */
 	value = readl(thermal->base + RTK_TM_INTR_STS);
 
 	if (value & TM_BIT_ISR_TM_LOW_WT) {
-		dev_info(thermal->dev, "Low warning temperature detect interrupt\n");
+		dev_info(thermal->dev, "Low warning temperature detected\n");
 	}
 
 	if (value & TM_BIT_ISR_TM_HIGH_WT) {
-		dev_info(thermal->dev, "High warning temperature detect interrupt\n");
+		dev_info(thermal->dev, "High warning temperature detected\n");
 	}
 
 	writel(value, thermal->base + RTK_TM_INTR_STS);
@@ -87,7 +87,7 @@ static int realtek_thermal_get_temp(void *data, int *temp)
 		return -EAGAIN;
 	}
 
-	/* Retrieve temperature result  */
+	/* Retrieve temperature result */
 	temp_result = TM_GET_OUT(readl(thermal->base + RTK_TM_RESULT));
 
 	if (temp_result >= 0x40000) {
@@ -125,7 +125,7 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 	u32 reg_value;
 
 	realtek_thermal_cmd(thermal, false);
-	//set thermal control register
+	/* Set thermal control register */
 	reg_value = readl(thermal->base + RTK_TM_CTRL);
 	reg_value &= ~TM_MASK_OSR;
 	reg_value |= TM_OSR(realtek_thermal_cfg.down_rate);
@@ -136,14 +136,14 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 	}
 	reg_value |= TM_BIT_EN_LATCH;
 	writel(reg_value, thermal->base + RTK_TM_CTRL);
-	// set thermal threshold
+	/* Set thermal threshold */
 	reg_value = (TM_HIGH_PT_THR(thermal->temp_critical) |
 				 TM_BIT_HIGHCMP_WT_EN |
 				 TM_HIGH_WT_THR(thermal->temp_passive) |
 				 TM_BIT_LOWCMP_WT_EN |
 				 TM_LOW_WT_THR(realtek_thermal_cfg.low_tmp_th));
 	writel(reg_value, thermal->base + RTK_TM_TH_CTRL);
-	// max and min clear
+	/* Max and min clear */
 	reg_value = readl(thermal->base + RTK_TM_MAX_CTRL);
 	reg_value |= TM_BIT_MAX_CLR;
 	reg_value &= ~TM_BIT_MAX_CLR;
@@ -152,15 +152,15 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 	reg_value |= TM_BIT_MIN_CLR;
 	reg_value &= ~TM_BIT_MIN_CLR;
 	writel(reg_value, thermal->base + RTK_TM_MIN_CTRL);
-	// clear all interrupt
+	/* Clear all interrupt */
 	writel((TM_BIT_ISR_TM_LOW_WT | TM_BIT_ISR_TM_HIGH_WT), thermal->base + RTK_TM_INTR_STS);
-	// set timer period
+	/* Set timer period */
 	writel(TM_TIME_PERIOD(realtek_thermal_cfg.period), thermal->base + RTK_TM_TIMER);
 
 	realtek_thermal_cmd(thermal, true);
 	mdelay(500);
 	realtek_thermal_set_latch(thermal, false);
-	// enable interrupt
+	/* Enable interrupt */
 	writel((TM_BIT_IMR_TM_HIGH_WT | TM_BIT_IMR_TM_LOW_WT), thermal->base + RTK_TM_INTR_CTRL);
 }
 #endif
@@ -172,7 +172,7 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 
 	writel(0, thermal->base + RTK_TM_INTR_CTRL);
 	realtek_thermal_cmd(thermal, false);
-	//set thermal control register
+	/* Set thermal control register */
 	reg_value = readl(thermal->base + RTK_TM_CTRL);
 	reg_value &= ~TM_MASK_OSR;
 	reg_value |= TM_OSR(realtek_thermal_cfg.down_rate);
@@ -181,8 +181,8 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 	} else {
 		reg_value &= ~TM_BIT_ADCCKSEL;
 	}
-	
-	// max and min clear
+
+	/* Max and min clear */
 	reg_value = readl(thermal->base + RTK_TM_MAX_CTRL);
 	reg_value |= TM_BIT_MAX_CLR;
 	reg_value &= ~TM_BIT_MAX_CLR;
@@ -192,14 +192,14 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 	reg_value &= ~TM_BIT_MIN_CLR;
 	writel(reg_value, thermal->base + RTK_TM_MIN_CTRL);
 
-	// set timer period
+	/* Set timer period */
 	writel(TM_TIME_PERIOD(realtek_thermal_cfg.period), thermal->base + RTK_TM_TIMER);
 
 	realtek_thermal_cmd(thermal, true);
-	
-	// clear all interrupt
+
+	/* Clear all interrupt */
 	writel((TM_BIT_ISR_TM_LOW_WT | TM_BIT_ISR_TM_HIGH_WT), thermal->base + RTK_TM_INTR_STS);
-	// set thermal threshold
+	/* Set thermal threshold */
 	reg_value = (TM_HIGH_PT_THR(thermal->temp_critical) |
 				 TM_BIT_HIGHCMP_WT_EN |
 				 TM_HIGH_WT_THR(thermal->temp_passive) |
@@ -222,7 +222,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 	int ret, i;
 
 	if (!pdev->dev.of_node) {
-		dev_err(&pdev->dev, "%s: device tree node not found\n", __func__);
+		dev_err(&pdev->dev, "Invalid device node\n");
 		return -EINVAL;
 	}
 
@@ -245,7 +245,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 	/* Register IRQ into GIC */
 	thermal->irq = platform_get_irq(pdev, 0);
 	if (thermal->irq < 0) {
-		dev_err(&pdev->dev, "Unable to find IRQ\n");
+		dev_err(&pdev->dev, "Failed to get IRQ\n");
 		return thermal->irq;
 	}
 
@@ -258,7 +258,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 
 	thermal->th_dev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, thermal, &realtek_tz_ops);
 	if (IS_ERR(thermal->th_dev)) {
-		dev_err(&pdev->dev, "thermal zone thermal register failed\n");
+		dev_err(&pdev->dev, "Failed to register thermal\n");
 		ret = PTR_ERR(thermal->th_dev);
 		return ret;
 	}
@@ -271,7 +271,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 
 	ret = thermal->th_dev->ops->get_crit_temp(thermal->th_dev, &thermal->temp_critical);
 	if (ret) {
-		dev_err(&pdev->dev, "Not able to read critical_temp: %d\n", ret);
+		dev_err(&pdev->dev, "Failed to read critical_temp: %d\n", ret);
 		goto err_tz;
 	}
 
@@ -289,25 +289,25 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 
 	thermal->atim_clk = devm_clk_get(&pdev->dev, "rtk_aon_tim_clk");
 	if (IS_ERR(thermal->atim_clk)) {
-		dev_err(&pdev->dev, "Fail to get aon timer clock\n");
+		dev_err(&pdev->dev, "Failed to get AON timer clock\n");
 		return PTR_ERR(thermal->atim_clk);
 	}
 
 	thermal->thm_clk = devm_clk_get(&pdev->dev, "rtk_thermal_clk");
 	if (IS_ERR(thermal->thm_clk)) {
-		dev_err(&pdev->dev, "Fail to get thermal clock\n");
+		dev_err(&pdev->dev, "Failed to get thermal clock\n");
 		return PTR_ERR(thermal->thm_clk);
 	}
 
 	ret = clk_prepare_enable(thermal->atim_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable aon timer clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable AON timer clock: %d\n", ret);
 		return ret;
 	}
 
 	ret = clk_prepare_enable(thermal->thm_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable thermal clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable thermal clock: %d\n", ret);
 		goto clk_fail;
 	}
 
@@ -326,8 +326,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 
 	thermal->mode = THERMAL_DEVICE_ENABLED;
 
-	dev_info(&pdev->dev, "%s: Driver initialized successfully\n",
-			 __func__);
+	dev_info(&pdev->dev, "Initialized successfully\n");
 
 	return 0;
 
@@ -369,5 +368,6 @@ static struct platform_driver realtek_thermal_driver = {
 
 builtin_platform_driver(realtek_thermal_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_thermal_data driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba Thermal driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

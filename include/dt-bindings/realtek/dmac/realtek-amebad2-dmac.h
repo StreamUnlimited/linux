@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek DMAC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _DT_BINDINGS_REALTEK_AMEBAD2_DMAC_H
 #define _DT_BINDINGS_REALTEK_AMEBAD2_DMAC_H
 

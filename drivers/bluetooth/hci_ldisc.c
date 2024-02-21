@@ -549,7 +549,6 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	struct hci_uart *hu;
 
 	BT_DBG("tty %p", tty);
-	printk("************ hci_uart_tty_open ************\n");
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;

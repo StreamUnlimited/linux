@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek ALSA support
+*
+* Copyright (C) 2021, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _AMEBAD2_AUDIO_CLOCK_H_
 #define _AMEBAD2_AUDIO_CLOCK_H_
 

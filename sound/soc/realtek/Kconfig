@@ -15,9 +15,6 @@ config SND_SOC_SPORT_RTK_AMEBA
 config SND_SOC_DMA_RTK_AMEBA
         tristate "Realtek Amebad2 DMA interface support"
 
-config SND_SOC_RTK_CAPTURE_TIMER
-        tristate "Realtek Amebad2 capture timer support"
-
 config SND_SOC_RTK_AMEBA
 	tristate "Realtek Amebad2 Total Audio Support"
 	select SND_SOC_CODEC_RTK_AMEBA

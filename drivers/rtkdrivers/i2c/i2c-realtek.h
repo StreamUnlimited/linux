@@ -1,20 +1,9 @@
-/** @addtogroup I2C
-  * @verbatim
-  *****************************************************************************************
-  * Introduction
-  *****************************************************************************************
-  * I2C0:
-  *		- Base Address: I2C0_DEV
-  *		- IPclk: 62.5Mhz
-  *		- Speed: Standard (up to 100 kHz) and Fast (up to 400 kHz) Modes
-  *		- Address: 7/10-bit Address Mode
-  *		- SocPs: SleepMode (clock gating & power gating)
-  *		- Slave: Can register one slave_running
-  *		- IRQ: I2C-1_IRQ
-  *****************************************************************************************
-  *****************************************************************************************
-  * @endverbatim
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek I2C support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -39,12 +28,11 @@
 #include <linux/time.h>
 #include <linux/timer.h>
 #include <linux/completion.h>
-
+ 
 #ifndef RTK_I2C_DEFINE
 #define RTK_I2C_DEFINE
 
 #define RTK_I2C_TODO			0
-#define RTK_I2C_DEBUG_EXTEND		0
 #define RTK_I2C_AUTO_RE_RECV		0
 
 /*-----------------------------------------------------------------*/

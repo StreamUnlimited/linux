@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 
 struct inic_device global_idev;
@@ -96,7 +106,7 @@ void llhw_ipc_event_ch_deinit(void)
 	global_idev.event_ch = NULL;
 }
 
-int llhw_ipc_init(void __iomem *km4_map_start)
+int llhw_init(void __iomem *km4_map_start)
 {
 	int ret = 0;
 	struct inic_device *idev = &global_idev;
@@ -109,11 +119,10 @@ int llhw_ipc_init(void __iomem *km4_map_start)
 		return -ENOMEM;
 	}
 	global_idev.ipc_dev = global_idev.data_ch->pdev;
-
 	global_idev.km4_map_start = km4_map_start;
 
 	/* initialize the message queue, and assign the task haddle function */
-	ret = inic_ipc_msg_q_init(global_idev.ipc_dev, llhw_ipc_recv_task_from_msg);
+	ret = inic_msg_q_init(global_idev.ipc_dev, llhw_recv_task_from_msg);
 	if (ret < 0) {
 		dev_err(global_idev.fullmac_dev, "msg queue init fail.");
 		goto ipc_deinit;
@@ -121,20 +130,20 @@ int llhw_ipc_init(void __iomem *km4_map_start)
 
 	/* TODO: position. */
 	/* TODO: bottom of this line should unregister ipc channel if error occurs. */
-	ret = llhw_ipc_event_init(idev);
+	ret = llhw_event_init(idev);
 	if (ret < 0) {
 		dev_err(global_idev.fullmac_dev, "ipc host: init ipc host event_priv error(%d).\n", ret);
 		goto ipc_deinit;
 	}
 
-	ret = llhw_ipc_xmit_init();
+	ret = llhw_xmit_init();
 	if (ret < 0) {
 		dev_err(global_idev.fullmac_dev, "molloc ipc xmit memory failed.(%d).\n", ret);
 		goto ipc_deinit;
 	}
 
 	/* tell KM4 to do wifi on? wifi on when insmod ? */
-	llhw_ipc_wifi_on();
+	llhw_wifi_on();
 
 	return 0;
 
@@ -144,14 +153,14 @@ ipc_deinit:
 	return ret;
 }
 
-void llhw_ipc_deinit(void)
+void llhw_deinit(void)
 {
-	llhw_ipc_event_deinit();
+	llhw_event_deinit();
 
 	/* Deinit ipc channel of data and event. */
 	llhw_ipc_event_ch_deinit();
 	llhw_ipc_data_ch_deinit();
 
-	llhw_ipc_xmit_deinit();
-	inic_ipc_msg_q_deinit();
+	llhw_xmit_deinit();
+	inic_msg_q_deinit();
 }

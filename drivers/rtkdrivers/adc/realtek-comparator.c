@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file is part of realtek comparator driver
- *
- * Copyright (C) 2021, Realtek - All Rights Reserved
- */
+* Realtek ADC comparator support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -152,7 +152,7 @@ static irqreturn_t realtek_comp_isr(int irq, void *data)
 	if (status & COMP_MASK_WK_STS) {
 		while ((ADC_GET_FLR(readl(comparator->adc->base + RTK_ADC_FLR))) == 0);
 		adc_data = (u16)ADC_GET_DATA_GLOBAL(readl(comparator->adc->base + RTK_ADC_DATA_GLOBAL));
-		dev_dbg(comparator->dev, "status: %x, adc sample data: %x\n", status, adc_data);
+		dev_dbg(comparator->dev, "INT status = 0x%08X, ADC sample data = 0x%04X\n", status, adc_data);
 		writel(status, comparator->base + RTK_COMP_WK_STS);
 		realtek_adc_clear_fifo(comparator->adc);
 
@@ -256,19 +256,21 @@ static int realtek_comp_probe(struct platform_device *pdev)
 
 	ret = devm_request_irq(&pdev->dev, comparator->irq, realtek_comp_isr, 0, pdev->name, comparator);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to request IRQ\n");
+		dev_err(&pdev->dev, "Failed to request IRQ\n");
 		return ret;
 	}
 
 	if (of_property_read_u32(pdev->dev.of_node, "rtk,cmp-ref0", &comparator->ref0)) {
-		dev_err(&pdev->dev, "comparator mode property not found\n");
+		dev_err(&pdev->dev, "Comparator mode property not found\n");
 		return -EINVAL;
 	}
 
 	if (of_property_read_u32(pdev->dev.of_node, "rtk,cmp-ref1", &comparator->ref1)) {
-		dev_err(&pdev->dev, "comparator mode property not found\n");
+		dev_err(&pdev->dev, "Comparator mode property not found\n");
 		return -EINVAL;
 	}
+
+	dev_info(&pdev->dev, "ADC comparator mode ref0 = 0x%08X, ref1 = 0x%08X\n", comparator->ref0, comparator->ref1);
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
 		device_init_wakeup(&pdev->dev, true);
@@ -295,7 +297,7 @@ static int realtek_comp_remove(struct platform_device *pdev)
 	return 0;
 }
 
-extern suspend_state_t pm_suspend_target_state;
+#ifdef CONFIG_PM
 static int realtek_comp_suspend(struct device *dev)
 {
 	struct realtek_adc_data *comp_adc = dev_get_drvdata(dev->parent);
@@ -319,7 +321,7 @@ static int realtek_comp_resume(struct device *dev)
 static const struct dev_pm_ops realtek_amebad2_comp_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_comp_suspend, realtek_comp_resume)
 };
-
+#endif
 
 static const struct of_device_id realtek_comp_match[] = {
 	{.compatible = "realtek,amebad2-comparator",},
@@ -333,11 +335,14 @@ static struct platform_driver realtek_comp_driver = {
 	.driver = {
 		.name = "realtek-amebad2-comparator",
 		.of_match_table = of_match_ptr(realtek_comp_match),
+#ifdef CONFIG_PM
 		.pm = &realtek_amebad2_comp_pm_ops,
+#endif
 	},
 };
 
 builtin_platform_driver(realtek_comp_driver);
 
-MODULE_DESCRIPTION("AmebaD2 realtek_comp_data driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba ADC comparator driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

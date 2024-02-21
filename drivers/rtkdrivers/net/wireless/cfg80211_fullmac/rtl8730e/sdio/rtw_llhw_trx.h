@@ -1,5 +1,5 @@
-#ifndef __INIC_IPC_HOST_TRX_H__
-#define __INIC_IPC_HOST_TRX_H__
+#ifndef __RTW_LLHW_TRX_H__
+#define __RTW_LLHW_TRX_H__
 
 /*TX reserve size before 802.3 pkt*/
 #define WLAN_ETHHDR_LEN		14
@@ -30,7 +30,6 @@
 /* -------------------------- Function declaration -------------------------- */
 
 /* ---------------------------- Global Variables ---------------------------- */
-#define SKB_NUM_AP		10
 #define QUEUE_STOP_THRES	3
 #define QUEUE_WAKE_THRES	6
 
@@ -42,8 +41,6 @@ struct  dev_sk_buff_head {
 struct skb_raw_para {
 	unsigned char enable;
 	unsigned char rate;
-	unsigned char retry_limit;
-	unsigned char ac_queue;		/*0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO*/
 };
 
 struct dev_sk_buff {
@@ -87,4 +84,4 @@ static inline unsigned char *dev_skb_put(struct dev_sk_buff *skb, unsigned int l
 	return tmp;
 }
 
-#endif /* __INIC_IPC_HOST_TRX_H__ */
+#endif /* __RTW_LLHW_TRX_H__ */

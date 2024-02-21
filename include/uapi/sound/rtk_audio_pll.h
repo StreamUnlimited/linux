@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+/*
+* Realtek Audio support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef __SND_SOC_REALTEK_AUDIO_PLL_H_
 #define __SND_SOC_REALTEK_AUDIO_PLL_H_
 

@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 #ifdef CONFIG_NAN
 
@@ -48,14 +58,14 @@ exit:
 static int rtw_cfgvendor_set_nan_srvc_extinfo(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_SRVC_EXT_INFO, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_SRVC_EXT_INFO, data, len);
 	return 0;
 }
 
 static int rtw_cfgvendor_set_nan_data_request(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_DATA_REQ, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_DATA_REQ, data, len);
 
 	return 0;
 }
@@ -63,7 +73,7 @@ static int rtw_cfgvendor_set_nan_data_request(struct wiphy *wiphy,
 static int rtw_cfgvendor_set_nan_data_response(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_DATA_RSP, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_DATA_RSP, data, len);
 
 	return 0;
 }
@@ -71,7 +81,7 @@ static int rtw_cfgvendor_set_nan_data_response(struct wiphy *wiphy,
 static int rtw_cfgvendor_set_nan_data_end(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_DATA_END, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_DATA_END, data, len);
 
 	return 0;
 }
@@ -80,7 +90,7 @@ static int rtw_cfgvendor_set_nan_data_end(struct wiphy *wiphy,
 static int rtw_cfgvendor_set_nan_follow_up(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_FOLLOWUP, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_FOLLOWUP, data, len);
 
 	return 0;
 }
@@ -88,7 +98,7 @@ static int rtw_cfgvendor_set_nan_follow_up(struct wiphy *wiphy,
 static int rtw_cfgvendor_nan_pairing_set_pw(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_PAIRING_SET_PW, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_PAIRING_SET_PW, data, len);
 
 	return 0;
 }
@@ -96,7 +106,7 @@ static int rtw_cfgvendor_nan_pairing_set_pw(struct wiphy *wiphy,
 static int rtw_cfgvendor_nan_pasn_start(struct wiphy *wiphy,
 										struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_PASN_START, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_PASN_START, data, len);
 
 	return 0;
 }
@@ -104,7 +114,7 @@ static int rtw_cfgvendor_nan_pasn_start(struct wiphy *wiphy,
 static int rtw_cfgvendor_nan_pasn_setkeys(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_PASN_SET_KEY, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_PASN_SET_KEY, data, len);
 
 	return 0;
 }
@@ -114,7 +124,7 @@ static int rtw_cfgvendor_nan_pasn_setkeys(struct wiphy *wiphy,
 static int rtw_cfgvendor_nandow_entry(struct wiphy *wiphy,
 									  struct wireless_dev *wdev, const void *data, int len)
 {
-	llhw_ipc_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_CUSTOMER_NANDOW, data, len);
+	llhw_wifi_nan_cfgvendor_cmd(NAN_SUBCMD_CUSTOMER_NANDOW, data, len);
 
 	return 0;
 }

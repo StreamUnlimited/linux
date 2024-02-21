@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek Km4-console support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
@@ -49,8 +56,9 @@ static long realtek_console_ioctl(struct file *file, unsigned int cmd, unsigned 
 
 	spin_lock(&lock);
 
-	if (copy_from_user(&preq_msg, (char __user *)arg, CONSOLE_MAX_CHAR))
+	if (copy_from_user(&preq_msg, (char __user *)arg, CONSOLE_MAX_CHAR)) {
 		return -EFAULT;
+	}
 
 	ret = rtk_console_process(preq_msg, strlen(preq_msg), result);
 	if (ret < 0) {
@@ -78,7 +86,7 @@ static void realtek_console_setup_cdev(struct realtek_console_dev *dev, int inde
 	dev->cdev.ops = &realtek_console_fops;
 	err = cdev_add(&dev->cdev, devno, 1);
 	if (err) {
-		pr_err("Error %d add realtek_console %d", err, index);
+		pr_err("Error: Failed to add realtek console: %d\n", err);
 	}
 }
 
@@ -97,7 +105,7 @@ int realtek_console_init(void)
 	realtek_console_devp = kmalloc(sizeof(struct realtek_console_dev), GFP_KERNEL);
 	if (!realtek_console_devp) {
 		ret = -ENOMEM;
-		pr_err("Error add realtek_console");
+		pr_err("Error: Failed to alloc realtek console\n");
 		goto fail_malloc;
 	}
 
@@ -117,7 +125,7 @@ fail_malloc:
 
 void realtek_console_exit(void)
 {
-	pr_info("End realtek_console");
+	pr_info("Realtek console exit\n");
 	cdev_del(&realtek_console_devp->cdev);
 	kfree(realtek_console_devp);
 	unregister_chrdev_region(MKDEV(realtek_console_major, 0), 1);
@@ -126,6 +134,6 @@ void realtek_console_exit(void)
 fs_initcall(realtek_console_init);
 module_exit(realtek_console_exit);
 
-MODULE_DESCRIPTION("Realtek console-ctrl");
+MODULE_DESCRIPTION("Realtek Ameba Console driver");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Realtek Corporation");
-MODULE_LICENSE("GPL");

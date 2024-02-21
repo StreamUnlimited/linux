@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek PWM support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/delay.h>
 #include <linux/ktime.h>
 #include <linux/highmem.h>
@@ -31,11 +38,11 @@
 
 struct rtk_pwm {
 	struct pwm_chip chip;
-	struct clk * pwm_clk;
+	struct clk *pwm_clk;
 	u32 clk;
 	void __iomem *base;
-	struct mutex lock; 			/*protect pwm for all channel */
-	int chan_en[AMEBA_PWM_CHAN_NUM];  /*is channel enable*/
+	struct mutex lock; 			/* Protect PWM for all channel */
+	int chan_en[AMEBA_PWM_CHAN_NUM];  /* Channel enable */
 };
 
 
@@ -50,9 +57,10 @@ static int active_channels(struct pwm_chip *chip)
 	int i;
 	struct rtk_pwm *pwm = to_rtk_pwm_dev(chip);
 
-	for(i = 0; i < AMEBA_PWM_CHAN_NUM; i++) {
-		if(pwm->chan_en[i] == 1)
+	for (i = 0; i < AMEBA_PWM_CHAN_NUM; i++) {
+		if (pwm->chan_en[i] == 1) {
 			return -1;
+		}
 	}
 
 	return 0;
@@ -60,7 +68,7 @@ static int active_channels(struct pwm_chip *chip)
 
 
 
-/*start or stop timer.(counter will not reset to 0)*/
+/* Start or stop timer.(Counter will not reset to 0)*/
 static void rtk_pwm_timer_start_count(struct pwm_chip *chip, u32 NewState)
 {
 	u32 reg;
@@ -68,29 +76,31 @@ static void rtk_pwm_timer_start_count(struct pwm_chip *chip, u32 NewState)
 	void __iomem *base = pwm->base;
 
 	if (NewState != PWM_DISABLE) {
-		/* Enable the TIM Counter, dont do this if timer is RUN */
+		/* Enable the timer Counter, don't do this if timer is running */
 		reg = readl(base + REG_TIM_EN);
 		if ((readl(base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
 			writel(TIM_BIT_CNT_START, base + REG_TIM_EN);
 		}
 
-		/* poll if cnt is running, 3*32k cycles */
+		/* Poll if cnt is running, 3*32k cycles */
 		while (1) {
 			mdelay(200);
-			if (readl(base + REG_TIM_EN) & TIM_BIT_CEN)
+			if (readl(base + REG_TIM_EN) & TIM_BIT_CEN) {
 				break;
+			}
 		}
 	} else {
-		/* Disable the TIM Counter, dont do this if timer is not RUN */
+		/* Disable the timer counter, dont do this if timer is not running */
 		/* this action need sync to 32k domain for 100us */
 		if (readl(base + REG_TIM_EN) & TIM_BIT_CEN) {
 			writel(TIM_BIT_CNT_STOP, base + REG_TIM_EN);
 		}
 
-		/* poll if cnt is running, aout 100us */
+		/* Poll if cnt is running, about 100us */
 		while (1) {
-			if ((readl(base + REG_TIM_EN) & TIM_BIT_CEN) == 0)
+			if ((readl(base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
 				break;
+			}
 		}
 	}
 }
@@ -103,13 +113,14 @@ static void rtk_pwm_polarity_config(struct pwm_chip *chip, u32 polarity, u32 ch)
 	struct rtk_pwm *pwm = to_rtk_pwm_dev(chip);
 	void __iomem *base = pwm->base;
 
-	reg = readl(base + REG_TIM_CCR0 + 4*ch);
+	reg = readl(base + REG_TIM_CCR0 + 4 * ch);
 	reg &= ~TIM_BIT_CCxP;
-	if(polarity != 0)
+	if (polarity != 0) {
 		reg |= TIM_CCPolarity_High;
-	else
+	} else {
 		reg |= TIM_CCPolarity_Low;
-	writel(reg, base + REG_TIM_CCR0 + 4*ch);
+	}
+	writel(reg, base + REG_TIM_CCR0 + 4 * ch);
 }
 
 static void rtk_pwm_disable(struct pwm_chip *chip, int ch)
@@ -118,17 +129,18 @@ static void rtk_pwm_disable(struct pwm_chip *chip, int ch)
 	struct rtk_pwm *pwm = to_rtk_pwm_dev(chip);
 	void __iomem *base = pwm->base;
 
-	/*Set flag*/
+	/* Set flag*/
 	pwm->chan_en[ch] = 0;
 	/* Disable channel */
-	reg = readl(base + REG_TIM_CCR0 + 4*ch);
+	reg = readl(base + REG_TIM_CCR0 + 4 * ch);
 	reg &= ~TIM_BIT_CCxE;
 	reg |= TIM_CCx_Disable;
-	writel(reg, base + REG_TIM_CCR0 + 4*ch);
+	writel(reg, base + REG_TIM_CCR0 + 4 * ch);
 
 	/* When all channels are disabled, we can disable the controller */
-	if (!active_channels(chip))
+	if (!active_channels(chip)) {
 		rtk_pwm_timer_start_count(chip, PWM_DISABLE);
+	}
 }
 
 
@@ -139,13 +151,13 @@ static int rtk_pwm_enable(struct pwm_chip *chip, int ch)
 	void __iomem *base = pwm->base;
 	u32 reg;
 
-	/*Set flag*/
+	/* Set flag*/
 	pwm->chan_en[ch] = 1;
 
-	reg = readl(base + REG_TIM_CCR0 + 4*ch);
+	reg = readl(base + REG_TIM_CCR0 + 4 * ch);
 	reg &= ~TIM_BIT_CCxE;
 	reg |= TIM_CCx_Enable;
-	writel(reg, base + REG_TIM_CCR0 + 4*ch);
+	writel(reg, base + REG_TIM_CCR0 + 4 * ch);
 
 	return 0;
 }
@@ -161,11 +173,11 @@ static int rtk_pwm_config(struct pwm_chip *chip, int ch, u32 duty_ns, u32 period
 	/* Period and prescaler values depends on clock rate */
 	div = (unsigned long long)pwm->clk * period_ns;
 
-	/*start to compute arr and prescaler*/
+	/* Start to compute arr and prescaler */
 	do_div(div, NSEC_PER_SEC);
 	prd = div;
 
-	/*max count is UINT32_MAX because REG_TIM_CNT is 32bit*/
+	/* Max count is UINT32_MAX because REG_TIM_CNT is 32bit */
 	while (div > U16_MAX) {
 		prescaler++;
 		div = prd;
@@ -174,29 +186,31 @@ static int rtk_pwm_config(struct pwm_chip *chip, int ch, u32 duty_ns, u32 period
 
 	prd = div;
 
-	/*prescaler is 16bit*/
-	if (prescaler > U16_MAX || prd > U16_MAX)
+	/* Prescaler is 16bit */
+	if (prescaler > U16_MAX || prd > U16_MAX) {
 		return -EINVAL;
+	}
 
 	/*
 	 * All channels share the same prescaler and counter so when two
 	 * channels are active at the same time we can't change them
 	 */
-	if (active_channels(chip) ) {
+	if (active_channels(chip)) {
 		u32 psc, arr;
 
 		psc = readl(base + REG_TIM_PSC);
 		arr = readl(base + REG_TIM_ARR);
 
-		if ((psc != prescaler) || (arr != prd - 1))
+		if ((psc != prescaler) || (arr != prd - 1)) {
 			return -EBUSY;
+		}
 	}
 
-	/*update arr and perscaler*/
+	/* Update arr and perscaler */
 	writel(prescaler, base + REG_TIM_PSC);
 	writel(prd - 1, base + REG_TIM_ARR);
 
-	/*update APRE to reload ARR*/
+	/* Update APRE to reload ARR */
 	reg = readl(base + REG_TIM_CR);
 	reg &= ~TIM_BIT_ARPE;
 	writel(reg, base + REG_TIM_CR);
@@ -205,12 +219,12 @@ static int rtk_pwm_config(struct pwm_chip *chip, int ch, u32 duty_ns, u32 period
 	dty = prd * duty_ns;
 	do_div(dty, period_ns);
 
-	/* write duty and set pwm mode */
-	reg = readl(base + REG_TIM_CCR0 + 4*ch);
+	/* Write duty and set pwm mode */
+	reg = readl(base + REG_TIM_CCR0 + 4 * ch);
 	reg &= ~TIM_CCMode_CCR;
 	reg |= dty;
 	reg |= TIM_CCMode_PWM;
-	writel(reg, base + REG_TIM_CCR0 + 4*ch);
+	writel(reg, base + REG_TIM_CCR0 + 4 * ch);
 
 	return 0;
 }
@@ -223,7 +237,7 @@ static int rtk_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	int ret;
 	bool enabled;
 
-	/* protect common prescaler for all active channels */
+	/* Protect common prescaler for all active channels */
 	mutex_lock(&priv->lock);
 
 	enabled = pwm->state.enabled;
@@ -234,22 +248,25 @@ static int rtk_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		goto exit;
 	}
 
-	/* set polarity */
-	if (state->polarity != pwm->state.polarity)
+	/* Set polarity */
+	if (state->polarity != pwm->state.polarity) {
 		rtk_pwm_polarity_config(chip, state->polarity, pwm->hwpwm);
+	}
 
-	/* config duty_cycle and period */
+	/* Config duty_cycle and period */
 	ret = rtk_pwm_config(chip, pwm->hwpwm, state->duty_cycle, state->period);
-	if (ret)
+	if (ret) {
 		goto exit;
+	}
 
 	if (!enabled && state->enabled) {
 		ret = rtk_pwm_enable(chip, pwm->hwpwm);
-		if (ret)
+		if (ret) {
 			goto exit;
+		}
 	}
 
-	/* start timer counter if it is not start */
+	/* Start timer counter if it is not start */
 	rtk_pwm_timer_start_count(chip, PWM_ENABLE);
 
 exit:
@@ -273,12 +290,13 @@ static const struct pwm_ops rtk_pwm_ops = {
 static int rtk_pwm_probe(struct platform_device *pdev)
 {
 	struct rtk_pwm *pwm;
-	struct rtk_tim * tim = dev_get_drvdata(pdev->dev.parent);
+	struct rtk_tim *tim = dev_get_drvdata(pdev->dev.parent);
 	int ret;
 
 	pwm = devm_kzalloc(&pdev->dev, sizeof(struct rtk_pwm), GFP_KERNEL);  //todo_eric
-	if (!pwm)
+	if (!pwm) {
 		return -ENOMEM;
+	}
 
 	mutex_init(&pwm->lock);
 
@@ -292,7 +310,7 @@ static int rtk_pwm_probe(struct platform_device *pdev)
 
 	ret = pwmchip_add(&pwm->chip);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to add PWM chip, error %d\n", ret);
+		dev_err(&pdev->dev, "Failed to add PWM chip: %d\n", ret);
 		return ret;
 	}
 
@@ -310,14 +328,13 @@ static const struct of_device_id rtk_pwm_of_match[] = {
 static struct platform_driver rtk_pwm_driver = {
 	.probe	= rtk_pwm_probe,
 	.driver	= {
-		.name = "rtk-pwm",
+		.name = "realtek-amebad2-pwm",
 		.of_match_table = rtk_pwm_of_match,
 	},
 };
 
 builtin_platform_driver(rtk_pwm_driver);
 
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek PWM driver");
+MODULE_DESCRIPTION("Realtek Ameba PWM driver");
 MODULE_LICENSE("GPL v2");
-
+MODULE_AUTHOR("Realtek Corporation");

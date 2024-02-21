@@ -1,28 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    ir-realtek.c
-  * @author
-  * @version V1.0.0
-  * @date    2021-11-20
-  * @brief   This file contains all the functions prototypes for the IR firmware
-  *             library, including the following functionalities of the Universal Asynchronous
-  *             Receiver/Transmitter peripheral:
-  *           -Initialization
-  *           -IR Control (disable/enable)
-  *           -Receive/Send Data Interface
-  *           -Interrupts and flags management
-  *           -Threshold setting interface
-  *           -Clear TX/RX FIFO
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * This module is a confidential and proprietary property of RealTek and
-  * possession or use of this module requires written permission of RealTek.
-  *
-  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
-  ******************************************************************************
-  */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek IR support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include "ir-realtek.h"
 
@@ -53,25 +34,18 @@ void rtk_ir_reg_update(
 	rtk_ir_writel(ptr, reg, temp);
 }
 
-#if RTK_IR_REG_DUMP
 void rtk_ir_reg_dump(struct rtk_ir_dev *ir_rtk)
 {
-	pr_info("IR_CLK_DIV[%x] = %x", IR_CLK_DIV, rtk_ir_readl(ir_rtk->base, IR_CLK_DIV));
-	pr_info("IR_TX_CONFIG[%x] = %x", IR_TX_CONFIG, rtk_ir_readl(ir_rtk->base, IR_TX_CONFIG));
-	pr_info("IR_TX_SR[%x] = %x", IR_TX_SR, rtk_ir_readl(ir_rtk->base, IR_TX_SR));
-	pr_info("IR_TX_COMPE_DIV[%x] = %x", IR_TX_COMPE_DIV, rtk_ir_readl(ir_rtk->base, IR_TX_COMPE_DIV));
-	pr_info("IR_RX_CONFIG[%x] = %x", IR_RX_CONFIG, rtk_ir_readl(ir_rtk->base, IR_RX_CONFIG));
-	pr_info("IR_RX_SR[%x] = %x", IR_RX_SR, rtk_ir_readl(ir_rtk->base, IR_RX_SR));
-	pr_info("IR_RX_CNT_INT_SEL[%x] = %x", IR_RX_CNT_INT_SEL, rtk_ir_readl(ir_rtk->base, IR_RX_CNT_INT_SEL));
-	pr_info("IR_VERSION[%x] = %x", IR_VERSION, rtk_ir_readl(ir_rtk->base, IR_VERSION));
-}
+#if RTK_IR_REG_DUMP
+	dev_dbg(ir_rtk->dev, "IR_CLK_DIV[0x%04X] = 0x%08X\n", IR_CLK_DIV, rtk_ir_readl(ir_rtk->base, IR_CLK_DIV));
+	dev_dbg(ir_rtk->dev, "IR_TX_CONFIG[0x%04X] = 0x%08X\n", IR_TX_CONFIG, rtk_ir_readl(ir_rtk->base, IR_TX_CONFIG));
+	dev_dbg(ir_rtk->dev, "IR_TX_SR[0x%04X] = 0x%08X\n", IR_TX_SR, rtk_ir_readl(ir_rtk->base, IR_TX_SR));
+	dev_dbg(ir_rtk->dev, "IR_TX_COMPE_DIV[0x%04X] = 0x%08X\n", IR_TX_COMPE_DIV, rtk_ir_readl(ir_rtk->base, IR_TX_COMPE_DIV));
+	dev_dbg(ir_rtk->dev, "IR_RX_CONFIG[0x%04X] = 0x%08X\n", IR_RX_CONFIG, rtk_ir_readl(ir_rtk->base, IR_RX_CONFIG));
+	dev_dbg(ir_rtk->dev, "IR_RX_SR[0x%04X] = 0x%08X\n", IR_RX_SR, rtk_ir_readl(ir_rtk->base, IR_RX_SR));
+	dev_dbg(ir_rtk->dev, "IR_RX_CNT_INT_SEL[0x%04X] = 0x%08X\n", IR_RX_CNT_INT_SEL, rtk_ir_readl(ir_rtk->base, IR_RX_CNT_INT_SEL));
+	dev_dbg(ir_rtk->dev, "IR_VERSION[0x%04X] = 0x%08X\n", IR_VERSION, rtk_ir_readl(ir_rtk->base, IR_VERSION));
 #endif // RTK_IR_REG_DUMP
-
-static void assert_param(u8 check_result)
-{
-	if (!check_result) {
-		pr_info("error: illegal parameter.");
-	}
 }
 
 void rtk_ir_init_hw(struct rtk_ir_dev *ir_rtk)
@@ -80,11 +54,12 @@ void rtk_ir_init_hw(struct rtk_ir_dev *ir_rtk)
 	rtk_ir_writel(ir_rtk->base, IR_CLK_DIV, (ir_rtk->ir_param.ir_clock) / (ir_rtk->ir_param.ir_freq) - 1);
 
 	if (ir_rtk->ir_param.ir_mode == IR_MODE_TX) {
-		dev_dbg(ir_rtk->dev, "mode sel tx!!!");
 		/* Check the parameters in TX mode */
-		assert_param(IS_IR_FREQUENCY(ir_rtk->ir_param.ir_freq));
-
-		/* save IR TX interrupt configuration */
+		if (!IS_IR_FREQUENCY(ir_rtk->ir_param.ir_freq)) {
+			dev_err(ir_rtk->dev, "Illegal parameter: ir_freq\n");
+			return;
+		}
+		/* Save IR TX interrupt configuration */
 		rtk_ir_writel(ir_rtk->base, IR_TX_CONFIG, 0x3F);
 
 		/* Configure TX mode parameters and disable all TX interrupt */
@@ -109,13 +84,15 @@ void rtk_ir_init_hw(struct rtk_ir_dev *ir_rtk)
 		rtk_ir_writel(ir_rtk->base, IR_TX_COMPE_DIV,
 					  (ir_rtk->ir_param.ir_clock) / (ir_rtk->ir_param.ir_tx_comp_clk) - 1);
 	} else {
-		dev_dbg(ir_rtk->dev, "mode sel rx!!!");
 		/* Check the parameters in RX mode */
-		assert_param(IS_IR_RX_TRIGGER_EDGE(ir_rtk->ir_param.ir_rx_trigger_mode));
+		if (!IS_IR_RX_TRIGGER_EDGE(ir_rtk->ir_param.ir_rx_trigger_mode)) {
+			dev_err(ir_rtk->dev, "Illegal parameter: ir_rx_trigger_mode\n");
+			return;
+		}
 
 		/* Enable RX mode */
 		rtk_ir_reg_update(ir_rtk->base, IR_TX_CONFIG, IR_BIT_MODE_SEL, IR_BIT_MODE_SEL);
-		dev_dbg(ir_rtk->dev, "set rx mode result %x", IR_MODE(rtk_ir_readl(ir_rtk->base, IR_TX_CONFIG)));
+		dev_dbg(ir_rtk->dev, "Set RX mode result = 0x%08X\n", IR_MODE(rtk_ir_readl(ir_rtk->base, IR_TX_CONFIG)));
 		/* Configure RX mode parameters and disable all RX interrupt */
 		if (ir_rtk->ir_param.ir_rx_auto) {
 			rtk_ir_writel(ir_rtk->base, IR_RX_CONFIG, IR_BIT_RX_START_MODE |
@@ -161,13 +138,13 @@ static void rtk_get_dts_info(
 {
 	int nr_requests, ret;
 
-	/* get dts params. */
+	/* Get DTS params. */
 	ret = of_property_read_u32(np, dts_name, &nr_requests);
 	if (ret) {
-		dev_err(ir_rtk->dev, "can't get %s", dts_name);
+		dev_warn(ir_rtk->dev, "Can't get DTS property %s, set it to default value %d\n", dts_name, default_value);
 		*param_to_set = default_value;
 	} else {
-		dev_dbg(ir_rtk->dev, "%s = %d", dts_name, nr_requests);
+		dev_dbg(ir_rtk->dev, "Get DTS property %s = %d\n", dts_name, nr_requests);
 		*param_to_set = nr_requests;
 	}
 }
@@ -183,6 +160,7 @@ void rtk_ir_struct_init(
 	char s5[] = "rtk,ir-rx-trigger-mode";
 	char s6[] = "rtk,ir-cnt-thred-type";
 	char s7[] = "rtk,ir-idle-level";
+	char s8[] = "rtk,ir_rx_inverse";
 
 	ir_rtk->ir_manage.duty_cycle = 50;
 
@@ -200,6 +178,7 @@ void rtk_ir_struct_init(
 	rtk_get_dts_info(ir_rtk, np, &ir_rtk->ir_param.ir_rx_trigger_mode, IR_RX_FALL_EDGE, s5);
 	rtk_get_dts_info(ir_rtk, np, &ir_rtk->ir_param.ir_rx_cnt_thr_type, IR_RX_COUNT_HIGH_LEVEL, s6);
 	rtk_get_dts_info(ir_rtk, np, &ir_rtk->ir_param.ir_tx_idle_level, IR_IDLE_OUTPUT_LOW, s7);
+	rtk_get_dts_info(ir_rtk, np, &ir_rtk->ir_param.ir_rx_inverse, 0, s8);
 
 	ir_rtk->ir_param.ir_clock = 100000000; // 100MHz
 	ir_rtk->ir_param.ir_freq = 38000; // 38kHz
@@ -215,7 +194,6 @@ void rtk_ir_struct_init(
 void rtk_ir_enable_cmd(
 	struct rtk_ir_dev *ir_rtk, u32 mode, u32 new_state)
 {
-	dev_dbg(ir_rtk->dev, "%s, state = %s", __FUNCTION__, new_state ? "enable" : "disable");
 	if (new_state == ENABLE) {
 		if (mode == IR_MODE_TX) {
 			rtk_ir_reg_update(ir_rtk->base, IR_TX_CONFIG, IR_BIT_TX_START, IR_BIT_TX_START);
@@ -235,9 +213,6 @@ void rtk_ir_send_buf(
 	struct rtk_ir_dev *ir_rtk,
 	u32 *pbuf, u32 len, u32 is_last_pkt)
 {
-#if RTK_IR_DEBUG_DETAILS
-	pr_info("%s, send len = %d", __FUNCTION__, len);
-#endif // RTK_IR_DEBUG_DETAILS
 	if (len == 0) {
 		return;
 	}
@@ -246,7 +221,7 @@ void rtk_ir_send_buf(
 		rtk_ir_writel(ir_rtk->base, IR_TX_FIFO, *pbuf++);
 	}
 
-	/* If send the last IR packet, SET the following bit */
+	/* If send the last IR packet, set the following bit */
 	if (is_last_pkt) {
 		rtk_ir_writel(ir_rtk->base, IR_TX_FIFO, *pbuf | IR_BIT_TX_DATA_END_FLAG);
 	} else {
@@ -283,7 +258,6 @@ u32 rtk_ir_get_int_status(struct rtk_ir_dev *ir_rtk)
 		status = rtk_ir_readl(ir_rtk->base, IR_TX_SR);
 	}
 
-	/* Return the ir_int status */
 	return status;
 }
 
@@ -297,7 +271,6 @@ u32 rtk_ir_get_mask_type(struct rtk_ir_dev *ir_rtk)
 		mask = rtk_ir_readl(ir_rtk->base, IR_TX_CONFIG) & IR_TX_INT_ALL_MASK;
 	}
 
-	/* Return the ir_int mask status */
 	return  mask;
 }
 
@@ -305,10 +278,16 @@ void rtk_ir_clear_int_pending_bit(
 	struct rtk_ir_dev *ir_rtk, u32 int_to_clear)
 {
 	if (IR_MODE(rtk_ir_readl(ir_rtk->base, IR_TX_CONFIG))) {
-		assert_param(IS_RX_INT_CLR(int_to_clear));
+		if (!IS_RX_INT_CLR(int_to_clear)) {
+			dev_err(ir_rtk->dev, "Illegal RX clear bit\n");
+			return;
+		}
 		rtk_ir_reg_update(ir_rtk->base, IR_RX_INT_CLR, int_to_clear, int_to_clear);
 	} else {
-		assert_param(IS_TX_INT_CLR(int_to_clear));
+		if (!IS_TX_INT_CLR(int_to_clear)) {
+			dev_err(ir_rtk->dev, "Illegal TX clear bit\n");
+			return;
+		}
 		rtk_ir_reg_update(ir_rtk->base, IR_TX_INT_CLR, int_to_clear, int_to_clear);
 	}
 }
@@ -329,9 +308,7 @@ u32 rtk_ir_receive_data(struct rtk_ir_dev *ir_rtk)
 {
 	u32 temp;
 	temp = rtk_ir_readl(ir_rtk->base, IR_RX_FIFO);
-#if RTK_IR_DEBUG_DETAILS
-	pr_info("ir recv %s = %d", temp & IR_BIT_RX_LEVEL ? "pulse" : "space", temp & IR_MASK_RX_CNT);
-#endif // RTK_IR_DEBUG_DETAILS
+	dev_dbg(ir_rtk->dev, "RX %s cnt = %d\n", temp & IR_BIT_RX_LEVEL ? "pulse" : "space", temp & IR_MASK_RX_CNT);
 	return temp;
 }
 
@@ -343,7 +320,7 @@ void rtk_ir_clear_rx_fifo(struct rtk_ir_dev *ir_rtk)
 void rtk_ir_start_manual_rx_trigger(
 	struct rtk_ir_dev *ir_rtk, u32 new_state)
 {
-	/* Start Rx manual mode */
+	/* Start RX manual mode */
 	if (new_state == ENABLE) {
 		rtk_ir_reg_update(ir_rtk->base, IR_RX_CONFIG, IR_BIT_RX_MAN_START, IR_BIT_RX_MAN_START);
 	} else {
@@ -435,12 +412,9 @@ void ir_rx_prepare(struct rtk_ir_dev *ir_rtk)
 	rtk_ir_interrupt_config(ir_rtk, IR_RX_INT_ALL_EN, ENABLE);
 	rtk_ir_interrupt_config(ir_rtk, IR_RX_INT_ALL_MASK, DISABLE);
 
-	/* Mask the first idle before ir recv wave. */
+	/* Mask the first idle before IR recv wave. */
 	rtk_ir_interrupt_config(ir_rtk, IR_BIT_RX_CNT_THR_INT_EN, DISABLE);
-#if RTK_IR_REG_DUMP
-	pr_info("IR_RX_CONFIG[%x] = %x", IR_RX_CONFIG, rtk_ir_readl(ir_rtk->base, IR_RX_CONFIG));
-#endif // RTK_IR_REG_DUMP
-
+	dev_dbg(ir_rtk->dev, "IR_RX_CONFIG= 0x%08X\n", rtk_ir_readl(ir_rtk->base, IR_RX_CONFIG));
 	rtk_ir_enable_cmd(ir_rtk, IR_MODE_RX, ENABLE);
 }
 
@@ -448,9 +422,6 @@ void ir_recv_end(struct rtk_ir_dev *ir_rtk)
 {
 	int i, us_duration = 0;
 	struct ir_raw_event rx_ev;
-
-	dev_dbg(ir_rtk->dev, "\n ===== rx cnt %d ====\n", ir_rtk->ir_manage.wbuf_index);
-	dev_dbg(ir_rtk->dev, "start print buf");
 
 	ir_raw_event_reset(ir_rtk->rcdev);
 
@@ -463,15 +434,13 @@ void ir_recv_end(struct rtk_ir_dev *ir_rtk)
 	for (i = 0; i < ir_rtk->ir_manage.wbuf_index; i++) {
 		if (ir_rtk->ir_manage.wbuf[i] & IR_BIT_RX_LEVEL) {
 			us_duration =  1000 * (ir_rtk->ir_manage.wbuf[i] & IR_MASK_RX_CNT) / (ir_rtk->ir_param.ir_freq / 1000);
-			dev_dbg(ir_rtk->dev, "%d>>>>>>> %d", ir_rtk->ir_manage.wbuf[i] & IR_MASK_RX_CNT, us_duration);
 			rx_ev.duration = US_TO_NS(us_duration);
-			rx_ev.pulse = 1;
+			rx_ev.pulse = ir_rtk->ir_param.ir_rx_inverse? 0 : 1;
 			ir_raw_event_store(ir_rtk->rcdev, &rx_ev);
 		} else {
 			us_duration =  1000 * ir_rtk->ir_manage.wbuf[i] / (ir_rtk->ir_param.ir_freq / 1000);
-			dev_dbg(ir_rtk->dev, "%d>>>>>>> %d", ir_rtk->ir_manage.wbuf[i], us_duration);
 			rx_ev.duration = US_TO_NS(us_duration);
-			rx_ev.pulse = 0;
+			rx_ev.pulse = ir_rtk->ir_param.ir_rx_inverse? 1 : 0;
 			ir_raw_event_store(ir_rtk->rcdev, &rx_ev);
 		}
 	}
@@ -500,26 +469,48 @@ int ir_rx_recv(void *input_param)
 
 	while (len) {
 		if ((ir_rtk->ir_manage.wbuf_index + len) >= (MAX_BUF_LEN - 1)) {
-			pr_info("Software buffer is full, drop newest data and refresh rx hardware.");
+			dev_info(ir_rtk->dev, "Software buffer is full, drop newest data and refresh RX hardware\n");
 			rtk_ir_enable_cmd(ir_rtk, IR_MODE_RX, DISABLE);
 			ir_recv_end(ir_rtk);
 			rtk_ir_enable_cmd(ir_rtk, IR_MODE_RX, ENABLE);
 			return 0;
 		}
+		/*****************************************************************************************/
+		/*** Attention: demodulator may recv inverse wave, see debug info in ir-nec-decoder.c ****/
+		/*** Configure "rtk,ir_rx_inverse = <1>; rtk,ir-cnt-thred-type = <1>;" in dts ************/
+		/*****************************************************************************************/
+		/*****************************************************************************************/
+		/* Attention: configurations of wire-to-wire are as follow. See instructions for ir-led. */
+		/*** Set "rtk,ir-cnt-thred-type = <0>; rtk,rtk,ir-rx-trigger-mode = <1>;" in dts *********/
+		/*****************************************************************************************/
 		for (i = 0; i < len; i++) {
 			reg_data = rtk_ir_receive_data(ir_rtk);
 			data = reg_data & IR_MASK_RX_CNT;
-
 			if (data > RTK_IR_MAX_CARRIER) {
 				if (ir_rtk->ir_manage.pulse_duration) {
+					dev_dbg(ir_rtk->dev, "IR LED: pulse = %d, space = %d.\n",
+						1000 * ir_rtk->ir_manage.pulse_duration / (ir_rtk->ir_param.ir_freq / 1000),
+						1000 * data / (ir_rtk->ir_param.ir_freq / 1000));
+					/* ir led pulse total. */
 					ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = IR_BIT_RX_LEVEL | ir_rtk->ir_manage.pulse_duration;
 					ir_rtk->ir_manage.wbuf_index++;
-					ir_rtk->ir_manage.pulse_duration = 0;
+					/* ir led space duration. */
+					ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = data;
+					ir_rtk->ir_manage.wbuf_index++;
+				} else if (reg_data & IR_BIT_RX_LEVEL) {
+					dev_dbg(ir_rtk->dev, "IR demodulator: pulse = %d\n", 1000 * data / (ir_rtk->ir_param.ir_freq / 1000));
+					/* ir demodulator pulse. */
+					ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = IR_BIT_RX_LEVEL | data;
+					ir_rtk->ir_manage.wbuf_index++;
+				} else {
+					/* first space, or ir demodulator space. */
+					dev_dbg(ir_rtk->dev, "IR demodulator: space = %d\n", 1000 * data / (ir_rtk->ir_param.ir_freq / 1000));
+					ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = data;
+					ir_rtk->ir_manage.wbuf_index++;
 				}
-
-				ir_rtk->ir_manage.wbuf[ir_rtk->ir_manage.wbuf_index] = data;
-				ir_rtk->ir_manage.wbuf_index++;
+				ir_rtk->ir_manage.pulse_duration = 0;
 			} else {
+				/* ir led small pulse. */
 				ir_rtk->ir_manage.pulse_duration += data;
 			}
 		}
@@ -547,8 +538,7 @@ void ir_tx_start(struct rtk_ir_dev *ir_rtk)
 	rtk_ir_send_buf(ir_rtk, ir_rtk->ir_manage.wbuf, IR_TX_FIFO_SIZE, 0);
 	tx_count += IR_TX_FIFO_SIZE;
 
-	dev_dbg(ir_rtk->dev, "tx_count = %d", tx_count);
-	dev_dbg(ir_rtk->dev, "left = %d", ir_rtk->ir_manage.wbuf_len - tx_count);
+	dev_dbg(ir_rtk->dev, "Start TX, count = %d, left = %d\n", tx_count, ir_rtk->ir_manage.wbuf_len - tx_count);
 
 	while (ir_rtk->ir_manage.wbuf_len - tx_count > 0) {
 		while (rtk_ir_get_tx_fifo_free_len(ir_rtk) < RTK_IR_TX_THRESHOLD) {
@@ -585,12 +575,12 @@ static irqreturn_t rtk_ir_isr_event(int irq, void *data)
 		rtk_ir_interrupt_config(ir_rtk, IR_RX_INT_ALL_MASK, ENABLE);
 
 		if (int_status & IR_BIT_RX_FIFO_FULL_INT_STATUS) {
-			dev_dbg(ir_rtk->dev, "Rx fifo full !!!");
+			dev_dbg(ir_rtk->dev, "RX fifo full\n");
 			rtk_ir_clear_int_pending_bit(ir_rtk, IR_BIT_RX_FIFO_FULL_INT_CLR);
 		}
 
 		if (int_status & IR_BIT_RX_FIFO_LEVEL_INT_STATUS) {
-			dev_dbg(ir_rtk->dev, "Start rx interrupt. ");
+			dev_dbg(ir_rtk->dev, "Start RX interrupt\n");
 			ir_rx_recv(ir_rtk);
 			rtk_ir_clear_int_pending_bit(ir_rtk, IR_BIT_RX_FIFO_LEVEL_INT_CLR);
 		}
@@ -600,12 +590,12 @@ static irqreturn_t rtk_ir_isr_event(int irq, void *data)
 		}
 
 		if (int_status & IR_BIT_RX_FIFO_OF_INT_STATUS) {
-			dev_dbg(ir_rtk->dev, "Rx fifo overflow !!!");
+			dev_dbg(ir_rtk->dev, "RX fifo overflow\n");
 			rtk_ir_clear_int_pending_bit(ir_rtk, IR_BIT_RX_FIFO_OF_INT_CLR);
 		}
 
 		if (int_status & IR_BIT_RX_CNT_THR_INT_STATUS) {
-			dev_dbg(ir_rtk->dev, "Rx count threshold interrupt. rx end. ");
+			dev_dbg(ir_rtk->dev, "RX count threshold interrupt. RX end\n");
 			ir_rx_recv(ir_rtk);
 			ir_recv_end(ir_rtk);
 			rtk_ir_clear_int_pending_bit(ir_rtk, IR_BIT_RX_CNT_THR_INT_CLR);
@@ -663,9 +653,9 @@ static int ir_rtk_tx(struct rc_dev *dev, unsigned int *buffer,
 		return -EINVAL;
 	}
 
-	dev_dbg(ir_rtk->dev, "origin get count = %d", count);
+	dev_dbg(ir_rtk->dev, "Get TX count = %d\n", count);
 	for (i = 0; i < count; i++) {
-		dev_dbg(ir_rtk->dev, "[%p]: %d", buffer, *(buffer + i));
+		dev_dbg(ir_rtk->dev, "Dump TX buf[%d] = 0x%08X\n", i, *(buffer + i));
 	}
 
 	ir_rtk->ir_manage.ir_status = RTK_IR_TX_ONGOING;
@@ -695,16 +685,14 @@ static int ir_rtk_open(struct rc_dev *dev)
 		return -EBUSY;
 	}
 
-	/* When ir device is open, ready to rx. */
+	/* When IR device is open, ready to RX. */
 	if (ir_rtk->ir_param.ir_rx_enable_mode) {
 		ir_rtk->ir_manage.wbuf_index = 0;
 		ir_rtk->ir_manage.pulse_duration = 0;
 		ir_rx_prepare(ir_rtk);
 	}
 
-#if RTK_IR_REG_DUMP
 	rtk_ir_reg_dump(ir_rtk);
-#endif // RTK_IR_REG_DUMP
 
 	return 0;
 }
@@ -731,7 +719,6 @@ static int ir_rtk_set_duty_cycle(
 {
 	struct rtk_ir_dev *ir_rtk = dev->priv;
 
-	dev_dbg(ir_rtk->dev, "duty to set = %d(dec)", duty);
 	ir_rtk->ir_manage.duty_cycle = duty;
 
 	return 0;
@@ -741,7 +728,6 @@ static int ir_rtk_tx_carrier_send(
 	struct rc_dev *dev, u32 carrier)
 {
 	struct rtk_ir_dev *ir_rtk = dev->priv;
-	dev_dbg(ir_rtk->dev, "carrier = %d(dec)", carrier);
 
 	if (carrier > 500000 || carrier < 20000) {
 		return -EINVAL;
@@ -788,7 +774,7 @@ static int ir_rtk_resume(struct platform_device *dev)
 
 static const struct of_device_id rtk_ir_match[] = {
 	{
-		.compatible = "realtek,amebad2-rtk-ir",
+		.compatible = "realtek,amebad2-ir",
 	},
 	{},
 };
@@ -823,7 +809,7 @@ static int ir_rtk_probe(struct platform_device *pdev)
 	/* Enable IR Clock. */
 	ir_rtk->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(ir_rtk->clk)) {
-		dev_err(&pdev->dev, "unable to get RTK_CKE_IR clock\n");
+		dev_err(&pdev->dev, "Failed to get clock\n");
 		return PTR_ERR(ir_rtk->clk);
 	}
 	clk_prepare_enable(ir_rtk->clk);
@@ -837,13 +823,13 @@ static int ir_rtk_probe(struct platform_device *pdev)
 	rtk_ir_struct_init(ir_rtk, np);
 
 	if (ir_rtk->ir_param.ir_rx_enable_mode) {
-		dev_dbg(ir_rtk->dev, "register ir raw.");
+		dev_dbg(ir_rtk->dev, "Register IR raw\n");
 		rcdev = devm_rc_allocate_device(&pdev->dev, RC_DRIVER_IR_RAW);
 	} else if (!ir_rtk->ir_param.ir_rx_enable_mode && !ir_rtk->ir_param.ir_tx_encode_enable) {
-		dev_dbg(ir_rtk->dev, "register ir raw tx.");
+		dev_dbg(ir_rtk->dev, "Register IR raw TX\n");
 		rcdev = devm_rc_allocate_device(&pdev->dev, RC_DRIVER_IR_RAW_TX);
 	} else {
-		dev_dbg(ir_rtk->dev, "register ir scancode.");
+		dev_dbg(ir_rtk->dev, "Register IR scancode\n");
 		rcdev = devm_rc_allocate_device(&pdev->dev, RC_DRIVER_SCANCODE);
 	}
 
@@ -870,7 +856,7 @@ static int ir_rtk_probe(struct platform_device *pdev)
 
 	ret = ir_raw_event_prepare(rcdev);
 	if (ret < 0) {
-		pr_err("prepare raw event fail.");
+		dev_err(ir_rtk->dev, "Failed to prepare raw event\n");
 	}
 
 	rcdev->raw->dev->enabled_protocols = RC_PROTO_BIT_NEC | RC_PROTO_BIT_NECX | RC_PROTO_BIT_NEC32;
@@ -904,6 +890,6 @@ static struct platform_driver rtk_ir_platform_driver = {
 };
 module_platform_driver(rtk_ir_platform_driver);
 
-MODULE_DESCRIPTION("Realtek IR controller for Amebad2");
+MODULE_DESCRIPTION("Realtek Ameba IR driver");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Realtek Corporation");
-MODULE_LICENSE("GPL");

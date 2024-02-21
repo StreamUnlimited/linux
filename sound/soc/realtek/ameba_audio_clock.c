@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek ALSA support
+*
+* Copyright (C) 2021, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/device.h>

@@ -1,12 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek AmebaD2 soc usb phy header.
- *
- * Copyright (C) 2021 Realtek Microelectronics
- *
- * This file is licensed under the terms of the GNU General Public
- * License version 2.  This program is licensed "as is" without any
- * warranty of any kind, whether express or implied.
- */
+* Realtek USB PHY support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #ifndef __PHY_RTK_VIEWPORT_H
 #define __PHY_RTK_VIEWPORT_H
@@ -50,17 +47,17 @@
 #define HSYS_BIT_OTG_ANA_EN              				BIT(16) /* Default 0, 1: enable USBPHY lv2hv, hv2lv check for OTG */
 
 /* USB PHY vendor control register */
-#define USB_OTG_GPVNDCTL							0x0034
+#define USB_OTG_GPVNDCTL								0x0034
 
-#define USB_OTG_GPVNDCTL_REGDATA_Pos             (0U)
-#define USB_OTG_GPVNDCTL_REGDATA_Msk             (0xFFUL << USB_OTG_GPVNDCTL_REGDATA_Pos) /*!< 0x000000FF */
-#define USB_OTG_GPVNDCTL_REGDATA                 USB_OTG_GPVNDCTL_REGDATA_Msk /*!< Register Data */
-#define USB_OTG_GPVNDCTL_VCTRL_Pos               (8U)
-#define USB_OTG_GPVNDCTL_VCTRL_Msk               (0xFFUL << USB_OTG_GPVNDCTL_VCTRL_Pos) /*!< 0x0000FF00 */
-#define USB_OTG_GPVNDCTL_VCTRL                   USB_OTG_GPVNDCTL_VCTRL_Msk /*!< UTMI+ Vendor Control Register Address */
-#define USB_OTG_GPVNDCTL_VSTSDONE_Pos            (27U)
-#define USB_OTG_GPVNDCTL_VSTSDONE_Msk            (0x1UL << USB_OTG_GPVNDCTL_VSTSDONE_Pos) /*!< 0x02000000 */
-#define USB_OTG_GPVNDCTL_VSTSDONE                USB_OTG_GPVNDCTL_VSTSDONE_Msk /*!< VStatus Done */
+#define USB_OTG_GPVNDCTL_REGDATA_Pos					(0U)
+#define USB_OTG_GPVNDCTL_REGDATA_Msk					(0xFFUL << USB_OTG_GPVNDCTL_REGDATA_Pos) /*!< 0x000000FF */
+#define USB_OTG_GPVNDCTL_REGDATA						USB_OTG_GPVNDCTL_REGDATA_Msk /*!< Register Data */
+#define USB_OTG_GPVNDCTL_VCTRL_Pos						(8U)
+#define USB_OTG_GPVNDCTL_VCTRL_Msk						(0xFFUL << USB_OTG_GPVNDCTL_VCTRL_Pos) /*!< 0x0000FF00 */
+#define USB_OTG_GPVNDCTL_VCTRL							USB_OTG_GPVNDCTL_VCTRL_Msk /*!< UTMI+ Vendor Control Register Address */
+#define USB_OTG_GPVNDCTL_VSTSDONE_Pos					(27U)
+#define USB_OTG_GPVNDCTL_VSTSDONE_Msk					(0x1UL << USB_OTG_GPVNDCTL_VSTSDONE_Pos) /*!< 0x02000000 */
+#define USB_OTG_GPVNDCTL_VSTSDONE						USB_OTG_GPVNDCTL_VSTSDONE_Msk /*!< VStatus Done */
 
 /* USB PHY registers */
 #define USB_OTG_PHY_REG_E0								0xE0U

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek Timer support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/kernel.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
@@ -107,7 +114,7 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 	tim = &gtimer[index];
 	base = tim->base;
 
-	/*calculate arr & psc*/
+	/* Calculate arr & psc*/
 	div = (u64)tim->clk_rate * period_ns;
 	do_div(div, NSEC_PER_SEC);
 
@@ -118,11 +125,11 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 		/* Period and prescaler values depends on clock rate */
 		div = (unsigned long long)tim->clk_rate * period_ns;
 
-		/*start to compute arr and prescaler*/
+		/* Start to compute arr and prescaler*/
 		do_div(div, NSEC_PER_SEC);
 		prd = div;
 
-		/*max count is UINT32_MAX because REG_TIM_CNT is 32bit*/
+		/* Max count is UINT32_MAX because REG_TIM_CNT is 32bit*/
 		while (div > U16_MAX) {
 			psc++;
 			div = prd;
@@ -132,7 +139,7 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 		prd = div;
 		arr = prd - 1;
 
-		/*prescaler is 16bit*/
+		/* Prescaler is 16bit*/
 		if (psc > U16_MAX || prd > U16_MAX) {
 			return -EINVAL;
 		}
@@ -143,7 +150,7 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 	reg &= ~TIM_BIT_ARPE;
 	writel_relaxed(reg, base + REG_TIM_CR);
 
-	/*set ARR*/
+	/* Set ARR*/
 	writel_relaxed(arr, base + REG_TIM_ARR);
 
 	if (psc != 0) {
@@ -153,7 +160,7 @@ int rtk_gtimer_change_period(u32 index, u64 period_ns)
 	/* Generate an update event */
 	writel_relaxed(TIM_PSCReloadMode_Immediate, base + REG_TIM_EGR);
 
-	/* poll EGR UG done */
+	/* Poll EGR UG done */
 	while (1) {
 		if (readl_relaxed(base + REG_TIM_SR) & TIM_BIT_UG_DONE) {
 			break;
@@ -195,7 +202,7 @@ int rtk_gtimer_start(u32 index, u32 NewState)
 			writel_relaxed(TIM_BIT_CNT_START, base + REG_TIM_EN);
 		}
 
-		/* poll if cnt is running, 3*32k cycles */
+		/* Poll if cnt is running, 3*32k cycles */
 		while (1) {
 			if (readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) {
 				break;
@@ -203,12 +210,12 @@ int rtk_gtimer_start(u32 index, u32 NewState)
 		}
 	} else {
 		/* Disable the TIM Counter, dont do this if timer is not RUN */
-		/* this action need sync to 32k domain for 100us */
+		/* This action need sync to 32k domain for 100us */
 		if (readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) {
 			writel_relaxed(TIM_BIT_CNT_STOP, base + REG_TIM_EN);
 		}
 
-		/* poll if cnt is running, aout 100us */
+		/* Poll if cnt is running, aout 100us */
 		while (1) {
 			if ((readl_relaxed(base + REG_TIM_EN) & TIM_BIT_CEN) == 0) {
 				break;
@@ -247,7 +254,7 @@ int rtk_gtimer_int_clear(u32 index)
 	reg = readl_relaxed(base + REG_TIM_SR);
 	writel_relaxed(reg, base + REG_TIM_SR);
 
-	/* make sure write ok, because bus delay */
+	/* Make sure write ok, because bus delay */
 	while (1) {
 		CounterIndex++;
 		if (CounterIndex >= 300) {
@@ -360,7 +367,7 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void *cbhandler, void *cbdata)
 	spin_unlock(&lock);
 	base = tim->base;
 
-	/*calculate arr & psc*/
+	/* Calculate arr & psc*/
 	div = (u64)tim->clk_rate * period_ns;
 	do_div(div, NSEC_PER_SEC);
 
@@ -371,11 +378,11 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void *cbhandler, void *cbdata)
 		/* Period and prescaler values depends on clock rate */
 		div = (u64)tim->clk_rate * period_ns;
 
-		/*start to compute arr and prescaler*/
+		/* Start to compute arr and prescaler*/
 		do_div(div, NSEC_PER_SEC);
 		prd = div;
 
-		/*max count is UINT32_MAX because REG_TIM_CNT is 32bit*/
+		/* Max count is UINT32_MAX because REG_TIM_CNT is 32bit*/
 		while (div > U16_MAX) {
 			psc++;
 			div = prd;
@@ -385,37 +392,37 @@ int rtk_gtimer_init(u32 index, u64 period_ns, void *cbhandler, void *cbdata)
 		prd = div;
 		arr = prd - 1;
 
-		/*prescaler is 16bit*/
+		/* Prescaler is 16bit*/
 		if (psc > U16_MAX || prd > U16_MAX) {
 			return -EINVAL;
 		}
 	}
 
-	/*disble timer*/
+	/* Disble timer*/
 	rtk_gtimer_start(index, TIMER_DISABLE);
 
-	/*disable interrupt*/
+	/* Disable interrupt*/
 	writel_relaxed(0, base + REG_TIM_DIER);
 
-	/*clear all pending bits*/
+	/* Clear all pending bits*/
 	reg = readl_relaxed(base + REG_TIM_SR);
 	writel_relaxed(reg, base + REG_TIM_SR);
 	reg = readl_relaxed(base + REG_TIM_SR);
 
-	/*set ARR*/
+	/* Set ARR*/
 	writel_relaxed(arr, base + REG_TIM_ARR);
 
 	if (psc != 0) {
 		writel_relaxed(psc, base + REG_TIM_PSC);
 	}
 
-	/*set CR*/
+	/* Set CR*/
 	reg = readl_relaxed(base + REG_TIM_CR);
 	reg |= TIM_BIT_ARPE | TIM_BIT_URS;
 	reg &= ~TIM_BIT_UDIS;
 	writel_relaxed(reg, base + REG_TIM_CR);
 
-	/*Generate an update event*/
+	/* Generate an update event*/
 	writel_relaxed(TIM_PSCReloadMode_Immediate, base + REG_TIM_EGR);
 
 	while (1) {
@@ -455,38 +462,38 @@ int rtk_gtimer_dynamic_init(u64 period_ns, void *cbhandler, void *cbdata)
 	tim = &gtimer[index];
 	base = tim->base;
 
-	/*calculate arr & psc*/
+	/* Calculate arr & psc*/
 	div = (u64)tim->clk_rate * period_ns;
 	do_div(div, NSEC_PER_SEC);
 
 	arr = (u32)div;
 	psc = 0;
 
-	/*disble timer*/
+	/* Disble timer*/
 	rtk_gtimer_start(index, TIMER_DISABLE);
 
-	/*disable interrupt*/
+	/* Disable interrupt*/
 	writel_relaxed(0, base + REG_TIM_DIER);
 
-	/*clear all pending bits*/
+	/* Clear all pending bits*/
 	reg = readl_relaxed(base + REG_TIM_SR);
 	writel_relaxed(reg, base + REG_TIM_SR);
 	reg = readl_relaxed(base + REG_TIM_SR);
 
-	/*set ARR*/
+	/* Set ARR*/
 	writel_relaxed(arr, base + REG_TIM_ARR);
 
 	if (psc != 0) {
 		writel_relaxed(psc, base + REG_TIM_PSC);
 	}
 
-	/*set CR*/
+	/* Set CR*/
 	reg = readl_relaxed(base + REG_TIM_CR);
 	reg |= TIM_BIT_ARPE | TIM_BIT_URS;
 	reg &= ~TIM_BIT_UDIS;
 	writel_relaxed(reg, base + REG_TIM_CR);
 
-	/*Generate an update event*/
+	/* Generate an update event*/
 	writel_relaxed(TIM_PSCReloadMode_Immediate, base + REG_TIM_EGR);
 
 	while (1) {
@@ -515,7 +522,7 @@ static int rtk_gtimer_probe(struct platform_device *pdev)
 	if (pdev->dev.of_node) {
 		pdev->id = of_alias_get_id(pdev->dev.of_node, "tim");
 	} else {
-		dev_err(&pdev->dev, "of_node is NULL\n");
+		dev_err(&pdev->dev, "Invalid node\n");
 		return -ENODEV;
 	}
 
@@ -536,25 +543,25 @@ static int rtk_gtimer_probe(struct platform_device *pdev)
 	tim->tim_clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(tim->tim_clk)) {
 		ret =  PTR_ERR(tim->tim_clk);
-		dev_err(&pdev->dev, "Fail to get rcc clk: %d\n", ret);
+		dev_err(&pdev->dev, "Failed to get clock: %d\n", ret);
 		return ret;
 	}
 
 	ret = clk_prepare_enable(tim->tim_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Fail to enable clock %d\n", ret);
+		dev_err(&pdev->dev, "Failed to enable clock: %d\n", ret);
 		return ret;
 	}
 
 	tim->irq = platform_get_irq(pdev, 0);
 	if (tim->irq < 0) {
-		dev_err(&pdev->dev, "Fail to get irq\n");
+		dev_err(&pdev->dev, "Failed to get IRQ\n");
 		return tim->irq;
 	}
 
 	ret = request_irq(tim->irq, (irq_handler_t) rtk_gtimer_irq, 0, pdev->name, tim);
 	if (ret) {
-		dev_err(&pdev->dev, "Fail to request irq\n");
+		dev_err(&pdev->dev, "Failed to request IRQ\n");
 		return ret;
 	}
 
@@ -574,10 +581,11 @@ static int rtk_gtimer_probe(struct platform_device *pdev)
 	if (pdev->id == 8) {
 		ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 		if (ret < 0) {
-			dev_err(&pdev->dev, "failed to populate DT children\n");
+			dev_err(&pdev->dev, "Failed to populate DT children\n");
 			return ret;
 		}
 	}
+	dev_info(&pdev->dev, "Timer %d init done, clock rate is %d\n",pdev->id, tim->clk_rate);
 
 	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source")) {
 		device_init_wakeup(&pdev->dev, true);
@@ -605,7 +613,7 @@ static ssize_t mode_store(struct device *dev,
 	struct rtk_tim *tim = dev->driver_data;
 
 	if (tim->valid != 1) {
-		pr_err("This timer is not valid!\n");
+		dev_err(dev, "This timer is not valid\n");
 		return -1;
 	}
 
@@ -628,7 +636,7 @@ static ssize_t mode_show(struct device *dev,
 	const char *polarity = "unknown";
 
 	if (tim->valid != 1) {
-		pr_err("This timer is not valid!\n");
+		dev_err(dev,"This timer is not valid\n");
 		return -1;
 	}
 
@@ -654,7 +662,7 @@ static ssize_t enable_store(struct device *dev,
 	u32 val;
 
 	if (tim->valid != 1) {
-		pr_err("This timer is not valid!\n");
+		dev_err(dev, "This timer is not valid\n");
 		return -1;
 	}
 
@@ -686,7 +694,7 @@ static ssize_t enable_show(struct device *dev,
 	struct rtk_tim *tim = dev->driver_data;
 
 	if (tim->valid != 1) {
-		pr_err("This timer is not valid!\n");
+		dev_err(dev, "This timer is not valid\n");
 		return -1;
 	}
 
@@ -703,7 +711,7 @@ static ssize_t time_ms_store(struct device *dev,
 	int ret;
 
 	if (tim->valid != 1) {
-		pr_err("This timer is not valid!\n");
+		dev_err(dev, "This timer is not valid\n");
 		return -1;
 	}
 
@@ -728,7 +736,7 @@ static ssize_t time_ms_show(struct device *dev,
 	struct rtk_tim *tim = dev->driver_data;
 
 	if (tim->valid != 1) {
-		pr_err("This timer is not valid!\n");
+		dev_err(dev, "This timer is not valid\n");
 		return -1;
 	}
 
@@ -759,7 +767,7 @@ static const struct of_device_id rtk_timer_of_match[] = {
 static struct platform_driver rtk_timer_driver = {
 	.probe	= rtk_gtimer_probe,
 	.driver	= {
-		.name = "rtk-mfd-timer",
+		.name = "realtek-amebad2-timer",
 		.of_match_table = rtk_timer_of_match,
 		.dev_groups = timer_config_groups,
 	},
@@ -768,8 +776,6 @@ static struct platform_driver rtk_timer_driver = {
 
 builtin_platform_driver(rtk_timer_driver);
 
-MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
-MODULE_DESCRIPTION("realtek timer driver");
+MODULE_DESCRIPTION("Realtek Ameba Timer driver");
 MODULE_LICENSE("GPL v2");
-
-
+MODULE_AUTHOR("Realtek Corporation");

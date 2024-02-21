@@ -3,4 +3,4 @@ config USB_RTK_AMEBA_USB20PHY
 	depends on HW_HAS_USB
 	select USB_PHY
         help
-          Enable this to support Realtek USB20PHY for Ameba SoCs.
+          Support Realtek USB20PHY for Ameba SoCs

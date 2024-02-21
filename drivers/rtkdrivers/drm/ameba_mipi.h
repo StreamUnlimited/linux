@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek MIPI support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _AMEBAD2_MIPI_H_
 #define _AMEBAD2_MIPI_H_
 
@@ -1488,7 +1495,7 @@ _LONG_CALL_ void MIPI_DSI_CMD_Send(void __iomem *MIPIx, u8 DataId, u8 Byte0, u8 
 _LONG_CALL_ u32 MIPI_DSI_CMD_Rxcv_CMD(void __iomem *MIPIx, u8 rcmd_idx);
 _LONG_CALL_ void MIPI_DSI_CMD_LongPkt_MemQWordRW(void __iomem *MIPIx, u32 Addr, u32 *Word0, u32 *Word1, u8 IsRead);
 
-_LONG_CALL_ void MIPI_DSI_Mode_Switch(void __iomem *MIPIx, u32 MIPI_VideoNCmdMode);
+_LONG_CALL_ void MIPI_DSI_Mode_Switch(void __iomem *MIPIx, u32 video);
 _LONG_CALL_ void MIPI_StructInit(MIPI_InitTypeDef *MIPI_InitStruct);
 _LONG_CALL_ void MIPI_DSI_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct);
 _LONG_CALL_ void MIPI_DPHY_init(struct device *dev, void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct);

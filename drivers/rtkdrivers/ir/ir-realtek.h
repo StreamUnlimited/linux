@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek IR support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -331,7 +338,11 @@
 /** @defgroup IR_RX_INT
   * @{
   */
-#define IR_RX_INT_ALL_EN			((u32)0x0000003F)
+#define IR_RX_INT_ALL_EN			((u32)(IR_BIT_RX_FIFO_ERROR_INT_EN | \
+					IR_BIT_RX_CNT_THR_INT_EN | \
+						IR_BIT_RX_FIFO_OF_INT_EN | \
+						IR_BIT_RX_FIFO_LEVEL_INT_EN | \
+					IR_BIT_RX_FIFO_FULL_INT_EN))
 #define IR_RX_INT_ALL_CLR			((u32)0x0000003F)
 #define IR_RX_INT_ALL_MASK			((u32)0x000FC000)
 #define IS_RX_INT_MASK(MASK)			(((MASK) & (~IR_RX_INT_ALL_MASK)) == 0)
@@ -416,6 +427,7 @@ struct rtk_ir_hw_params {
 	u32				ir_rx_filter_time;
 	u32				ir_rx_cnt_thr_type;
 	u32				ir_rx_cnt_thr;
+	u32				ir_rx_inverse;
 };
 
 struct ir_management_adapter {

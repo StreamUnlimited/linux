@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef _RTW_TOP_HEADER_
 #define _RTW_TOP_HEADER_
 
@@ -67,25 +77,31 @@
 #include <linux/ieee80211.h>
 #include <net/cfg80211.h>
 
-/* ipc driver. */
-#include <ameba_ipc/ameba_ipc.h>
-
 /* fullmac headers. */
 #include "rom_rtw_defs.h"
 #include "rtw_wifi_defs.h"
 #include "rtw_wiphy.h"
 #include "wifi_intf_drv_to_app_basic.h"
+#include "rtw_llhw_trx.h"
+
+#ifdef CONFIG_FULLMAC_HCI_IPC
+/* ipc driver. */
+#include <ameba_ipc/ameba_ipc.h>
 #include "inic_ipc.h"
+#else
+#include <linux/mmc/sdio_func.h>
+#include "inic_sdio.h"
+#include "rtw_sdio.h"
+#endif
 
 #include "rtw_llhw_event.h"
 #include "rtw_drv_probe.h"
 #include "rtw_regd.h"
 #include "rtw_netdev_ops.h"
 #include "rtw_ethtool_ops.h"
-#include "rtw_llhw_hci_ipc.h"
+#include "rtw_llhw_hci.h"
 #include "rtw_llhw_ops.h"
-#include "rtw_llhw_trx.h"
-#include "rtw_llhw_hci_ipc_msg.h"
+#include "rtw_llhw_msg.h"
 #include "rtw_functions.h"
 #include "rtw_cfgvendor.h"
 #include "rtw_proc.h"
@@ -112,13 +128,19 @@ struct rtw_ieee80211_hdr_3addr {
 	u16				seq_ctl;
 } __attribute__((packed));
 
+struct wps_str {
+	u8 wps_probe_ie[258];
+	u16 wps_probe_ielen;
+	u8 wps_phase;
+};
+
 #define set_frame_sub_type(pbuf, type) \
 	do {    \
 		*(unsigned short *)(pbuf) &= cpu_to_le16(~(BIT(7) | BIT(6) | BIT(5) | BIT(4) | BIT(3) | BIT(2))); \
 		*(unsigned short *)(pbuf) |= cpu_to_le16(type); \
 	} while (0)
 
-#define get_addr2_ptr(pbuf)    ((unsigned char *)((unsigned int)(pbuf) + 10))
+#define get_addr2_ptr(pbuf)    ((unsigned char *)((unsigned char *)(pbuf) + 10))
 
 #define RTW_GET_LE16(a) ((u16) (((a)[1] << 8) | (a)[0]))
 #define RSN_HEADER_LEN 4

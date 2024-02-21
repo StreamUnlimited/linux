@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek ALSA support
+*
+* Copyright (C) 2021, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/cdev.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
@@ -922,7 +929,6 @@ static struct platform_driver amebad2_audio_clock_driver = {
 module_platform_driver(amebad2_audio_clock_driver);
 
 /* Module information */
-MODULE_DESCRIPTION("ALSA SoC Amebad2 audio");
-MODULE_AUTHOR("Anne Yu <anne.yu@realsil.com.cn>");
-MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:Amebad2 audio");
+MODULE_DESCRIPTION("Realtek Ameba ALSA driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

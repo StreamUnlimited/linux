@@ -1,3 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include "rtw_cfg80211_fullmac.h"
 
 #define RTW_PROC_NAME "rtl8730e"
@@ -26,7 +36,12 @@ inline struct proc_dir_entry *rtw_proc_create_dir(const char *name, struct proc_
 }
 
 inline struct proc_dir_entry *rtw_proc_create_entry(const char *name, struct proc_dir_entry *parent,
-		const struct file_operations *fops, void *data)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+		const struct proc_ops *fops,
+#else
+		const struct file_operations *fops,
+#endif
+		void *data)
 {
 	struct proc_dir_entry *entry;
 
@@ -69,7 +84,11 @@ const int ndev_ap_proc_hdls_num = sizeof(ndev_ap_proc_hdls) / sizeof(struct rtw_
 
 static int rtw_ndev_ap_proc_open(struct inode *inode, struct file *file)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+	ssize_t index = (ssize_t)pde_data(inode);
+#else
 	ssize_t index = (ssize_t)PDE_DATA(inode);
+#endif
 	const struct rtw_proc_hdl *hdl = ndev_ap_proc_hdls + index;
 	void *private = NULL;
 
@@ -96,7 +115,11 @@ static int rtw_ndev_ap_proc_open(struct inode *inode, struct file *file)
 
 static ssize_t rtw_ndev_ap_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+	ssize_t index = (ssize_t)pde_data(file_inode(file));
+#else
 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
+#endif
 	const struct rtw_proc_hdl *hdl = ndev_ap_proc_hdls + index;
 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
 
@@ -107,6 +130,23 @@ static ssize_t rtw_ndev_ap_proc_write(struct file *file, const char __user *buff
 	return -EROFS;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+static const struct proc_ops rtw_ap_proc_seq_fops = {
+	.proc_open = rtw_ndev_ap_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release,
+	.proc_write = rtw_ndev_ap_proc_write,
+};
+
+static const struct proc_ops rtw_ap_proc_sseq_fops = {
+	.proc_open = rtw_ndev_ap_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release,
+	.proc_write = rtw_ndev_ap_proc_write,
+};
+#else
 static const struct file_operations rtw_ap_proc_seq_fops = {
 	.owner = THIS_MODULE,
 	.open = rtw_ndev_ap_proc_open,
@@ -124,6 +164,7 @@ static const struct file_operations rtw_ap_proc_sseq_fops = {
 	.release = single_release,
 	.write = rtw_ndev_ap_proc_write,
 };
+#endif
 
 static struct proc_dir_entry *rtw_ndev_ap_proc_init(void)
 {
@@ -193,7 +234,11 @@ const int ndev_sta_proc_hdls_num = sizeof(ndev_sta_proc_hdls) / sizeof(struct rt
 
 static int rtw_ndev_sta_proc_open(struct inode *inode, struct file *file)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+	ssize_t index = (ssize_t)pde_data(inode);
+#else
 	ssize_t index = (ssize_t)PDE_DATA(inode);
+#endif
 	const struct rtw_proc_hdl *hdl = ndev_sta_proc_hdls + index;
 	void *private = NULL;
 
@@ -220,7 +265,11 @@ static int rtw_ndev_sta_proc_open(struct inode *inode, struct file *file)
 
 static ssize_t rtw_ndev_sta_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+	ssize_t index = (ssize_t)pde_data(file_inode(file));
+#else
 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
+#endif
 	const struct rtw_proc_hdl *hdl = ndev_sta_proc_hdls + index;
 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
 
@@ -231,6 +280,23 @@ static ssize_t rtw_ndev_sta_proc_write(struct file *file, const char __user *buf
 	return -EROFS;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+static const struct proc_ops rtw_sta_proc_seq_fops = {
+	.proc_open = rtw_ndev_sta_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release,
+	.proc_write = rtw_ndev_sta_proc_write,
+};
+
+static const struct proc_ops rtw_sta_proc_sseq_fops = {
+	.proc_open = rtw_ndev_sta_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release,
+	.proc_write = rtw_ndev_sta_proc_write,
+};
+#else
 static const struct file_operations rtw_sta_proc_seq_fops = {
 	.owner = THIS_MODULE,
 	.open = rtw_ndev_sta_proc_open,
@@ -248,6 +314,7 @@ static const struct file_operations rtw_sta_proc_sseq_fops = {
 	.release = single_release,
 	.write = rtw_ndev_sta_proc_write,
 };
+#endif
 
 static struct proc_dir_entry *rtw_ndev_sta_proc_init(void)
 {
@@ -316,7 +383,11 @@ const int drv_proc_hdls_num = sizeof(drv_proc_hdls) / sizeof(struct rtw_proc_hdl
 
 static int rtw_drv_proc_open(struct inode *inode, struct file *file)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+	ssize_t index = (ssize_t)pde_data(inode);
+#else
 	ssize_t index = (ssize_t)PDE_DATA(inode);
+#endif
 	const struct rtw_proc_hdl *hdl = drv_proc_hdls + index;
 	void *private = NULL;
 
@@ -343,7 +414,11 @@ static int rtw_drv_proc_open(struct inode *inode, struct file *file)
 
 static ssize_t rtw_drv_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+	ssize_t index = (ssize_t)pde_data(file_inode(file));
+#else
 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
+#endif
 	const struct rtw_proc_hdl *hdl = drv_proc_hdls + index;
 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
 
@@ -354,6 +429,23 @@ static ssize_t rtw_drv_proc_write(struct file *file, const char __user *buffer, 
 	return -EROFS;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+static const struct proc_ops rtw_drv_proc_seq_fops = {
+	.proc_open = rtw_drv_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release,
+	.proc_write = rtw_drv_proc_write,
+};
+
+static const struct proc_ops rtw_drv_proc_sseq_fops = {
+	.proc_open = rtw_drv_proc_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release,
+	.proc_write = rtw_drv_proc_write,
+};
+#else
 static const struct file_operations rtw_drv_proc_seq_fops = {
 	.owner = THIS_MODULE,
 	.open = rtw_drv_proc_open,
@@ -371,6 +463,7 @@ static const struct file_operations rtw_drv_proc_sseq_fops = {
 	.release = single_release,
 	.write = rtw_drv_proc_write,
 };
+#endif
 
 /*
 * rtw_drv_proc

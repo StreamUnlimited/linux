@@ -1,10 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Realtek Semiconductor Corp.
- *
- * bsp/bspinit.h:
- *
- * Copyright (C) 2006-2012  Tony Wu (tonywu@realtek.com)
- */
+* Realtek INIT support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #ifndef __BSPINIT_H_
 #define __BSPINIT_H_
 

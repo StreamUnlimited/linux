@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (C) Maxime Coquelin 2015
- * Copyright (C) STMicroelectronics 2017
- * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
- *
- * Heavily based on Mediatek's pinctrl driver
- */
+* Realtek Pinctrl support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <linux/clk.h>
 #include <linux/hwspinlock.h>
 #include <linux/io.h>
@@ -129,7 +128,7 @@ static int realtek_pctrl_dt_node_to_map_func(struct realtek_pinctrl *pctl,
 	(*map)[*num_maps].data.mux.group = grp->name;
 
 	if (!realtek_pctrl_is_function_valid(pctl, pin, fnum)) {
-		dev_err(pctl->dev, "invalid function %d on pin %d .\n",
+		dev_err(pctl->dev, "Invalid function %d on pin %d\n",
 				fnum, pin);
 		return -EINVAL;
 	}
@@ -160,7 +159,7 @@ static int realtek_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 
 	pins = of_find_property(node, "pinmux", NULL);
 	if (!pins) {
-		dev_err(pctl->dev, "missing pins property in node %pOFn .\n",
+		dev_err(pctl->dev, "No pinmux property in DTS\n",
 				node);
 		return -EINVAL;
 	}
@@ -209,14 +208,14 @@ static int realtek_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		func = REALTEK_GET_PIN_FUNC(pinfunc);
 
 		if (!realtek_pctrl_is_function_valid(pctl, pin, func)) {
-			dev_err(pctl->dev, "invalid function %d for pin %d.\n", func, pin);
+			dev_err(pctl->dev, "Invalid function %d for pin %d\n", func, pin);
 			err = -EINVAL;
 			goto exit;
 		}
 
 		grp = realtek_pctrl_find_group_by_pin(pctl, pin);
 		if (!grp) {
-			dev_err(pctl->dev, "unable to match pin %d to group\n",
+			dev_err(pctl->dev, "Unable to match pin %d to group\n",
 					pin);
 			err = -EINVAL;
 			goto exit;
@@ -344,7 +343,7 @@ static int realtek_pmx_set_mux(struct pinctrl_dev *pctldev,
 
 	ret = realtek_pctrl_is_function_valid(pctl, g->pin, function);
 	if (!ret) {
-		dev_err(pctl->dev, "invalid function %d on group %d .\n",
+		dev_err(pctl->dev, "Invalid function %d on group %d\n",
 				function, group);
 		return -EINVAL;
 	}
@@ -352,14 +351,14 @@ static int realtek_pmx_set_mux(struct pinctrl_dev *pctldev,
 	/* Should change according to our own code*/
 	spin_lock_irqsave(&pctl->lock, flags);
 
-	/* get PADCTR */
+	/* Get PADCTR */
 	val = readl(pctl->membase + (g->pin * 0x4));
 
-	/* set needs function */
+	/* Set needs function */
 	val &= ~PAD_MASK_GPIOx_SEL;
 	val |= PAD_GPIOx_SEL(function);
 
-	/* set PADCTR register */
+	/* Set PADCTR register */
 	writel(val, pctl->membase + (g->pin * 0x4));
 
 	spin_unlock_irqrestore(&pctl->lock, flags);
@@ -431,10 +430,10 @@ static int realtek_pconf_set_bias(struct pinctrl_dev *pctldev,
 	/* Should change according to our own code*/
 	val = readl(pctl->membase + offset);
 
-	/* clear Pin_Num Pull contrl */
+	/* Clear Pin_Num Pull contrl */
 	val &= ~(PAD_BIT_GPIOx_PU | PAD_BIT_GPIOx_PD | PAD_BIT_GPIOx_PD_SLP | PAD_BIT_GPIOx_PU_SLP);
 
-	/* set needs Pull contrl */
+	/* Set needs Pull contrl */
 	if (pull_type == GPIO_PuPd_DOWN) {
 		val |= PAD_BIT_GPIOx_PD;
 		val |= PAD_BIT_GPIOx_PD_SLP;
@@ -455,13 +454,13 @@ static int realtek_pconf_swd_off(struct pinctrl_dev *pctldev, unsigned int pin)
 
 #ifdef CONFIG_SOC_CPU_ARMA7
 	if ((pin != 3) && (pin != 4)) {
-		dev_err(pctl->dev, "pin%d is out of range.\n", pin);
+		dev_err(pctl->dev, "Pin%d is out of range\n", pin);
 		return -EINVAL;
 	}
 #endif
 #ifdef CONFIG_SOC_CPU_ARMA32
 	if ((pin != 13) && (pin != 14)) {
-		dev_err(pctl->dev, "pin%d is out of range.\n", pin);
+		dev_err(pctl->dev, "Pin%d is out of range\n", pin);
 		return -EINVAL;
 	}
 #endif
@@ -480,7 +479,7 @@ static int realtek_pconf_audio_share_enable(struct pinctrl_dev *pctldev, unsigne
 	u32 val;
 
 	if ((pin < 18) || (pin > 39)) {
-		dev_err(pctl->dev, "pin%d is out of range.\n", pin);
+		dev_err(pctl->dev, "Pin%d is out of range\n", pin);
 		return -EINVAL;
 	}
 
@@ -492,7 +491,7 @@ static int realtek_pconf_audio_share_enable(struct pinctrl_dev *pctldev, unsigne
 	return 0;
 }
 
-/*should change accoring to pin not gpio*/
+/* Should change accoring to pin not GPIO*/
 static int realtek_pconf_parse_conf(struct pinctrl_dev *pctldev,
 									unsigned int pin, enum pin_config_param param,
 									enum pin_config_param arg)
@@ -592,13 +591,13 @@ static int realtek_pconf_group_get(struct pinctrl_dev *pctldev,
 								   unsigned long *config)
 {
 	struct realtek_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
-  	unsigned long flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&pctl->lock, flags);
 
 	*config = pctl->groups[group].config;
 
-  	spin_unlock_irqrestore(&pctl->lock, flags);
+	spin_unlock_irqrestore(&pctl->lock, flags);
 	return 0;
 }
 
@@ -761,7 +760,7 @@ int realtek_pctl_probe(struct platform_device *pdev)
 
 	ret = realtek_pctrl_build_state(pdev);
 	if (ret) {
-		dev_err(dev, "build state failed: %d\n", ret);
+		dev_err(dev, "Failed to build state: %d\n", ret);
 		return -EINVAL;
 	}
 
@@ -791,11 +790,11 @@ int realtek_pctl_probe(struct platform_device *pdev)
 										   pctl);
 
 	if (IS_ERR(pctl->pctl_dev)) {
-		dev_err(&pdev->dev, "Failed pinctrl registration\n");
+		dev_err(&pdev->dev, "Failed to register pinctrl\n");
 		return PTR_ERR(pctl->pctl_dev);
 	}
 
-	dev_info(dev, "Pinctrl Realtek initialized\n");
+	dev_info(dev, "Initialized successfully\n");
 
 	return 0;
 }

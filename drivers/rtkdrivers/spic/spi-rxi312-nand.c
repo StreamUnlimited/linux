@@ -1,13 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Ameba SPI controller driver
- *
- * Copyright 2015-2018, Realtek Semiconductor Corp.
- * Author: PSP Software Group
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
+* Realtek SPIC support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
@@ -256,7 +252,7 @@ static void rxi312_spi_waitbusy(struct rxi312_spi_map *map, u32 wait_type)
 /* Enter/Exit user mode */
 static void rxi312_spi_usermode_en(struct rxi312_spi_map *map, u8 enable)
 {
-	/* Wait spic busy done before switch mode */
+	/* Wait SPIC busy done before switch mode */
 	rxi312_spi_waitbusy(map, WAIT_SPIC_BUSY);
 
 	if (enable) {
@@ -370,7 +366,7 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 
 		while (i + 4 <= nbytes) {
 			fifo_level = map->rxflr >> 2;
-			// A safe way to avoid HW error: (j < fifo_level) && (i + 4 <= nbytes)
+			/* A safe way to avoid HW error: (j < fifo_level) && (i + 4 <= nbytes) */
 			for (j = 0; j < fifo_level; j++) {
 				aligned32_buf[j] = map->dr[0].word;
 			}
@@ -401,7 +397,7 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		write_ns = ktime_get_raw_ns();
 #endif
 
-		/* write the remaining data into fifo */
+		/* Write the remaining data into FIFO */
 		if (nbytes) {
 			i = 0;
 			buf = (u8 *)op->data.buf.out;
@@ -460,25 +456,25 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 
 	if (nbytes >= 2048) {
 		if (tmod == RXI312_SPI_TMODE_RX) {
-			pr_info("[RTP] byte=%u total=%llu umode_en=%llu read=%llu wait=%llu umode_dis=%llu addrbw=%d databw=%d\n",
-				nbytes,
-				total_ns,
-				umode_en_ns,
-				read_ns,
-				read_wait_ns,
-				umode_dis_ns,
-				op->addr.buswidth,
-				op->data.buswidth);
+			pr_info("SPIC: RX byte=%u total=%llu umode_en=%llu read=%llu wait=%llu umode_dis=%llu addrbw=%d databw=%d\n",
+					nbytes,
+					total_ns,
+					umode_en_ns,
+					read_ns,
+					read_wait_ns,
+					umode_dis_ns,
+					op->addr.buswidth,
+					op->data.buswidth);
 		} else {
-			pr_info("[WTP] byte=%u total=%llu umode_en=%llu write=%llu wait=%llu umode_dis=%llu addrbw=%d databw=%d\n",
-				nbytes,
-				total_ns,
-				umode_en_ns,
-				write_ns,
-				write_wait_ns,
-				umode_dis_ns,
-				op->addr.buswidth,
-				op->data.buswidth);
+			pr_info("SPIC: TX byte=%u total=%llu umode_en=%llu write=%llu wait=%llu umode_dis=%llu addrbw=%d databw=%d\n",
+					nbytes,
+					total_ns,
+					umode_en_ns,
+					write_ns,
+					write_wait_ns,
+					umode_dis_ns,
+					op->addr.buswidth,
+					op->data.buswidth);
 		}
 	}
 #endif
@@ -520,7 +516,7 @@ static int rxi312_spi_setup(struct spi_device *sdev)
 		sdev->mode |= SPI_TX_DUAL | SPI_RX_DUAL;
 	}
 
-	dev_info(&sdev->dev, "spi mode 0x%04X\n", sdev->mode);
+	dev_info(&sdev->dev, "SPI mode = 0x%08X\n", sdev->mode);
 
 	mutex_unlock(&spi->lock);
 
@@ -529,7 +525,7 @@ static int rxi312_spi_setup(struct spi_device *sdev)
 
 static const struct of_device_id rxi312_spi_of_match_table[] = {
 	{
-		.compatible = "realtek,rxi312-spi-nand",
+		.compatible = "realtek,rxi312-nand",
 	},
 	{ },
 };
@@ -553,7 +549,7 @@ static int rxi312_spi_probe(struct platform_device *pdev)
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*spi));
 	if (!master) {
-		dev_err(&pdev->dev, "fail to allocate spi master\n");
+		dev_err(&pdev->dev, "Failed to allocate SPI master\n");
 		return -ENOMEM;
 	}
 
@@ -594,7 +590,7 @@ static int rxi312_spi_probe(struct platform_device *pdev)
 
 	status = devm_spi_register_master(&pdev->dev, master);
 	if (status) {
-		dev_err(&pdev->dev, "failed to register spi master (%d)\n", status);
+		dev_err(&pdev->dev, "Failed to register SPI master: %d\n", status);
 		goto fail_register_master;
 	}
 
@@ -630,7 +626,7 @@ static int rxi312_spi_remove(struct platform_device *pdev)
 
 static struct platform_driver rxi312_spi_driver = {
 	.driver = {
-		.name = "spi-rxi312",
+		.name = "realetek-rxi312-nand",
 		.of_match_table =
 		of_match_ptr(rxi312_spi_of_match_table),
 	},
@@ -640,5 +636,6 @@ static struct platform_driver rxi312_spi_driver = {
 
 builtin_platform_driver(rxi312_spi_driver);
 
-MODULE_DESCRIPTION("Realtek RXI312 SPI controller driver");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Realtek Ameba RXI312 SPIC driver");
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Realtek Corporation");

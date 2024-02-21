@@ -1,9 +1,9 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (C) Realtek Microelectronics 2021 - All Rights Reserved
- * Author: Jingjun WU <jingjun_wu@realsil.com.cn> for Realtek Microelectronics.
- */
-
+* Realtek Pinctrl support
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
 #ifndef _DT_BINDINGS_REALTEK_AMEBAD2_PINFUNC_H
 #define _DT_BINDINGS_REALTEK_AMEBAD2_PINFUNC_H
 

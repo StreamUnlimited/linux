@@ -1,6 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+* Realtek wireless local area network IC driver.
+*   This is an interface between cfg80211 and firmware in other core. The
+*   commnunication between driver and firmware is IPC（Inter Process
+*   Communication）bus.
+*
+* Copyright (C) 2023, Realtek Corporation. All rights reserved.
+*/
+
 #include <rtw_cfg80211_fullmac.h>
 
-void llhw_ipc_xmit_done(int idx_wlan)
+void llhw_xmit_done(int idx_wlan)
 {
 	atomic_inc(&global_idev.xmit_priv.skb_free_num);
 	if (atomic_read(&global_idev.xmit_priv.skb_free_num) >= QUEUE_WAKE_THRES) {
@@ -28,7 +38,7 @@ static struct dev_sk_buff *llhw_find_one_free_skb(u32 *skb_index, bool *b_droppe
 	return NULL;
 }
 
-int llhw_ipc_xmit_entry(int idx, struct sk_buff *pskb)
+int llhw_xmit_entry(int idx, struct sk_buff *pskb)
 {
 	struct dev_sk_buff *skb = NULL;
 	struct skb_data *skb_data = NULL;
@@ -84,14 +94,12 @@ int llhw_ipc_xmit_entry(int idx, struct sk_buff *pskb)
 	ipc_msg.event_num = IPC_WIFI_CMD_XIMT_PKTS;
 	ipc_msg.msg_addr = (u32)skb_phy;
 	ipc_msg.wlan_idx = idx;
-	llhw_ipc_send_packet(&ipc_msg);
-	pstats->tx_packets++;
+	llhw_send_packet(&ipc_msg);
 	pstats->tx_bytes += pskb->len;
 
 func_exit:
 	skb_tx_timestamp(pskb);
 	if (b_dropped) {
-		pstats->tx_dropped++;
 		ret = NETDEV_TX_BUSY;
 		/* requeue or free this skb in netdevice, not here. */
 	} else {
@@ -101,7 +109,7 @@ func_exit:
 	return ret;
 }
 
-int llhw_ipc_xmit_init(void)
+int llhw_xmit_init(void)
 {
 	struct device *pdev = global_idev.ipc_dev;
 	struct xmit_priv_t *xmit_priv = &global_idev.xmit_priv;
@@ -132,7 +140,7 @@ int llhw_ipc_xmit_init(void)
 	return 0;
 }
 
-void llhw_ipc_xmit_deinit(void)
+void llhw_xmit_deinit(void)
 {
 	struct device *pdev = global_idev.ipc_dev;
 	struct xmit_priv_t *xmit_priv = &global_idev.xmit_priv;
