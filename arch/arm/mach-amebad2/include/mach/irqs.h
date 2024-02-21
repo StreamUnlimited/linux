@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek IRQ support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * Realtek Semiconductor Corp.
+ *
+ * bsp/include/mach/irqs.h:
+ *
+ * Copyright 2012  Tony Wu (tonywu@realtek.com)
+ */
 
 #ifndef _MACH_IRQS_H_
 #define _MACH_IRQS_H_

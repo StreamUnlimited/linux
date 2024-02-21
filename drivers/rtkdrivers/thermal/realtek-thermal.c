@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-2.0
 /*
-* Realtek Thermal support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * This file is part of realtek thermal driver
+ *
+ * Copyright (C) 2021, Realtek - All Rights Reserved
+ */
 
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -369,6 +369,5 @@ static struct platform_driver realtek_thermal_driver = {
 
 builtin_platform_driver(realtek_thermal_driver);
 
-MODULE_DESCRIPTION("Realtek Ameba Thermal driver");
-MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Realtek Corporation");
+MODULE_DESCRIPTION("AmebaD2 realtek_thermal_data driver");
+MODULE_LICENSE("GPL");

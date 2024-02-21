@@ -1,11 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-2.0+
 /*
-* Realtek Panel support
-*
-* MIPI-DSI Synaptics R63353 panel driver. This is a 1280*720
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * MIPI-DSI Synaptics R63353 panel driver. This is a 1280*720
+ */
 
 #include <drm/drm_modes.h>
 #include <drm/drm_mipi_dsi.h>

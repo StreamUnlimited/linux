@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek Memory support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * Realtek Semiconductor Corp.
+ *
+ * bsp/include/mach/memory.h:
+ *
+ * Copyright 2014  Johnson Yu (jsonyu@realtek.com)
+ */
 
 #ifndef __ASM_ARCH_MEMORY_H
 #define __ASM_ARCH_MEMORY_H __FILE__

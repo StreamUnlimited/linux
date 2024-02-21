@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
-* Realtek Misc support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
-
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
@@ -441,6 +434,6 @@ void realtek_misc_exit(void)
 module_init(realtek_misc_init);
 module_exit(realtek_misc_exit);
 
-MODULE_DESCRIPTION("Realtek Ameba Misc driver");
-MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("Realtek misc ioctl");
 MODULE_AUTHOR("Realtek Corporation");
+MODULE_LICENSE("GPL");

@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek PM support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * arch/arm/mach-amebd2/pm.c
+ *
+ */
+
 
 #include <linux/suspend.h>
 #include <linux/io.h>

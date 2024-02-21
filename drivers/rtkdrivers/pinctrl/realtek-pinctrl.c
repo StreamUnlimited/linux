@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-2.0
 /*
-* Realtek Pinctrl support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
-
+ * Copyright (C) Maxime Coquelin 2015
+ * Copyright (C) STMicroelectronics 2017
+ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+ *
+ * Heavily based on Mediatek's pinctrl driver
+ */
 #include <linux/clk.h>
 #include <linux/hwspinlock.h>
 #include <linux/io.h>

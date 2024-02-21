@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek Hardware support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
-
+ * Realtek Semiconductor Corp.
+ *
+ * bsp/include/mach/hardware.h:
+ *
+ * Copyright 2012  Tony Wu (tonywu@realtek.com)
+ */
 
 #ifndef _HARDWARE_H_
 #define _HARDWARE_H_

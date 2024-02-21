@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
-* Realtek PWM support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
-
 #include <linux/delay.h>
 #include <linux/ktime.h>
 #include <linux/highmem.h>
@@ -324,6 +317,7 @@ static struct platform_driver rtk_pwm_driver = {
 
 builtin_platform_driver(rtk_pwm_driver);
 
-MODULE_DESCRIPTION("Realtek Ameba PWM driver");
+MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
+MODULE_DESCRIPTION("realtek PWM driver");
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Realtek Corporation");
+

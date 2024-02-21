@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek Hash support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * This file is part of Realtek Crypto driver for Linux.
+ *
+ * Copyright (C) 2021, Realtek - All Rights Reserved
+ */
 
 #include <linux/clk.h>
 #include <linux/crypto.h>
@@ -1381,6 +1381,5 @@ static struct platform_driver realtek_hash_driver = {
 
 builtin_platform_driver(realtek_hash_driver);
 
-MODULE_DESCRIPTION("Realtek Ameba Hash driver");
-MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Realtek Corporation");
+MODULE_DESCRIPTION("AmebaD2 realtek_hash driver");
+MODULE_LICENSE("GPL");

@@ -1,9 +1,28 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
-* Realtek Watchdog support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+/**
+  ******************************************************************************
+  * @file    realtek_wdg.c
+  * @author
+  * @version V1.0.0
+  * @date    2021-10-25
+  * @brief   This file contains all the functions prototypes for the WDG firmware
+  *          library.
+  ******************************************************************************
+  * @attention
+  *
+  * This module is a confidential and proprietary property of RealTek and
+  * possession or use of this module requires written permission of RealTek.
+  *
+  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
+  ******************************************************************************
+  ******************************************************************************
+  * @note
+  *
+  * To use watchdog, we need trigger it in user space first.
+  * Refer to package\testcase\watchdog\watchdog_test.c if needed.
+  * Refer to package\testcase\watchdog\readme.txt if needed.
+  *
+  ******************************************************************************
+  */
 
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -537,6 +556,5 @@ static struct platform_driver rtk_watchdog_driver = {
 
 module_platform_driver(rtk_watchdog_driver);
 
-MODULE_DESCRIPTION("Realtek Ameba Watchdog driver");
-MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Realtek Corporation");
+MODULE_DESCRIPTION("Realtek Watchdog Driver");
+MODULE_LICENSE("GPL");

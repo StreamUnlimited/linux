@@ -1,11 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-2.0+
 /*
-* Realtek Panel support
-*
-* MIPI-DSI st7701s panel driver. This is a 480*800
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * MIPI-DSI st7701s panel driver. This is a 480*800
+ */
 
 #include <drm/drm_modes.h>
 #include <drm/drm_mipi_dsi.h>

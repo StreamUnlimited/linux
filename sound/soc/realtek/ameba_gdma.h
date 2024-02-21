@@ -1,9 +1,20 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
-* Realtek ALSA support
-*
-* Copyright (C) 2021, Realtek Corporation. All rights reserved.
-*/
+/**
+  ******************************************************************************
+  * @file    ameba_gdma.h
+  * @author
+  * @version V1.0.0
+  * @date    2016-05-17
+  * @brief   This file contains all the functions prototypes for the GDMA firmware
+  *          library.
+  ******************************************************************************
+  * @attention
+  *
+  * This module is a confidential and proprietary property of RealTek and
+  * possession or use of this module requires written permission of RealTek.
+  *
+  * Copyright(c) 2016, Realtek Semiconductor Corporation. All rights reserved.
+  ******************************************************************************
+  */
 
 #ifndef _RTL8710B_GDMA_H_
 #define _RTL8710B_GDMA_H_

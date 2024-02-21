@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek IO support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * Realtek Semiconductor Corp.
+ *
+ * bsp/include/mach/io.h:
+ *
+ * Copyright 2012  Tony Wu (tonywu@realtek.com)
+ */
 
 #ifndef _IO_H_
 #define _IO_H_

@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek SMP support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
-
+ * Realtek Semiconductor Corp.
+ *
+ * arch/arm/bsp/smp.c
+ *
+ * Copyright 2012  Viller Hsiao (villerhsiao@realtek.com)
+ * Copyright 2014  Jethro Hsu (jethro@realtek.com)
+ */
 #include <linux/init.h>
 #include <linux/linkage.h>
 #include <linux/delay.h>

@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek SMP support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * Realtek Semiconductor Corp.
+ *
+ * bsp/include/mach/smp.h:
+ *
+ * Copyright 2012  Tony Wu (tonywu@realtek.com)
+ */
 
 #ifndef _SMP_H_
 #define _SMP_H_

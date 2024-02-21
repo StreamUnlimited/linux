@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
-* Realtek Timer support
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
-
 #include <linux/kernel.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
@@ -775,6 +768,8 @@ static struct platform_driver rtk_timer_driver = {
 
 builtin_platform_driver(rtk_timer_driver);
 
-MODULE_DESCRIPTION("Realtek Ameba Timer driver");
+MODULE_AUTHOR("<eric_gao@realsil.com.cn>");
+MODULE_DESCRIPTION("realtek timer driver");
 MODULE_LICENSE("GPL v2");
-MODULE_AUTHOR("Realtek Corporation");
+
+
