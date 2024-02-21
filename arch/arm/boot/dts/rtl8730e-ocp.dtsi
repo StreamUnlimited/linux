@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
-* Realtek DTS for on-chip peripherals
-*
-* Copyright (C) 2023, Realtek Corporation. All rights reserved.
-*/
+ * Realtek Semiconductor Corp.
+ *
+ * Device Tree Structure
+ *
+ * Tony Wu (tonywu@realtek.com)
+ */
 
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/realtek/ameba_ipc/ameba_ipc_resource.h>
