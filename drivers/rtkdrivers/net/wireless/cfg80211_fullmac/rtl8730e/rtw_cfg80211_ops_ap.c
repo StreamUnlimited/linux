@@ -322,23 +322,26 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 							settings->beacon.beacon_ies_len) {
 			elem_num++;
 		}
-		/* allocate an array to store the pointor of struct element */
-		pelem = kmalloc(sizeof(struct element *) * elem_num, GFP_KERNEL);
-		if (!pelem) {
-			dev_dbg(global_idev.fullmac_dev, "%s: malloc pelem failed.", __func__);
-			return -ENOMEM;
-		}
 
-		elem_num = 0;
-		for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
-							settings->beacon.beacon_ies,
-							settings->beacon.beacon_ies_len) {
-			pelem[elem_num] = elem;
-			elem_num++;
-		}
-		llhw_wifi_add_custom_ie(pelem, elem_num);
+		if (elem_num != 0) {
+			/* allocate an array to store the pointor of struct element */
+			pelem = kmalloc(sizeof(struct element *) * elem_num, GFP_KERNEL);
+			if (!pelem) {
+				dev_dbg(global_idev.fullmac_dev, "%s: malloc pelem failed.", __func__);
+				return -ENOMEM;
+			}
 
-		kfree(pelem);
+			elem_num = 0;
+			for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
+								settings->beacon.beacon_ies,
+								settings->beacon.beacon_ies_len) {
+				pelem[elem_num] = elem;
+				elem_num++;
+			}
+			llhw_wifi_add_custom_ie(pelem, elem_num);
+
+			kfree(pelem);
+		}
 	}
 
 	return ret;
