@@ -35,8 +35,8 @@ struct realtek_captouch_data *captouch;
 static void realtek_captouch_para_set(struct realtek_ct_init_para *ct_init)
 {
 	ct_init->debounce_ena = 1;
-	ct_init->sample_cnt = 6;
-	ct_init->scan_interval = 60;
+	ct_init->sample_cnt = 3;
+	ct_init->scan_interval = 30;
 	ct_init->step = 1;
 	ct_init->factor = 4;
 	ct_init->etc_scan_interval = 3;
