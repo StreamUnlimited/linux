@@ -302,16 +302,6 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 		softAP_config.security_type = RTW_SECURITY_OPEN;
 	}
 
-	ret = llhw_wifi_start_ap(&softAP_config);
-
-	netif_carrier_on(ndev);
-
-	if (pwd_vir) {
-		rtw_mfree(strlen(pwd_vir), pwd_vir, pwd_phy);
-	}
-
-
-
 	if (settings->beacon.beacon_ies_len) {
 		llhw_wifi_del_custom_ie(1);
 
@@ -343,6 +333,14 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 
 			kfree(pelem);
 		}
+	}
+
+	ret = llhw_wifi_start_ap(&softAP_config);
+
+	netif_carrier_on(ndev);
+
+	if (pwd_vir) {
+		rtw_mfree(strlen(pwd_vir), pwd_vir, pwd_phy);
 	}
 
 	return ret;
