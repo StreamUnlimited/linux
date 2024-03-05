@@ -366,14 +366,6 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 	}
 #endif
 
-	ret = whc_fullmac_host_start_ap(softAP_config);
-
-	netif_carrier_on(ndev);
-
-	if (buf) {
-		kfree(buf);
-	}
-
 	if (settings->beacon.beacon_ies_len) {
 		whc_fullmac_host_del_custom_ie(1);
 
@@ -412,6 +404,14 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 
 			kfree(pelem);
 		}
+	}
+
+	ret = whc_fullmac_host_start_ap(softAP_config);
+
+	netif_carrier_on(ndev);
+
+	if (buf) {
+		kfree(buf);
 	}
 
 	return ret;
