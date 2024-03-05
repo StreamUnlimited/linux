@@ -338,7 +338,8 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 				pelem[elem_num] = elem;
 				elem_num++;
 			}
-			llhw_wifi_add_custom_ie(pelem, elem_num);
+
+			llhw_wifi_add_custom_ie(pelem, elem_num, (BEACON | PROBE_RSP));
 
 			kfree(pelem);
 		}

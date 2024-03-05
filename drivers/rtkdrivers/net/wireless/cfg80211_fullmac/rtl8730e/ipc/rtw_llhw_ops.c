@@ -804,7 +804,7 @@ int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16
 	return ret;
 }
 
-int llhw_wifi_add_custom_ie(const struct element **elem, u8 num)
+int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
 {
 	int ret = 0;
 	u32 param_buf[3];
@@ -815,7 +815,7 @@ int llhw_wifi_add_custom_ie(const struct element **elem, u8 num)
 	struct device *pdev = global_idev.ipc_dev;
 
 	vir_array = kmalloc(sizeof(void *) * num, GFP_KERNEL);
-	if (!elem) {
+	if (!vir_array) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc vir_array failed.", __func__);
 		return -ENOMEM;
 	}
@@ -828,7 +828,7 @@ int llhw_wifi_add_custom_ie(const struct element **elem, u8 num)
 	}
 
 	for (i = 0; i < num; i++) {
-		cus_ie_array[i].type = elem[i]->id;
+		cus_ie_array[i].type = type;
 		ie_vir = rtw_malloc(elem[i]->datalen + 2, &ie_phy);
 		if (!ie_vir) {
 			dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
