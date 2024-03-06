@@ -113,6 +113,11 @@
 		compatible = "ti,ina220";
 		reg = <0x45>;
 	};
+
+	veml3328@10 {
+		compatible = "vishay,veml3328";
+		reg = <0x10>;
+	};
 };
 
 // We will use a fixed MCLK of 6.144 MHz to calibrate the interal
