@@ -1,4 +1,22 @@
 
+/ {
+	i2c1_gpio: i2c1_gpio {
+		compatible = "i2c-gpio";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c1_gpio_pins>;
+
+		sda-gpios = <&gpiob 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&gpiob 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+
+		status = "okay";
+	};
+};
+
 &pinctrl {
 	pinctrl-names = "default";
 	pinctrl-0 = <&gpio_factory_pins>, <&gpio_factory_pins_swd_disable>, <&gpio_factory_pins_audioshare>;
@@ -57,6 +75,16 @@
 			<REALTEK_PINMUX('B', 6, GPIO)>;
 
 			audio-share-enable;
+		};
+	};
+
+	i2c1_gpio_pins: i2c1_gpios {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 12, GPIO)>, // I2C1_SDA
+					<REALTEK_PINMUX('B', 13, GPIO)>;  // I2C1_SCL
+			bias-pull-up;
+			slew-rate = <0>;
+			drive-strength = <0>;
 		};
 	};
 };
