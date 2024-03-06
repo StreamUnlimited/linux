@@ -89,6 +89,13 @@
 	};
 };
 
+&i2c1_gpio {
+	ina220@45 {
+		compatible = "ti,ina220";
+		reg = <0x45>;
+	};
+};
+
 // We will use a fixed MCLK of 6.144 MHz to calibrate the interal
 // load capacitors.
 &sport3 {
