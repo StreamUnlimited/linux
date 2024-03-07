@@ -634,9 +634,15 @@ static void realtek_adc_hw_init(struct iio_dev *indio_dev)
 	for (i = 0; i < indio_dev->num_channels; i++) {
 		if (indio_dev->channels[i].differential == 1) {
 			reg_value |= ADC_CH_BIT(indio_dev->channels[i].channel);
-			path_reg &= ~ ADC_CH_BIT(indio_dev->channels[i].channel2);
+			// Only channels 0-5 correspond to Pins PA0-PA5. We should only
+			// disable digital input for these pins (and not for PA6-PA9)
+			if (indio_dev->channels[i].channel2 < 6)
+				path_reg &= ~ADC_CH_BIT(indio_dev->channels[i].channel2);
 		}
-		path_reg &= ~ ADC_CH_BIT(indio_dev->channels[i].channel);
+		// Only channels 0-5 correspond to Pins PA0-PA5. We should only
+		// disable digital input for these pins (and not for PA6-PA9)
+		if (indio_dev->channels[i].channel < 6)
+			path_reg &= ~ADC_CH_BIT(indio_dev->channels[i].channel);
 	}
 	writel(reg_value, adc->base + RTK_ADC_IN_TYPE);
 	// Disable digital path input for adc
