@@ -93,27 +93,28 @@ static int axg_toddr_dai_spdif_hw_params(struct snd_pcm_substream *substream,
 	unsigned int type, width, phys_width, msb, lsb, endian = 0;
 
 	phys_width = params_physical_width(params);
+	width = params_width(params);
 
-	switch (phys_width) {
+	switch (width) {
 	case 8:
 		type = 0; /* 8 samples of 8 bits */
 		break;
 	case 16:
 		type = 2; /* 4 samples of 16 bits - right justified */
 		break;
-	case 32:
+	case 24:
 		type = 4; /* 2 samples of 32 bits - right justified */
-		endian = 5;
+		break;
+	case 32:
+		type = 3; /* 2 samples of 32 bits - left justified */
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	width = params_width(params);
-
 	msb = 28 - 1;
-	if (phys_width <= 24)
-		lsb = 28 - phys_width;
+	if (width <= 24)
+		lsb = 28 - width;
 	else
 		lsb = 4;
 
