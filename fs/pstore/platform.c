@@ -437,7 +437,10 @@ int pstore_register(struct pstore_info *psi)
 		return -EINVAL;
 	}
 
-	allocate_buf_for_compression();
+	// Do not allocate a buffer for compression which will
+	// effectively disable the compression. On newer kernels
+	// there is a config option for that, but not on this one.
+	// allocate_buf_for_compression();
 
 	if (pstore_is_mounted())
 		pstore_get_records(0);
