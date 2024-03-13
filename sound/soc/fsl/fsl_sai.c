@@ -1584,7 +1584,7 @@ static int fsl_sai_probe(struct platform_device *pdev)
 			dev_warn(&pdev->dev, "could not get normal pins\n");
 
 		if (IS_ERR_OR_NULL(sai->pins_state_suspend))
-			dev_info(&pdev->dev, "could not get suspend pins\n");
+			dev_dbg(&pdev->dev, "could not get suspend pins\n");
 	} else {
 		dev_warn(&pdev->dev, "failed to get pinctrl\n");
 	}
@@ -1836,7 +1836,7 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 {
 	struct fsl_sai *sai = dev_get_drvdata(dev);
 
-	dev_info(dev, "suspending\n");
+	dev_dbg(dev, "suspending\n");
 
 	// Set pins to suspend state
 	if (!IS_ERR_OR_NULL(sai->pinctrl) && !IS_ERR_OR_NULL(sai->pins_state_suspend)) {
@@ -1872,7 +1872,7 @@ static int fsl_sai_runtime_resume(struct device *dev)
 	unsigned int ofs = sai->soc_data->reg_offset;
 	int ret;
 
-	dev_info(dev, "resuming\n");
+	dev_dbg(dev, "resuming\n");
 
 	ret = clk_prepare_enable(sai->bus_clk);
 	if (ret) {
