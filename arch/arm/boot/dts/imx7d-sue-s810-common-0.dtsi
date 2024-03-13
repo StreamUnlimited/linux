@@ -48,6 +48,23 @@
 		};
 	};
 
+	reserved-memory {
+		ramoops@0x88000000 {
+			compatible = "ramoops";
+
+			// 128 KiB buffer
+			reg = <0x88000000 0x20000>;
+
+			// We only care about a single crash/entry from the last boot,
+			// so make `record-size` equal to the total size
+			record-size = <0x20000>;
+
+			// Only dump panics, in our configuration we are setting
+			// `panic_on_oops=1` anyway which will log it.
+			no-dump-oops;
+		};
+	};
+
 	gpio_buttons: gpio-keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
