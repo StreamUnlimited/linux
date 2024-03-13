@@ -219,6 +219,24 @@
 			alignment = <0x0 0x400000>;
 			alloc-ranges = <0x0 0x05000000 0x0 0x400000>;
 		};
+
+		ramoops@0x8800000 {
+			compatible = "ramoops";
+
+			// On A113 it seems that some chunks of memory are overwritten
+			// on a reset by the early stage bootloaders. This address was
+			// experimentally determined to be working correctly for the
+			// whole 128 KiB buffer.
+			reg = <0 0x8800000 0 0x20000>;
+
+			// We only care about a single crash/entry from the last boot,
+			// so make `record-size` equal to the total size
+			record-size = <0x20000>;
+
+			// Only dump panics, in our configuration we are setting
+			// `panic_on_oops=1` anyway which will log it.
+			no-dump-oops;
+		};
 	};
 
 	amlogic_reboot: amlogic_reboot{
