@@ -44,6 +44,7 @@
 #define SPDIFIN_STAT1			0x20
 #define SPDIFIN_STAT2			0x24
 #define SPDIFIN_MUTE_VAL		0x28
+#define  SPDIFIN_CTRL0_MUTE_BOTH	GENMASK(7, 6)
 
 #define SPDIFIN_MODE_NUM		7
 #define SPDIFIN_SAMPLE_RATE_ENUM_NAME		"Sample Rate"
@@ -62,6 +63,7 @@ struct axg_spdifin {
 	struct snd_soc_card *card;
 	struct snd_kcontrol *ctrl_sample_rate;
 	struct snd_pcm_hw_constraint_list constraint_rates;
+	struct delayed_work unmute_work;
 };
 
 /*
@@ -201,11 +203,34 @@ static irqreturn_t axg_spdifin_status_isr_thread(int irq, void *devid)
 {
 	struct axg_spdifin *priv = (struct axg_spdifin *)devid;
 
+	unsigned int rate = axg_spdifin_get_rate(priv);
+	if (!rate) {
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH,  SPDIFIN_CTRL0_MUTE_BOTH);
+		cancel_delayed_work(&priv->unmute_work);
+	} else {
+		cancel_delayed_work(&priv->unmute_work);
+		schedule_delayed_work(&priv->unmute_work, msecs_to_jiffies(400));
+	}
+
 	snd_ctl_notify(priv->card->snd_card,
 					SNDRV_CTL_EVENT_MASK_VALUE,
 					&priv->ctrl_sample_rate->id);
 
 	return IRQ_HANDLED;
+}
+
+static void unmute_work_handler(struct work_struct *work) {
+	struct axg_spdifin *priv = container_of(work, struct axg_spdifin, unmute_work.work);
+	unsigned int stat;
+
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_STATUS_SEL, FIELD_PREP(SPDIFIN_CTRL0_STATUS_SEL, 0));
+
+	regmap_read(priv->map, SPDIFIN_STAT1, &stat);
+	if ((stat >> 1) & 1) {
+		schedule_delayed_work(&priv->unmute_work, HZ);
+	} else {
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH,  0);
+	}
 }
 
 static void axg_spdifin_write_mode_param(struct regmap *map, int mode,
@@ -374,6 +399,8 @@ pclk_err:
 static int axg_spdifin_dai_remove(struct snd_soc_dai *dai)
 {
 	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
+
+	cancel_delayed_work_sync(&priv->unmute_work);
 
 	/* Disable IRQ */
 	regmap_update_bits(priv->map, SPDIFIN_CTRL1,
@@ -661,6 +688,8 @@ static int axg_spdifin_probe(struct platform_device *pdev)
 	priv->irq = platform_get_irq(pdev, 0);
 	if (priv->irq < 0)
 		return dev_err_probe(dev, priv->irq, "failed to get interrupt\n");
+
+	INIT_DELAYED_WORK(&priv->unmute_work, unmute_work_handler);
 
 	return devm_snd_soc_register_component(dev, &axg_spdifin_component_drv,
 					       dai_drv, 1);
