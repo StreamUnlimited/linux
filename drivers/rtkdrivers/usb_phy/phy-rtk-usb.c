@@ -247,7 +247,7 @@ int rtk_phy_calibrate(struct dwc2_hsotg *hsotg)
 	/* 3ms + 2.5us from DD, 3ms already delayed after soft disconnect */
 	usleep_range(3, 4);
 
-	if (rtk_misc_get_rl_version() == RTK_CUT_VERSION_A) {
+	if (rtk_misc_get_rl_version() != RTK_CUT_VERSION_A) {
 		data = (struct rtk_usb_phy_cal_data_t *)rtk_usb_cut_b_cal_data;
 	} else {
 		data = (struct rtk_usb_phy_cal_data_t *)rtk_usb_cut_a_cal_data;
