@@ -105,6 +105,7 @@ static int axg_spdifin_prepare(struct snd_pcm_substream *substream,
 {
 	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
 
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, 0);
 	/* Apply both reset */
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
 			   SPDIFIN_CTRL0_RST_OUT |
@@ -117,6 +118,32 @@ static int axg_spdifin_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
 			   SPDIFIN_CTRL0_RST_IN,  SPDIFIN_CTRL0_RST_IN);
 
+	return 0;
+}
+
+static int axg_spdifin_hw_free(struct snd_pcm_substream *substream,
+			       struct snd_soc_dai *dai)
+{
+	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
+
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, SPDIFIN_CTRL0_EN);
+
+	return 0;
+}
+
+int axg_spdifin_trigger(struct snd_pcm_substream *substream, int cmd, struct snd_soc_dai *dai) {
+	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, SPDIFIN_CTRL0_EN);
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, 0);
+		break;
+	default:
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -364,6 +391,8 @@ static const struct snd_soc_dai_ops axg_spdifin_ops = {
 	.remove		= axg_spdifin_dai_remove,
 	.prepare	= axg_spdifin_prepare,
 	.startup	= axg_spdifin_dai_startup,
+	.trigger	= axg_spdifin_trigger,
+	.hw_free	= axg_spdifin_hw_free,
 };
 
 static int axg_spdifin_iec958_info(struct snd_kcontrol *kcontrol,
