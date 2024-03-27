@@ -159,6 +159,8 @@ static int pcm_dummy_probe(struct platform_device *pDev)
 	struct device *dev = &pDev->dev;
 	struct pcm_dummy_private *pdata = NULL;
 	const struct of_device_id *match = NULL;
+	unsigned int max_channels = 32;
+	struct snd_soc_dai_driver *dai_driver = &pcm_dummy_dai;
 	int ret = 0;
 
 	dev_dbg(dev, "pcm_dummy_probe(): starting\n");
@@ -182,6 +184,14 @@ static int pcm_dummy_probe(struct platform_device *pDev)
 	pdata->gpio_nreset = of_get_named_gpio(dev->of_node, "reset-gpio", 0);
 	pdata->gpio_mute   = of_get_named_gpio(dev->of_node, "mute-gpio", 0);
 	pdata->nmute       = of_get_property(dev->of_node, "sue,nmute", NULL);
+	if (of_property_read_u32(dev->of_node, "max-channels", &max_channels) == 0) {
+		dai_driver = devm_kzalloc(dev, sizeof(*dai_driver), GFP_KERNEL);
+		if (!dai_driver)
+			return -ENOMEM;
+		memcpy(dai_driver, &pcm_dummy_dai, sizeof(*dai_driver));
+		dai_driver->playback.channels_max = max_channels;
+		dai_driver->capture.channels_max = max_channels;
+	}
 	#endif
 
 
@@ -212,7 +222,7 @@ static int pcm_dummy_probe(struct platform_device *pDev)
 			gpio_set_value(pdata->gpio_mute, pdata->nmute ? 1 : 0);
 	}
 
-	ret = snd_soc_register_codec(dev, &soc_codec_dev_pcm_dummy, &pcm_dummy_dai, 1);
+	ret = snd_soc_register_codec(dev, &soc_codec_dev_pcm_dummy, dai_driver, 1);
 
 	if (ret < 0) {
 		dev_err(dev, "pcm_dummy_probe(): failed with error %d\n", ret);
