@@ -72,6 +72,7 @@
 	pcm_dummy1: pcm_dummy1 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_dummy_codec1>;
+		max-channels = <2>;
 
 		compatible = "sue,pcm_dummy";
 		mute-gpio = <&gpio1 11 0>;
@@ -80,10 +81,12 @@
 
 	pcm_dummy2: pcm_dummy2 {
 		compatible = "sue,pcm_dummy";
+		max-channels = <2>;
 	};
 
 	pcm_dummy3: pcm_dummy3 {
 		compatible = "sue,pcm_dummy";
+		max-channels = <2>;
 	};
 };
 

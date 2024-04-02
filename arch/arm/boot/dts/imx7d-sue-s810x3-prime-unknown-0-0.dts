@@ -17,6 +17,7 @@
 
 	pcm_dummy3: pcm_dummy3 {
 		compatible = "sue,pcm_dummy";
+		max-channels = <2>;
 	};
 };
 

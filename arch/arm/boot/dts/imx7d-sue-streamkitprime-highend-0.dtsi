@@ -84,10 +84,12 @@
 
 	pcm_dummy1: pcm_dummy1 {
 		compatible = "sue,pcm_dummy";
+		max-channels = <2>;
 	};
 
 	pcm_dummy2: pcm_dummy2 {
 		compatible = "sue,pcm_dummy";
+		max-channels = <2>;
 	};
 };
 

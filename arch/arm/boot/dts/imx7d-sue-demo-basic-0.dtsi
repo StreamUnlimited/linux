@@ -61,6 +61,7 @@
 	pcm_dummy: pcm_dummy {
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_codec>;
+		max-channels = <2>;
 
 		compatible = "sue,pcm_dummy";
 		mute-gpio = <&gpio5 8 0>;
