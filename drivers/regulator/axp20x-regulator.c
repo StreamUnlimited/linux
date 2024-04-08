@@ -26,6 +26,7 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/of_regulator.h>
+#include <dt-bindings/regulator/x-powers,axp20x.h>
 
 #define AXP20X_OFF	BIT(7)
 
@@ -365,6 +366,7 @@
 		.enable_val	= (_enable_val),				\
 		.disable_val	= (_disable_val),				\
 		.ops		= &axp20x_ops,					\
+		.of_map_mode	= axp20x_of_map_mode				\
 	}
 
 #define AXP_DESC(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
@@ -385,6 +387,7 @@
 		.enable_reg	= (_ereg),					\
 		.enable_mask	= (_emask),					\
 		.ops		= &axp20x_ops,					\
+		.of_map_mode	= axp20x_of_map_mode,				\
 	}
 
 #define AXP_DESC_SW(_family, _id, _match, _supply, _ereg, _emask)		\
@@ -399,6 +402,7 @@
 		.enable_reg	= (_ereg),					\
 		.enable_mask	= (_emask),					\
 		.ops		= &axp20x_ops_sw,				\
+		.of_map_mode	= axp20x_of_map_mode,				\
 	}
 
 #define AXP_DESC_FIXED(_family, _id, _match, _supply, _volt)			\
@@ -412,7 +416,8 @@
 		.n_voltages	= 1,						\
 		.owner		= THIS_MODULE,					\
 		.min_uV		= (_volt) * 1000,				\
-		.ops		= &axp20x_ops_fixed				\
+		.ops		= &axp20x_ops_fixed,				\
+		.of_map_mode	= axp20x_of_map_mode,				\
 	}
 
 #define AXP_DESC_RANGES(_family, _id, _match, _supply, _ranges, _n_voltages,	\
@@ -433,6 +438,7 @@
 		.linear_ranges	= (_ranges),					\
 		.n_linear_ranges = ARRAY_SIZE(_ranges),				\
 		.ops		= &axp20x_ops_range,				\
+		.of_map_mode	= axp20x_of_map_mode,				\
 	}
 
 static const int axp209_dcdc2_ldo3_slew_rates[] = {
@@ -562,6 +568,7 @@ static const struct regulator_ops axp20x_ops_fixed = {
 };
 
 int axp20x_set_mode(struct regulator_dev *dev, unsigned int mode);
+unsigned int axp20x_of_map_mode(unsigned int mode);
 
 static const struct regulator_ops axp20x_ops_range = {
 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
@@ -1464,6 +1471,18 @@ int axp20x_set_mode(struct regulator_dev *dev, unsigned int mode)
 	}
 
 	return 0;
+}
+
+unsigned int axp20x_of_map_mode(unsigned int mode)
+{
+	switch(mode) {
+	case AXP20X_MODE_FAST:
+		return REGULATOR_MODE_FAST;
+	case AXP20X_MODE_NORMAL:
+		return REGULATOR_MODE_NORMAL;
+	default:
+		return REGULATOR_MODE_INVALID;
+	}
 }
 
 /*

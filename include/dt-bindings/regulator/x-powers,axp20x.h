@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
+
+#ifndef _DT_BINDINGS_REGULATOR_X_POWERS_AXP20X_H
+#define _DT_BINDINGS_REGULATOR_X_POWERS_AXP20X_H
+
+#define AXP20X_MODE_FAST		1
+#define AXP20X_MODE_NORMAL		2
+
+#endif
