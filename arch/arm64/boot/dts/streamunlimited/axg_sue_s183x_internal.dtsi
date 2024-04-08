@@ -8,6 +8,7 @@
 #include "../amlogic/meson-axg.dtsi"
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/thermal/thermal.h>
+#include <dt-bindings/regulator/x-powers,axp20x.h>
 
 / {
 	compatible = "sue,stream1832", "amlogic,a113d", "amlogic,meson-axg";
@@ -382,13 +383,7 @@
 				regulator-max-microvolt = <1150000>;
 				regulator-boot-on;
 				regulator-always-on;
-
-				/*
-				 * Allow the following workmodes (OR'ed together):
-				 *   1: REGULATOR_MODE_FAST	=> PWM only mode
-				 *   2: REGULATOR_MODE_NORMAL	=> Auto mode
-				 */
-				regulator-allowed-modes = <3>;
+				regulator-allowed-modes = <AXP20X_MODE_FAST AXP20X_MODE_NORMAL>;
 			};
 
 			out_3v3: ldo0 {
