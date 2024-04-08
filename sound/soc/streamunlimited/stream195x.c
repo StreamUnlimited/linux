@@ -971,16 +971,22 @@ static int stream195x_set_ignore_suspend(struct snd_soc_card *card, bool ignore_
 
 	dev_info(dev, "%s suspend, runtime %s components\n", ignore_suspend ? "ignoring" : "not ignoring", !ignore_suspend ? "releasing" : "acquiring");
 
+#ifdef CONFIG_PM
 	// We achieve the "ignore suspend" behavior by increasing the reference counter of all
 	// components, by using `pm_runtime_get_sync()`. To enable the suspend behavior again
 	// we just decrease the reference counter with `pm_runtime_put_sync()`.
 	for_each_card_components(card, component) {
 		ret = priv->ignore_suspend ? pm_runtime_get_sync(component->dev) : pm_runtime_put_sync(component->dev);
-		if (ret < 0 && ret != -ENOSYS) {
+		// The -EACCES error is returned if a driver did not enable runtime power-management via `pm_runtime_enable()`,
+		// so we just ignore it as it is up to the individual drivers to do any runtime power-management. The runtime pm
+		// core will still increase/decrease the reference count, so even if a driver decides to enable runtime
+		// power-management later on, the reference count will be correct.
+		if (ret < 0 && ret != -EACCES) {
 			dev_err(component->dev, "%s() failed: %d\n", priv->ignore_suspend ? "pm_runtime_get_sync" : "pm_runtime_put_sync", ret);
 			break;
 		}
 	}
+#endif
 
 	return ret;
 }
