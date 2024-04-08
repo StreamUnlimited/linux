@@ -28,13 +28,7 @@
 				regulator-max-microvolt = <1150000>;
 				regulator-boot-on;
 				regulator-always-on;
-
-				/*
-				 * Allow the following workmodes (OR'ed together):
-				 *   1: REGULATOR_MODE_FAST	=> PWM only mode
-				 *   2: REGULATOR_MODE_NORMAL	=> Auto mode
-				 */
-				regulator-allowed-modes = <3>;
+				regulator-allowed-modes = <AXP20X_MODE_FAST AXP20X_MODE_NORMAL>;
 			};
 		};
 	};
