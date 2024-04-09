@@ -88,6 +88,10 @@
 	pinctrl-0 = <&captouch_pins>;
 	pinctrl-1 = <&captouch_pins>;
 
+	// Disable the ETC (environmental tracking and calibration) as it performs
+	// poorly if the device is not grounded and connected to an AC outlet.
+	disable-etc;
+
 	// The values are resonably good defaults for StreamKit210, final
 	// products will have a calibration done.
 	rtk,ctc-diffthr = <500>, <500>, <500>, <500>, <500>, <500>, <500>, <500>, <500>;
