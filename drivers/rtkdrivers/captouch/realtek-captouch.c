@@ -37,6 +37,7 @@ static void realtek_captouch_para_set(struct realtek_ct_init_para *ct_init)
 	ct_init->debounce_ena = 1;
 	ct_init->sample_cnt = 3;
 	ct_init->scan_interval = 30;
+	ct_init->etc_ena = true;
 	ct_init->step = 1;
 	ct_init->factor = 4;
 	ct_init->etc_scan_interval = 3;
@@ -156,7 +157,7 @@ static int realtek_captouch_init(struct realtek_ct_init_para *ct_init)
 	reg_value = CT_BASELINE_UPD_STEP(ct_init->step) | \
 				CT_BASELINE_WT_FACTOR(ct_init->factor) | \
 				CT_ETC_SCAN_INTERVAL(ct_init->etc_scan_interval) | \
-				CT_BIT_ETC_FUNC_CTRL;
+				(ct_init->etc_ena ? CT_BIT_ETC_FUNC_CTRL : 0);
 	writel(reg_value, captouch->base + RTK_CT_ETC_CTRL);
 	writel(CT_BIT_CH_SWITCH_CTRL, captouch->base + RTK_CT_DEBUG_MODE_CTRL);
 
@@ -434,6 +435,8 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 	}
 
 	realtek_captouch_para_set(ct_init);
+	ct_init->etc_ena = !of_property_read_bool(pdev->dev.of_node, "disable-etc");
+
 	ret = realtek_captouch_init(ct_init);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to init captouch: parameter error\n");
