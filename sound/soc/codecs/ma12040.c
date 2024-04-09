@@ -45,8 +45,8 @@ static const struct reg_sequence ma12040_init_sequence[] = {
 	/* change audio input mode to 26dB (increases maximum volume by 6dB) */
 	{ 0x25, 0x30 },
 	/* enable power mode profile PMP01 (Filterfree: optimized audio
-	 * performance, active speaker applications) */
-	{ 0x1d, 0x01 },
+	 * performance, default applications) */
+	{ 0x1d, 0x02 },
 };
 
 struct ma12040_data {
