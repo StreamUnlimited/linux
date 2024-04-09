@@ -268,6 +268,7 @@ struct realtek_ct_chinit_para {
  * @debounce_ena: CapTouch press event Debounce Enable.
  * @sample_cnt: sample count for average function,sample count = 2*exp(sample_cnt+2).
  * @scan_interval: Scan interval of every key.
+ * @etc_ena: Enable ETC (environmental tracking and calibration)
  * @step: Baseline update setp of ETC.
  * @factor: CapTouch ETC Factor.
  * @etc_scan_interval: Baseline update step of ETC.
@@ -277,6 +278,7 @@ struct realtek_ct_init_para {
 	u32 debounce_ena;
 	u32 sample_cnt;
 	u32 scan_interval;
+	bool etc_ena;
 	u32 step;
 	u32 factor;
 	u32 etc_scan_interval;
