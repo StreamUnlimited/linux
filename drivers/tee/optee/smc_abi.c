@@ -1474,21 +1474,6 @@ static int optee_smc_remove(struct platform_device *pdev)
 	return 0;
 }
 
-/* optee_shutdown - Device Removal Routine
- * @pdev: platform device information struct
- *
- * platform_shutdown is called by the platform subsystem to alert
- * the driver that a shutdown, reboot, or kexec is happening and
- * device must be disabled.
- */
-static void optee_shutdown(struct platform_device *pdev)
-{
-	struct optee *optee = platform_get_drvdata(pdev);
-
-	if (!optee->rpc_param_count)
-		optee_disable_shm_cache(optee);
-}
-
 #ifdef CONFIG_OPTEE_INSECURE_LOAD_IMAGE
 
 #define OPTEE_FW_IMAGE "optee/tee.bin"
@@ -1823,7 +1808,6 @@ MODULE_DEVICE_TABLE(of, optee_dt_match);
 static struct platform_driver optee_driver = {
 	.probe  = optee_probe,
 	.remove = optee_smc_remove,
-	.shutdown = optee_shutdown,
 	.driver = {
 		.name = "optee",
 		.of_match_table = optee_dt_match,
