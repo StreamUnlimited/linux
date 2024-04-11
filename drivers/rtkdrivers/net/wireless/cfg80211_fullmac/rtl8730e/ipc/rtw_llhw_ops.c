@@ -53,6 +53,36 @@ func_exit:
 	return ret;
 }
 
+int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg)
+{
+	u32 param_buf[1];
+	dma_addr_t phy_addr;
+	int *pusrcfg_temp = NULL;
+	int ret = 0;
+	struct device *pdev = global_idev.ipc_dev;
+	pusrcfg_temp = kzalloc(sizeof(struct wifi_user_conf), GFP_KERNEL);
+	if (pusrcfg_temp == NULL) {
+		return -1;
+	}
+
+	phy_addr = dma_map_single(pdev, (void *)pusrcfg_temp, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, phy_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		ret = -1;
+		goto free_buf;
+	}
+	param_buf[0] = (u32)phy_addr;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_USR_CFG, param_buf, 1);
+	dma_unmap_single(pdev, phy_addr, sizeof(struct wifi_user_conf), DMA_FROM_DEVICE);
+	memcpy(pwifi_usrcfg, pusrcfg_temp, sizeof(struct wifi_user_conf));
+
+free_buf:
+	kfree((u8 *)pusrcfg_temp);
+
+	return ret;
+}
+
 void llhw_wifi_on(void)
 {
 	u32 param_buf[1];
@@ -105,6 +135,15 @@ int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_NETWROKS, param_buf, 3);
 	dma_unmap_single(pdev, dma_addr_scan_param, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
+
+	return ret;
+}
+
+int llhw_wifi_scan_abort(void)
+{
+	int ret = 0;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_ABORT, NULL, 0);
 
 	return ret;
 }
@@ -670,7 +709,7 @@ int llhw_wifi_stop_nan(void)
 int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 {
 	int ret = 0;
-	u32 param_buf[2];
+	u32 param_buf[3];
 	dma_addr_t dma_addr_func = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
@@ -682,8 +721,9 @@ int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 
 	param_buf[0] = (u32)dma_addr_func;
 	param_buf[1] = (u32)nan_func_pointer;
+	param_buf[2] = (u32)sizeof(rtw_nan_func_info_t);
 
-	ret = llhw_ipc_send_msg(INIC_API_NAN_ADD_FUNC, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_ADD_FUNC, param_buf, 3);
 	dma_unmap_single(pdev, dma_addr_func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
 	return ret;
 }
@@ -741,14 +781,15 @@ int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 	return ret;
 }
 
-int llhw_wifi_set_ch_plan(u8 ch_plan)
+int llhw_wifi_set_ch_plan(u8 ch_plan, u8 tx_power_lmt)
 {
 	int ret = 0;
-	u32 param_buf[1];
+	u32 param_buf[2];
 
 	param_buf[0] = (u32)ch_plan;
+	param_buf[1] = (u32)tx_power_lmt;
 
-	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHPLAN, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHPLAN, param_buf, 2);
 	return ret;
 }
 
@@ -795,3 +836,104 @@ int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16
 	return ret;
 }
 
+int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
+{
+	int ret = 0;
+	u32 param_buf[3];
+	dma_addr_t cus_ie_aphy = 0, ie_phy = 0;
+	u8 *ie_vir = NULL, *vir_array = NULL;
+	rtw_custom_ie_t *cus_ie_array = NULL;
+	u8 i = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	vir_array = kmalloc(sizeof(void *) * num, GFP_KERNEL);
+	if (!vir_array) {
+		dev_dbg(global_idev.fullmac_dev, "%s: malloc vir_array failed.", __func__);
+		return -ENOMEM;
+	}
+
+	cus_ie_array = rtw_malloc(sizeof(rtw_custom_ie_t) * num, &cus_ie_aphy);
+	if (!cus_ie_array) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom ie failed.", __func__);
+		kfree(vir_array);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < num; i++) {
+		cus_ie_array[i].type = type;
+		ie_vir = rtw_malloc(elem[i]->datalen + 2, &ie_phy);
+		if (!ie_vir) {
+			dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
+			rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie_array, cus_ie_aphy);
+			kfree(vir_array);
+			return -ENOMEM;
+		}
+		vir_array[i] = ie_vir;
+		ie_vir[0] = elem[i]->id;
+		ie_vir[1] = elem[i]->datalen;
+		memcpy(ie_vir + 2, elem[i]->data, elem[i]->datalen);
+		cus_ie_array[i].ie = ie_phy;
+	}
+
+	param_buf[0] = (u32)0;
+	param_buf[1] = (u32)cus_ie_aphy;
+	param_buf[2] = (u32)num;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 3);
+
+	for (i = 0; i < num; i++) {
+		rtw_mfree(elem[i]->datalen + 2, (void *)vir_array[i], cus_ie_array[i].ie);
+	}
+	rtw_mfree(sizeof(rtw_custom_ie_t) * num, (void *)cus_ie_array, cus_ie_aphy);
+	kfree(vir_array);
+
+	return ret;
+}
+
+int llhw_wifi_del_custom_ie(unsigned char wlan_idx)
+{
+	int ret = 0;
+	u32 param_buf[2];
+
+	param_buf[0] = (u32)2;
+	param_buf[1] = (u32)wlan_idx;
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 2);
+
+	return ret;
+}
+
+int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
+{
+	int ret = 0;
+	u32 param_buf[3];
+	dma_addr_t cus_ie_aphy = 0, ie_phy = 0;
+	u8 *ie_vir = NULL;
+	rtw_custom_ie_t *cus_ie_array = NULL;
+	struct device *pdev = global_idev.ipc_dev;
+
+	cus_ie_array = rtw_malloc(sizeof(rtw_custom_ie_t), &cus_ie_aphy);
+	if (!cus_ie_array) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom ie failed.", __func__);
+		return -ENOMEM;
+	}
+	cus_ie_array->type = ie[0];
+	ie_vir = rtw_malloc(ie[1] + 2, &ie_phy);
+	if (!ie_vir) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
+		rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie_array, cus_ie_aphy);
+		return -ENOMEM;
+	}
+	memcpy(ie_vir, ie, ie[1] + 2);
+	cus_ie_array->ie = ie_phy;
+
+	param_buf[0] = (u32)1;
+	param_buf[1] = (u32)cus_ie_aphy;
+	param_buf[2] = (u32)ie_index;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 3);
+
+	rtw_mfree(ie[1] + 2, ie_vir, ie_phy);
+	rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie_array, cus_ie_aphy);
+
+	return ret;
+}

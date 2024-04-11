@@ -113,7 +113,7 @@ void LCDC_DMADebugConfig(void __iomem *LCDCx, u32 DmaWriteBack, u32 ImgDestAddr)
 void LCDC_INTConfig(void __iomem *LCDCx, u32 LCDC_IT, u32 NewState)
 {
 	u32 Value32 = readl(LCDCx+LCDC_IRQ_EN_OFFSET);
-	if (NewState != DISABLE) {
+	if (NewState != 0) {
 		/* Enable the selected LCDC interrupts */
 		Value32 |= LCDC_IT;
 	} else {
@@ -231,7 +231,7 @@ void LCDC_Cmd(void __iomem *LCDCx, u32 NewState)
 {
 	u32 TempCtrl = readl(LCDCx+LCDC_CTRL_OFFSET);
 
-	if (NewState != DISABLE) {
+	if (NewState != 0) {
 		/* clear DISABLE bits, or it leads to enable LCDC unsuccessfully*/
 		TempCtrl &= ~LCDC_BIT_DIS;
 
@@ -373,7 +373,7 @@ void LCDC_LayerConfig(void __iomem *LCDCx, u8 LayerId, LCDC_LayerConfigTypeDef *
 	}
 	
 	/*Note: the setting of this layer is not clear by LCDC_BIT_LAYERx_IMG_LAYER_EN bit*/
-	if (DISABLE == EachLayer->LCDC_LayerEn) {
+	if (0 == EachLayer->LCDC_LayerEn) {
 		writel(0,LCDC_Layerx+LCDC_LAYERx_CTRL_OFFSET);
 		return;
 	}
@@ -440,8 +440,8 @@ void LCDC_StructInit(LCDC_InitTypeDef *LCDC_InitStruct)
 	LCDC_InitStruct->LCDC_BgColorBlue = 0;
 
 	for (idx = 0; idx < LCDC_LAYER_MAX_NUM; idx++) {
-		LCDC_InitStruct->layerx[idx].LCDC_LayerEn = DISABLE;
-		LCDC_InitStruct->layerx[idx].LCDC_LayerColorKeyingEn = DISABLE;
+		LCDC_InitStruct->layerx[idx].LCDC_LayerEn = 0;
+		LCDC_InitStruct->layerx[idx].LCDC_LayerColorKeyingEn = 0;
 		LCDC_InitStruct->layerx[idx].LCDC_LayerImgFormat = LCDC_LAYER_IMG_FORMAT_ARGB8888;
 		LCDC_InitStruct->layerx[idx].LCDC_LayerImgBaseAddr = 0;
 		LCDC_InitStruct->layerx[idx].LCDC_LayerHorizontalStart = 0;

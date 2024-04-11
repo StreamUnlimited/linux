@@ -437,7 +437,7 @@ u8 rtk_i2c_receive_data(
 	return data_recved;
 }
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 static void rtk_i2c_isr_handle_tx_abort(
 	struct rtk_i2c_dev *i2c_dev
 )
@@ -490,7 +490,7 @@ static void rtk_i2c_isr_handle_tx_abort(
 		}
 	}
 }
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 hal_status rtk_i2c_flow_init(struct rtk_i2c_dev *i2c_dev)
 {
@@ -626,8 +626,7 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 
 	/* I2C TX Abort Intr */
 	if (intr_status & I2C_BIT_R_TX_ABRT) {
-#if RTK_I2C_AUTO_RE_RECV
-		/* For xperi, if not recv enough bytes, trigger I2C recv agian automatically by driver.*/
+		/* If not recv enough bytes, trigger I2C recv agian automatically by driver.*/
 		if ((rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE)) & I2C_BIT_ABRT_7B_ADDR_NOACK) {
 			/* Read mode: trigger hw retry. */
 			if (((i2c_dev->i2c_manage.dev_status == I2C_STS_RX_ING)
@@ -636,7 +635,7 @@ static irqreturn_t rtk_i2c_isr_event(int irq, void *data)
 				rtk_i2c_receive_master(i2c_dev);
 			}
 		}
-#endif
+
 		if ((rtk_i2c_readl(i2c_dev->base, IC_TX_ABRT_SOURCE)) & I2C_BIT_ARBT_LOST) {
 			/*Acquire the data number in TX FIFO*/
 			i2c_dev->i2c_manage.tx_info.p_data_buf -= rtk_i2c_readl(i2c_dev->base, IC_TXFLR);
@@ -755,13 +754,13 @@ static int rtk_i2c_probe(struct platform_device *pdev)
 		goto clk_free;
 	}
 
-#if RTK_I2C_TODO
-	pm_runtime_set_autosuspend_delay(i2c_dev->dev, RTK_AUTOSUSPEND_DELAY);
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
+	pm_runtime_set_autosuspend_delay(i2c_dev->dev, 2000); /* ms to delay then idle. */
 	pm_runtime_use_autosuspend(i2c_dev->dev);
 	pm_runtime_set_active(i2c_dev->dev);
 	pm_runtime_enable(i2c_dev->dev);
 	pm_runtime_get_noresume(&pdev->dev);
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 	ret = i2c_add_numbered_adapter(adap);
 	if (ret) {
@@ -770,19 +769,19 @@ static int rtk_i2c_probe(struct platform_device *pdev)
 
 	dev_info(i2c_dev->dev, "I2C %d adapter registered\n", adap->nr);
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	pm_runtime_mark_last_busy(i2c_dev->dev);
 	pm_runtime_put_autosuspend(i2c_dev->dev);
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	return 0;
 
 pm_disable:
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	pm_runtime_put_noidle(i2c_dev->dev);
 	pm_runtime_disable(i2c_dev->dev);
 	pm_runtime_set_suspended(i2c_dev->dev);
 	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 clk_free:
 	clk_disable_unprepare(i2c_dev->clock);
@@ -794,19 +793,19 @@ static int rtk_i2c_remove(struct platform_device *pdev)
 	struct rtk_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
 	i2c_del_adapter(&i2c_dev->adap);
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	pm_runtime_get_sync(i2c_dev->dev);
 	pm_runtime_put_noidle(i2c_dev->dev);
 	pm_runtime_disable(i2c_dev->dev);
 	pm_runtime_set_suspended(i2c_dev->dev);
 	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 	clk_disable_unprepare(i2c_dev->clock);
 	return 0;
 }
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 static int rtk_i2c_runtime_suspend(struct device *dev)
 {
 	struct rtk_i2c_dev *i2c_dev = dev_get_drvdata(dev);
@@ -819,10 +818,45 @@ static int rtk_i2c_runtime_resume(struct device *dev)
 	return 0;
 }
 
+static int rtk_i2c_runtime_idle(struct device *dev)
+{
+	struct rtk_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+
+	/* If i2c slave registered, not idle for ever. */
+	return 0;
+}
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
+
+static int rtk_i2c_suspend(struct device *dev)
+{
+	struct rtk_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+
+	i2c_mark_adapter_suspended(&i2c_dev->adap);
+	return 0;
+}
+
+static int rtk_i2c_resume(struct device *dev)
+{
+	struct rtk_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+
+	/* PG MODE: */
+	/* For kernel space i2c-slave client, keep system active if waiting for instructions. */
+	/* When system sleep, unreg the i2c slave. After system resume, reg the slave again. */
+
+	/* CG MODE: slave need do nothing here. */
+
+	i2c_mark_adapter_resumed(&i2c_dev->adap);
+	return 0;
+}
+
 static const struct dev_pm_ops rtk_i2c_pm_ops = {
-	SET_RUNTIME_PM_OPS(rtk_i2c_runtime_suspend, rtk_i2c_runtime_resume, NULL)
+	/* system syspend/resume call: */
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(rtk_i2c_suspend, rtk_i2c_resume)
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
+	/* i2c runtime idle suspend/resume call: */
+	SET_RUNTIME_PM_OPS(rtk_i2c_runtime_suspend, rtk_i2c_runtime_resume, rtk_i2c_runtime_idle)
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 };
-#endif // RTK_I2C_TODO
 
 static const struct of_device_id rtk_i2c_match[] = {
 	{ .compatible = "realtek,amebad2-i2c"},
@@ -834,9 +868,7 @@ static struct platform_driver rtk_i2c_driver = {
 	.driver = {
 		.name = "realtek-amebad2-i2c",
 		.of_match_table = rtk_i2c_match,
-#if RTK_I2C_TODO
 		.pm = &rtk_i2c_pm_ops,
-#endif // RTK_I2C_TODO
 	},
 	.probe = rtk_i2c_probe,
 	.remove = rtk_i2c_remove,

@@ -159,7 +159,7 @@ static const struct file_operations rtk_bt_cdev_fops = {
 
 int rtk_bt_cdev_init(void)
 {
-	int ret;
+	int ret = 0;
 	struct device_node *np;
 	struct device *dev;
 	dev_t devno;

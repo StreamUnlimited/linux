@@ -112,7 +112,7 @@ static const struct wiphy_wowlan_support rtw_wowlan_stub = {
 
 int rtw_wiphy_band_init(struct wiphy *pwiphy, u32 band_type)
 {
-	int n_channels, n_bitrates;
+	int n_channels = 0, n_bitrates = 0;
 	struct ieee80211_supported_band *band = NULL;
 
 	if (band_type == NL80211_BAND_2GHZ) {

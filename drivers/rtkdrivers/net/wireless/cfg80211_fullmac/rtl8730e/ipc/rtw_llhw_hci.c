@@ -135,9 +135,16 @@ int llhw_init(void)
 		goto ipc_deinit;
 	}
 
+	memset(&global_idev.wifi_user_config, 0, sizeof(struct wifi_user_conf));
+	ret = llhw_wifi_get_user_config(&global_idev.wifi_user_config);
+	if (ret < 0) {
+		dev_err(global_idev.fullmac_dev, "get wifi user config failed.(%d).\n", ret);
+		goto ipc_deinit;
+	}
+
 	ret = llhw_xmit_init();
 	if (ret < 0) {
-		dev_err(global_idev.fullmac_dev, "molloc ipc xmit memory failed.(%d).\n", ret);
+		dev_err(global_idev.fullmac_dev, "malloc ipc xmit memory failed.(%d).\n", ret);
 		goto ipc_deinit;
 	}
 

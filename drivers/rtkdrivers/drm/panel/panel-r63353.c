@@ -11,13 +11,14 @@
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
+#include <drm/drm_drv.h>
 #include <video/mipi_display.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio/consumer.h>
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/of_device.h>
-#include <linux/module.h>
+//#include <linux/module.h>
 
 #include "ameba_panel_base.h"
 #include "ameba_panel_priv.h"
@@ -188,7 +189,7 @@ static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
 	{ REGFLAG_DELAY, 120, {}},/* Delayms (120) */
 
 	{ REGFLAG_END_OF_TABLE, 0x00, {}},
-} ;
+};
 
 static int dsi_gpio_reset(int iod,int value,int flag)
 {	
@@ -220,11 +221,11 @@ static int dsi_gpio_reset(int iod,int value,int flag)
 static int r63353_enable(struct drm_panel *panel)
 {
 	struct ameba_panel_desc *desc = panel_to_desc(panel);
-	struct r63353      	*handle = desc->priv;
-	struct device       *dev = desc->dev;
-	int ret;
+	struct r63353           *handle = desc->priv;
+	struct device           *dev = desc->dev;
+	int                     ret;
 
-//	dsi_gpio_reset(dsi->gpio_reset,1,0));
+	//dsi_gpio_reset(dsi->gpio_reset,1,0));
 	dsi_gpio_reset(handle->gpio_v01,1,0);
 	dsi_gpio_reset(handle->gpio_v02,1,0);
 	dsi_gpio_reset(handle->gpio_pwm,0,0);
@@ -239,7 +240,7 @@ static int r63353_enable(struct drm_panel *panel)
 	ret |= dsi_gpio_reset(handle->gpio_reset,1,1);
 	mdelay(10);
 	ret |= dsi_gpio_reset(handle->gpio_pwm,1,1);
-//		mdelay(1000);
+	//mdelay(1000);
 	if (ret) {
 		DRM_ERROR("Failed to set dsi gpio\n");
 		return ret ;
@@ -277,9 +278,8 @@ static int r63353_get_modes(struct drm_panel *panel)
 static int r63353_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct device_node              *np = dev->of_node;
-	enum of_gpio_flags              flags;
 	struct r63353                   *r63353_data;
-	int                             ret;
+	enum of_gpio_flags              flags;
 
 	r63353_data = devm_kzalloc(dev, sizeof(struct r63353), GFP_KERNEL);
 	if (!r63353_data)
@@ -311,13 +311,13 @@ static int r63353_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 		return -ENODEV;
 	}
 
-	return ret;
+	return 0;
 }
 
 static int r63353_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct r63353      *handle = priv_data->priv;
-	AMEBA_DRM_DEBUG
+	AMEBA_DRM_DEBUG();
 
 	//disable gpio 
 	gpio_free(handle->gpio_reset);
@@ -330,19 +330,19 @@ static int r63353_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 }
 
 static struct drm_panel_funcs r63353_panel_funcs = {
-	.disable = r63353_disable,
-	.enable = r63353_enable,
+	.disable   = r63353_disable,
+	.enable    = r63353_enable,
 	.get_modes = r63353_get_modes,
 };
 
 struct ameba_panel_desc panel_r63353_desc = {
-	.dev = NULL,
-	.init_table = r63353_initialization,
+	.dev          = NULL,
+	.priv         = NULL,
+	.init_table   = r63353_initialization,
 	.panel_module = &r63353_mode,
-	.priv = NULL,
-	.rtk_panel_funcs = &r63353_panel_funcs,
+	.rtk_panel_funcs  = &r63353_panel_funcs,
 
-	.init = r63353_probe,
+	.init   = r63353_probe,
 	.deinit = r63353_remove,
 };
 EXPORT_SYMBOL(panel_r63353_desc);

@@ -450,9 +450,7 @@ static const struct watchdog_ops rtk_wdg_ops = {
 };
 
 static const struct watchdog_info rtk_wdg_info = {
-	.options	= WDIOF_KEEPALIVEPING
-	| WDIOF_MAGICCLOSE
-	| WDIOF_SETTIMEOUT,
+	.options	= WDIOF_KEEPALIVEPING,
 	.identity	= KBUILD_MODNAME,
 };
 

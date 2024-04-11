@@ -69,6 +69,7 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, u32 *para
 	int idx = (int)param_buf[0];
 	unsigned char *dev_addr = (u8 *)&param_buf[1];
 	unsigned char last;
+	int softap_addr_offset_idx = global_idev.wifi_user_config.softap_addr_offset_idx;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: set netif info.");
 
@@ -91,8 +92,8 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, u32 *para
 	/*set ap port mac address*/
 	memcpy((void *)global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
 
-	last = global_idev.pndev[0]->dev_addr[5] + 1;
-	memcpy((void *)&global_idev.pndev[1]->dev_addr[5], &last, 1);
+	last = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
+	memcpy((void *)&global_idev.pndev[1]->dev_addr[softap_addr_offset_idx], &last, 1);
 
 func_exit:
 	return;
@@ -169,7 +170,7 @@ static void llhw_event_nan_match_indicate(struct event_priv_t *event_priv, u32 *
 	u8 inst_id = param_buf[1];
 	u8 peer_inst_id = param_buf[2];
 	u32 info_len = param_buf[3];
-	u64 cookie = param_buf[5] << 32 | param_buf[4];
+	u64 cookie = ((u64)param_buf[5] << 32) | param_buf[4];
 	unsigned char *mac_addr = (u8 *)&param_buf[6];
 	unsigned char *IEs = mac_addr + ETH_ALEN;
 

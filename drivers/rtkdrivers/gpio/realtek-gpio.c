@@ -248,13 +248,15 @@ static int realtek_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 {
 	struct realtek_gpio_bank *bank = irq_data_get_irq_chip_data(data);
 	unsigned long flags;
-	u32 mask = BIT(data->hwirq);
+	u32 mask;
 
 	spin_lock_irqsave(&bank->lock, flags);
 
 	switch (type & IRQ_TYPE_SENSE_MASK) {
 	case IRQ_TYPE_EDGE_RISING:
-		writel(~mask, bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask = readl(bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask &= ~BIT(data->hwirq);
+		writel(mask, bank->reg_base + GPIO_INT_BOTHEDGE);
 
 		mask = readl(bank->reg_base + GPIO_INT_TYPE);
 		mask |= BIT(data->hwirq);
@@ -265,7 +267,9 @@ static int realtek_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 		writel(mask, bank->reg_base + GPIO_INT_POLARITY);
 		break;
 	case IRQ_TYPE_EDGE_FALLING:
-		writel(~mask, bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask = readl(bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask &= ~BIT(data->hwirq);
+		writel(mask, bank->reg_base + GPIO_INT_BOTHEDGE);
 
 		mask = readl(bank->reg_base + GPIO_INT_TYPE);
 		mask |= BIT(data->hwirq);
@@ -276,10 +280,14 @@ static int realtek_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 		writel(mask, bank->reg_base + GPIO_INT_POLARITY);
 		break;
 	case IRQ_TYPE_EDGE_BOTH:
+		mask = readl(bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask |= BIT(data->hwirq);
 		writel(mask, bank->reg_base + GPIO_INT_BOTHEDGE);
 		break;
 	case IRQ_TYPE_LEVEL_HIGH:
-		writel(~mask, bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask = readl(bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask &= ~BIT(data->hwirq);
+		writel(mask, bank->reg_base + GPIO_INT_BOTHEDGE);
 
 		mask = readl(bank->reg_base + GPIO_INT_TYPE);
 		mask &= ~BIT(data->hwirq);
@@ -290,7 +298,9 @@ static int realtek_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 		writel(mask, bank->reg_base + GPIO_INT_POLARITY);
 		break;
 	case IRQ_TYPE_LEVEL_LOW:
-		writel(~mask, bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask = readl(bank->reg_base + GPIO_INT_BOTHEDGE);
+		mask &= ~BIT(data->hwirq);
+		writel(mask, bank->reg_base + GPIO_INT_BOTHEDGE);
 
 		mask = readl(bank->reg_base + GPIO_INT_TYPE);
 		mask &= ~BIT(data->hwirq);

@@ -48,6 +48,8 @@ source "drivers/rtkdrivers/mrdump/Kconfig"
 
 source "drivers/rtkdrivers/otp/Kconfig"
 
+source "drivers/rtkdrivers/otp_ipc/Kconfig"
+
 source "drivers/rtkdrivers/pinctrl/Kconfig"
 
 source "drivers/rtkdrivers/pwm/Kconfig"

@@ -13,32 +13,23 @@
 #include <linux/io.h>
 #include <drm/drm_print.h>
 
-
-#ifndef ENABLE
-#define   ENABLE    1
-#endif
-
-#ifndef DISABLE
-#define   DISABLE   0
-#endif
-
-#define LCDC_MAX_REMOTE_DEV 				(2)
+#define LCDC_MAX_REMOTE_DEV                 (2)
 
 //dsi default value
 #define LCDC_KG_COLOR                       0xFFFFFFFF
 #define LCDC_UNDFLOW_COLOR                  0xFFFFFFFF
 
+#define DRM_DEBUG_VALUE                     0x80000000  // enable ameba_drm_debug mask
+
 #define LCDC_LAY_COLOR_KEY                  0x00000000
 #define LCDC_LAY_BLEND_ALPHA                0xff
 
-//while disable lcdc ctl, mipi will show the pattern
-#define ENABLE_LCDC_CTL                     (1)
-//#undef ENABLE_LCDC_CTL 
-
-#define UPDATE_DUMP_LDCD_REG                (10)
-#define UPDATE_DRM_DEBUG_MASK               (20)
+#define TRIGGER_DUMP_LDCD_REG               (10)  // lcdc reg dump
+#define UPDATE_DRM_DEBUG_MASK               (20)  // drm debug mask
+#define UPDATE_AMEBA_DRM_DEBUG              (30)  // enable AMEBA_DRM_DEBUG
+#define TRIGGER_DUMP_DSI_REG                (10)  // dsi reg dump
 
 #define assert_param(expr)                  ((expr) ? (void)0 : printk("[DRM]assert issue:%s,%d",__func__,__LINE__))
-#define AMEBA_DRM_DEBUG                     //DRM_INFO("%s Enter %d\n", __func__, __LINE__);
+#define AMEBA_DRM_DEBUG()                   if(DRM_DEBUG_VALUE == drm_debug)DRM_INFO("%s Enter %d\n", __func__, __LINE__)
 
 #endif  /*_AMEBAD2_DRM_BASE_H_*/

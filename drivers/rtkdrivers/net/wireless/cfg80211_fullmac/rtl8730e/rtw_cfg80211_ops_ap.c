@@ -250,6 +250,8 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	char fake_pwd[] = "12345678";
 	u8 *pwd_vir = NULL;
 	dma_addr_t pwd_phy;
+	u8 elem_num = 0;
+	const struct element *elem, **pelem;
 
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Start Softap\n", FUNC_NDEV_ARG(ndev));
 
@@ -286,13 +288,14 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 			return -EPERM;
 		}
 
-		pwd_vir = rtw_malloc(strlen(fake_pwd), &pwd_phy);
+		/* fix CWE-170, null terminated string, so to add 1. */
+		pwd_vir = rtw_malloc(strlen(fake_pwd) + 1, &pwd_phy);
 		if (!pwd_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			return -ENOMEM;
 		}
 		/* If not fake, copy from upper layer, like WEP(unsupported). */
-		memcpy(pwd_vir, fake_pwd, strlen(fake_pwd));
+		memcpy(pwd_vir, fake_pwd, strlen(fake_pwd) + 1);
 		softAP_config.password = (unsigned char *)pwd_phy;
 		softAP_config.password_len = strlen(fake_pwd);
 		//dev_dbg(global_idev.fullmac_dev, "security_type=0x%x, password=%s, len=%d \n", softAP_config.security_type, softAP_config.password, softAP_config.password_len);
@@ -305,7 +308,40 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	netif_carrier_on(ndev);
 
 	if (pwd_vir) {
-		rtw_mfree(strlen(pwd_vir), pwd_vir, pwd_phy);
+		rtw_mfree(strlen(pwd_vir) + 1, pwd_vir, pwd_phy);
+	}
+
+	if (settings->beacon.beacon_ies_len) {
+		llhw_wifi_del_custom_ie(1);
+
+		/* to get the number of EID_VENDOR_SPECIFIC from beacon_ies */
+		elem_num = 0;
+		for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
+							settings->beacon.beacon_ies,
+							settings->beacon.beacon_ies_len) {
+			elem_num++;
+		}
+
+		if (elem_num != 0) {
+			/* allocate an array to store the pointor of struct element */
+			pelem = kmalloc(sizeof(struct element *) * elem_num, GFP_KERNEL);
+			if (!pelem) {
+				dev_dbg(global_idev.fullmac_dev, "%s: malloc pelem failed.", __func__);
+				return -ENOMEM;
+			}
+
+			elem_num = 0;
+			for_each_element_id(elem, WLAN_EID_VENDOR_SPECIFIC,
+								settings->beacon.beacon_ies,
+								settings->beacon.beacon_ies_len) {
+				pelem[elem_num] = elem;
+				elem_num++;
+			}
+
+			llhw_wifi_add_custom_ie(pelem, elem_num, (BEACON | PROBE_RSP));
+
+			kfree(pelem);
+		}
 	}
 
 	return ret;

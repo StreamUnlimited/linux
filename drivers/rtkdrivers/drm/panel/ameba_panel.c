@@ -12,7 +12,7 @@
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
 #include <drm/drm_drv.h>
-#include <video/mipi_display.h>
+// #include <video/mipi_display.h>
 #include <linux/component.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio/consumer.h>
@@ -24,23 +24,7 @@
 #include "ameba_panel_base.h"
 #include "ameba_panel_priv.h"
 
-//components
-static int panel_bind(struct device *dev, struct device *master, void *data)
-{
-	DRM_INFO("Panel Bind Success!\n");
-	return 0;
-}
-static void panel_unbind(struct device *dev, struct device *master, void *data)
-{
-	DRM_INFO("Run Panel Unbind\n");
-}
-
-static const struct component_ops panel_ops = {
-	.bind	= panel_bind,
-	.unbind	= panel_unbind,
-};
-
-//st7701s
+//panel description
 extern struct ameba_panel_desc panel_st7701s_desc;
 extern struct ameba_panel_desc panel_r63353_desc;
 static const struct of_device_id ameba_panel_match[] = {
@@ -56,12 +40,28 @@ static const struct of_device_id ameba_panel_match[] = {
 };
 MODULE_DEVICE_TABLE(of, ameba_panel_match);
 
+//components
+static int ameba_panel_bind(struct device *dev, struct device *master, void *data)
+{
+	DRM_INFO("Panel Bind Success!\n");
+	return 0;
+}
+
+static void ameba_panel_unbind(struct device *dev, struct device *master, void *data)
+{
+	DRM_INFO("Run Panel Unbind\n");
+}
+
+static const struct component_ops ameba_panel_ops = {
+	.bind	= ameba_panel_bind,
+	.unbind	= ameba_panel_unbind,
+};
 
 static int ameba_panel_probe(struct platform_device *pdev)
 {
-	struct device           *dev = &pdev->dev;
-	const struct of_device_id *id;
-	struct ameba_panel_desc *priv_data;
+	struct device              *dev = &pdev->dev;
+	const struct of_device_id  *id;
+	struct ameba_panel_desc    *priv_data;
 	struct ameba_drm_panel_struct   *ameba_panel;
 	int                             ret = 0;
 
@@ -72,6 +72,8 @@ static int ameba_panel_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	priv_data = (struct ameba_panel_desc *)id->data;
+	if (!priv_data)
+		return -ENODEV;
 
 	ameba_panel = devm_kzalloc(dev, sizeof(struct ameba_drm_panel_struct), GFP_KERNEL);
 	if (!ameba_panel)
@@ -85,7 +87,7 @@ static int ameba_panel_probe(struct platform_device *pdev)
 
 	drm_panel_init(&priv_data->panel);
 
-	if (priv_data && priv_data->init)
+	if (priv_data->init)
 		priv_data->init(dev,priv_data);
 
 	priv_data->panel.dev = dev;
@@ -93,8 +95,9 @@ static int ameba_panel_probe(struct platform_device *pdev)
 
 	ret = drm_panel_add(&priv_data->panel);
 
-	return component_add(dev, &panel_ops);
+	return component_add(dev, &ameba_panel_ops);
 }
+
 static int ameba_panel_remove(struct platform_device *pdev)
 {
 	struct device           *dev = &pdev->dev;
@@ -114,7 +117,7 @@ static int ameba_panel_remove(struct platform_device *pdev)
 
 	drm_panel_remove(&priv_data->panel);
 
-	component_del(dev, &panel_ops);
+	component_del(dev, &ameba_panel_ops);
 
 	return 0;
 }
@@ -132,7 +135,7 @@ static struct platform_driver ameba_panel_driver = {
 static int __init rtk_panel_init(void)
 {
 	int err;
-	AMEBA_DRM_DEBUG
+	AMEBA_DRM_DEBUG();
 	err = platform_driver_register(&ameba_panel_driver);
 	if (err < 0)
 		return err;
@@ -140,9 +143,10 @@ static int __init rtk_panel_init(void)
 	return 0;
 }
 postcore_initcall(rtk_panel_init);//init 2
+
 static void __exit rtk_panel_exit(void)
 {
-	AMEBA_DRM_DEBUG
+	AMEBA_DRM_DEBUG();
 	platform_driver_unregister(&ameba_panel_driver);
 }
 module_exit(rtk_panel_exit);

@@ -18,7 +18,7 @@ void rtk_i2c_master_send(
 				   (i2c_cmd << 8) | (i2c_stop << 9));
 }
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 void rtk_i2c_master_send_null_data(
 	struct rtk_i2c_hw_params *i2c_param,
 	u8 *pbuf, u8 i2c_cmd, u8 i2c_stop, u8 i2c_restart)
@@ -27,7 +27,7 @@ void rtk_i2c_master_send_null_data(
 				   * (pbuf) | (1 << 11) | (i2c_restart << 10) |
 				   (i2c_cmd << 8) | (i2c_stop << 9));
 }
-#endif //RTK_I2C_TODO
+#endif //RTK_I2C_PM_RUNTIME
 
 void rtk_i2c_set_slave_addr(
 	struct rtk_i2c_hw_params *i2c_param, u16 address)
@@ -339,7 +339,7 @@ u8 rtk_i2c_master_write_brk(
 	return cnt;
 }
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 void rtk_i2c_master_read_dw(
 	struct rtk_i2c_hw_params *i2c_param, u8 *pbuf, u8 len)
 {
@@ -382,7 +382,7 @@ void rtk_i2c_master_read_dw(
 
 	*pbuf++ = (u8) rtk_i2c_readl(i2c_param->i2c_dev->base, IC_DATA_CMD);
 }
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 u8 rtk_i2c_master_read(
 	struct rtk_i2c_hw_params *i2c_param, u8 *pbuf, u8 len)
@@ -524,7 +524,6 @@ REOPERATION:
 static hal_status rtk_i2c_receive_int_master(
 	struct rtk_i2c_dev *i2c_dev)
 {
-	u32 i2c_local_len = 0;
 	u8 i2c_stop = 0;
 
 	/* Calculate user time out parameters */
@@ -540,7 +539,6 @@ static hal_status rtk_i2c_receive_int_master(
 
 	/* To fill the master read command into TX FIFO */
 	i2c_dev->i2c_manage.master_rd_cmd_cnt = i2c_dev->i2c_manage.rx_info.data_len;
-	i2c_local_len = 2;
 	i2c_dev->i2c_manage.dev_status = I2C_STS_RX_READY;
 
 	if (i2c_dev->i2c_manage.rx_info.data_len > 0) {
@@ -571,7 +569,7 @@ static hal_status rtk_i2c_receive_int_master(
 		if (i2c_dev->i2c_manage.master_rd_cmd_cnt > 0) {
 			i2c_dev->i2c_manage.master_rd_cmd_cnt--;
 		}
-		i2c_local_len--;
+
 		rtk_i2c_master_send(&i2c_dev->i2c_param, i2c_dev->i2c_manage.rx_info.p_data_buf,
 							I2C_READ_CMD, i2c_stop, 0);
 	}
@@ -794,12 +792,12 @@ static int rtk_i2c_xfer(struct i2c_adapter *i2c_adap,
 	/* Wait for slave hardware read/write flip. */
 	udelay(50);
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	ret = pm_runtime_get_sync(i2c_dev->dev);
 	if (ret < 0) {
 		return ret;
 	}
-#endif //RTK_I2C_TODO
+#endif //RTK_I2C_PM_RUNTIME
 
 	ret = rtk_i2c_wait_free_bus(i2c_dev);
 	if (ret) {
@@ -830,10 +828,10 @@ static int rtk_i2c_xfer(struct i2c_adapter *i2c_adap,
 	}
 
 pm_free:
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	pm_runtime_mark_last_busy(i2c_dev->dev);
 	pm_runtime_put_autosuspend(i2c_dev->dev);
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 	return (ret < 0) ? ret : num;
 }

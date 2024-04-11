@@ -645,11 +645,11 @@ static long	rtk_apll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 {
 	long val;
 
-	/* Rate should be multiple of 40M, and between 800M and 1480M*/
+	/* Rate should be multiple of 40M, and between 800M and 1320M*/
 	if (rate < 800000000) {
 		val = 800000000;
-	} else if (rate > 1480000000) {
-		val = 1480000000;
+	} else if (rate > 1320000000) {
+		val = 1320000000;
 	} else {
 		val = rate;
 	}

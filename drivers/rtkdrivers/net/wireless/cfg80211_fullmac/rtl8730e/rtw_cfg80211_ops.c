@@ -398,6 +398,12 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	struct element *wps_ptr;
 	struct cfg80211_external_auth_params *auth_ext_para = &global_idev.mlme_priv.auth_ext_para;
 
+	if (sme->bssid == NULL) {
+		dev_err(global_idev.fullmac_dev, "=> bssid is NULL!\n");
+		ret = -EINVAL;
+		goto exit;
+	}
+
 	if (ndev) {
 		wlan_idx = rtw_netdev_idx(ndev);
 	} else {

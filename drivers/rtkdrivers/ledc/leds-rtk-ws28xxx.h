@@ -21,8 +21,6 @@
 
 #define RTK_LEDC_TODO				1
 #define RTK_LEDC_TEST_FOR_DMA_MODE		0
-/* DO NOT set this macro while using leds. */
-#define RTK_LEDC_DMA_MODE_DEBUG_LEVEL		0
 
 /***********************************************************************/
 /************************** Hardware Layer *****************************/
@@ -590,6 +588,7 @@
 /**
   * @}
   */
+#define LEDC_TRANS_FAIL_ATTEMPS		300
 
 /** @defgroup LEDC_LED_Num_definitions
   * @{
@@ -624,6 +623,7 @@ struct rtk_ws28xxx_ledc_init {
 	u32				ledc_polarity;
 	u32				ledc_trans_mode;
 	u32				ledc_fifo_level;
+	u32				auto_dma_thred;
 };
 
 struct rtk_ws28xxx_led {
@@ -656,10 +656,6 @@ struct rtk_ledc_dmac_parameters {
 	int				gdma_count;
 	u32				sent_len;
 	struct device			*dma_dev;
-#if RTK_LEDC_DMA_MODE_DEBUG_LEVEL
-	dma_addr_t			dma_test_buf_phy_addr;
-	u8				*dma_test_buf_addr;
-#endif // RTK_LEDC_DMA_MODE_DEBUG_LEVEL
 };
 
 struct rtk_ws28xxx_led_priv {

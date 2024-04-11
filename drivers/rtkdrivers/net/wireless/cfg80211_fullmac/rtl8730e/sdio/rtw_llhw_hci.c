@@ -37,6 +37,9 @@ int llhw_init(void)
 		goto exit;
 	}
 
+	memset(&global_idev.wifi_user_config, sizeof(struct wifi_user_conf), 0);
+	llhw_wifi_get_user_config(&global_idev.wifi_user_config);
+
 	llhw_xmit_init();
 
 	/* tell KM4 to do wifi on? wifi on when insmod ? */

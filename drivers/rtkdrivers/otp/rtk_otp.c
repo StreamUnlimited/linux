@@ -695,11 +695,11 @@ static int rtk_otp_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Initialized successfully\n");
 	return ret;
 exit:
-	if (rtk_otp->mem_base) {
+	if (rtk_otp && rtk_otp->mem_base) {
 		iounmap(rtk_otp->mem_base);
 	}
 
-	if (rtk_otp->sys_base) {
+	if (rtk_otp && rtk_otp->sys_base) {
 		iounmap(rtk_otp->sys_base);
 	}
 

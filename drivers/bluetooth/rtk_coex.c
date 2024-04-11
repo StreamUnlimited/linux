@@ -3067,7 +3067,8 @@ static void check_profileinfo_cmd(void)
 
 static void rtl_cmd_work(struct work_struct *work)
 {
-	check_profileinfo_cmd();
+	// check_profileinfo_cmd();
+	profileinfo_cmd = 1;
 }
 
 void rtk_btcoex_open(struct hci_dev *hdev)

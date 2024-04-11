@@ -25,7 +25,7 @@
 			compatible = "arm,cortex-a32";
 			reg = <0x0>;
 			enable-method = "psci";
-			clock-frequency = <1400000000>;
+			clock-frequency = <1200000000>;
 			clock-latency = <1000000>;
 			clocks = <&rcc RTK_CKE_AP>,
 					<&rcc RTK_CKD_AP>,
@@ -33,15 +33,8 @@
 					<&rcc RTK_CLK_AP_PLL>,
 					<&clk_np_syspll 0>;
 			clock-names = "cpu","cpu-div","cpu-mux","ap-pll","np-pll";
-			freq_tab = < 800000 840000 
-						880000 920000 
-						960000 1000000 
-						1040000 1080000 
-						1120000 1160000 
-						1200000 1240000 
-						1280000 1320000 
-						1360000 1400000
-						1440000 1480000>;
+			freq_tab = < 330000 440000 
+						660000 1320000>;
 		};
 
 		cpu@1 {
@@ -49,7 +42,7 @@
 			compatible = "arm,cortex-a32";
 			reg = <0x1>;
 			enable-method = "psci";
-			clock-frequency = <1400000000>;
+			clock-frequency = <1200000000>;
 			clock-latency = <1000000>;
 			clocks = <&rcc RTK_CKE_AP>,
 					<&rcc RTK_CKD_AP>,
@@ -57,15 +50,8 @@
 					<&rcc RTK_CLK_AP_PLL>,
 					<&clk_np_syspll 0>;
 			clock-names = "cpu","cpu-div","cpu-mux","ap-pll","np-pll";
-			freq_tab = < 800000 840000 
-						880000 920000 
-						960000 1000000 
-						1040000 1080000 
-						1120000 1160000 
-						1200000 1240000 
-						1280000 1320000 
-						1360000 1400000
-						1440000 1480000>;
+			freq_tab = < 330000 440000 
+						660000 1320000>;
 		};
 
 	};

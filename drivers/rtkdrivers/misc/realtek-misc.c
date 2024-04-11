@@ -6,7 +6,6 @@
 */
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -164,7 +163,7 @@ static const struct file_operations rtk_misc_fops = {
 
 int rtk_misc_init(void)
 {
-	int ret;
+	int ret = 0;
 	struct device_node *np;
 	struct device *dev;
 	dev_t devno;

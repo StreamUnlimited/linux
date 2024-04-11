@@ -136,6 +136,7 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_
 	dma_addr_t dma_addr = 0;
 	int idx = (u32)p_ipc_msg->param_buf[0];
 	unsigned char *dev_addr = phys_to_virt(p_ipc_msg->param_buf[1]);
+	int softap_addr_offset_idx = global_idev.wifi_user_config.softap_addr_offset_idx;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: set netif info.");
 
@@ -174,7 +175,7 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_
 
 	/*set ap port mac address*/
 	memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-	global_idev.pndev[1]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] = global_idev.pndev[0]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] + 1;
+	global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
 
 	dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
 
