@@ -143,7 +143,7 @@ static void otp_ipc_host_otp_task(unsigned long data) {
 		goto func_exit;
 	}
 	msg_len = otp_d->otp_ipc_msg.msg_len;
-	p_recv_res = phys_to_virt(otp_d->otp_ipc_msg.msg);
+	p_recv_res = (otp_ipc_rx_res_t *)otp_d->otp_ipc_msg.msg;
 
 	otp_done = 1;
 
@@ -168,6 +168,7 @@ int rtk_otp_process(void* data, u8 *result)
 	int ret = 0;
 	int retry = 0;
 	struct rtk_otp *otp_d = NULL;
+	otp_ipc_rx_res_t __iomem *v_recv_res = NULL;
 
 	if (otp_done) {
 		otp_done = 0;
@@ -193,18 +194,34 @@ int rtk_otp_process(void* data, u8 *result)
 		}
 	}
 
-	if (p_recv_res->ret != 1) {
-			pr_warning("OTP failed but has already complete %d", p_recv_res->complete_num);
-			goto err_ret;
+	if (p_recv_res == NULL) {
+		pr_warning("p_recv_res was NULL\n");
+		goto err_ret;
+	}
+
+	v_recv_res = ioremap_nocache((resource_size_t)p_recv_res, sizeof(*v_recv_res));
+	if (v_recv_res == NULL) {
+		pr_warning("ioremap() failed\n");
+		goto err_ret;
+	}
+
+	if (v_recv_res->ret != 1) {
+		pr_warning("OTP failed but has already complete %d", v_recv_res->complete_num);
+		goto err_ret;
 	}
 
 	otp_d = piihp_priv;
-	ret = p_recv_res->ret;
+	ret = v_recv_res->ret;
 	memcpy(result, otp_d->preq_msg->param_buf, preq_msg->len);
+
+	iounmap(v_recv_res);
+	p_recv_res = NULL;
 
 	return ret;
 
 err_ret:
+	if (v_recv_res)
+		iounmap(v_recv_res);
 	otp_done = 1;
 	return -EINVAL;
 }
