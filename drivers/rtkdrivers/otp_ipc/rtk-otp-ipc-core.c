@@ -103,7 +103,7 @@ int otp_ipc_host_otp_send_msg(otp_ipc_host_req_t *preq_msg)
 	if (!otp_channel_busy) {
 		pr_debug("End no wait.");
 	} else {
-		retry = 100;
+		retry = 5000;
 		while (retry > 0 && otp_channel_busy) {
 			udelay(50);
 			retry--;
@@ -189,7 +189,7 @@ int rtk_otp_process(void* data, u8 *result)
 	while (!otp_done) {
 		retry++;
 		udelay(50);
-		if (retry > 1000) {
+		if (retry > 5000) {
 			goto err_ret;
 		}
 	}
