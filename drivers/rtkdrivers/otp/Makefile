@@ -1,2 +1,2 @@
 obj-$(CONFIG_OTP_RTK_AMEBA)	+= otp.o
-otp-objs := rtk_otp.o realtek-otp-core.o
+otp-objs := rtk_otp.o
