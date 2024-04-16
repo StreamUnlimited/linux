@@ -13,19 +13,14 @@
 
 	cpus {
 		cpu@0 {
-			// This removes the last few (1.24 to 1.48 GHz) entries from
-			// the frequency table as per Realtek confirmation the chip is
-			// only stable up to 1.2 GHz.
-			freq_tab = <800000 840000 880000 920000 960000 1000000
-					1040000 1080000 1120000 1160000 1200000>;
+			clock-frequency = <1280000000>;
+			freq_tab = <640000 1280000>;
+
 		};
 
 		cpu@1 {
-			// This removes the last few (1.24 to 1.48 GHz) entries from
-			// the frequency table as per Realtek confirmation the chip is
-			// only stable up to 1.2 GHz.
-			freq_tab = <800000 840000 880000 920000 960000 1000000
-					1040000 1080000 1120000 1160000 1200000>;
+			clock-frequency = <1280000000>;
+			freq_tab = <640000 1280000>;
 		};
 	};
 
