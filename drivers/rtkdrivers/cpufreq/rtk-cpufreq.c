@@ -105,7 +105,6 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 	int ret, cnt, i;
 	const __be32 *val;
 	struct device *cpu = get_cpu_device(policy->cpu);
-	int match_flag = 0;
 
 	rtk_data = kmalloc(sizeof(struct rtk_cpufreq), GFP_KERNEL);
 	if (!rtk_data) {
@@ -153,9 +152,6 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 	for (i = 0; i < cnt; i++) {
 		freq_tab[i].driver_data = i;
 		freq_tab[i].frequency = be32_to_cpup(val++);
-		if (freq_tab[i].frequency == (rtk_data->cpu_init_rate / 1000)) {
-			match_flag = 1;
-		}
 	}
 
 	freq_tab[i].driver_data = i;
@@ -201,11 +197,9 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 	policy->driver_data = rtk_data;
 	rtk_data->freq_tab = freq_tab;
 
-	/* if cpu initial clock rate is not one of available frequency,
-	   tune cpu clock to the max available frequency*/
-	if (match_flag != 1) {
-		rtk_cpufreq_apll(policy, cnt - 1);
-	}
+	// Configure the APLL once to the maximum frequency, any other frequencies
+	// will only be divided down from this APLL frequency.
+	rtk_cpufreq_apll(policy, cnt - 1);
 
 	cpufreq_generic_init(policy, freq_tab, rtk_data->transition_latency);
 
