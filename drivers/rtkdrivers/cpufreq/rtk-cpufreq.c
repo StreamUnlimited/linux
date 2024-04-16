@@ -68,6 +68,8 @@ static int rtk_cpufreq_apll(struct cpufreq_policy *policy, unsigned int index)
 		pr_err("CPU%d: Failed to re-parent CPU clock\n", policy->cpu);
 		return ret;
 	}
+
+	return 0;
 }
 
 
