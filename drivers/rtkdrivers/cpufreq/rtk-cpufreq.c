@@ -269,6 +269,7 @@ static struct cpufreq_driver rtk_cpufreq_driver = {
 	.verify       = cpufreq_generic_frequency_table_verify,
 	.suspend      = rtk_cpufreq_suspend,
 	.resume       = rtk_cpufreq_resume,
+	.attr         = cpufreq_generic_attr,
 };
 
 
