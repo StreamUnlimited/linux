@@ -246,7 +246,7 @@ static int rtk_cpufreq_resume(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver rtk_cpufreq_driver = {
-	.name         = "realtek-ameba-cpufreq",
+	.name         = "rtk-cpufreq",
 	.flags        = CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.init         = rtk_cpufreq_init,
 	.get          = cpufreq_generic_get,
