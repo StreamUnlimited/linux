@@ -42,11 +42,15 @@
 extern "C" {
 #endif
 
-/** @defgroup WIFI_Exported_Constants WIFI Exported Constants
-  * @{
-  */
+/** @defgroup WIFI_Exported_Types WIFI Exported Types
+* @{
+*/
 
 #define INIC_MAX_SSID_LENGTH (33)
+
+/** @addtogroup Enums
+   *@{
+   */
 
 /**
  * @brief The enumeration lists the results of the function.
@@ -68,9 +72,24 @@ typedef enum {
 #endif
 
 /**
+ * @brief The enumeration lists rcr mode under promisc
+ */
+typedef enum {
+	RCR_ALL_PKT,  /**< all packets */
+	RCR_AP_ALL     /**< only ap related packets */
+} promisc_rcr_mode;
+
+/** @} */
+
+
+/** @addtogroup Structs
+   *@{
+   */
+
+/**
   * @brief  The structure is used to describe the SSID.
   */
-typedef struct rtw_ssid {
+typedef struct {
 	unsigned char		len;     /**< SSID length */
 	unsigned char		val[INIC_MAX_SSID_LENGTH]; /**< SSID name (AP name)  */
 } rtw_ssid_t;
@@ -78,7 +97,7 @@ typedef struct rtw_ssid {
 /**
   * @brief  The structure is used to describe the unique 6-byte MAC address.
   */
-typedef struct rtw_mac {
+typedef struct {
 	unsigned char		octet[6]; /**< Unique 6-byte MAC address */
 } rtw_mac_t;
 
@@ -131,7 +150,7 @@ typedef struct {
 /**
   * @brief  The structure is used for fullmac to get wpa_supplicant's info for STA connect,
   */
-typedef struct rtw_wpa_supp_connect {
+typedef struct {
 	u8 rsnxe_ie[RSNXE_MAX_LEN];
 } rtw_wpa_supp_connect_t;
 
@@ -141,7 +160,7 @@ typedef struct rtw_wpa_supp_connect {
   * @note  The data length of string pointed by ssid should not exceed 32,
   *        and the data length of string pointed by password should not exceed 64.
   */
-typedef struct rtw_softap_info {
+typedef struct {
 	rtw_ssid_t		ssid;
 	unsigned char		hidden_ssid;
 	rtw_security_t		security_type;
@@ -150,7 +169,7 @@ typedef struct rtw_softap_info {
 	unsigned char		channel;
 } rtw_softap_info_t;
 
-typedef struct raw_data_desc {
+typedef struct {
 	unsigned char		wlan_idx;      /**< index of wlan interface which will transmit */
 	unsigned char		*buf;          /**< poninter of buf where raw data is stored*/
 	unsigned short		buf_len;      /**< the length of raw data*/
@@ -201,6 +220,15 @@ struct wpa_sae_param_t {
 	u8					h2e;
 };
 
+#ifdef CONFIG_OWE_SUPPORT
+struct rtw_owe_param_t {
+	u16 group;
+	u8 pub_key[RTW_OWE_KEY_LEN];/*32(Temporarily support group 19 with 256 bit public key)*/
+	u8 pub_key_len;
+	u8 peer_mac[6];
+};
+#endif
+
 /**
   * @brief  The structure is used to describe the phy statistics
   */
@@ -219,33 +247,6 @@ typedef struct {
 	unsigned int	rx_drop;
 	unsigned int	supported_max_rate;
 } rtw_phy_statistics_t;
-
-/** @defgroup API_INFO_Defs
-   *@{
-   */
-/**
-* @brief Create RTW_ENABLE_API_INFO
-*/
-#define RTW_ENABLE_API_INFO
-
-
-/**
-* @brief Create RTW_API_INFO
-*/
-#if defined RTW_ENABLE_API_INFO || defined __DOXYGEN__
-#define RTW_API_INFO printf
-#else
-#define RTW_API_INFO(args)
-#endif
-/** @} */
-
-/**
- * @brief The enumeration lists rcr mode under promisc
- */
-typedef enum {
-	RCR_ALL_PKT,
-	RCR_AP_ALL
-} promisc_rcr_mode;
 
 typedef struct {
 	promisc_rcr_mode filter_mode;
@@ -279,8 +280,34 @@ typedef struct {
 	rtw_wpa_supp_connect_t	wpa_supp;
 	rtw_mac_t		prev_bssid;
 } rtw_network_info_t;
+/** @} */
 
 /** @} */
+
+
+/** @defgroup WIFI_Exported_Constants WIFI Exported Constants
+  * @{
+  */
+
+/** @defgroup API_INFO_Defs
+   *@{
+   */
+/**
+* @brief Create RTW_ENABLE_API_INFO
+*/
+#define RTW_ENABLE_API_INFO
+
+
+/**
+* @brief Create RTW_API_INFO
+*/
+#if defined RTW_ENABLE_API_INFO || defined __DOXYGEN__
+#define RTW_API_INFO printf
+#else
+#define RTW_API_INFO(args)
+#endif
+/** @} */
+
 
 /** @defgroup MAC_Defs
    *@{
@@ -349,6 +376,12 @@ typedef struct {
 #ifndef BIT
 #define BIT(x)	((__u32)1 << (x))
 #endif
+
+/**
+ * @brief  parameters of rf_calibration_disable.
+ */
+#define DIS_DPK BIT(0)
+
 /**
 * @}
 */
@@ -419,10 +452,6 @@ struct rx_pkt_info {
 	u32 len;
 };
 
-/**
- * @brief  parameters of rf_calibration_disable.
- */
-#define DIS_DPK BIT(0)
 
 typedef int (*wifi_do_fast_connect_ptr)(void);
 typedef int (*write_fast_connect_info_ptr)(unsigned int data1, unsigned int data2);
@@ -459,24 +488,25 @@ struct  wifi_user_conf {
 	unsigned char rtw_tx_pwr_by_rate;	///< 0: disable, 1: enable, 2: Depend on efuse(flash)
 	unsigned char rtw_trp_tis_cert_en;
 
-	rtw_wpa_mode wifi_wpa_mode_force;
+	unsigned char wifi_wpa_mode_force;	//rtw_wpa_mode
 	unsigned char tdma_dig_enable;	///0:bb tdma dig on off, 1:bb tdma dig on
 
 	unsigned char g_user_ap_sta_num;
 
-	/* power save */
-	unsigned char lps_dtim;
-	unsigned char lps_enter_threshold;
-	unsigned char rtw_power_mgnt;
-	unsigned char rtw_lps_level;
-	unsigned char smart_ps;
-	unsigned char rtw_ips_level;
+	/* IPS(Inactive power save) */
+	unsigned char ips_enable;
+	unsigned char ips_level;
 	unsigned char ips_ctrl_by_usr;
-#ifdef CONFIG_WMMPS_STA
-	unsigned char	uapsd_enable;
+	/* LPS(leisure power save) */
+	unsigned char lps_enable;
+	unsigned char lps_mode;
+	unsigned char legacy_ps_listen_interval;
+	unsigned char legacy_ps_enter_threshold;
+	unsigned char legacy_ps_use_ps_poll;
+//#ifdef CONFIG_WMMPS_STA
 	unsigned char	uapsd_max_sp_len;
 	unsigned char	uapsd_ac_enable;
-#endif /* CONFIG_WMMPS_STA */
+//#endif /* CONFIG_WMMPS_STA */
 
 	/* AP */
 	unsigned char bForwardingDisabled;
@@ -507,6 +537,8 @@ struct  wifi_user_conf {
 	unsigned char ap_polling_sta;
 
 	unsigned char channel_plan;
+	unsigned char tx_pwr_lmt;
+
 	unsigned char bw_40_enable;
 
 	unsigned char rtw_802_11d_en;
@@ -541,14 +573,6 @@ struct  wifi_user_conf {
 };
 
 extern  struct wifi_user_conf wifi_user_config;
-/**
-  * @brief  The structure is power limit regu map.
-  */
-typedef struct _pwr_lmt_regu_remap {
-	unsigned char	domain_code;
-	unsigned char	PwrLmtRegu_2g;
-	unsigned char	PwrLmtRegu_5g;
-} pwr_lmt_regu_remap;
 
 /**
   * @brief  The structure is used to describe the sw statistics
@@ -570,6 +594,8 @@ struct raw_frame_desc_t {
 	MGN_RATE tx_rate;
 	unsigned char retry_limit;
 	unsigned char ac_queue;		/**< 0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO*/
+	unsigned char sgi;		/* 1 for enable data short */
+	unsigned char agg_en;
 } ;
 
 /**
@@ -707,7 +733,7 @@ typedef struct {
  * 	and type match CUSTOM_IE_TYPE.
  * 	The ie will be transmitted according to the type.
  */
-typedef struct _cus_ie {
+typedef struct {
 	__u8 *ie;
 	__u8 type;
 } rtw_custom_ie_t, *p_rtw_custom_ie_t;
@@ -771,7 +797,9 @@ extern Rltk_wlan_t rltk_wlan_info[NET_IF_NUM];
 * @}
 */
 
-
+/**
+* @}
+*/
 
 /** @defgroup WIFI_Exported_Functions WIFI Exported Functions
   * @{
@@ -928,11 +956,7 @@ int _wifi_off_ap(void);
 * @}
 */
 
-/**
-  ******************************************************************************
-  *below for promisc mode
-  ******************************************************************************
-  */
+/** @} */
 
 /** @} */
 #ifdef __cplusplus

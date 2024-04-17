@@ -39,6 +39,8 @@
 #define DEV_MSG_DUMY_NUM		(64 - (DEV_MSG_PARAM_NUM + 2) * 4)
 
 #define INIC_MP_MSG_BUF_SIZE 4096
+#define NP_SKIP_XMIT_TASK/*https://jira.realtek.com/browse/RSWLANDIOT-7134*/
+
 
 /* ------------------------------- Data Types ------------------------------- */
 enum IPC_WIFI_CTRL_TYPE {
@@ -83,11 +85,11 @@ extern const char *TAG_WLAN_INIC;
 /* -------------------------- Function declaration -------------------------- */
 /*for ipc host*/
 void inic_host_init(void);
-void inic_host_event_int_hdl(void *Data, u32 IrqStatus, u32 ChanNum);
+void inic_host_trx_int_hdl(void *Data, u32 IrqStatus, u32 ChanNum);
 
 /*for ipc device*/
 void inic_dev_init(void);
-void inic_dev_event_int_hdl(void *Data, u32 IrqStatus, u32 ChanNum);
+void inic_dev_trx_int_hdl(void *Data, u32 IrqStatus, u32 ChanNum);
 
 /*for ipc host api*/
 void inic_api_init_host(void);
@@ -113,7 +115,7 @@ void inic_cfg80211_indicate_scan_report(u32 channel, u32 frame_is_bcn, s32 rssi,
 void inic_host_init_skb(void);
 #ifdef CONFIG_NAN
 void inic_cfg80211_indicate_nan_match(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32 info_len, u8 *info, u64 cookie);
-void inic_cfg80211_nan_func_free(void  *data);
+void inic_cfg80211_nan_func_free(u64 data);
 void inic_cfg80211_nan_cfgvendor_event_report(u16 event_id, void *event, int event_len);
 void inic_cfg80211_cfgvendor_send_cmd_reply(void *data, int len);
 #endif

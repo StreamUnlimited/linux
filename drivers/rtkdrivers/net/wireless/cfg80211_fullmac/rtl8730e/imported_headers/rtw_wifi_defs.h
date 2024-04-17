@@ -147,6 +147,7 @@
 #define RTW_MAX_PSK_LEN		RTW_WPA3_MAX_PSK_LEN
 #define RTW_MIN_PSK_LEN		(8)		/**< minimum psk length */
 #define MCSSET_LEN		16		/**<mcsset length */
+#define RTW_OWE_KEY_LEN		32 /*32(Temporarily support group 19 with 256 bit public key)*/
 
 /* adaptivity */
 #define RTW_ADAPTIVITY_EN_DISABLE			0
@@ -419,23 +420,26 @@ typedef enum {
 
 } rtw_country_code_t;
 
+/**
+ * @brief The enumeration lists band type
+ */
 enum band_type {
-	BAND_ON_24G	= 0,
-	BAND_ON_5G	= 1,
-	BAND_ON_6G	= 2,
-	BAND_MAX,
+	BAND_ON_24G	= 0,   /**< band is on 2.4G                          */
+	BAND_ON_5G	= 1,   /**< band is on 5G                          */
+	BAND_ON_6G	= 2,   /**< band is on 6G                          */
+	BAND_MAX,                  /**< max band                          */
 };
 
 /**
  * @brief The enumeration lists wpa mode
  */
 typedef enum {
-	WPA_AUTO_MODE,
-	WPA_ONLY_MODE,
-	WPA2_ONLY_MODE,
-	WPA3_ONLY_MODE,
-	WPA_WPA2_MIXED_MODE,
-	WPA2_WPA3_MIXED_MODE
+	WPA_AUTO_MODE,  /**< wpa auto mode                       */
+	WPA_ONLY_MODE,   /**< wpa only mode                       */
+	WPA2_ONLY_MODE, /**< wpa2 only mode                       */
+	WPA3_ONLY_MODE, /**< wpa3 only mode                       */
+	WPA_WPA2_MIXED_MODE, /**< wpa and wpa2  mixed mode                       */
+	WPA2_WPA3_MIXED_MODE /**< wpa2 and wpa3  mixed mode                       */
 } rtw_wpa_mode;
 
 #define WPA2_MODE_CHECK(wpa_mode) ((wpa_mode == WPA_AUTO_MODE) || (wpa_mode == WPA2_ONLY_MODE) || (wpa_mode == WPA3_ONLY_MODE) || \
@@ -688,9 +692,9 @@ typedef enum {
   * @brief csi alg_opt.
   */
 typedef enum {
-	CSI_ALG_LS = 0,
-	CSI_ALG_SMOTHING,
-	CSI_ALG_MAX
+	CSI_ALG_LS = 0,  /**< ls algo */
+	CSI_ALG_SMOTHING, /**< smothing algo */
+	CSI_ALG_MAX            /**< other algo */
 } rtw_csi_alg_opt;
 
 /**
@@ -718,12 +722,8 @@ typedef enum {
   */
 typedef enum {
 	PS_MODE_ACTIVE	= 0	, ///< active mode
-	PS_MODE_MIN		,       ///< min mode
-	PS_MODE_MAX		,       ///< max mode
-	PS_MODE_DTIM		,      ///<dtim mode
+	PS_MODE_LEGACY		,       ///< legacy mode
 	PS_MODE_UAPSD_WMM	, ///< uapsd wmm mode
-	PS_MODE_UAPSD		,       ///< uapsd mode mode
-	PM_Card_Disable		,      ///<card disable
 } Power_Mgnt;
 
 /**
@@ -897,6 +897,11 @@ typedef enum {
 	WIFI_EVENT_WPA_STA_4WAY_RECV,
 	WIFI_EVENT_WPA_AP_4WAY_RECV,
 	WIFI_EVENT_WPA_SET_PSK_INFO,
+#ifdef CONFIG_OWE_SUPPORT
+	/* owe event */
+	WIFI_EVENT_OWE_START_CALC,
+	WIFI_EVENT_OWE_PEER_KEY_RECV,
+#endif
 
 	/* csi rx done event */
 	WIFI_EVENT_CSI_DONE,
@@ -910,20 +915,17 @@ typedef enum {
 	WIFI_EVENT_MAX,
 } rtw_event_indicate_t;
 
-enum flash_operation {
-	FLASH_READ = 0,
-	FLASH_WRITE,
-};
+/**
+  * The enumeration lists the flash operation status.
+  */
+typedef enum  {
+	FLASH_READ = 0,   /**< read  flash                       */
+	FLASH_WRITE,       /**< write  flash                       */
+} flash_operation;
 
 /**
   * The enumeration lists the power save status.
   */
-typedef enum {
-	LPS_NORMAL = 0, ///< normal
-	LPS_PG,             ///<pg
-	LPS_LEVEL_MAX,
-} lps_level;
-
 typedef enum {
 	IPS_WIFI_OFF = 0,
 	IPS_WIFI_PG,

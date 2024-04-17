@@ -106,6 +106,13 @@ typedef enum _RT_CHANNEL_DOMAIN_5G {
 	RTW_RD_5G_52 = 52,		/*US (include Ch144)(2018 Dec 05 New standard, include ch144)Add FCC 5.9G Channel*/
 	RTW_RD_5G_53 = 53,		/*Korea*/
 	RTW_RD_5G_54 = 54,
+	RTW_RD_5G_55 = 55,      /*5G Worldwide (include Ch144 and FCC 5.9G) Band2&3 w/i DFS for AP mode. */
+	RTW_RD_5G_56 = 56,      /* Canada (w/o Weather radar) (w/o Ch120~Ch128, include Ch144) Add Canada 5.9G Channel*/
+	RTW_RD_5G_57 = 57,      /*Europe*/
+	RTW_RD_5G_58 = 58,      /*Russia*/
+	RTW_RD_5G_59 = 59,      /*Bolivia*/
+	RTW_RD_5G_60 = 60,      /*ETSI (include ch169/ch173)*/
+	RTW_RD_5G_61 = 61,      /*Malaysia(include ch169/ch173)*/
 	//===== Add new channel plan above this line===============//
 	RT_CHANNEL_DOMAIN_5G_MAX
 } RT_CHANNEL_DOMAIN_5G, *PRT_CHANNEL_DOMAIN_5G;
@@ -113,25 +120,27 @@ typedef enum _RT_CHANNEL_DOMAIN_5G {
 // Tx Power Limit Table Size
 typedef enum _REGULATION_TXPWR_LMT {
 	TXPWR_LMT_FCC = 0,
-	TXPWR_LMT_MKK = 1,
-	TXPWR_LMT_ETSI = 2,
-	TXPWR_LMT_IC = 3,
-	TXPWR_LMT_KCC = 4,
-	TXPWR_LMT_ACMA = 5,
-	TXPWR_LMT_CHILE = 6,
-	TXPWR_LMT_MEXICO = 7,
-	TXPWR_LMT_WW = 8, // WW13, The mininum of ETSI,MKK
-	TXPWR_LMT_GL = 9, // Global, The mininum of all
-	TXPWR_LMT_UKRAINE = 10,
-	TXPWR_LMT_CN = 11,
-	TXPWR_LMT_QATAR = 12,
-	TXPWR_LMT_UK = 13,
-	TXPWR_LMT_NCC = 14,
-	TXPWR_LMT_EXT = 15, /* Customer Customization */
-	TXPWR_LMT_NA = 16,  /* Not support, choose NA */
+	TXPWR_LMT_ETSI = 1,     /* CE */
+	TXPWR_LMT_WW = 2,       /* Worldwide, The mininum of all */
+	TXPWR_LMT_MKK = 3,      /* Japan */
+	TXPWR_LMT_IC = 4,       /* Canada */
+	TXPWR_LMT_KCC = 5,      /* South Korea */
+	TXPWR_LMT_CN = 6,       /* China */
+	TXPWR_LMT_ACMA = 7,     /* Australia */
+	TXPWR_LMT_CHILE = 8,    /* Chile */
+	TXPWR_LMT_MEXICO = 9,   /* Mexico */
+	TXPWR_LMT_UKRAINE = 10, /* Ukraine */
+	TXPWR_LMT_QATAR = 11,   /* Qatar */
+	TXPWR_LMT_UK = 12,      /* Great Britain (United Kingdom; England) */
+	TXPWR_LMT_NCC = 13,     /* Taiwan */
+	TXPWR_LMT_EXT = 14,     /* Customer Customization */
+
+	/* ===== Add new power limit above this line. ===== */
+	TXPWR_LMT_MAX           /* Not support */
 } REGULATION_TXPWR_LMT;
 
-#define TXPWR_LMT_MAX_REGULATION_NUM  TXPWR_LMT_NA
+
+#define TXPWR_LMT_MAX_REGULATION_NUM  TXPWR_LMT_MAX
 
 //
 // Channel Plan Type.
@@ -496,7 +505,7 @@ typedef enum _WIRELESS_MODE {
 } WIRELESS_MODE;
 
 #define _HW_MSR_STATE_NOLINK_		0x00
-#define _HW_MSR_STATE_NAN_		0x01
+#define _HW_MSR_STATE_NAN_		0x01		//only smart valid
 #define _HW_MSR_STATE_STATION_ 		0x02
 #define _HW_MSR_STATE_AP_		0x03
 #define _HW_MSR_STATE_MONITOR_		0x04
