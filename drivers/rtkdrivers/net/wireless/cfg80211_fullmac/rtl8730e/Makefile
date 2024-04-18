@@ -7,7 +7,6 @@ ifeq ($(CONFIG_FULLMAC_HCI_IPC),y)
 
 ccflags-$(CONFIG_NAN) += -DCONFIG_NAN
 ccflags-$(CONFIG_FULLMAC_RTK_RTL8730E) += -DCONFIG_FULLMAC
-
 ccflags-$(CONFIG_FULLMAC_RTK_RTL8730E) += -I$(srctree)/$(src)
 ccflags-$(CONFIG_FULLMAC_RTK_RTL8730E) += -I$(srctree)/$(src)/imported_headers
 
@@ -40,12 +39,6 @@ default:
 modules modules_install clean help kernelrelease:
 	$(MAKE) -C $(KDIR) M=$(M) $@
 	$(MAKE) -C $(KDIR) M=$(M)/sdio $@
-
-# Install generated dtbo
-dtbo_install: modules_install
-	d=`echo $(INSTALL_MOD_PATH)/lib/modules/* | sed 's#lib/modules#boot/dtbs#'` && \
-	mkdir -p $$d/overlays && \
-	find $B -name '*.dtbo' -print -exec cp -v {} $$d/overlays \;
 
 endif
 

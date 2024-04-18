@@ -32,20 +32,20 @@ struct rtk_cpufreq {
 	struct clk *mux_clk;
 	struct clk *cpu_clk;
 
+	u32 cpu_init_rate;
 	u32 transition_latency;
 	struct cpufreq_frequency_table *freq_tab;
 	u32 cpu_cur_rate;
 };
 
 
-
-static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int index)
+static int rtk_cpufreq_apll(struct cpufreq_policy *policy, unsigned int index)
 {
 	u32 new_freq;
 	int ret;
 	struct rtk_cpufreq *rtk_data;
-	new_freq = policy->freq_table[index].frequency;
 	rtk_data = policy->driver_data;
+	new_freq = rtk_data->freq_tab[index].frequency;
 
 	/* Reparent mux clock to NP PLL clock*/
 	ret = clk_set_parent(rtk_data->mux_clk, rtk_data->npll_clk);
@@ -68,6 +68,26 @@ static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int 
 		pr_err("CPU%d: Failed to re-parent CPU clock\n", policy->cpu);
 		return ret;
 	}
+}
+
+
+
+static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int index)
+{
+	u32 new_freq;
+	int ret;
+	struct rtk_cpufreq *rtk_data;
+	new_freq = policy->freq_table[index].frequency;
+	rtk_data = policy->driver_data;
+
+	/* method 1: tune AP clock divider.
+	   method 2: tune APLL clock rate.
+	   Now we choose method 1. */
+	ret = clk_set_rate(rtk_data->div_clk, new_freq * 1000);
+	if (ret) {
+		pr_err("Failed to set CPU clock to %dKHz\n", new_freq);
+		return ret;
+	}
 
 	return ret;
 }
@@ -83,6 +103,7 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 	int ret, cnt, i;
 	const __be32 *val;
 	struct device *cpu = get_cpu_device(policy->cpu);
+	int match_flag = 0;
 
 	rtk_data = kmalloc(sizeof(struct rtk_cpufreq), GFP_KERNEL);
 	if (!rtk_data) {
@@ -97,6 +118,11 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 		pr_err("No CPU node found\n");
 		ret = -ENODEV;
 		goto out1;
+	}
+
+	ret = of_property_read_u32(np, "clock-frequency", &rtk_data->cpu_init_rate);
+	if (ret) {
+		rtk_data->cpu_init_rate = 0;
 	}
 
 	ret = of_property_read_u32(np, "clock-latency", &rtk_data->transition_latency);
@@ -125,6 +151,9 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 	for (i = 0; i < cnt; i++) {
 		freq_tab[i].driver_data = i;
 		freq_tab[i].frequency = be32_to_cpup(val++);
+		if (freq_tab[i].frequency == (rtk_data->cpu_init_rate / 1000)) {
+			match_flag = 1;
+		}
 	}
 
 	freq_tab[i].driver_data = i;
@@ -165,10 +194,16 @@ static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 		goto out7;
 	}
 
-	policy->clk = rtk_data->apll_clk;
+	policy->clk = rtk_data->cpu_clk;
 	rtk_data->cpu = cpu;
 	policy->driver_data = rtk_data;
 	rtk_data->freq_tab = freq_tab;
+
+	/* if cpu initial clock rate is not one of available frequency,
+	   tune cpu clock to the max available frequency*/
+	if (match_flag != 1) {
+		rtk_cpufreq_apll(policy, cnt - 1);
+	}
 
 	cpufreq_generic_init(policy, freq_tab, rtk_data->transition_latency);
 

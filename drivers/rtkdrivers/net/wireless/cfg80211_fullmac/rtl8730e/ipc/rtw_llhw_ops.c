@@ -53,6 +53,36 @@ func_exit:
 	return ret;
 }
 
+int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg)
+{
+	u32 param_buf[1];
+	dma_addr_t phy_addr;
+	int *pusrcfg_temp = NULL;
+	int ret = 0;
+	struct device *pdev = global_idev.ipc_dev;
+	pusrcfg_temp = kzalloc(sizeof(struct wifi_user_conf), GFP_KERNEL);
+	if (pusrcfg_temp == NULL) {
+		return -1;
+	}
+
+	phy_addr = dma_map_single(pdev, (void *)pusrcfg_temp, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, phy_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		ret = -1;
+		goto free_buf;
+	}
+	param_buf[0] = (u32)phy_addr;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_USR_CFG, param_buf, 1);
+	dma_unmap_single(pdev, phy_addr, sizeof(struct wifi_user_conf), DMA_FROM_DEVICE);
+	memcpy(pwifi_usrcfg, pusrcfg_temp, sizeof(struct wifi_user_conf));
+
+free_buf:
+	kfree((u8 *)pusrcfg_temp);
+
+	return ret;
+}
+
 void llhw_wifi_on(void)
 {
 	u32 param_buf[1];
@@ -679,7 +709,7 @@ int llhw_wifi_stop_nan(void)
 int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 {
 	int ret = 0;
-	u32 param_buf[2];
+	u32 param_buf[3];
 	dma_addr_t dma_addr_func = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
@@ -691,8 +721,9 @@ int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 
 	param_buf[0] = (u32)dma_addr_func;
 	param_buf[1] = (u32)nan_func_pointer;
+	param_buf[2] = (u32)sizeof(rtw_nan_func_info_t);
 
-	ret = llhw_ipc_send_msg(INIC_API_NAN_ADD_FUNC, param_buf, 2);
+	ret = llhw_ipc_send_msg(INIC_API_NAN_ADD_FUNC, param_buf, 3);
 	dma_unmap_single(pdev, dma_addr_func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
 	return ret;
 }
@@ -750,14 +781,15 @@ int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 	return ret;
 }
 
-int llhw_wifi_set_ch_plan(u8 ch_plan)
+int llhw_wifi_set_ch_plan(u8 ch_plan, u8 tx_power_lmt)
 {
 	int ret = 0;
-	u32 param_buf[1];
+	u32 param_buf[2];
 
 	param_buf[0] = (u32)ch_plan;
+	param_buf[1] = (u32)tx_power_lmt;
 
-	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHPLAN, param_buf, 1);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHPLAN, param_buf, 2);
 	return ret;
 }
 

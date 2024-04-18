@@ -105,6 +105,7 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_
 	struct device *pdev = NULL;
 	int idx = (u32)p_ipc_msg->param_buf[0];
 	unsigned char *dev_addr = km4_phys_to_virt(p_ipc_msg->param_buf[1]);
+	int softap_addr_offset_idx = global_idev.wifi_user_config.softap_addr_offset_idx;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: set netif info.");
 
@@ -137,7 +138,7 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, inic_ipc_
 
 	/*set ap port mac address*/
 	memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-	global_idev.pndev[1]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] = global_idev.pndev[0]->dev_addr[SOFTAP_ADDR_OFFSET_INDEX] + 1;
+	global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
 
 func_exit:
 	return;
@@ -258,7 +259,7 @@ static void llhw_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_priv, 
 		goto func_exit;
 	}
 
-	rtw_cfgvendor_send_cmd_reply(dma_data, size);
+	rtw_cfgvendor_send_cmd_reply(data_addr, size);
 
 func_exit:
 	return;
@@ -289,6 +290,7 @@ void llhw_event_task(unsigned long data)
 		dev_err(global_idev.fullmac_dev, "%s: Invalid device message!\n", "event");
 		goto func_exit;
 	}
+
 	p_recv_msg = km4_phys_to_virt(event_priv->recv_ipc_msg.msg);
 
 	switch (p_recv_msg->enevt_id) {

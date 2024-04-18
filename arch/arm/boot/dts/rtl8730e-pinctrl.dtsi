@@ -218,8 +218,8 @@
 				pins {
 					pinmux = <REALTEK_PINMUX('A', 15, LOG_UART_RTS_CTS)>, // UART0_CTS
 							<REALTEK_PINMUX('A', 16, LOG_UART_RTS_CTS)>,  // UART0_RTS
-							<REALTEK_PINMUX('A', 13, UART_DATA)>,          // UART0_RXD
-							<REALTEK_PINMUX('A', 14, UART_DATA)>;          // UART0_TXD
+							<REALTEK_PINMUX('A', 2, UART_DATA)>,          // UART0_RXD
+							<REALTEK_PINMUX('A', 3, UART_DATA)>;          // UART0_TXD
 					bias-pull-up;
 					slew-rate = <0>;
 					drive-strength = <0>;

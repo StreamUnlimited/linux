@@ -26,7 +26,7 @@
 #include "realtek-adc.h"
 
 /* adc configuration data */
-static const struct realtek_adc_info realtek_adc_cfg = {
+static struct realtek_adc_info realtek_adc_cfg = {
 	.clk_div = 3,
 	.rx_level = 0,
 	.chid_en = 0,
@@ -190,10 +190,9 @@ static void realtek_adc_auto_cmd(struct realtek_adc_data *adc, bool state)
   */
 static void realtek_adc_timtrig_cmd(struct realtek_adc_data *adc, u8 Tim_Idx, u64 PeriodNs, bool state)
 {
-	writel(Tim_Idx, adc->base + RTK_ADC_EXT_TRIG_TIMER_SEL);
-
 	if (state) {
 		rtk_gtimer_init(Tim_Idx, PeriodNs, NULL, NULL);
+		writel(Tim_Idx, adc->base + RTK_ADC_EXT_TRIG_TIMER_SEL);
 		rtk_gtimer_start(Tim_Idx, state);
 	} else {
 		rtk_gtimer_start(Tim_Idx, state);
@@ -213,7 +212,7 @@ static int realtek_adc_single_read(struct iio_dev *indio_dev,
 {
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
 	long timeout;
-	int ret;
+	int ret = IIO_VAL_INT;
 	unsigned long flags;
 	u32 reg_value;
 
@@ -244,9 +243,9 @@ static int realtek_adc_single_read(struct iio_dev *indio_dev,
 		ret = IIO_VAL_INT;
 	} else if (adc->mode == ADC_TIM_TRI_MODE) {
 		reinit_completion(&adc->completion);
-		realtek_adc_int_config(adc, ADC_BIT_IT_CV_END_EN, true);
 		realtek_adc_timtrig_cmd(adc, realtek_adc_cfg.timer_idx, realtek_adc_cfg.period, true);
-		timeout = wait_for_completion_interruptible_timeout(&adc->completion, msecs_to_jiffies(100));
+		realtek_adc_int_config(adc, ADC_BIT_IT_CV_END_EN, true);
+		timeout = wait_for_completion_interruptible_timeout(&adc->completion, msecs_to_jiffies(2000));
 		if (timeout == 0) {
 			ret = -ETIMEDOUT;
 		} else if (timeout < 0) {
@@ -255,7 +254,7 @@ static int realtek_adc_single_read(struct iio_dev *indio_dev,
 			*res = (int) adc->buffer[0];
 			ret = IIO_VAL_INT;
 		}
-		realtek_adc_int_config(adc, (ADC_BIT_IT_CV_END_EN), false);
+		realtek_adc_int_config(adc, ADC_BIT_IT_CV_END_EN, false);
 		rtk_gtimer_deinit(realtek_adc_cfg.timer_idx);
 	}
 
@@ -518,7 +517,7 @@ static int realtek_adc_update_scan_mode(struct iio_dev *indio_dev,
 	//set adc mode and channel list len
 	reg_value = readl(adc->base + RTK_ADC_CONF);
 	reg_value &= ~(ADC_MASK_OP_MOD | ADC_MASK_CVLIST_LEN);
-	reg_value |= ADC_OP_MOD(ADC_AUTO_MODE) | ADC_CVLIST_LEN((i - 1));
+	reg_value |= ADC_OP_MOD(adc->mode) | ADC_CVLIST_LEN((i - 1));
 	writel(reg_value, adc->base + RTK_ADC_CONF);
 	realtek_adc_cmd(adc, true);
 
@@ -577,30 +576,65 @@ static irqreturn_t realtek_adc_isr(int irq, void *data)
 	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
 	u32 status = readl(adc->base + RTK_ADC_INTR_STS);
 	u32 cnt;
+	int ret = 0;
 
 	if (status & ADC_BIT_CV_END_STS) {
-		adc->buffer[0] = ADC_GET_DATA_GLOBAL(readl(adc->base + RTK_ADC_DATA_GLOBAL));
-		realtek_adc_timtrig_cmd(adc, realtek_adc_cfg.timer_idx, 0, false);
-		complete(&adc->completion);
+		/* ADC timer mode end irq. */
+		if ((adc->mode != ADC_TIM_TRI_MODE) || !ADC_GET_FLR(readl(adc->base + RTK_ADC_FLR))) {
+			writel(status, adc->base + RTK_ADC_INTR_STS);
+			return IRQ_HANDLED;
+		}
+		if (iio_buffer_enabled(indio_dev)) {
+			/* Buffer trigger mode. Scan list triggered. */
+			for (cnt = 0; cnt < ((indio_dev->scan_bytes) / 2); cnt++) {
+				adc->buffer[adc->buf_index] = ADC_GET_DATA_GLOBAL(readl(adc->base + RTK_ADC_DATA_GLOBAL));
+				adc->buf_index++;
+			}
+			ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, NULL);
+			adc->buf_index = 0;
+			if (ret < 0) {
+				dev_dbg(&indio_dev->dev, "System buffer is full.");
+				iio_trigger_notify_done(indio_dev->trig);
+				realtek_adc_int_config(adc, (ADC_BIT_IT_CV_END_EN), false);
+				rtk_gtimer_deinit(realtek_adc_cfg.timer_idx);
+			}
+		} else {
+			/* Single trigger mode. Only 1 channel triggered. */
+			adc->buffer[0] = ADC_GET_DATA_GLOBAL(readl(adc->base + RTK_ADC_DATA_GLOBAL));
+			realtek_adc_timtrig_cmd(adc, realtek_adc_cfg.timer_idx, 0, false);
+			complete(&adc->completion);
+		}
 		writel(status, adc->base + RTK_ADC_INTR_STS);
 		return IRQ_HANDLED;
 	} else if (status & ADC_BIT_FIFO_FULL_STS) {
+		/* ADC auto mode irq. */
+		if (adc->mode != ADC_AUTO_MODE) {
+			writel(status, adc->base + RTK_ADC_INTR_STS);
+			return IRQ_HANDLED;
+		}
 		if (iio_buffer_enabled(indio_dev)) {
 			cnt = ADC_GET_FLR(readl(adc->base + RTK_ADC_FLR));
 			while (cnt--) {
 				adc->buffer[adc->buf_index] = ADC_GET_DATA_GLOBAL(readl(adc->base + RTK_ADC_DATA_GLOBAL));
 				adc->buf_index++;
-				if (RTK_ADC_BUF_SIZE <= adc->buf_index) {
-					break;
+				/* scan_bytes u8 -> buffer[i] u16 */
+				if (adc->buf_index == ((indio_dev->scan_bytes) / 2)) {
+					ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, NULL);
+					if (ret < 0) {
+						dev_dbg(&indio_dev->dev, "System buffer is full.");
+						iio_trigger_notify_done(indio_dev->trig);
+						realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), false);
+						realtek_adc_auto_cmd(adc, false);
+						cnt = 0;
+					}
+					adc->buf_index = 0;
 				}
 			}
-
-			if (adc->buf_index >= RTK_ADC_BUF_SIZE) {
-				realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), false);
-				iio_trigger_poll(indio_dev->trig);
-			}
+		} else {
+			realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), false);
+			realtek_adc_auto_cmd(adc, false);
 		}
-
+		writel(status, adc->base + RTK_ADC_INTR_STS);
 		return IRQ_HANDLED;
 	} else if (status & ADC_BIT_FIFO_OVER_STS) {
 		dev_dbg(&indio_dev->dev, "FIFO overflow\n");
@@ -634,15 +668,17 @@ static void realtek_adc_hw_init(struct iio_dev *indio_dev)
 	for (i = 0; i < indio_dev->num_channels; i++) {
 		if (indio_dev->channels[i].differential == 1) {
 			reg_value |= ADC_CH_BIT(indio_dev->channels[i].channel);
-			// Only channels 0-5 correspond to Pins PA0-PA5. We should only
-			// disable digital input for these pins (and not for PA6-PA9)
-			if (indio_dev->channels[i].channel2 < 6)
-				path_reg &= ~ADC_CH_BIT(indio_dev->channels[i].channel2);
+			if (indio_dev->channels[i].channel2 < 6) {
+				/* PINMUX above PA6 is for captouch, do not config in adc. */
+				/* ADC channel6 uses PIN-VBAT. */
+				path_reg &= ~ ADC_CH_BIT(indio_dev->channels[i].channel2);
+			}
 		}
-		// Only channels 0-5 correspond to Pins PA0-PA5. We should only
-		// disable digital input for these pins (and not for PA6-PA9)
-		if (indio_dev->channels[i].channel < 6)
-			path_reg &= ~ADC_CH_BIT(indio_dev->channels[i].channel);
+		if (indio_dev->channels[i].channel < 6) {
+				/* PINMUX above PA6 is for captouch, do not config in adc. */
+				/* ADC channel6 uses PIN-VBAT. */
+				path_reg &= ~ ADC_CH_BIT(indio_dev->channels[i].channel);
+		}
 	}
 	writel(reg_value, adc->base + RTK_ADC_IN_TYPE);
 	// Disable digital path input for adc
@@ -705,6 +741,7 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 	struct iio_chan_spec *channels;
 	int scan_index = 0, ret, i;
 	u32 val = 0, num_channels = 0, num_diff = 0;
+	int nr_requests;
 
 	ret = of_property_count_u32_elems(node, "rtk,adc-channels");
 	if (ret > RTK_ADC_CH_NUM) {
@@ -729,6 +766,14 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 		if (ret) {
 			return ret;
 		}
+	}
+
+	ret = of_property_read_u32(node, "rtk,adc-timer-period", &nr_requests);
+	if (ret) {
+		dev_warn(&indio_dev->dev, "Can't get DTS property rtk,adc-timer-period, set it to default value %d\n", realtek_adc_cfg.period);
+	} else {
+		dev_dbg(&indio_dev->dev, "Get DTS property rtk,adc-timer-period = %d\n", nr_requests);
+		realtek_adc_cfg.period = nr_requests;
 	}
 
 	if (!num_channels) {
@@ -795,13 +840,19 @@ static int realtek_adc_buffer_postenable(struct iio_dev *indio_dev)
 	}
 
 	spin_lock_irqsave(&adc->lock, flags);
+
+	realtek_adc_cmd(adc, false);
+
 	adc->buf_index = 0;
 	realtek_adc_clear_fifo(adc);
 	writel(1, adc->base + RTK_ADC_RST_LIST);
 	writel(0, adc->base + RTK_ADC_RST_LIST);
 	writel(0x3FFFF, adc->base + RTK_ADC_INTR_STS);
-	realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), true);
-	realtek_adc_auto_cmd(adc, true);
+	//realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), true);
+	//realtek_adc_auto_cmd(adc, true);
+
+	realtek_adc_cmd(adc, true);
+
 	spin_unlock_irqrestore(&adc->lock, flags);
 
 	return 0;
@@ -820,7 +871,7 @@ static int realtek_adc_buffer_predisable(struct iio_dev *indio_dev)
 	}
 
 	spin_lock_irqsave(&adc->lock, flags);
-	realtek_adc_auto_cmd(adc, false);
+	realtek_adc_cmd(adc, false);
 
 	for (i = 0; i < RTK_ADC_BUF_SIZE; i++) {
 		dev_dbg(&indio_dev->dev, "Dump data[%d] = 0x%04X\n", i, adc->buffer[i]);
@@ -840,12 +891,37 @@ static irqreturn_t realtek_adc_trigger_handler(int irq, void *private)
 	struct iio_poll_func *pf = private;
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
+	int i = 0, ret = 0;
+	unsigned long flags;
 
-	adc->buf_index = 0;
+	if (adc->mode == ADC_SW_TRI_MODE) {
+		spin_lock_irqsave(&adc->lock, flags);
+		/* scan_bytes u8 -> buffer[i] u16 */
+		for (i = 0; i < (indio_dev->scan_bytes) / 2; i++) {
+			realtek_adc_swtrig_cmd(adc, true);
+			while (realtek_adc_readable(adc) == 0);
+			adc->buffer[i] = ADC_GET_DATA_GLOBAL(readl(adc->base + RTK_ADC_DATA_GLOBAL));
+			realtek_adc_swtrig_cmd(adc, false);
+		}
+		spin_unlock_irqrestore(&adc->lock, flags);
 
-	iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, pf->timestamp);
-
-	iio_trigger_notify_done(indio_dev->trig);
+		ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, pf->timestamp);
+		if (ret < 0) {
+			dev_dbg(&indio_dev->dev, "System buffer is full.");
+		}
+		iio_trigger_notify_done(indio_dev->trig);
+	} else if (adc->mode == ADC_AUTO_MODE) {
+		spin_lock_irqsave(&adc->lock, flags);
+		realtek_adc_clear_fifo(adc);
+		realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), true);
+		realtek_adc_auto_cmd(adc, true);
+		spin_unlock_irqrestore(&adc->lock, flags);
+	} else if (adc->mode == ADC_TIM_TRI_MODE) {
+		spin_lock_irqsave(&adc->lock, flags);
+		realtek_adc_timtrig_cmd(adc, realtek_adc_cfg.timer_idx, realtek_adc_cfg.period, true);
+		realtek_adc_int_config(adc, ADC_BIT_IT_CV_END_EN, true);
+		spin_unlock_irqrestore(&adc->lock, flags);
+	}
 
 	return IRQ_HANDLED;
 }

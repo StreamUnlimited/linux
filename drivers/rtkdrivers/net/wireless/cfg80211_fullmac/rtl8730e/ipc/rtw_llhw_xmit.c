@@ -24,9 +24,10 @@ static struct dev_sk_buff *llhw_find_one_free_skb(u32 *skb_index, bool *b_droppe
 {
 	struct dev_sk_buff *skb;
 	u32 start_idx = *skb_index;
+	int skb_num_ap = global_idev.wifi_user_config.skb_num_ap;
 
 	do {
-		*skb_index = (*skb_index + 1) % SKB_NUM_AP;
+		*skb_index = (*skb_index + 1) % skb_num_ap;
 		skb = &global_idev.xmit_priv.host_skb_info[*skb_index].skb;
 		if (skb->busy == 0) {
 			return skb;
@@ -50,6 +51,7 @@ int llhw_xmit_entry(int idx, struct sk_buff *pskb)
 	bool b_dropped = false;
 	int size = 0;
 	struct inic_ipc_ex_msg ipc_msg = {0};
+	int skb_num_ap = global_idev.wifi_user_config.skb_num_ap;
 
 	/*s1. check free skb num*/
 	if (atomic_read(&global_idev.xmit_priv.skb_free_num) < QUEUE_STOP_THRES) {
@@ -71,7 +73,7 @@ int llhw_xmit_entry(int idx, struct sk_buff *pskb)
 		goto func_exit;
 	}
 	skb->busy = 1;
-	global_idev.xmit_priv.skb_idx = (skb_index + 1) % SKB_NUM_AP;/*next skb, for next tx*/
+	global_idev.xmit_priv.skb_idx = (skb_index + 1) % skb_num_ap;/*next skb, for next tx*/
 	atomic_dec(&global_idev.xmit_priv.skb_free_num);
 	spin_unlock(&(global_idev.xmit_priv.skb_lock));
 
@@ -113,29 +115,30 @@ int llhw_xmit_init(void)
 {
 	struct device *pdev = global_idev.ipc_dev;
 	struct xmit_priv_t *xmit_priv = &global_idev.xmit_priv;
+	int skb_num_ap = global_idev.wifi_user_config.skb_num_ap;
 
 	if (xmit_priv->host_skb_data || xmit_priv->host_skb_info) {
 		dev_err(global_idev.fullmac_dev, "host_skb_info or host_skb_data not mfree|\n");
 		return -ENOMEM;
 	}
 
-	xmit_priv->host_skb_info = (struct skb_info *)dmam_alloc_coherent(pdev, sizeof(struct skb_info) * SKB_NUM_AP, &xmit_priv->host_skb_info_phy, GFP_KERNEL);
+	xmit_priv->host_skb_info = (struct skb_info *)dmam_alloc_coherent(pdev, sizeof(struct skb_info) * skb_num_ap, &xmit_priv->host_skb_info_phy, GFP_KERNEL);
 	if (!xmit_priv->host_skb_info) {
 		dev_err(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
 	}
 
-	xmit_priv->host_skb_data = (struct skb_data *)dmam_alloc_coherent(pdev, sizeof(struct skb_data) * SKB_NUM_AP, &xmit_priv->host_skb_data_phy, GFP_KERNEL);
+	xmit_priv->host_skb_data = (struct skb_data *)dmam_alloc_coherent(pdev, sizeof(struct skb_data) * skb_num_ap, &xmit_priv->host_skb_data_phy, GFP_KERNEL);
 	if (!xmit_priv->host_skb_data) {
 		dev_err(global_idev.fullmac_dev, "%s: malloc failed, free former one and return -ENOMEM.", __func__);
-		dma_free_coherent(pdev, sizeof(struct skb_info) * SKB_NUM_AP, xmit_priv->host_skb_info, xmit_priv->host_skb_info_phy);
+		dma_free_coherent(pdev, sizeof(struct skb_info) * skb_num_ap, xmit_priv->host_skb_info, xmit_priv->host_skb_info_phy);
 		return -ENOMEM;
 	}
 
-	memset(xmit_priv->host_skb_info, 0, sizeof(struct skb_info) * SKB_NUM_AP);
-	memset(xmit_priv->host_skb_data, 0, sizeof(struct skb_data) * SKB_NUM_AP);
+	memset(xmit_priv->host_skb_info, 0, sizeof(struct skb_info) * skb_num_ap);
+	memset(xmit_priv->host_skb_data, 0, sizeof(struct skb_data) * skb_num_ap);
 	spin_lock_init(&(xmit_priv->skb_lock));
-	atomic_set(&global_idev.xmit_priv.skb_free_num, SKB_NUM_AP);
+	atomic_set(&global_idev.xmit_priv.skb_free_num, skb_num_ap);
 
 	return 0;
 }
@@ -144,10 +147,11 @@ void llhw_xmit_deinit(void)
 {
 	struct device *pdev = global_idev.ipc_dev;
 	struct xmit_priv_t *xmit_priv = &global_idev.xmit_priv;
+	int skb_num_ap = global_idev.wifi_user_config.skb_num_ap;
 
 	if (xmit_priv->host_skb_data || xmit_priv->host_skb_info) {
-		dma_free_coherent(pdev, sizeof(struct skb_info) * SKB_NUM_AP, xmit_priv->host_skb_info, xmit_priv->host_skb_info_phy);
-		dma_free_coherent(pdev, sizeof(struct skb_data) * SKB_NUM_AP, xmit_priv->host_skb_data, xmit_priv->host_skb_data_phy);
+		dma_free_coherent(pdev, sizeof(struct skb_info) * skb_num_ap, xmit_priv->host_skb_info, xmit_priv->host_skb_info_phy);
+		dma_free_coherent(pdev, sizeof(struct skb_data) * skb_num_ap, xmit_priv->host_skb_data, xmit_priv->host_skb_data_phy);
 		memset(&global_idev.xmit_priv, 0, sizeof(struct xmit_priv_t));
 	}
 }

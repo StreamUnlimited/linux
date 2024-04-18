@@ -169,7 +169,7 @@ struct rtk_dma_txd *rtk_dma_find_unused_txd(struct rtk_dma_vchan *vchan)
 	for (cnt_txd = 0; cnt_txd < RTK_MAX_TXD_PER_VCHAN; cnt_txd++) {
 		if (vchan->txd[cnt_txd].allocated == false) {
 			txd = &vchan->txd[cnt_txd];
-			memset(txd, 0, RTK_MAX_TXD_PER_VCHAN);
+			memset(txd, 0, sizeof(struct rtk_dma_txd));
 			txd->allocated = true;
 			txd->is_active = true;
 			txd->vchan = vchan;
@@ -832,13 +832,7 @@ static void rtk_dma_desc_free(struct virt_dma_desc *vd)
 	struct rtk_dma *rsdma = NULL;
 	struct rtk_dma_txd *txd = NULL;
 
-	if (!vd) {
-		dev_err(rsdma->dma.dev, "Input vd is null\n");
-		return;
-	}
-
-	if (!vd->tx.chan) {
-		dev_err(rsdma->dma.dev, "Input vd has no channel\n");
+	if (!vd || !vd->tx.chan) {
 		return;
 	}
 
@@ -932,6 +926,7 @@ static int rtk_dma_pause(struct dma_chan *chan)
 
 END_PAUSE_PROCESS:
 	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+
 	return 0;
 }
 

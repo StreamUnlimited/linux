@@ -37,7 +37,7 @@ void rtk_i2c_isr_slave_handle_rx_full(struct rtk_i2c_dev *i2c_dev)
 	u8 data_recved;
 
 	if (!i2c_dev->slave_dev->current_slave) {
-		dev_err(i2c_dev->dev, "Slave-end quit\n");
+		dev_dbg(i2c_dev->dev, "%s: Slave-end quit\n", __func__);
 		return;
 	}
 
@@ -114,8 +114,8 @@ void rtk_i2c_isr_slave_handle_rx_full(struct rtk_i2c_dev *i2c_dev)
 void rkt_i2c_isr_slave_handle_res_done(struct rtk_i2c_dev *i2c_dev)
 {
 	if (!i2c_dev->slave_dev->current_slave) {
-		dev_err(i2c_dev->dev, "Slave-end quit\n");
-		return;
+		dev_dbg(i2c_dev->dev, "%s: Slave-end quit\n", __func__);
+		goto exit;
 	}
 	if (i2c_dev->slave_dev->current_slave->slave) {
 		i2c_slave_event(i2c_dev->slave_dev->current_slave->slave, I2C_SLAVE_STOP, NULL);
@@ -126,6 +126,8 @@ void rkt_i2c_isr_slave_handle_res_done(struct rtk_i2c_dev *i2c_dev)
 		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RD_REQ);
 	}
 
+exit:
+	rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_M_STOP_DET);
 	i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
 	i2c_dev->slave_dev->current_slave = NULL;
 	i2c_dev->slave_dev->broadcast = 0;
@@ -137,8 +139,8 @@ void rtk_i2c_isr_slave_handle_rd_req(struct rtk_i2c_dev *i2c_dev)
 	u8 data_for_send;
 
 	if (!i2c_dev->slave_dev->current_slave) {
-		dev_err(i2c_dev->dev, "Slave-end quit\n");
-		return;
+		dev_dbg(i2c_dev->dev, "%s: Slave-end quit\n", __func__);
+		goto exit;
 	}
 
 	if (i2c_dev->i2c_manage.dev_status != I2C_STS_TX_ING &&
@@ -147,27 +149,37 @@ void rtk_i2c_isr_slave_handle_rd_req(struct rtk_i2c_dev *i2c_dev)
 							I2C_SLAVE_READ_REQUESTED, &data_for_send) < 0) {
 			i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
 			/* Current slave reject the data. */
-			return;
+			goto exit;
 		}
+		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RD_REQ);
 		rtk_i2c_slave_send(&i2c_dev->i2c_param, data_for_send);
+		i2c_dev->i2c_manage.dev_status = I2C_STS_TX_ING;
+		return;
 	}
 
 	i2c_dev->i2c_manage.dev_status = I2C_STS_TX_ING;
 	if (rtk_i2c_check_flag_state(&i2c_dev->i2c_param, BIT_TFNF)) {
+		/* Check master rx done for slave first, then callback the slave send. */
 		if (i2c_slave_event(i2c_dev->slave_dev->current_slave->slave,
 							I2C_SLAVE_READ_PROCESSED, &data_for_send) < 0) {
-			/* Current slave give the last data. */
-			rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RD_REQ);
-			i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
-			return;
+			goto exit;
 		}
+		rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RD_REQ);
 		rtk_i2c_slave_send(&i2c_dev->i2c_param, data_for_send);
+		return;
 	}
+
+exit:
+	dev_err(i2c_dev->dev, "Abort slave tx by no data. Reset i2c slave-end.");
+	rtk_i2c_clear_interrupt(&i2c_dev->i2c_param, I2C_BIT_R_RD_REQ);
+	rtk_i2c_enable_cmd(&i2c_dev->i2c_param, DISABLE);
+	rtk_i2c_enable_cmd(&i2c_dev->i2c_param, ENABLE);
+	i2c_dev->i2c_manage.dev_status = I2C_STS_IDLE;
+	i2c_dev->slave_dev->current_slave = NULL;
+	i2c_dev->slave_dev->broadcast = 0;
 }
 
-static hal_status rtk_i2c_prepare_slave_interrupts(
-	struct rtk_i2c_dev *i2c_dev
-)
+hal_status rtk_i2c_prepare_slave_interrupts(struct rtk_i2c_dev *i2c_dev)
 {
 	rtk_i2c_clear_all_interrupts(&i2c_dev->i2c_param);
 	rtk_i2c_interrupt_config(&i2c_dev->i2c_param,
@@ -208,8 +220,7 @@ static int rtk_i2c_slave_register(
 	return -EINVAL;
 }
 
-static bool rtk_i2c_slave_offline_check(
-	struct rtk_i2c_dev *i2c_dev)
+static bool rtk_i2c_slave_offline_check(struct rtk_i2c_dev *i2c_dev)
 {
 	int i;
 
@@ -263,17 +274,17 @@ static int rtk_i2c_reg_slave(struct i2c_client *slave)
 
 	rtk_i2c_prepare_slave_interrupts(i2c_dev);
 
-#if RTK_I2C_TODO
-	ret = pm_runtime_get_sync(dev);
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
+	ret = pm_runtime_get_sync(i2c_dev->dev);
 	if (ret < 0) {
 		return ret;
 	}
 
 	ret = 0;
 pm_free:
-	pm_runtime_mark_last_busy(dev);
-	pm_runtime_put_autosuspend(dev);
-#endif // RTK_I2C_TODO
+	pm_runtime_mark_last_busy(i2c_dev->dev);
+	pm_runtime_put_autosuspend(i2c_dev->dev);
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	return ret;
 }
 
@@ -299,13 +310,13 @@ static int rtk_i2c_unreg_slave(struct i2c_client *slave)
 		}
 	}
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	int ret;
 	ret = pm_runtime_get_sync(i2c_dev->dev);
 	if (ret < 0) {
 		return ret;
 	}
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 	if (rtk_i2c_slave_offline_check(i2c_dev)) {
 		rtk_i2c_interrupt_config(&i2c_dev->i2c_param, (I2C_BIT_M_RX_FULL |
@@ -318,10 +329,10 @@ static int rtk_i2c_unreg_slave(struct i2c_client *slave)
 		rtk_i2c_init_hw(&i2c_dev->i2c_param);
 	}
 
-#if RTK_I2C_TODO
+#if defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 	pm_runtime_mark_last_busy(i2c_dev->dev);
 	pm_runtime_put_autosuspend(i2c_dev->dev);
-#endif // RTK_I2C_TODO
+#endif // defined(RTK_I2C_PM_RUNTIME) && RTK_I2C_PM_RUNTIME
 
 	return 0;
 }

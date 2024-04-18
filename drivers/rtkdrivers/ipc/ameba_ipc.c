@@ -11,7 +11,6 @@
 /* External head files */
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -190,11 +189,6 @@ static u32 ameba_ipc_find_channel_id(struct aipc_port *pport)
 	u32 id = AIPC_NOT_ASSIGNED_CH;
 	struct aipc_ch_node *chn = NULL;
 
-	if (!pport) {
-		dev_err(pport->dev->dev, "Invalid port\n");
-		goto func_exit;
-	}
-
 	/* Assume is is 0 before polling the channel list */
 	id = 0;
 	list_for_each_entry(chn, &pport->ch_list, list) {
@@ -226,12 +220,6 @@ func_exit:
 static void ameba_ipc_check_channel_id(struct aipc_port *pport, u32 *pid)
 {
 	struct aipc_ch_node *chn = NULL;
-
-	if (!pport) {
-		dev_err(pport->dev->dev, "Invalid port\n");
-		*pid = AIPC_NOT_ASSIGNED_CH;
-		return;
-	}
 
 	list_for_each_entry(chn, &pport->ch_list, list) {
 		if (*pid == chn->ch->ch_id) {
@@ -353,11 +341,6 @@ static irqreturn_t ameba_ipc_int_hdl(int irq, void *dev)
 	struct aipc_port *pport = NULL;
 	u32 reg_isr = 0, reg_imr = 0;
 	unsigned long flags = 0;
-
-	if (!pipc) {
-		dev_err(pipc->dev, "Invalid device\n");
-		goto interrupt_exit;
-	}
 
 	spin_lock_irqsave(&pipc->lock, flags);
 	/**

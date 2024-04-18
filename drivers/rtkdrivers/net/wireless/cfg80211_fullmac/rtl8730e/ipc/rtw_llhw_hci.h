@@ -107,6 +107,9 @@ struct inic_device {
 	u8				wowlan_state; /* 0: resume, 1: suspend */
 
 	void __iomem			*km4_map_start;
+
+	/* wifi user config */
+	struct  wifi_user_conf	wifi_user_config;
 };
 /* TODO: kzalloc to platform device private data instead of axi_data. */
 extern struct inic_device global_idev;

@@ -29,7 +29,8 @@
 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
 			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
-			rtk,adc-mode = <1>;
+			rtk,adc-mode = <0>; // 0: Software-trigger mode, 1: Automatic mode, 2: Timer-trigger mode
+			rtk,adc-timer-period = <200000000>; // Useful only in timer-trigger mode. Unit: ns. Range: 100ms~2s
 			//rtk,adc-channels = <0>, <1>, <2>, <6>;
 			//rtk,adc-diff-channels = <4 5>;
 			nvmem-cells = <&adc_normal_cal>, <&adc_vbat_cal>;
@@ -164,7 +165,8 @@
 			#size-cells = <0>;
 			clocks = <&rcc RTK_CKE_LEDC>;
 			rtk,led-nums = <1>;
-			rtk,leds-dma-enable = <0>;
+			dmas = <&dma 5>;
+			dma-names = "dma_leds_tx";
 			rtk,wait-data-timeout = <0x7FFF>;
 			rtk,output-RGB-mode = <0>; // Refer to spec for details.
 			rtk,data-tx-time0h = <0xD>;
@@ -227,6 +229,10 @@
 			compatible = "realtek,amebad2-otp-logical";
 			reg = <0x42000000 0x400>,
 				<0x42008000 0x1000>;
+		};
+
+		otp_ipc: otp_ipc@0 {
+			compatible = "realtek,amebad2-otp-ipc";
 		};
 
 		rtc: rtc@4200E000 {

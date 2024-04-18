@@ -1498,7 +1498,7 @@ _LONG_CALL_ void MIPI_DSI_CMD_LongPkt_MemQWordRW(void __iomem *MIPIx, u32 Addr, 
 _LONG_CALL_ void MIPI_DSI_Mode_Switch(void __iomem *MIPIx, u32 video);
 _LONG_CALL_ void MIPI_StructInit(MIPI_InitTypeDef *MIPI_InitStruct);
 _LONG_CALL_ void MIPI_DSI_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct);
-_LONG_CALL_ void MIPI_DPHY_init(struct device *dev, void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct);
+_LONG_CALL_ void MIPI_DPHY_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct);
 //_LONG_CALL_ void MIPI_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct);
 _LONG_CALL_ void MIPI_BG_CMD(void __iomem *sys_aip_ctrl, u32 NewStatus);
 /**

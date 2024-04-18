@@ -31,6 +31,10 @@ static void platform_device_init(struct platform_device *pdev)
 
 	/* TODO: axi_data useless in fullmac, clear later. */
 	axi_data = (PAXI_DATA)kzalloc(sizeof(AXI_DATA), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	if (!axi_data) {
+		pr_err("Can't get axi_data\n");
+		goto exit;
+	}
 	paxi_data_global = axi_data;
 
 	ocp_node = of_get_parent(pdev->dev.of_node);

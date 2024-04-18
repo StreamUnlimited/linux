@@ -40,7 +40,6 @@
 /* -------------------------- Function declaration -------------------------- */
 
 /* ---------------------------- Global Variables ---------------------------- */
-#define SKB_NUM_AP		10
 #define QUEUE_STOP_THRES	3
 #define QUEUE_WAKE_THRES	6
 
@@ -54,6 +53,8 @@ struct skb_raw_para {
 	unsigned char rate;
 	unsigned char retry_limit;
 	unsigned char ac_queue;		/*0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO*/
+	unsigned char sgi;		/* 1 for enable data short */
+	unsigned char agg_en;
 };
 
 struct dev_sk_buff {

@@ -33,24 +33,106 @@
 /*
 *	mipi dsi apis
 */
-void DelayUs(u32 time)
+
+/*handle for underflow issue*/
+static u8 ameba_dsi_check_lcdc_ready(void __iomem *LCDCx)
 {
-	ndelay(1000 * time) ;
+	/*get the LCDC Ready state of LCDC_STATUS*/
+	if (readl(LCDCx+LCDC_STATUS_OFFSET) & LCDC_BIT_LCDCREADY) {
+		return true;
+	} else {
+		return false;
+	}
 }
-u32 ameba_lcdc_reg_read(void __iomem *address)
+
+static void ameba_dsi_set_lcdc_status(void __iomem *address, u32 NewState)
+{
+	if (0 == NewState) {
+		ameba_dsi_set_lcdc_state(address, 0);
+	} else {
+		/*enable the LCDC*/
+		ameba_dsi_set_lcdc_state(address, 1);
+		while (!ameba_dsi_check_lcdc_ready(address));
+	}
+}
+
+static void ameba_dsi_send_dcs_cmd(void __iomem *MIPIx, u8 cmd, u8 payload_len, u8 *para_list)
+{
+	u32 word0, word1, addr, idx;
+
+	if (payload_len == 1) {
+		MIPI_DSI_CMD_Send(MIPIx, cmd, para_list[0], 0);
+		return;
+	} else if (payload_len == 2) {
+		MIPI_DSI_CMD_Send(MIPIx, cmd, para_list[0], para_list[1]);
+		return;
+	}
+
+	/* the addr payload_len 1 ~ 8 is 0 */
+	for (addr = 0; addr < (u32)(payload_len + 7) / 8; addr++) {
+		idx = addr * 8;
+		word0 = (para_list[idx + 3] << 24) + (para_list[idx + 2] << 16) + (para_list[idx + 1] << 8) + para_list[idx + 0];
+		word1 = (para_list[idx + 7] << 24) + (para_list[idx + 6] << 16) + (para_list[idx + 5] << 8) + para_list[idx + 4];
+
+		MIPI_DSI_CMD_LongPkt_MemQWordRW(MIPIx, addr, &word0, &word1, false);
+	}
+	MIPI_DSI_CMD_Send(MIPIx, cmd, payload_len, 0);
+}
+
+static void ameba_dsi_send_cmd(void __iomem *MIPIx, LCM_setting_table_t *table, u32 *initdone,u32 *rxcmd)
+{
+	static u8    send_cmd_idx_s = 0;
+	u32          payload_len;
+	u8           cmd, send_flag = false;
+	u8           *para_list;
+
+	while (1) {
+		cmd = table[send_cmd_idx_s].cmd;
+
+		switch (cmd) {
+		case REGFLAG_DELAY:
+			mdelay(table[send_cmd_idx_s].count);
+			break;
+		case REGFLAG_END_OF_TABLE:
+			*initdone = 1;
+			return;
+		default:
+			if (send_flag) {
+				return;
+			}
+			para_list = table[send_cmd_idx_s].para_list;
+			payload_len = table[send_cmd_idx_s].count;
+
+			if(rxcmd) {
+				if(MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM == cmd) {
+					*rxcmd = 1;
+				} else {
+					*rxcmd = 0;
+				}
+			}
+			ameba_dsi_send_dcs_cmd(MIPIx, cmd, payload_len, para_list);
+
+			send_flag = true;
+		}
+		send_cmd_idx_s++;
+	}
+}
+
+u32 ameba_dsi_reg_read(void __iomem *address)
 {
 	return readl(address);
 }
-void ameba_lcdc_reg_write(void __iomem *address,u32 Value32)
+
+void ameba_dsi_reg_write(void __iomem *address,u32 Value32)
 {
 	writel(Value32,address);
 }
-/*handle for underflow issue*/
-static void MIPI_LCDC_Cmd(void __iomem *LCDCx, u32 NewState)
+
+void ameba_dsi_set_lcdc_state(void __iomem *LCDCx, u32 NewState)
 {
 	u32 TempCtrl = readl(LCDCx+LCDC_CTRL_OFFSET);
 
-	if (NewState != DISABLE) {
+	if (NewState != 0) {
 		/* clear DISABLE bits, or it leads to enable LCDC unsuccessfully*/
 		TempCtrl &= ~LCDC_BIT_DIS;
 
@@ -64,34 +146,14 @@ static void MIPI_LCDC_Cmd(void __iomem *LCDCx, u32 NewState)
 
 	writel(TempCtrl,LCDCx+LCDC_CTRL_OFFSET);
 }
-static u8 MIPI_LCDC_CheckLCDCReady(void __iomem *LCDCx)
+
+void ameba_dsi_lcdc_reenable(void __iomem* address)
 {
-	/*get the LCDC Ready state of LCDC_STATUS*/
-	if (readl(LCDCx+LCDC_STATUS_OFFSET) & LCDC_BIT_LCDCREADY) {
-		return true;
-	} else {
-		return false;
-	}
+	ameba_dsi_set_lcdc_status(address, 0);
+	ameba_dsi_set_lcdc_status(address, 1);
 }
 
-void mipi_lcdc_enable(void __iomem *address, u32 NewState)
-{
-	if (DISABLE == NewState) {
-		MIPI_LCDC_Cmd(address, DISABLE);
-	} else {
-		/*enable the LCDC*/
-		MIPI_LCDC_Cmd(address, ENABLE);
-		while (!MIPI_LCDC_CheckLCDCReady(address));
-	}
-}
-void ameba_lcdc_reenable(void __iomem* plcdc_reg)
-{
-	mipi_lcdc_enable(plcdc_reg, DISABLE);
-	mipi_lcdc_enable(plcdc_reg, ENABLE);
-}
-
-
-void MIPI_InitStruct_Config(struct device *dev, MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd)
+void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd)
 {
 	u32 vtotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits, total_bits;
 	u32 MIPI_HACT_g = width;
@@ -167,82 +229,20 @@ void MIPI_InitStruct_Config(struct device *dev, MIPI_InitTypeDef *MIPI_InitStruc
 		MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LineTime, vo_freq, mipi_div);
 }
 
-static void MipiDsi_Send_DCS_Cmd(void __iomem *MIPIx, u8 cmd, u8 payload_len, u8 *para_list)
+void ameba_dsi_do_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u32 *tx_done,u32 *rxcmd,void *init_table)
 {
-	u32 word0, word1, addr, idx;
-
-	if (payload_len == 1) {
-		MIPI_DSI_CMD_Send(MIPIx, cmd, para_list[0], 0);
-		return;
-	} else if (payload_len == 2) {
-		MIPI_DSI_CMD_Send(MIPIx, cmd, para_list[0], para_list[1]);
-		return;
-	}
-
-	/* the addr payload_len 1 ~ 8 is 0 */
-	for (addr = 0; addr < (u32)(payload_len + 7) / 8; addr++) {
-		idx = addr * 8;
-		word0 = (para_list[idx + 3] << 24) + (para_list[idx + 2] << 16) + (para_list[idx + 1] << 8) + para_list[idx + 0];
-		word1 = (para_list[idx + 7] << 24) + (para_list[idx + 6] << 16) + (para_list[idx + 5] << 8) + para_list[idx + 4];
-
-		MIPI_DSI_CMD_LongPkt_MemQWordRW(MIPIx, addr, &word0, &word1, false);
-	}
-	MIPI_DSI_CMD_Send(MIPIx, cmd, payload_len, 0);
-}
-
-static void MipiDsi_Send_Cmd(void __iomem *MIPIx, LCM_setting_table_t *table, u32 *initdone,u32 *rxcmd)
-{
-	static u8    send_cmd_idx_s = 0;
-	u32          payload_len;
-	u8           cmd, send_flag = false;
-	u8           *para_list;
-
-	while (1) {
-		cmd = table[send_cmd_idx_s].cmd;
-
-		switch (cmd) {
-		case REGFLAG_DELAY:
-			mdelay(table[send_cmd_idx_s].count);
-			break;
-		case REGFLAG_END_OF_TABLE:
-			*initdone = 1;
-			return;
-		default:
-			if (send_flag) {
-				return;
-			}
-			para_list = table[send_cmd_idx_s].para_list;
-			payload_len = table[send_cmd_idx_s].count;
-
-			if(rxcmd) {
-				if(MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM == cmd) {
-					*rxcmd = 1;
-				} else {
-					*rxcmd = 0;
-				}
-			}
-			MipiDsi_Send_DCS_Cmd(MIPIx, cmd, payload_len, para_list);
-
-			send_flag = true;
-		}
-		send_cmd_idx_s++;
-	}
-}
-
-void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u32 *tx_done,u32 *rxcmd,void *init_table)
-{
-	u32 initdone = 0 ;
+	u32 initdone = 0;
 	*tx_done = true;
 
 	if(NULL == init_table)
-		return ;
+		return;
 
-	MIPI_DSI_TO1_Set(MIPIx, DISABLE, 0);
-	MIPI_DSI_TO2_Set(MIPIx, ENABLE, 0x7FFFFFFF);
-	MIPI_DSI_TO3_Set(MIPIx, DISABLE, 0);
+	MIPI_DSI_TO1_Set(MIPIx, 0, 0);
+	MIPI_DSI_TO2_Set(MIPIx, 1, 0x7FFFFFFF);
+	MIPI_DSI_TO3_Set(MIPIx, 0, 0);
 
 	//enable ir ,get the cmd send finish issue
-	MIPI_DSI_INT_Config(MIPIx, DISABLE, ENABLE, false);
+	MIPI_DSI_INT_Config(MIPIx, 0, 1, 0);
 	MIPI_DSI_init(MIPIx, MIPI_InitStruct);
 
 	while (1) {
@@ -250,7 +250,7 @@ void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u32
 			*tx_done = 0;
 
 			if (!(initdone)) {
-				MipiDsi_Send_Cmd(MIPIx, init_table, &initdone, rxcmd);
+				ameba_dsi_send_cmd(MIPIx, init_table, &initdone, rxcmd);
 				mdelay(1);
 			} else {
 				break;
@@ -260,13 +260,12 @@ void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u32
 		}
 	}
 
-	MIPI_DSI_INT_Config(MIPIx, DISABLE, DISABLE, false);
+	MIPI_DSI_INT_Config(MIPIx, 0, 0, 0);
 }
 
-void MipiDumpRegValue(struct device *dev, void __iomem *address)
+void ameba_dsi_reg_dump(void __iomem *address)
 {
 	void __iomem *MIPIx = address;
-	(void)dev;
 
 	/*global register*/
 	DRM_INFO( "Dump mipi register value baseaddr : 0x%08x\n", (u32)MIPIx);	
@@ -299,5 +298,3 @@ void MipiDumpRegValue(struct device *dev, void __iomem *address)
 	DRM_INFO( "MIPIx[0x%x] = 0x%08x\n", MIPI_TC5_OFFSET,readl(MIPIx + MIPI_TC5_OFFSET));
 	DRM_INFO( "\n");
 }
-
-//afdsads

@@ -91,9 +91,9 @@ struct rtk_otp {
 
 struct rtk_otp_params {
 	const char *name;
+	bool is_logical;
 	int (*read)(void *priv, unsigned int offset, void *val, size_t bytes);
 	int (*write)(void *priv, unsigned int offset, void *val, size_t bytes);
-	bool is_logical;
 };
 
 static void rtk_otp_wait_for_busy(struct rtk_otp *rtk_otp, u32 flags)
@@ -789,11 +789,11 @@ static int rtk_otp_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Initialized successfully\n");
 	return ret;
 exit:
-	if (rtk_otp->mem_base) {
+	if (rtk_otp && rtk_otp->mem_base) {
 		iounmap(rtk_otp->mem_base);
 	}
 
-	if (rtk_otp->sys_base) {
+	if (rtk_otp && rtk_otp->sys_base) {
 		iounmap(rtk_otp->sys_base);
 	}
 

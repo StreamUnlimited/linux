@@ -8,13 +8,19 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-//#include "ameba_soc.h"
+#include <linux/slab.h>
+#include <linux/delay.h>
 #include <drm/drm_print.h>
 #include "ameba_drm_base.h"
 #include "ameba_mipi.h"
 #include "ameba_drm_comm.h"
 
-void MIPI_DPHY_Reset(void __iomem *MIPIx_)
+static void DelayUs(u32 time)
+{
+	ndelay(1000 * time) ;
+}
+
+static void MIPI_DPHY_Reset(void __iomem *MIPIx_)
 {
 	u32 Value32;
 	u32 MIPIx = (u32) MIPIx_ ;
@@ -46,7 +52,7 @@ void MIPI_DPHY_Reset(void __iomem *MIPIx_)
 	writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
 }
 
-static void MIPI_DPHY_Reset_Release(struct device *dev, void __iomem *MIPIx_, u32 dataLane_freq, u8 lane_num)
+static void MIPI_DPHY_Reset_Release(void __iomem *MIPIx_, u32 dataLane_freq, u8 lane_num)
 {
 	u32 Value32;
 	u8 div4, div2;
@@ -99,7 +105,7 @@ static void MIPI_DPHY_Reset_Release(struct device *dev, void __iomem *MIPIx_, u3
 	DelayUs(4);
 }
 
-void MIPI_DPHY_PLL_Set(struct device *dev, void __iomem *MIPIx_, u32 dataLane_freq)
+static void MIPI_DPHY_PLL_Set(void __iomem *MIPIx_, u32 dataLane_freq)
 {
 	u8 div_number = 1, ncode, xtal_clk = 40;
 	u16 fcode;
@@ -283,12 +289,12 @@ void MIPI_DPHY_Timing_Set(void __iomem *MIPIx_, u32 dataLane_freq)
 #endif
 }
 
-void MIPI_DPHY_init(struct device *dev, void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct)
+void MIPI_DPHY_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct)
 {
 	MIPI_DPHY_Reset(MIPIx);
-	MIPI_DPHY_PLL_Set(dev, MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq);
+	MIPI_DPHY_PLL_Set(MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq);
 	MIPI_DPHY_Timing_Set(MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq);
-	MIPI_DPHY_Reset_Release(dev, MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LaneNum);
+	MIPI_DPHY_Reset_Release(MIPIx, MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LaneNum);
 }
 
 void MIPI_DSI_TC0_Set(void __iomem *MIPIx_, u16 HSA, u16 HACT, u8 VideoDataFormat)
@@ -459,7 +465,7 @@ void MIPI_DSI_TO1_Set(void __iomem *MIPIx_, u8 NewState, u32 TimeoutValue)
 	Value32 = readl((void*)(MIPIx + MIPI_TO1_OFFSET));
 	Value32 &= ~(MIPI_BIT_HSTX_TO_EN | MIPI_MASK_HSTX_TO);
 	/* HSTX Timeout */
-	if (NewState != DISABLE) {
+	if (NewState != 0) {
 		Value32 |= MIPI_BIT_HSTX_TO_EN;
 		Value32 |= MIPI_HSTX_TO(TimeoutValue);
 	}
@@ -474,7 +480,7 @@ void MIPI_DSI_TO2_Set(void __iomem *MIPIx_, u8 NewState, u32 TimeoutValue)
 	Value32 = readl((void*)(MIPIx + MIPI_TO2_OFFSET));
 	Value32 &= ~(MIPI_BIT_LPTX_TO_EN | MIPI_MASK_LPTX_TO);
 	/* LPTX Timeout */
-	if (NewState != DISABLE) {
+	if (NewState != 0) {
 		Value32 |= MIPI_BIT_LPTX_TO_EN;
 		Value32 |= MIPI_LPTX_TO(TimeoutValue);
 	}
@@ -489,7 +495,7 @@ void MIPI_DSI_TO3_Set(void __iomem *MIPIx_, u8 NewState, u32 TimeoutValue)
 	Value32 = readl((void*)(MIPIx + MIPI_TO3_OFFSET));
 	Value32 &= ~(MIPI_BIT_LPRX_TO_EN | MIPI_MASK_LPRX_TO);
 	/* LPRX Timeout */
-	if (NewState != DISABLE) {
+	if (NewState != 0) {
 		Value32 |= MIPI_BIT_LPRX_TO_EN;
 		Value32 |= MIPI_LPRX_TO(TimeoutValue);
 	}
@@ -640,12 +646,12 @@ void MIPI_StructInit(MIPI_InitTypeDef *MIPI_InitStruct)
 	MIPI_InitStruct->MIPI_VideoDataFormat  = MIPI_VIDEO_DATA_FORMAT_RGB888;
 	MIPI_InitStruct->MIPI_VideoModeInterface = MIPI_VIDEO_NON_BURST_MODE_WITH_SYNC_PULSES;
 
-	MIPI_InitStruct->MIPI_TxCrcCalculationEn = ENABLE;
-	MIPI_InitStruct->MIPI_RxEccChkEn = ENABLE;
-	MIPI_InitStruct->MIPI_RxCrcChkEn = ENABLE;
+	MIPI_InitStruct->MIPI_TxCrcCalculationEn = 1;
+	MIPI_InitStruct->MIPI_RxEccChkEn = 1;
+	MIPI_InitStruct->MIPI_RxCrcChkEn = 1;
 
-	MIPI_InitStruct->MIPI_EotpEn = DISABLE;
-	MIPI_InitStruct->MIPI_BTADis = DISABLE;
+	MIPI_InitStruct->MIPI_EotpEn = 0;
+	MIPI_InitStruct->MIPI_BTADis = 0;
 
 	MIPI_InitStruct->MIPI_LaneNum = 2;
 	MIPI_InitStruct->MIPI_FrameRate = 60;

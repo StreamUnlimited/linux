@@ -63,6 +63,19 @@ exit:
 
 }
 
+int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg)
+{
+	u32 size;
+	u32 param_buf[1];
+
+	size = sizeof(struct wifi_user_conf);
+	param_buf[0] = 0;
+
+	llhw_send_msg(INIC_API_WIFI_GET_USR_CFG, (u8 *)param_buf, sizeof(param_buf), (u8 *)pwifi_usrcfg, size);
+
+	return 0;
+}
+
 void llhw_wifi_on(void)
 {
 	u32 param_buf[1];
@@ -139,6 +152,15 @@ int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 	llhw_send_msg(INIC_API_WIFI_SCAN_NETWROKS, (u8 *)param, size, (u8 *)&ret, sizeof(int));
 
 	kfree((void *)param);
+
+	return ret;
+}
+
+int llhw_wifi_scan_abort(void)
+{
+	int ret = 0;
+
+	llhw_send_msg(INIC_API_WIFI_SCAN_ABORT, NULL, 0, (u8 *)&ret, sizeof(int));
 
 	return ret;
 }
@@ -577,6 +599,22 @@ u64 llhw_wifi_get_tsft(u8 iface_type)
 }
 
 #ifdef CONFIG_NAN
+int llhw_wifi_init_nan(void)
+{
+	int ret = 0;
+
+	llhw_send_msg(INIC_API_NAN_INIT, NULL, 0, (u8 *)&ret, sizeof(int));
+	return ret;
+}
+
+int llhw_wifi_deinit_nan(void)
+{
+	int ret = 0;
+
+	llhw_send_msg(INIC_API_NAN_DEINIT, NULL, 0, (u8 *)&ret, sizeof(int));
+	return ret;
+}
+
 int llhw_wifi_start_nan(u8 master_pref, u8 band_support)
 {
 	int ret = 0;
@@ -607,7 +645,8 @@ int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 
 	size = sizeof(rtw_nan_func_info_t) + func->serv_spec_info_len + func->srf_bf_len + func->srf_num_macs * sizeof(struct mac_address)
 		   + (func->num_tx_filters + func->num_rx_filters) * sizeof(struct cfg80211_nan_func_filter) + sizeof(void *);
-	ptr = param = (u32 *)kzalloc(size, GFP_KERNEL);
+	param = (u8 *)kzalloc(size, GFP_KERNEL);
+	ptr = param;
 
 	memcpy(ptr, func, sizeof(rtw_nan_func_info_t));
 	ptr += sizeof(rtw_nan_func_info_t);
@@ -619,7 +658,7 @@ int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 	ptr += func->srf_bf_len;
 
 	memcpy(ptr, func->srf_macs, func->srf_num_macs * sizeof(struct mac_address));
-	ptr += func->func->srf_num_macs * sizeof(struct mac_address);
+	ptr += func->srf_num_macs * sizeof(struct mac_address);
 
 	memcpy(ptr, func->tx_filters, func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter));
 	ptr += func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter);
@@ -689,12 +728,13 @@ int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 	return ret;
 }
 
-int llhw_wifi_set_ch_plan(u8 ch_plan)
+int llhw_wifi_set_ch_plan(u8 ch_plan, u8 tx_power_lmt)
 {
 	int ret = 0;
-	u32 param_buf[1];
+	u32 param_buf[2];
 
 	param_buf[0] = (u32)ch_plan;
+	param_buf[1] = (u32)tx_power_lmt;
 
 	llhw_send_msg(INIC_API_WIFI_SET_CHPLAN, (u8 *)param_buf, sizeof(param_buf), (u8 *)&ret, sizeof(int));
 	return ret;
@@ -735,6 +775,74 @@ int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16
 	memcpy((void *)(param + 3), (void *)buf, buf_len);
 
 	llhw_send_msg(INIC_API_WIFI_SET_GEN_IE, (u8 *)param, size, (u8 *)&ret, sizeof(int));
+
+	kfree((void *)param);
+
+	return ret;
+}
+
+int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
+{
+	int ret = 0;
+	u32 size = 0;
+	u8 *ptr, *param;
+	u8 i = 0;
+
+	size += 2;
+	for (i = 0; i < num; i++) {
+		size += 3 + elem[i]->datalen;
+	}
+
+	ptr = param = (u8 *)kzalloc(size, GFP_KERNEL);
+
+	ptr[0] = 0;
+	ptr[1] = num;
+	ptr += 2;
+
+	for (i = 0; i < num; i++) {
+		ptr[0] = (u8)type;
+		ptr[1] = elem[i]->id;
+		ptr[2] = elem[i]->datalen;
+		memcpy(ptr + 3, elem[i]->data, elem[i]->datalen);
+
+		ptr += 3 + elem[i]->datalen;
+	}
+
+	llhw_send_msg(INIC_API_WIFI_CUS_IE, param, size, (u8 *)&ret, sizeof(int));
+
+	kfree((void *)param);
+
+	return ret;
+}
+
+int llhw_wifi_del_custom_ie(unsigned char wlan_idx)
+{
+	int ret = 0;
+	u8 param[2];
+
+	param[0] = 2;
+	param[1] = wlan_idx;
+	llhw_send_msg(INIC_API_WIFI_CUS_IE, param, 2, (u8 *)&ret, sizeof(int));
+
+	return ret;
+}
+
+int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
+{
+	int ret = 0;
+	u32 size = 0;
+	u8 *ptr, *param;
+
+	size = 2 + 2 + ie[1];
+	ptr = param = (u8 *)kzalloc(size, GFP_KERNEL);
+
+	ptr[0] = 1;
+	ptr[1] = (u8)ie_index;
+	ptr += 2;
+
+	memcpy(ptr, ie, 2 + ie[1]);
+
+	llhw_send_msg(INIC_API_WIFI_CUS_IE, param, size, (u8 *)&ret, sizeof(int));
 
 	kfree((void *)param);
 

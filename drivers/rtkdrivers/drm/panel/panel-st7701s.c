@@ -11,13 +11,14 @@
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
+#include <drm/drm_drv.h>
 #include <video/mipi_display.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio/consumer.h>
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/of_device.h>
-#include <linux/module.h>
+//#include <linux/module.h>
 
 #include "ameba_panel_base.h"
 #include "ameba_panel_priv.h"
@@ -189,11 +190,6 @@ static LCM_setting_table_t kt_pv04005td25e_init[] = {
 	{REGFLAG_END_OF_TABLE, 0x00, {}},
 };
 
-
-static inline void dsi_gpio_set_pin(int gpio_index,u8 Newstatus)
-{
-	gpio_set_value(gpio_index, Newstatus);
-}
 static int dsi_gpio_reset(int iod)
 {
 	int                 req_status;
@@ -213,11 +209,11 @@ static int dsi_gpio_reset(int iod)
 	}
 
 	/* to prevent electric leakage */
-	dsi_gpio_set_pin(iod,1);
+	gpio_set_value(iod,1);
 	mdelay(10);
-	dsi_gpio_set_pin(iod,0);
+	gpio_set_value(iod,0);
 	mdelay(10);
-	dsi_gpio_set_pin(iod,1);
+	gpio_set_value(iod,1);
 	gpio_free(gpio_index);
 
 	mdelay(120);
@@ -227,10 +223,10 @@ static int dsi_gpio_reset(int iod)
 
 static int st7701s_enable(struct drm_panel *panel)
 {
-	struct ameba_panel_desc *desc = panel_to_desc(panel);
-	struct st7701s      *handle = desc->priv;
-	struct device       *dev = desc->dev;
-	int ret;
+	struct ameba_panel_desc  *desc = panel_to_desc(panel);
+	struct st7701s           *handle = desc->priv;
+	struct device            *dev = desc->dev;
+	int                      ret;
 
 	ret = dsi_gpio_reset(handle->gpio);
 	if (ret) {
@@ -271,9 +267,8 @@ static int st7701s_get_modes(struct drm_panel *panel)
 static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct device_node              *np = dev->of_node;
-	enum of_gpio_flags              flags;
 	struct st7701s                  *st7701s_data;
-	int                             ret;
+	enum of_gpio_flags              flags;
 
 	st7701s_data = devm_kzalloc(dev, sizeof(struct st7701s), GFP_KERNEL);
 	if (!st7701s_data)
@@ -288,33 +283,34 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 		return -ENODEV;
 	}
 
-	return ret;
+	return 0;
 }
 
 static int st7701s_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct st7701s      *handle = priv_data->priv;
-	AMEBA_DRM_DEBUG
+	AMEBA_DRM_DEBUG();
 
 	//disable gpio 
 	gpio_free(handle->gpio);
 	//devm_kfree
 	return 0;
 }
+
 static struct drm_panel_funcs st7701s_panel_funcs = {
-	.disable = st7701s_disable,
-	.enable = st7701s_enable,
+	.disable   = st7701s_disable,
+	.enable    = st7701s_enable,
 	.get_modes = st7701s_get_modes,
 };
 
 struct ameba_panel_desc panel_st7701s_desc = {
-	.dev = NULL,
-	.init_table = st7701s_initialization,
+	.dev          = NULL,
+	.priv         = NULL,
+	.init_table   = st7701s_initialization,
 	.panel_module = &st7701s_mode,
-	.priv = NULL,
-	.rtk_panel_funcs = &st7701s_panel_funcs,
+	.rtk_panel_funcs  = &st7701s_panel_funcs,
 
-	.init = st7701s_probe,
+	.init   = st7701s_probe,
 	.deinit = st7701s_remove,
 };
 EXPORT_SYMBOL(panel_st7701s_desc);

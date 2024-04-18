@@ -701,15 +701,16 @@ static void ir_rtk_release(struct rc_dev *dev)
 {
 	struct rtk_ir_dev *ir_rtk = dev->priv;
 
+	if (!ir_rtk) {
+		return;
+	}
+
 	if (ir_rtk->ir_param.ir_rx_enable_mode) {
 		if (!ir_rtk->ir_param.ir_rx_auto) {
 			rtk_ir_start_manual_rx_trigger(ir_rtk, DISABLE);
 		}
 	}
-
-	if (ir_rtk) {
-		ir_rtk_off(ir_rtk);
-	}
+	ir_rtk_off(ir_rtk);
 
 	clear_bit(1, &ir_rtk->ir_manage.device_is_open);
 }

@@ -47,12 +47,12 @@ typedef struct {
 /*
 *	lcdc apis
 */
-static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u32 bgcolor, u16 widht, u16 height)
+static void ameba_lcdc_init_config(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u32 bgcolor, u16 widht, u16 height)
 {
 	u8                    idx ;
 	rgb888_t              bg_color;
 	if (NULL == plcdc_initstruct) {
-		return ;
+		return;
 	}
 	LCDC_StructInit(plcdc_initstruct);
 	plcdc_initstruct->LCDC_ImageWidth = widht;
@@ -64,7 +64,7 @@ static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u3
 	plcdc_initstruct->LCDC_BgColorBlue = bg_color.blue;
 
 	for (idx = 0; idx < LCDC_LAYER_MAX_NUM; idx++) {
-		plcdc_initstruct->layerx[idx].LCDC_LayerEn = DISABLE;
+		plcdc_initstruct->layerx[idx].LCDC_LayerEn = 0;
 		plcdc_initstruct->layerx[idx].LCDC_LayerImgFormat = LCDC_LAYER_IMG_FORMAT_ARGB8888;//default value
 		plcdc_initstruct->layerx[idx].LCDC_LayerImgBaseAddr = (u32)imgbuffer;
 		plcdc_initstruct->layerx[idx].LCDC_LayerHorizontalStart = 1;/*1-based*/
@@ -74,12 +74,59 @@ static void LcdcInitConfig(LCDC_InitTypeDef *plcdc_initstruct, u8 *imgbuffer, u3
 	}
 }
 
+static void ameba_lcdc_dsi_mode_set(void __iomem *MIPIx_, u32 video)
+{
+	u32     MIPIx = (u32) MIPIx_;
+	u32     Value32 = readl((void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET)) ;
+	if (video) {
+		Value32 |= MIPI_BIT_DSI_MODE;
+		writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
+	} else {
+		Value32 &= ~MIPI_BIT_DSI_MODE;
+		writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
+	}
+}
+
+/*handle for underflow issue*/
+static u32 ameba_lcdc_dsi_intr_acpu_get(void __iomem *MIPIx_)
+{
+	u32     MIPIx = (u32) MIPIx_;
+	return readl((void*)(MIPIx + MIPI_INTS_ACPU_OFFSET));
+}
+
+static void ameba_lcdc_dsi_intr_acpu_clr(void __iomem *MIPIx_, u32 DSI_INTS)
+{
+	u32     MIPIx = (u32) MIPIx_;
+	/*clear the specified interrupt*/
+	writel(DSI_INTS, (void*)(MIPIx + MIPI_INTS_ACPU_OFFSET));
+}
+
+static void ameba_lcdc_dsi_intr_config(void __iomem *MIPIx_, u8 AcpuEn, u8 ScpuEN, u8 IntSelAnS)
+{
+	u32     Value32;
+	u32     MIPIx = (u32) MIPIx_;
+
+	Value32 = readl((void*)(MIPIx + MIPI_INTE_OFFSET));
+	Value32 &= ~(MIPI_BIT_INTP_EN_ACPU | MIPI_BIT_INTP_EN | MIPI_BIT_SEL);
+	if (AcpuEn) {
+		Value32 |= MIPI_BIT_INTP_EN_ACPU;
+	}
+	if (ScpuEN) {
+		Value32 |= MIPI_BIT_INTP_EN;
+	}
+
+	if (IntSelAnS) {
+		Value32 |= MIPI_BIT_SEL;
+	}
+	writel(Value32, (void*)(MIPIx + MIPI_INTE_OFFSET));
+}
+
 //lcdc global register APIs
-void LcdcDumpRegValue(struct device *dev, void __iomem *address, const char *filename)
+void ameba_lcdc_reg_dump(void __iomem *address, const char *filename)
 {
 	void __iomem              *pLCDCx =  address;
 	void __iomem              *LCDC_Layerx;
-	u32                       idx ;
+	u32                       idx;
 
 	/*global register*/
 	DRM_INFO("[%s]Dump lcdc register value baseaddr : 0x%08x\n", filename, (u32)pLCDCx);
@@ -127,18 +174,20 @@ void LcdcDumpRegValue(struct device *dev, void __iomem *address, const char *fil
 
 void ameba_lcdc_enable(void __iomem *address, u32 NewState)
 {
-	if (DISABLE == NewState) {
-		LCDC_Cmd(address, DISABLE);
+	if (0 == NewState) {
+		LCDC_Cmd(address, 0);
 	} else {
 		/*enable the LCDC*/
-		LCDC_Cmd(address, ENABLE);
+		LCDC_Cmd(address, 1);
 		while (!LCDC_CheckLCDCReady(address));
 	}
 }
+
 u32 ameba_lcdc_get_irqstatus(void __iomem *address)
 {
 	return LCDC_GetINTStatus(address);
 }
+
 void ameba_lcdc_clean_irqstatus(void __iomem *address, u32 irq)
 {
 	LCDC_ClearINT(address, irq);
@@ -148,24 +197,26 @@ void ameba_lcdc_clean_irqstatus(void __iomem *address, u32 irq)
 void ameba_lcdc_reset_config(LCDC_InitTypeDef *LCDC_InitStruct,u16 width, u16 height,u32 bgcolor)
 {
 	if (NULL == LCDC_InitStruct) {
-		return ;
+		return;
 	}
 	//LCDC_StructInit(LCDC_InitStruct);
-	LcdcInitConfig(LCDC_InitStruct, NULL, bgcolor,width, height);
+	ameba_lcdc_init_config(LCDC_InitStruct, NULL, bgcolor,width, height);
 }
+
 void ameba_lcdc_set_planesize(LCDC_InitTypeDef *LCDC_InitStruct, u16 widht, u16 height)
 {
 	if (NULL == LCDC_InitStruct) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->LCDC_ImageWidth = widht;
 	LCDC_InitStruct->LCDC_ImageHeight = height;
 }
+
 void ameba_lcdc_set_background_color(LCDC_InitTypeDef *LCDC_InitStruct, u32 bgcolor)
 {
 	rgb888_t               bg_color;
 	if (NULL == LCDC_InitStruct) {
-		return ;
+		return;
 	}
 
 	*(u32 *)&bg_color = bgcolor;
@@ -173,13 +224,15 @@ void ameba_lcdc_set_background_color(LCDC_InitTypeDef *LCDC_InitStruct, u32 bgco
 	LCDC_InitStruct->LCDC_BgColorGreen = bg_color.green;
 	LCDC_InitStruct->LCDC_BgColorBlue = bg_color.blue;
 }
+
 void ameba_lcdc_config_setvalid(void __iomem *address, LCDC_InitTypeDef *LCDC_InitStruct)
 {
 	if (NULL == LCDC_InitStruct) {
-		return ;
+		return;
 	}
 	LCDC_Init(address, LCDC_InitStruct);
 }
+
 void ameba_lcdc_enable_SHW(void __iomem *address)
 {
 	LCDC_TrigerSHWReload(address);
@@ -190,148 +243,117 @@ void ameba_lcdc_dma_config_bustsize(void __iomem *address, u32 size)
 {
 	LCDC_DMAModeConfig(address, size);
 }
+
 void ameba_lcdc_dma_config_keeplastFrm(void __iomem *address, u32 DmaUnFlwMode, u32 showData)
 {
 	LCDC_DMAUnderFlowConfig(address, DmaUnFlwMode, showData);
 }
+
 void ameba_lcdc_dma_debug_config(void __iomem *address, u32 writeBackFlag, u32 ImgDestAddr)
 {
 	LCDC_DMADebugConfig(address, writeBackFlag, ImgDestAddr);
 }
+
 void ameba_lcdc_dma_get_unint_cnt(void __iomem *address, u32 *DmaUnIntCnt)
 {
 	LCDC_GetDmaUnINTCnt(address, DmaUnIntCnt);
 }
-
 
 //lcdc irq issue
 void ameba_lcdc_irq_enable(void __iomem *address, u32 LCDC_IT, u32 NewState)
 {
 	LCDC_INTConfig(address, LCDC_IT, NewState);
 }
+
 void ameba_lcdc_irq_linepos(void __iomem *address, u32 LineNum)
 {
 	LCDC_LineINTPosConfig(address, LineNum);
 }
+
 void ameba_lcdc_irq_config(void __iomem *address, u32 intType, u32 NewState)
 {
 	LCDC_INTConfig(address, intType, NewState);
 }
-
 
 ///layer
 void ameba_lcdc_update_layer_reg(void __iomem *address, u8 layid, LCDC_LayerConfigTypeDef *EachLayer)
 {
 	LCDC_LayerConfig(address, layid, EachLayer);
 }
+
 void ameba_lcdc_layer_enable(LCDC_InitTypeDef *LCDC_InitStruct, u8 layid, u8 able)
 {
 	if (NULL == LCDC_InitStruct || layid >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[layid].LCDC_LayerEn = able;
 }
+
 void ameba_lcdc_layer_imgfmt(LCDC_InitTypeDef *LCDC_InitStruct, u8 layid, u32 fmt)
 {
 	if (NULL == LCDC_InitStruct || layid >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[layid].LCDC_LayerImgFormat = fmt;
 }
+
 void ameba_lcdc_layer_imgaddress(LCDC_InitTypeDef *LCDC_InitStruct, u8 layid, u32 imgaddress)
 {
 	if (NULL == LCDC_InitStruct || layid >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[layid].LCDC_LayerImgBaseAddr = imgaddress;
 }
+
 void ameba_lcdc_layer_pos(LCDC_InitTypeDef *LCDC_InitStruct, u8 idx, u16 start_x, u16 stop_x, u16 start_y, u16 stop_y)
 {
 	if (NULL == LCDC_InitStruct || idx >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[idx].LCDC_LayerHorizontalStart = start_x;/*1-based*/
 	LCDC_InitStruct->layerx[idx].LCDC_LayerHorizontalStop = stop_x;
 	LCDC_InitStruct->layerx[idx].LCDC_LayerVerticalStart = start_y;/*1-based*/
 	LCDC_InitStruct->layerx[idx].LCDC_LayerVerticalStop = stop_y;
 }
+
 void ameba_lcdc_layer_colorkey_enable(LCDC_InitTypeDef *LCDC_InitStruct, u8 idx, u8 able)
 {
 	if (NULL == LCDC_InitStruct || idx >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[idx].LCDC_LayerColorKeyingEn = able;
 }
+
 void ameba_lcdc_layer_colorkey_value(LCDC_InitTypeDef *LCDC_InitStruct, u8 idx, u32 colorkey)
 {
 	if (NULL == LCDC_InitStruct || idx >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[idx].LCDC_LayerColorKeyingVal = colorkey;
 }
+
 void ameba_lcdc_layer_blend_value(LCDC_InitTypeDef *LCDC_InitStruct, u8 idx, u8 blend)
 {
 	if (NULL == LCDC_InitStruct || idx >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[idx].LCDC_LayerBlendConfig = blend;
 }
+
 void ameba_lcdc_layer_alpha_value(LCDC_InitTypeDef *LCDC_InitStruct, u8 idx, u8 alpha)
 {
 	if (NULL == LCDC_InitStruct || idx >= LCDC_LAYER_MAX_NUM) {
-		return ;
+		return;
 	}
 	LCDC_InitStruct->layerx[idx].LCDC_LayerConstAlpha = alpha;
 }
 
-/*handle for underflow issue*/
-static u32 LCDC_MIPI_DSI_INTS_ACPU_Get(void __iomem *MIPIx_)
+//underflow issue
+void ameba_lcdc_dsi_underflow_reset(void __iomem *pmipi_reg)
 {
-	u32     MIPIx = (u32) MIPIx_ ;
-	return readl((void*)(MIPIx + MIPI_INTS_ACPU_OFFSET));
-}
-static void LCDC_MIPI_DSI_INTS_ACPU_Clr(void __iomem *MIPIx_, u32 DSI_INTS)
-{
-	u32     MIPIx = (u32) MIPIx_ ;
-	/*clear the specified interrupt*/
-	writel(DSI_INTS, (void*)(MIPIx + MIPI_INTS_ACPU_OFFSET));
-}
-static void LCDC_MIPI_DSI_INT_Config(void __iomem *MIPIx_, u8 AcpuEn, u8 ScpuEN, u8 IntSelAnS)
-{
-	u32     Value32;
-	u32     MIPIx = (u32) MIPIx_ ;
-
-	Value32 = readl((void*)(MIPIx + MIPI_INTE_OFFSET));
-	Value32 &= ~(MIPI_BIT_INTP_EN_ACPU | MIPI_BIT_INTP_EN | MIPI_BIT_SEL);
-	if (AcpuEn) {
-		Value32 |= MIPI_BIT_INTP_EN_ACPU;
-	}
-	if (ScpuEN) {
-		Value32 |= MIPI_BIT_INTP_EN;
-	}
-
-	if (IntSelAnS) {
-		Value32 |= MIPI_BIT_SEL;
-	}
-	writel(Value32, (void*)(MIPIx + MIPI_INTE_OFFSET));
-}
-static void LCDC_MIPI_DSI_Mode_Switch(void __iomem *MIPIx_, u32 video)
-{
-	u32     MIPIx = (u32) MIPIx_ ;
-	u32     Value32 = readl((void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET)) ;
-	if (video) {
-		Value32 |= MIPI_BIT_DSI_MODE;
-		writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
-	} else {
-		Value32 &= ~MIPI_BIT_DSI_MODE;
-		writel(Value32, (void*)(MIPIx + MIPI_MAIN_CTRL_OFFSET));
-	}
-}
-void mipi_dsi_underflow_reset(void __iomem *pmipi_reg)
-{
-	LCDC_MIPI_DSI_INTS_ACPU_Clr(pmipi_reg, LCDC_MIPI_DSI_INTS_ACPU_Get(pmipi_reg));
-	LCDC_MIPI_DSI_INT_Config(pmipi_reg, ENABLE, DISABLE, ENABLE);//enable acpu, disable scpu
-	LCDC_MIPI_DSI_Mode_Switch(pmipi_reg, DISABLE);
+	ameba_lcdc_dsi_intr_acpu_clr(pmipi_reg, ameba_lcdc_dsi_intr_acpu_get(pmipi_reg));
+	ameba_lcdc_dsi_intr_config(pmipi_reg, 1, 0, 1);//enable acpu, disable scpu
+	ameba_lcdc_dsi_mode_set(pmipi_reg, 0);
 }
 
 /*DMA underflow*/

@@ -492,9 +492,13 @@ static int rtk_spi_wait_for_completion(struct spi_controller *controller,
 			return -EINTR;
 		}
 	} else {
-		ms = SPI_SHIFT_WAIT_MSECS * transfer->len;
-		do_div(ms, transfer->speed_hz);
-		ms += ms + SPI_WAIT_TOLERANCE; /* some tolerance */
+		if (transfer->speed_hz) {
+			ms = SPI_SHIFT_WAIT_MSECS * transfer->len;
+			do_div(ms, transfer->speed_hz);
+			ms += ms + SPI_WAIT_TOLERANCE; /* some tolerance */
+		} else {
+			ms = 2000; // 2s for default when speed_hz = 0.
+		}
 
 		if (ms > UINT_MAX) {
 			ms = UINT_MAX;
@@ -1539,6 +1543,9 @@ static int rtk_spi_probe(struct platform_device *pdev)
 
 	if (!controller) {
 		dev_err(&pdev->dev, "Failed to alloc SPI controller\n");
+		if (rtk_spi->spi_manage.is_slave) {
+			dev_err(&pdev->dev, "Please confirm SPI_SLAVE has been enabled.\n");
+		}
 		clk_disable_unprepare(rtk_spi->clk);
 		return -ENOMEM;
 	}

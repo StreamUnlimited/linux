@@ -127,15 +127,15 @@ u8 qos_acm(u8 acm_mask, u8 priority)
  */
 static u16 rtw_ndev_select_queue(struct net_device *pnetdev, struct sk_buff *skb, struct net_device *sb_dev)
 {
-	int acm_mask = 0;
+	/* int acm_mask = 0;*/
 	u16 rtw_1d_to_queue[8] = { 2, 3, 3, 2, 1, 1, 0, 0 };
 
 	skb->priority = rtw_classify8021d(skb);
 
 	/* acm_mask != 0 is qos packet. tmp. */
-	if (acm_mask != 0) {
+	/*if (acm_mask != 0) {
 		skb->priority = qos_acm(acm_mask, skb->priority);
-	}
+	}*/
 
 	return rtw_1d_to_queue[skb->priority];
 }
@@ -148,7 +148,7 @@ int rtw_ndev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd_id)
 	static dma_addr_t cmd_buf_phy = 0, user_buf_phy = 0;
 	int ret = 0;
 
-	if (copy_from_user(&cmd, wrq_data, sizeof(cmd))) {
+	if (copy_from_user(&cmd, wrq_data, sizeof(struct rtw_priv_ioctl))) {
 		dev_err(global_idev.fullmac_dev, "[fullmac]: %s copy_from_user failed\n", __func__);
 		ret = -EFAULT;
 		goto out;
@@ -249,6 +249,7 @@ static int rtw_ndev_close(struct net_device *pnetdev)
 	int ret = 0;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
+
 	spin_lock_bh(&event_priv->event_lock);
 	ret = llhw_wifi_scan_abort();
 	if (ret) {
@@ -359,6 +360,7 @@ int rtw_nan_iface_alloc(struct wiphy *wiphy,
 	struct wireless_dev *wdev = NULL;
 	struct net_device *ndev = NULL;
 	int ret = 0;
+	int softap_addr_offset_idx = global_idev.wifi_user_config.softap_addr_offset_idx;
 
 	if (global_idev.pwdev_global[2]) {
 		dev_info(global_idev.fullmac_dev, "%s: nan_wdev already exists", __func__);
@@ -385,7 +387,7 @@ int rtw_nan_iface_alloc(struct wiphy *wiphy,
 	netif_carrier_off(global_idev.pndev[2]);
 	/* set nan port mac address */
 	memcpy(global_idev.pndev[2]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-	global_idev.pndev[2]->dev_addr[5] = global_idev.pndev[0]->dev_addr[5] + 2;
+	global_idev.pndev[2]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 2;
 
 	ret = (register_netdevice(global_idev.pndev[2]) == 0) ? true : false;
 	if (ret != true) {
@@ -429,16 +431,32 @@ exit:
 
 void rtw_nan_iface_free(struct wiphy *wiphy)
 {
-	if (!global_idev.pwdev_global[2]) {
+	if (global_idev.pndev[2]) {
+		/* hold rtnl_lock in unregister_netdev. */
+		unregister_netdevice(global_idev.pndev[2]);
+	} else {
 		goto exit;
 	}
 
-	//rtnl_lock();
-	cfg80211_unregister_wdev(global_idev.pwdev_global[2]);
-	//rtnl_unlock();
+	dev_dbg(global_idev.fullmac_dev, "remove netdev done for interface NAN.");
 
-	kfree((u8 *)global_idev.pwdev_global[2]);
-	global_idev.pwdev_global[2] = NULL;
+	if (global_idev.pwdev_global[2]) {
+		//rtnl_lock();
+		cfg80211_unregister_wdev(global_idev.pwdev_global[2]);
+		//rtnl_unlock();
+
+		dev_dbg(global_idev.fullmac_dev, "remove wdev done for interface NAN.");
+
+		kfree((u8 *)global_idev.pwdev_global[2]);
+		global_idev.pwdev_global[2] = NULL;
+		/* remove wireless_dev in ndev. */
+		global_idev.pndev[2]->ieee80211_ptr = NULL;
+	}
+
+	if (global_idev.pndev[2]) {
+		free_netdev(global_idev.pndev[2]);
+		global_idev.pndev[2] = NULL;
+	}
 
 	llhw_wifi_deinit_nan();
 

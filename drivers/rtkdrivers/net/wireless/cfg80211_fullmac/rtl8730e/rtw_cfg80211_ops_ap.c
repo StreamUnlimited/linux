@@ -288,13 +288,14 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 			return -EPERM;
 		}
 
-		pwd_vir = rtw_malloc(strlen(fake_pwd), &pwd_phy);
+		/* fix CWE-170, null terminated string, so to add 1. */
+		pwd_vir = rtw_malloc(strlen(fake_pwd) + 1, &pwd_phy);
 		if (!pwd_vir) {
 			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 			return -ENOMEM;
 		}
 		/* If not fake, copy from upper layer, like WEP(unsupported). */
-		memcpy(pwd_vir, fake_pwd, strlen(fake_pwd));
+		memcpy(pwd_vir, fake_pwd, strlen(fake_pwd) + 1);
 		softAP_config.password = (unsigned char *)pwd_phy;
 		softAP_config.password_len = strlen(fake_pwd);
 		//dev_dbg(global_idev.fullmac_dev, "security_type=0x%x, password=%s, len=%d \n", softAP_config.security_type, softAP_config.password, softAP_config.password_len);
@@ -340,7 +341,7 @@ static int cfg80211_rtw_start_ap(struct wiphy *wiphy, struct net_device *ndev, s
 	netif_carrier_on(ndev);
 
 	if (pwd_vir) {
-		rtw_mfree(strlen(pwd_vir), pwd_vir, pwd_phy);
+		rtw_mfree(strlen(pwd_vir) + 1, pwd_vir, pwd_phy);
 	}
 
 	return ret;

@@ -16,29 +16,24 @@
 /*
 	APIs define
 */
-void DelayUs(u32 time);
-
 
 //lcdc api
 /*
 	1. lcdc reset 
-	2. lcdc update all info  ; such as  plan size/color ; 
-	3. update layer details , such as img , format , disable/enable 
-	4. do init to update to reg
-	5. update dma info 
-	6. able/disable dma debug info 
-	7. lcdc enable/disable ,
+	2. lcdc update all info; such as plan size/color ;
+	3. update layer details, such as img, format, disable/enable
+	4. do init to update the reg
+	5. update dma info
+	6. able/disable dma debug info
+	7. lcdc enable/disable
 	8. lcdc ir enable/disable
 	9. lcdc ir set posi
 */
-//lcdc global reg
-u32 ameba_lcdc_reg_read(void __iomem *address);
-void ameba_lcdc_reg_write(void __iomem *address,u32 Value32);
-
-void LcdcDumpRegValue(struct device *dev, void __iomem * address,const char* filename);
+void ameba_lcdc_reg_dump(void __iomem * address,const char* filename);
+void ameba_lcdc_dsi_underflow_reset(void __iomem *pmipi_reg);
 
 void ameba_lcdc_enable(void __iomem * address,u32 NewState);
-u32 ameba_lcdc_get_irqstatus(void __iomem * address);
+u32  ameba_lcdc_get_irqstatus(void __iomem * address);
 void ameba_lcdc_clean_irqstatus(void __iomem * address,u32 irq);
 
 void ameba_lcdc_reset_config(LCDC_InitTypeDef *LCDC_InitStruct, u16 widht, u16 height,u32 bgcolor);
@@ -58,7 +53,6 @@ void ameba_lcdc_irq_enable(void __iomem * address,u32 LCDC_IT, u32 NewState);
 void ameba_lcdc_irq_linepos(void __iomem * address,u32 LineNum);
 void ameba_lcdc_irq_config(void __iomem * address,u32 intType, u32 NewState);
 
-
 //layer reg
 void ameba_lcdc_update_layer_reg(void __iomem * address,u8 layid,LCDC_LayerConfigTypeDef *EachLayer);
 void ameba_lcdc_layer_enable(LCDC_InitTypeDef *LCDC_InitStruct,u8 layid,u8 able);
@@ -70,16 +64,13 @@ void ameba_lcdc_layer_colorkey_value(LCDC_InitTypeDef *LCDC_InitStruct,u8 layid,
 void ameba_lcdc_layer_blend_value(LCDC_InitTypeDef *LCDC_InitStruct,u8 layid,u8 blend);
 void ameba_lcdc_layer_alpha_value(LCDC_InitTypeDef *LCDC_InitStruct,u8 layid,u8 alpha);
 
-void mipi_lcdc_enable(void __iomem *address, u32 NewState);
-void ameba_lcdc_reenable(void __iomem* plcdc_reg);
-
 //mipi dis api
-void MipiDumpRegValue(struct device *dev, void __iomem * address);
-void MipiDsi_Do_Init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct,u32* txdone,u32 *rxcmd,void *init_table);
-void MIPI_InitStruct_Config(struct device *dev, MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd);
-void MIPI_DPHY_Reset(void __iomem *MIPIx);
-
-void mipi_dsi_underflow_reset(void __iomem *pmipi_reg);
-
+void ameba_dsi_set_lcdc_state(void __iomem *address, u32 NewState);
+void ameba_dsi_lcdc_reenable(void __iomem* address);
+u32  ameba_dsi_reg_read(void __iomem *address);
+void ameba_dsi_reg_write(void __iomem *address,u32 Value32);
+void ameba_dsi_reg_dump(void __iomem * address);
+void ameba_dsi_do_init(void __iomem *address, MIPI_InitTypeDef *MIPI_InitStruct,u32* txdone,u32 *rxcmd,void *init_table);
+void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd);
 
 #endif  /*_AMEBAD2_DRM_BASE_COMMON_H_*/

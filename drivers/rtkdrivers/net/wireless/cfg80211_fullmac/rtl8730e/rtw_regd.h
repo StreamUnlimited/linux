@@ -38,9 +38,10 @@
 
 #define RTL819x_5GHZ_ALL        (RTL819x_5GHZ_5150_5350, RTL819x_5GHZ_5470_5850)
 
-#define COUNTRY_CHPLAN_ENT(_alpha2, _chplan) \
+#define COUNTRY_CHPLAN_ENT(_alpha2, _chplan, _pwr_lmt) \
 	{.alpha2 = (_alpha2), \
-	 .chplan = (_chplan) \
+	 .chplan = (_chplan), \
+	 .pwr_lmt = (_pwr_lmt) \
 	}
 
 enum country_code_type_t {
@@ -66,6 +67,7 @@ enum country_code_type_t {
 struct country_chplan {
 	char alpha2[2];
 	u8 chplan;
+	u8 pwr_lmt;
 };
 
 #endif //__RTW_REGD_H__

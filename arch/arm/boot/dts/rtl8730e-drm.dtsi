@@ -36,6 +36,7 @@
 			reg = <0x400EA000 0xC10>,
 			      <0x4200825C 0x04>;
 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&rcc RTK_CKE_HPERI>;
 			rtk,lcdc-vo-clock = <&rcc>;
 			status = "disabled";
 

@@ -119,6 +119,7 @@ int llhw_init(void __iomem *km4_map_start)
 		return -ENOMEM;
 	}
 	global_idev.ipc_dev = global_idev.data_ch->pdev;
+
 	global_idev.km4_map_start = km4_map_start;
 
 	/* initialize the message queue, and assign the task haddle function */
@@ -136,9 +137,16 @@ int llhw_init(void __iomem *km4_map_start)
 		goto ipc_deinit;
 	}
 
+	memset(&global_idev.wifi_user_config, 0, sizeof(struct wifi_user_conf));
+	ret = llhw_wifi_get_user_config(&global_idev.wifi_user_config);
+	if (ret < 0) {
+		dev_err(global_idev.fullmac_dev, "get wifi user config failed.(%d).\n", ret);
+		goto ipc_deinit;
+	}
+
 	ret = llhw_xmit_init();
 	if (ret < 0) {
-		dev_err(global_idev.fullmac_dev, "molloc ipc xmit memory failed.(%d).\n", ret);
+		dev_err(global_idev.fullmac_dev, "malloc ipc xmit memory failed.(%d).\n", ret);
 		goto ipc_deinit;
 	}
 

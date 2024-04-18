@@ -15,6 +15,7 @@ int rtw_wiphy_init(void);
 void rtw_wiphy_deinit(void);
 int rtw_wiphy_init_params(struct wiphy *pwiphy);
 int rtw_wiphy_band_init(struct wiphy *pwiphy, u32 band_type);
+int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg);
 void llhw_wifi_on(void);
 int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_len, u32 block);
 int llhw_wifi_scan_abort(void);
@@ -58,14 +59,11 @@ u64 llhw_wifi_get_tsft(u8 iface_type);
 void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
 int rtw_regd_init(void);
 void rtw_ethtool_ops_init(void);
-int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type);
-int llhw_wifi_del_custom_ie(unsigned char wlan_idx);
-int llhw_wifi_update_custom_ie(u8 *ie, int ie_index);
 
 #ifdef CONFIG_NAN
 void cfg80211_rtw_ops_nan_init(void);
 void cfg80211_rtw_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32 info_len, u8 *info, u64 cookie);
-void cfg80211_rtw_nan_func_free(void *os_dep_data);
+void cfg80211_rtw_nan_func_free(u64 os_dep_data);
 int llhw_wifi_init_nan(void);
 int llhw_wifi_deinit_nan(void);
 int llhw_wifi_start_nan(u8 master_pref, u8 band_support);
@@ -79,10 +77,13 @@ int llhw_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len);
 #endif
 
 int llhw_wifi_set_pmf_mode(u8 pmf_mode);
-int llhw_wifi_set_ch_plan(u8 ch_plan);
+int llhw_wifi_set_ch_plan(u8 ch_plan, u8 tx_power_lmt);
 int llhw_wifi_set_wps_phase(u8 enable);
 int llhw_wifi_set_wpa_mode(rtw_wpa_mode wpa_mode);
 int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16 flags);
+int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type);
+int llhw_wifi_del_custom_ie(unsigned char wlan_idx);
+int llhw_wifi_update_custom_ie(u8 *ie, int ie_index);
 
 void *rtw_malloc(size_t size, dma_addr_t *paddr);
 void rtw_mfree(size_t size, void *vaddr, dma_addr_t paddr);

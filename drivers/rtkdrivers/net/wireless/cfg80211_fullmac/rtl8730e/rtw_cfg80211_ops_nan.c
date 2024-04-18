@@ -25,10 +25,8 @@ void dump_cfg80211_nan_func_filter(u8 num,
 
 void dump_cfg80211_nan_func(struct cfg80211_nan_func *func)
 {
-	int i;
-
 	printk("=======================\n");
-	printk("dump_cfg80211_nan_func:\n");
+	printk("%s:\n", __func__);
 	switch (func->type) {
 	case NL80211_NAN_FUNC_PUBLISH:
 		printk("type: publish\n");
@@ -53,8 +51,7 @@ void dump_cfg80211_nan_func(struct cfg80211_nan_func *func)
 		printk("type: unknown\n");
 
 	}
-
-	printk("service_id: %s\n", func->service_id);
+	rtw_dump_buf("service_id: ", func->service_id, NL80211_NAN_FUNC_SERVICE_ID_LEN);
 	printk("close_range: %s\n", (func->close_range) ? "true" : "false");
 
 	if (func->type == NL80211_NAN_FUNC_FOLLOW_UP) {
@@ -96,9 +93,7 @@ static int cfg80211_rtw_start_nan(struct wiphy *wiphy,
 	int ret = 0;
 	u8 band_support;
 
-	printk(" => %s\n", __func__);
-
-	printk("master_pref = %d, bands = %d\n", conf->master_pref, conf->bands);
+	printk(" => %s: master_pref = %d, bands = %d\n", __func__, conf->master_pref, conf->bands);
 
 	/* prepare neccessary parameters */
 	band_support = ((conf->bands & BIT(NL80211_BAND_2GHZ)) ? BAND_CAP_2G : 0)
@@ -107,7 +102,7 @@ static int cfg80211_rtw_start_nan(struct wiphy *wiphy,
 	if (llhw_wifi_start_nan(conf->master_pref, band_support) == -1) {
 		ret = -ENOTCONN;
 	}
-exit:
+
 	return ret;
 }
 
@@ -141,7 +136,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			goto exit;
 		}
 		memcpy(serv_spec_info_vir, func->serv_spec_info, func->serv_spec_info_len);
-		nan_param.serv_spec_info = serv_spec_info_phy;
+		nan_param.serv_spec_info = (const u8 *)serv_spec_info_phy;
 	}
 
 	if (func->srf_bf) {
@@ -152,7 +147,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			goto exit;
 		}
 		memcpy(srf_bf_vir, func->srf_bf, func->srf_bf_len);
-		nan_param.srf_bf = srf_bf_phy;
+		nan_param.srf_bf = (const u8 *)srf_bf_phy;
 	}
 
 	if (func->srf_macs) {
@@ -163,7 +158,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			goto exit;
 		}
 		memcpy(srf_macs_vir, func->srf_macs, func->srf_num_macs * sizeof(struct mac_address));
-		nan_param.srf_macs = srf_macs_phy;
+		nan_param.srf_macs = (struct mac_address *)srf_macs_phy;
 	}
 
 	if (func->rx_filters) {
@@ -174,7 +169,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			goto exit;
 		}
 		memcpy(rx_filters_vir, func->rx_filters, func->num_rx_filters * sizeof(struct cfg80211_nan_func_filter));
-		nan_param.rx_filters = rx_filters_phy;
+		nan_param.rx_filters = (struct cfg80211_nan_func_filter *)rx_filters_phy;
 	}
 
 	if (func->tx_filters) {
@@ -185,7 +180,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 			goto exit;
 		}
 		memcpy(tx_filters_vir, func->tx_filters, func->num_tx_filters * sizeof(struct cfg80211_nan_func_filter));
-		nan_param.tx_filters = tx_filters_phy;
+		nan_param.tx_filters = (struct cfg80211_nan_func_filter *)tx_filters_phy;
 	}
 
 	if (llhw_wifi_add_nan_func(&nan_param, func) < 0) {
@@ -217,8 +212,6 @@ exit:
 void cfg80211_rtw_del_nan_func(struct wiphy *wiphy,
 							   struct wireless_dev *wdev, u64 cookie)
 {
-	void *func = NULL;
-
 	printk("%s =>\n", __func__);
 
 	llhw_wifi_del_nan_func(cookie);
@@ -231,16 +224,12 @@ static int cfg80211_rtw_nan_change_conf(struct wiphy *wiphy,
 {
 	int ret = 0;
 
-	printk(" => %s\n", __func__);
-
-	printk("master_pref = %d, bands = %d changes=%d\n", conf->master_pref, conf->bands, changes);
+	printk(" => %s: master_pref = %d, bands = %d changes=%d\n", __func__, conf->master_pref, conf->bands, changes);
 
 	//rtw_update_nan_conf(conf,changes);
 
-exit:
 	return ret;
 }
-
 
 void cfg80211_rtw_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr, u32 info_len, u8 *info, u64 cookie)
 {
@@ -261,15 +250,17 @@ void cfg80211_rtw_nan_handle_sdf(u8 type, u8 inst_id, u8 peer_inst_id, u8 *addr,
 
 }
 
-void cfg80211_rtw_nan_func_free(void *os_dep_data)
+void cfg80211_rtw_nan_func_free(u64 os_dep_data)
 {
 	struct wireless_dev *wdev = global_idev.pwdev_global[2];
 	gfp_t kflags;
-	struct cfg80211_nan_func *func = os_dep_data;
+	struct cfg80211_nan_func *func = (struct cfg80211_nan_func *)os_dep_data;
 
 	if (wdev == NULL) {
 		return;
 	}
+
+	printk("%s => os_dep_data=%llx\n", __func__, os_dep_data);
 
 	kflags = in_atomic() ? GFP_ATOMIC : GFP_KERNEL;
 

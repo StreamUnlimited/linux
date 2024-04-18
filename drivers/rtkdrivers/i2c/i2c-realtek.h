@@ -28,13 +28,15 @@
 #include <linux/time.h>
 #include <linux/timer.h>
 #include <linux/completion.h>
- 
+
 #ifndef RTK_I2C_DEFINE
 #define RTK_I2C_DEFINE
 
-#define RTK_I2C_TODO			0
-#define RTK_I2C_AUTO_RE_RECV		0
-
+#ifdef CONFIG_PM
+/* SET_RUNTIME_PM_OPS only provided when CONFIG_PM enabled. */
+/* RTK I2C Runtime PM is not suggested to enable. */
+#define RTK_I2C_PM_RUNTIME			0
+#endif
 /*-----------------------------------------------------------------*/
 /*-------------------------- Hardware Layer -----------------------*/
 /*-----------------------------------------------------------------*/
@@ -945,7 +947,7 @@ u32 rtk_i2c_readl(void __iomem *ptr, u32 reg);
 void rtk_i2c_reg_update(void __iomem *ptr, u32 reg, u32 mask, u32 value);
 void rtk_i2c_enable_cmd(struct rtk_i2c_hw_params *i2c_param, u8 new_state);
 u8 rtk_i2c_check_flag_state(struct rtk_i2c_hw_params *i2c_param, u32 i2c_flag);
-void rtk_i2c_interrupt_config(struct rtk_i2c_hw_params *i2c_param,u32 i2c_interrupt, u32 new_state);
+void rtk_i2c_interrupt_config(struct rtk_i2c_hw_params *i2c_param, u32 i2c_interrupt, u32 new_state);
 void rtk_i2c_clear_interrupt(struct rtk_i2c_hw_params *i2c_param, u32 interrupt_bit);
 void rtk_i2c_clear_all_interrupts(struct rtk_i2c_hw_params *i2c_param);
 u32 rtk_i2c_get_raw_interrupt(struct rtk_i2c_hw_params *i2c_param);
@@ -963,6 +965,7 @@ int rtk_i2c_master_probe(struct platform_device *pdev, struct rtk_i2c_dev *i2c_d
 bool rtk_i2c_master_irq_wait_timeout(struct rtk_i2c_dev *i2c_dev);
 void rtk_i2c_isr_master_handle_rx_full(struct rtk_i2c_dev *i2c_dev);
 void rtk_i2c_isr_master_handle_tx_empty(struct rtk_i2c_dev *i2c_dev);
+hal_status rtk_i2c_receive_master(struct rtk_i2c_dev *i2c_dev);
 #endif // RTK_I2C_MASTER_FUNCTIONS
 
 /* slave */

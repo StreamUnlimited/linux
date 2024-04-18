@@ -471,7 +471,7 @@ static const struct file_operations rtw_drv_proc_sseq_fops = {
 int rtw_drv_proc_init(void)
 {
 	int ret = 0;
-	ssize_t i;
+	int i = 0;
 	struct proc_dir_entry *entry = NULL;
 
 	if (rtw_proc != NULL) {
@@ -512,7 +512,7 @@ exit:
 
 void rtw_drv_proc_deinit(void)
 {
-	int i;
+	int i = 0;
 
 	if (rtw_proc == NULL) {
 		return;

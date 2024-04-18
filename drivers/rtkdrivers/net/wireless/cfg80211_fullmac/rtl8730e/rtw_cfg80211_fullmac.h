@@ -113,7 +113,6 @@
 #define ETH_ALEN			6
 #define FUNC_NDEV_FMT			"%s(%s)"
 #define FUNC_NDEV_ARG(ndev)		__func__, ndev->name
-#define SOFTAP_ADDR_OFFSET_INDEX	1
 
 /******************************************************************/
 /***************** Definitions for cfg80211_ops. ******************/

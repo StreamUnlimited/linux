@@ -91,8 +91,6 @@ static irqreturn_t rtk_gtimer_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-
-
 /**
   * @brief  Change timer period.
   * @param  index: timer index, can be 0~13.
@@ -187,7 +185,6 @@ int rtk_gtimer_start(u32 index, u32 NewState)
 	struct rtk_tim *tim;
 	void __iomem *base;
 
-
 	if (is_timer_invalid(index)) {
 		return -ENODEV;
 	}
@@ -271,8 +268,6 @@ int rtk_gtimer_int_clear(u32 index)
 
 EXPORT_SYMBOL(rtk_gtimer_int_clear);
 
-
-
 /**
   * @brief  Enable or disable timer update interrupt.
   * @param  index: timer index, can be 0~13.
@@ -328,7 +323,6 @@ int rtk_gtimer_deinit(u32 index)
 	rtk_gtimer_start(index, TIMER_DISABLE);
 	tim->intr_handler = NULL;
 	tim->cbdata = NULL;
-	free_irq(tim->irq, tim);
 
 	spin_lock(&lock);
 	timer_manage[index] = TIMER_IDLE;
@@ -338,8 +332,6 @@ int rtk_gtimer_deinit(u32 index)
 }
 
 EXPORT_SYMBOL(rtk_gtimer_deinit);
-
-
 
 /**
   * @brief  Initilize timer.
