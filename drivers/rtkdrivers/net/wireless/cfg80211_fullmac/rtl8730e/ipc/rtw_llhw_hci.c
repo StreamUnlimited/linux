@@ -10,6 +10,26 @@
 
 #include <rtw_cfg80211_fullmac.h>
 
+#define CREATE_WIFI_CFG_MOD_PARAM(_name, _default) \
+	static int wifi_cfg_mod_param_##_name = _default; \
+	module_param(wifi_cfg_mod_param_##_name, int, 0444)
+
+#define SET_WIFI_CFG_FROM_MOD_PARAM(_struct, _name) \
+	_struct._name = wifi_cfg_mod_param_##_name
+
+CREATE_WIFI_CFG_MOD_PARAM(rtw_802_11d_en, 0);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_edcca_mode, RTW_EDCCA_NORM);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_tx_pwr_lmt_enable, 2);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_tx_pwr_by_rate, 2);
+
+CREATE_WIFI_CFG_MOD_PARAM(ips_enable, 1);
+CREATE_WIFI_CFG_MOD_PARAM(ips_level, IPS_WIFI_OFF);
+CREATE_WIFI_CFG_MOD_PARAM(lps_enable, 1);
+CREATE_WIFI_CFG_MOD_PARAM(lps_mode, PS_MODE_LEGACY);
+CREATE_WIFI_CFG_MOD_PARAM(legacy_ps_listen_interval, 0);
+CREATE_WIFI_CFG_MOD_PARAM(uapsd_max_sp_len, 0);
+CREATE_WIFI_CFG_MOD_PARAM(uapsd_ac_enable, 0);
+
 struct inic_device global_idev;
 
 extern struct aipc_ch_ops llhw_ipc_recv_ops;
@@ -136,6 +156,21 @@ int llhw_init(phys_addr_t km4_map_phys_base, void __iomem *km4_map_virt_base)
 	}
 
 	wifi_set_user_config();
+
+	// Override some parameters from the module arguments
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_802_11d_en);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_edcca_mode);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_tx_pwr_lmt_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_tx_pwr_by_rate);
+
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, ips_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, ips_level);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, lps_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, lps_mode);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, legacy_ps_listen_interval);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, uapsd_max_sp_len);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, uapsd_ac_enable);
+
 	memcpy(&global_idev.wifi_user_config, &wifi_user_config, sizeof(struct wifi_user_conf));
 	ret = llhw_wifi_set_user_config(&global_idev.wifi_user_config);
 	if (ret < 0) {
