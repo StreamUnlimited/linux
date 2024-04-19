@@ -10,6 +10,29 @@
 
 #include <whc_host_linux.h>
 
+#define CREATE_WIFI_CFG_MOD_PARAM(_name, _default) \
+	static int wifi_cfg_mod_param_##_name = _default; \
+	module_param(wifi_cfg_mod_param_##_name, int, 0444)
+
+#define SET_WIFI_CFG_FROM_MOD_PARAM(_struct, _name) \
+	_struct._name = wifi_cfg_mod_param_##_name
+
+CREATE_WIFI_CFG_MOD_PARAM(rtw_tx_pwr_lmt_enable, 2);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_tx_pwr_by_rate, 2);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_802_11d_en, 0);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_trp_tis_cert_en, RTW_TRP_TIS_DISABLE);
+CREATE_WIFI_CFG_MOD_PARAM(rtw_edcca_mode, RTW_EDCCA_NORM);
+CREATE_WIFI_CFG_MOD_PARAM(tdma_dig_enable, 0);
+CREATE_WIFI_CFG_MOD_PARAM(antdiv_mode, RTW_ANTDIV_DISABLE);
+
+CREATE_WIFI_CFG_MOD_PARAM(ips_enable, 1);
+CREATE_WIFI_CFG_MOD_PARAM(ips_level, RTW_IPS_WIFI_OFF);
+CREATE_WIFI_CFG_MOD_PARAM(lps_enable, 1);
+CREATE_WIFI_CFG_MOD_PARAM(lps_listen_interval, 0);
+CREATE_WIFI_CFG_MOD_PARAM(wowlan_rx_bcmc_dis, 0);
+CREATE_WIFI_CFG_MOD_PARAM(uapsd_max_sp_len, 0);
+CREATE_WIFI_CFG_MOD_PARAM(uapsd_ac_enable, 0);
+
 struct whc_device global_idev;
 
 extern struct aipc_ch_ops whc_fullmac_ipc_host_recv_ops;
@@ -133,6 +156,24 @@ int whc_host_init(void)
 	}
 
 	wifi_set_user_config();
+
+	// Override some parameters from the module arguments
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_tx_pwr_lmt_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_tx_pwr_by_rate);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_802_11d_en);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_trp_tis_cert_en);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_edcca_mode);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, tdma_dig_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, antdiv_mode);
+
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, ips_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, ips_level);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, lps_enable);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, lps_listen_interval);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, wowlan_rx_bcmc_dis);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, uapsd_max_sp_len);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, uapsd_ac_enable);
+
 	memcpy(&global_idev.wifi_user_config, &wifi_user_config, sizeof(struct wifi_user_conf));
 	ret = whc_fullmac_host_set_user_config(&global_idev.wifi_user_config);
 	if (ret < 0) {
