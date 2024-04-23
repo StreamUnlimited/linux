@@ -198,7 +198,7 @@ static void rtk_wdg_struct_init(struct rtk_wdg *wdg, struct device_node *np)
 
 	if (!IS_WDG_ALL_PERIPH(wdg->wdg_index)) {
 		wdg->wdg_index = 1;
-		dev_warn(wdg->dev, "Invalid rtk,wdg-index %d specified in DTS, set it to %d as default\n", wdg->wdg_index);
+		dev_warn(wdg->dev, "Invalid rtk,wdg-index %d specified in DTS, set it to %d as default\n", wdg->wdg_index, 1);
 	}
 
 	ret = of_property_read_u32(np, "rtk,wdg-max-timeout-ms", &nr_requests);
