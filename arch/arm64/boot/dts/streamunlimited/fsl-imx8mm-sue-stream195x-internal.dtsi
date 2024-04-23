@@ -91,10 +91,6 @@
 	status = "disabled";
 };
 
-&crypto {
-	status = "disabled";
-};
-
 &caam_sm {
 	status = "disabled";
 };
