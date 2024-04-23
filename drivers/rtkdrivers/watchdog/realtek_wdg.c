@@ -14,6 +14,7 @@
 #include <linux/watchdog.h>
 #include <linux/interrupt.h>
 #include <linux/of_device.h>
+#include <linux/workqueue.h>
 
 #define RTK_WDG_TODO			0
 
@@ -138,6 +139,8 @@ struct rtk_wdg {
 	int							irq;
 	int							wdg_index;
 	struct rtk_wdg_params		wdg_params;
+
+	struct delayed_work	wdg_work;
 };
 
 static void rtk_wdg_writel(
@@ -363,6 +366,10 @@ static int rtk_wdg_start(struct watchdog_device *wdd)
 		rtk_wdg_interrupt_config(wdg, WDG_BIT_EIE, 1);
 	}
 
+	// If the watchdog is started then an user-space program
+	// will pet it, so stop the delayed work.
+	cancel_delayed_work_sync(&wdg->wdg_work);
+
 	rtk_wdg_enable(wdg);
 
 	return 0;
@@ -370,8 +377,16 @@ static int rtk_wdg_start(struct watchdog_device *wdd)
 
 static int rtk_wdg_stop(struct watchdog_device *wdd)
 {
+	u32 pet_timeout;
 	struct rtk_wdg *wdg = to_rtk_wdg(wdd);
-	dev_info(wdg->dev, "Stop watchdog is not supported by realtek-wdg\n");
+
+	// The platform does not support stopping the watchdog once
+	// it's started so for that reason we will have a delayed work
+	// regularly petting the watchdog.
+	cancel_delayed_work_sync(&wdg->wdg_work);
+
+	pet_timeout = WDG_GET_RELOAD(rtk_wdg_readl(wdg->base, WDG_RLR)) / 2;
+	schedule_delayed_work(&wdg->wdg_work, msecs_to_jiffies(pet_timeout));
 
 	return 0;
 }
@@ -450,7 +465,7 @@ static const struct watchdog_ops rtk_wdg_ops = {
 };
 
 static const struct watchdog_info rtk_wdg_info = {
-	.options	= WDIOF_KEEPALIVEPING,
+	.options	= WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
 	.identity	= KBUILD_MODNAME,
 };
 
@@ -460,6 +475,17 @@ static const struct of_device_id rtk_wdg_of_table[] = {
 };
 
 MODULE_DEVICE_TABLE(of, rtk_wdg_of_table);
+
+static void rtk_wdg_work(struct work_struct *work)
+{
+	u32 pet_timeout;
+	struct rtk_wdg *wdg = container_of(work, struct rtk_wdg, wdg_work.work);
+
+	rtk_wdg_refresh(wdg);
+
+	pet_timeout = WDG_GET_RELOAD(rtk_wdg_readl(wdg->base, WDG_RLR)) / 2;
+	schedule_delayed_work(&wdg->wdg_work, msecs_to_jiffies(pet_timeout));
+}
 
 static int rtk_wdg_probe(struct platform_device *pdev)
 {
@@ -500,6 +526,8 @@ static int rtk_wdg_probe(struct platform_device *pdev)
 		wdg->irq = platform_get_irq(pdev, 0);
 		ret = devm_request_irq(&pdev->dev, wdg->irq, rtk_wdg_isr_event, 0, dev_name(&pdev->dev), wdg);
 	}
+
+	INIT_DELAYED_WORK(&wdg->wdg_work, rtk_wdg_work);
 
 	watchdog_init_timeout(&wdg->wdd, 0, dev);
 	rtk_wdg_init_hw(wdg); /* Init to reset mode */
