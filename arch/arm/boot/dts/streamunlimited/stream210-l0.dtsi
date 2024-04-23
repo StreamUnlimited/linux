@@ -104,3 +104,18 @@
 	// connected to the internal DAC and does not need any MCLK actually.
 	rtk,sport-mclk-multiplier = <256>;
 };
+
+&watchdog {
+	status = "okay";
+
+	// Disable interrupt mode which would generate an interrupt before the
+	// watchdog timer fires. In the current implementation the kernel will
+	// actually pet the watchdig in this interrupt which does not make
+	// sense for our use-case.
+	rtk,wdg-interrupt-mode = <0>;
+
+	// It is not possible to reconfigure the watchdog timeout and we
+	// are already configuring the watchdog to 30 seconds in u-boot
+	// so set it here to the same value to be consistent.
+	rtk,wdg-timeout = <30>;
+};
