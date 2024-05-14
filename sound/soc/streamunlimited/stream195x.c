@@ -1036,6 +1036,12 @@ static int simple_soc_late_probe(struct snd_soc_card *card)
 
 	return 0;
 }
+
+static int simple_soc_remove(struct snd_soc_card *card)
+{
+	device_remove_file(card->dev, &dev_attr_ignore_suspend);
+	return 0;
+}
 /* END SUE addition */
 
 static int simple_probe(struct platform_device *pdev)
@@ -1058,6 +1064,7 @@ static int simple_probe(struct platform_device *pdev)
 	card->driver_name       = "simple-card";
 	/* START SUE addition */
 	card->late_probe	= simple_soc_late_probe;
+	card->remove		= simple_soc_remove;
 	/* END SUE addition */
 
 	ret = -ENOMEM;
