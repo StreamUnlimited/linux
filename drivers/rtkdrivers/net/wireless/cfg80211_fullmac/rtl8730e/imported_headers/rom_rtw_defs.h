@@ -1,5 +1,26 @@
+/**
+  ******************************************************************************
+  * @file    rom_rtw_defs.h
+  * @author
+  * @version
+  * @date
+  * @brief
+  ******************************************************************************
+  * @attention
+  *
+  * This module is a confidential and proprietary property of RealTek and
+  * possession or use of this module requires written permission of RealTek.
+  *
+  * Copyright(c) 2024, Realtek Semiconductor Corporation. All rights reserved.
+  ******************************************************************************
+  */
+
 #ifndef __ROM_RTW_DEFS_H_
 #define __ROM_RTW_DEFS_H_
+
+#define TAG_WLAN_DRV   "WLAN"
+#define TAG_WLAN_COEX  "COEX"
+#define TAG_WLAN_INIC  "INIC"
 
 /**
   * @brief  The enumeration lists all the network mode.
@@ -38,7 +59,7 @@ enum wlan_mode {
 	WLAN_MD_MAX	= (WLAN_MD_24G_MIX | WLAN_MD_5G_MIX),
 };
 
-typedef enum _RT_CHANNEL_DOMAIN_2G {
+enum _RT_CHANNEL_DOMAIN_2G {
 	RTW_RD_2G_NULL = 0,	/* Do not support 2G*/
 	RTW_RD_2G_01 = 1,	/* Worldwide 13, Canada */
 	RTW_RD_2G_02 = 2,	/* Europe, Japan */
@@ -48,9 +69,9 @@ typedef enum _RT_CHANNEL_DOMAIN_2G {
 	RTW_RD_2G_06 = 6,	/* 2G Global, include channel 14 */
 	//===== Add new channel plan above this line===============//
 	RT_CHANNEL_DOMAIN_2G_MAX,
-} RT_CHANNEL_DOMAIN_2G, *PRT_CHANNEL_DOMAIN_2G;
+};
 
-typedef enum _RT_CHANNEL_DOMAIN_5G {
+enum _RT_CHANNEL_DOMAIN_5G {
 	RTW_RD_5G_NULL = 0,		/*Do not support 5G*/
 	RTW_RD_5G_01 = 1,		/*US, Canada, Australia, New Zealand, Mexico (w/o Weather radar), (w/o Ch120~Ch128)*/
 	RTW_RD_5G_02 = 2,		/*Europe, Japan (W52, W53, W56)*/
@@ -115,29 +136,30 @@ typedef enum _RT_CHANNEL_DOMAIN_5G {
 	RTW_RD_5G_61 = 61,      /*Malaysia(include ch169/ch173)*/
 	//===== Add new channel plan above this line===============//
 	RT_CHANNEL_DOMAIN_5G_MAX
-} RT_CHANNEL_DOMAIN_5G, *PRT_CHANNEL_DOMAIN_5G;
+};
 
 // Tx Power Limit Table Size
-typedef enum _REGULATION_TXPWR_LMT {
+enum _REGULATION_TXPWR_LMT {
 	TXPWR_LMT_FCC = 0,
-	TXPWR_LMT_ETSI = 1,     /* CE */
-	TXPWR_LMT_WW = 2,       /* Worldwide, The mininum of all */
-	TXPWR_LMT_MKK = 3,      /* Japan */
-	TXPWR_LMT_IC = 4,       /* Canada */
-	TXPWR_LMT_KCC = 5,      /* South Korea */
-	TXPWR_LMT_CN = 6,       /* China */
-	TXPWR_LMT_ACMA = 7,     /* Australia */
-	TXPWR_LMT_CHILE = 8,    /* Chile */
-	TXPWR_LMT_MEXICO = 9,   /* Mexico */
+	TXPWR_LMT_MKK = 1,      /* Japan */
+	TXPWR_LMT_ETSI = 2,     /* CE */
+	TXPWR_LMT_IC = 3,       /* Canada */
+	TXPWR_LMT_KCC = 4,      /* South Korea */
+	TXPWR_LMT_ACMA = 5, 	/* Australia */
+	TXPWR_LMT_CHILE = 6,    /* Chile */
+	TXPWR_LMT_MEXICO = 7,   /* Mexico */
+	TXPWR_LMT_WW = 8,       /* Worldwide, The mininum of all */
+	TXPWR_LMT_GL = 9,		/* Global */
 	TXPWR_LMT_UKRAINE = 10, /* Ukraine */
-	TXPWR_LMT_QATAR = 11,   /* Qatar */
-	TXPWR_LMT_UK = 12,      /* Great Britain (United Kingdom; England) */
-	TXPWR_LMT_NCC = 13,     /* Taiwan */
-	TXPWR_LMT_EXT = 14,     /* Customer Customization */
+	TXPWR_LMT_CN = 11,       /* China */
+	TXPWR_LMT_QATAR = 12,   /* Qatar */
+	TXPWR_LMT_UK = 13,      /* Great Britain (United Kingdom; England) */
+	TXPWR_LMT_NCC = 14,     /* Taiwan */
+	TXPWR_LMT_EXT = 15,     /* Customer Customization */
 
 	/* ===== Add new power limit above this line. ===== */
 	TXPWR_LMT_MAX           /* Not support */
-} REGULATION_TXPWR_LMT;
+};
 
 
 #define TXPWR_LMT_MAX_REGULATION_NUM  TXPWR_LMT_MAX
@@ -150,7 +172,7 @@ typedef enum _REGULATION_TXPWR_LMT {
 //	If you just wnat to customize the acitions(scan period or join actions) about one of the channel plan,
 //	customize them in RT_CHANNEL_INFO in the RT_CHANNEL_LIST.
 //
-typedef enum _RT_CHANNEL_DOMAIN {
+enum _RT_CHANNEL_DOMAIN {
 	//===== new channel plan mapping, (2GDOMAIN_5GDOMAIN) =====//
 	RT_CHANNEL_DOMAIN_WORLD_NULL = 0x20,
 	RT_CHANNEL_DOMAIN_ETSI1_NULL = 0x21,
@@ -251,16 +273,16 @@ typedef enum _RT_CHANNEL_DOMAIN {
 
 	/* ===== Add new channel plan above this line. ===== */
 	RT_CHANNEL_DOMAIN_MAX
-} RT_CHANNEL_DOMAIN, *PRT_CHANNEL_DOMAIN;
+};
 
 #define BAND_CAP_2G			BIT(0)
 #define BAND_CAP_5G			BIT(1)
 
 // Scan type including active and passive scan.
-typedef enum _RT_SCAN_TYPE {
+enum _RT_SCAN_TYPE {
 	SCAN_PASSIVE = 1,
 	SCAN_ACTIVE,
-} RT_SCAN_TYPE, *PRT_SCAN_TYPE;
+};
 
 enum channel_width {
 	CHANNEL_WIDTH_20		= 0,
@@ -301,7 +323,7 @@ enum channel_width {
 #define WPA_KEY_MGMT_OWE BIT(22)
 #define WPA_KEY_MGMT_DPP BIT(23)
 
-typedef enum _NDIS_802_11_AUTHENTICATION_MODE {
+enum _NDIS_802_11_AUTHENTICATION_MODE {
 	Ndis802_11AuthModeWPA = 3,
 	Ndis802_11AuthModeWPAPSK = 4,
 	Ndis802_11AuthModeWPA2 = 7,
@@ -309,7 +331,7 @@ typedef enum _NDIS_802_11_AUTHENTICATION_MODE {
 	Ndis802_11AuthModeWPA3 = 9,
 	Ndis802_11AuthModeWPA3PSK = 10,
 	Ndis802_11AuthModeMax               // Not a real mode, defined as upper bound
-} NDIS_802_11_AUTHENTICATION_MODE, *PNDIS_802_11_AUTHENTICATION_MODE;
+};
 
 #define MAX_IE_SZ	768 //384//
 
@@ -329,14 +351,8 @@ enum VCS_TYPE {
 #define A_SHA_DIGEST_LEN		20
 #define INFO_ELEMENT_SIZE       128
 
-typedef enum {
-	DOT11_PortStatus_Unauthorized,
-	DOT11_PortStatus_Authorized,
-	DOT11_PortStatus_Guest
-} DOT11_PORT_STATUS;
-
 /* SECCAM sec_type define */
-#if defined(CONFIG_AMEBAZ6)	/* AMEBAZ6_TODO */
+#if defined(CONFIG_AMEBAZ6)
 #define _NO_PRIVACY_	0x0
 #define _AES_		0x1	//_CCMP_128_
 #define _GCMP_		0x2	//_GCMP_128_
@@ -383,7 +399,7 @@ enum chan_offset {
 	CHAN_OFFSET_80M_LOWER = 7,
 };
 
-typedef enum {
+enum ENCRYP_PROTOCOL_E {
 	ENCRYP_PROTOCOL_OPENSYS,   //open system
 	ENCRYP_PROTOCOL_WEP,       //WEP
 	ENCRYP_PROTOCOL_WPA,       //WPA
@@ -391,7 +407,7 @@ typedef enum {
 	ENCRYP_PROTOCOL_WPA_WPA2,  //WPA & WPA2
 	ENCRYP_PROTOCOL_WAPI,      //WAPI: Not support in this version
 	ENCRYP_PROTOCOL_MAX
-} ENCRYP_PROTOCOL_E;
+};
 
 /**
  * enum mfp_options - Management frame protection (IEEE 802.11w) options
@@ -491,7 +507,7 @@ enum _IFACE_TYPE {
 	MAX_IFACE_PORT,
 };
 
-typedef enum _WIRELESS_MODE {
+enum _WIRELESS_MODE {
 	WIRELESS_MODE_UNKNOWN = 0x00,
 	WIRELESS_MODE_A = 0x01,
 	WIRELESS_MODE_B = 0x02,
@@ -502,7 +518,7 @@ typedef enum _WIRELESS_MODE {
 	WIRELESS_MODE_AC_5G = 0x40,
 	WIRELESS_MODE_AC_24G  = 0x80,
 	WIRELESS_MODE_AC_ONLY  = 0x100,
-} WIRELESS_MODE;
+};
 
 #define _HW_MSR_STATE_NOLINK_		0x00
 #define _HW_MSR_STATE_NAN_		0x01		//only smart valid

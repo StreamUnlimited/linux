@@ -1,22 +1,20 @@
-/******************************************************************************
- *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+/**
+  ******************************************************************************
+  * @file    rtw_wifi_defs.h
+  * @author
+  * @version
+  * @date
+  * @brief
+  ******************************************************************************
+  * @attention
+  *
+  * This module is a confidential and proprietary property of RealTek and
+  * possession or use of this module requires written permission of RealTek.
+  *
+  * Copyright(c) 2024, Realtek Semiconductor Corporation. All rights reserved.
+  ******************************************************************************
+  */
+
 #ifndef	__RTW_WIFI_DEFS_H_
 #define __RTW_WIFI_DEFS_H_
 
@@ -165,6 +163,31 @@
   * @}
   */
 
+/** @defgroup Packet_Defs
+   *@{
+   */
+#define	PACKET_NORMAL			0
+#define	PACKET_DHCP			1
+#define	PACKET_ARP			2
+#define	PACKET_EAPOL			3
+
+/**
+  * @}
+  */
+
+
+/** @defgroup WPA_MODE_CHECK_Defs
+   *@{
+   */
+#define WPA2_MODE_CHECK(wpa_mode) ((wpa_mode == WPA_AUTO_MODE) || (wpa_mode == WPA2_ONLY_MODE) || (wpa_mode == WPA3_ONLY_MODE) || \
+									(wpa_mode == WPA_WPA2_MIXED_MODE) || (wpa_mode == WPA2_WPA3_MIXED_MODE))
+#define WPA_MODE_CHECK(wpa_mode) ((wpa_mode == WPA_AUTO_MODE) ||(wpa_mode == WPA_ONLY_MODE) ||(wpa_mode == WPA_WPA2_MIXED_MODE))
+
+/**
+  * @}
+  */
+
+
 /**
   * @}
   */
@@ -198,7 +221,7 @@ enum RTK_IW_MODE {
 /**
 * @brief  The enumeration lists the promisc levels.
 */
-typedef enum {
+enum rtw_promisc_level {
 	RTW_PROMISC_DISABLE = 0,	/**< Disable the promisc */
 	RTW_PROMISC_ENABLE = 1,	/**< Fetch all ethernet packets */
 	RTW_PROMISC_ENABLE_1 = 2, /**< Fetch only B/M packets */
@@ -206,22 +229,12 @@ typedef enum {
 	RTW_PROMISC_ENABLE_3 = 4, /**< Fetch only B/M 802.11 packets*/
 	RTW_PROMISC_ENABLE_4 = 5, /**< Fetch all 802.11 packets & MIMO PLCP headers. Please note that the PLCP header would be struct rtw_rx_info_t defined in wifi_conf.h*/
 	RTW_PROMISC_ENABLE_5 = 6 /**< Fetch all unicast 802.11 packets, data frame and beacon in same BSSID*/
-} rtw_rcr_level_t;
-
-#if (defined(CONFIG_UNSUPPORT_PLCPHDR_RPT) && CONFIG_UNSUPPORT_PLCPHDR_RPT) || defined __DOXYGEN__
-/**
- * @brief The enumeration lists the promisc rx type.
- */
-typedef enum {
-	RTW_RX_NORMAL = 0,  /**< The supported 802.11 packet*/
-	RTW_RX_UNSUPPORT = 1 /**<  Unsupported 802.11 packet info */
-} rtw_rx_type_t;
-#endif
+};
 
 /**
 * @brief The enumeration lists all the country codes able to set to Wi-Fi driver.
 */
-typedef enum {
+enum rtw_country_code {
 	/* CHANNEL PLAN */
 	RTW_COUNTRY_WORLD1,	///< 0x20
 	RTW_COUNTRY_ETSI1,	///< 0x21
@@ -418,7 +431,7 @@ typedef enum {
 
 	RTW_COUNTRY_MAX
 
-} rtw_country_code_t;
+};
 
 /**
  * @brief The enumeration lists band type
@@ -433,26 +446,22 @@ enum band_type {
 /**
  * @brief The enumeration lists wpa mode
  */
-typedef enum {
+enum rtw_wpa_mode_type {
 	WPA_AUTO_MODE,  /**< wpa auto mode                       */
 	WPA_ONLY_MODE,   /**< wpa only mode                       */
 	WPA2_ONLY_MODE, /**< wpa2 only mode                       */
 	WPA3_ONLY_MODE, /**< wpa3 only mode                       */
 	WPA_WPA2_MIXED_MODE, /**< wpa and wpa2  mixed mode                       */
 	WPA2_WPA3_MIXED_MODE /**< wpa2 and wpa3  mixed mode                       */
-} rtw_wpa_mode;
+};
 
-#define WPA2_MODE_CHECK(wpa_mode) ((wpa_mode == WPA_AUTO_MODE) || (wpa_mode == WPA2_ONLY_MODE) || (wpa_mode == WPA3_ONLY_MODE) || \
-									(wpa_mode == WPA_WPA2_MIXED_MODE) || (wpa_mode == WPA2_WPA3_MIXED_MODE))
-
-#define WPA_MODE_CHECK(wpa_mode) ((wpa_mode == WPA_AUTO_MODE) ||(wpa_mode == WPA_ONLY_MODE) ||(wpa_mode == WPA_WPA2_MIXED_MODE))
 
 /**
  * @brief The enumeration lists the possible security types to set when connection.\n
  *			Station mode supports OPEN, WEP, and WPA2.\n
  *			AP mode support OPEN and WPA2.
  */
-typedef enum {
+enum rtw_security {
 	RTW_SECURITY_OPEN               = 0,                                                            /**< Open security                           */
 	RTW_SECURITY_WEP_PSK            = (WEP_ENABLED),                                                /**< WEP Security with open authentication   */
 	RTW_SECURITY_WEP_SHARED         = (WEP_ENABLED | SHARED_ENABLED),                               /**< WEP Security with shared authentication */
@@ -469,12 +478,12 @@ typedef enum {
 	RTW_SECURITY_WPA3_AES_PSK	 = (WPA3_SECURITY | AES_ENABLED),				  /**< WPA3-SAE with AES security			   */
 	RTW_SECURITY_WPA2_WPA3_MIXED = (WPA2_SECURITY | WPA3_SECURITY | AES_ENABLED), /**< WPA3-SAE/WPA2 with AES security		   */
 	RTW_SECURITY_WPA2_AES_CMAC      = (WPA2_SECURITY | AES_CMAC_ENABLED),                           /**< WPA2 Security with AES and Management Frame Protection */
-} rtw_security_t;
+};
 
 /**
  * @brief The enumeration lists encryption types
  */
-typedef enum {
+enum rtw_encryption_type {
 	RTW_ENCRYPTION_UNKNOWN = 0,    /**< unknown encryption type*/
 	RTW_ENCRYPTION_OPEN = 1,           /**< open encryption type*/
 	RTW_ENCRYPTION_WEP40 = 2,         /**< WEP40 encryption type*/
@@ -485,7 +494,7 @@ typedef enum {
 	RTW_ENCRYPTION_WPA2_MIXED = 7,  /**< WPA2+MIXED encryption type*/
 	RTW_ENCRYPTION_WEP104 = 9,          /**< WEP104 encryption type*/
 	RTW_ENCRYPTION_UNDEF = 0xFF    /**< undefined encryption type*/
-} rtw_encryption_t;
+};
 
 enum WIFI_STATUS_CODE {
 	_STATS_SUCCESSFUL_			= 0,
@@ -507,7 +516,7 @@ enum WIFI_STATUS_CODE {
 /**
   * @brief The enumeration lists the BIT 7 HT Rate.
   */
-typedef enum {
+enum mgn_rate_type {
 	MGN_1M		= 0x02,     /**< 0x02 */
 	MGN_2M		= 0x04,     /**< 0x04 */
 	MGN_5_5M	= 0x0B,     /**< 0x0B */
@@ -642,134 +651,161 @@ typedef enum {
 	MGN_HE4SS_MCS10,
 	MGN_HE4SS_MCS11 = 0xff,  /**< 0xff */
 	MGN_UNKNOWN
-} MGN_RATE;
+};
 
-#define	PACKET_NORMAL			0
-#define	PACKET_DHCP			1
-#define	PACKET_ARP			2
-#define	PACKET_EAPOL			3
 
 /**
   * @brief csi enable or config
   */
-typedef enum {
+enum rtw_csi_action_type {
 	CSI_ACT_EN,    /**< enable or disable csi func */
 	CSI_ACT_CFG,  /**< config csi parameters */
 	CSI_ACT_MAX
-} rtw_csi_action;
+};
 
 /**
   * @brief csi group num
   */
-typedef enum {
+enum rtw_csi_group_type {
 	CSI_GROUP_NUM_1 = 0,  /**< per tone */
 	CSI_GROUP_NUM_2,         /**< per 2tone */
 	CSI_GROUP_NUM_4,        /**< per 4tone */
 	CSI_GROUP_NUM_16,     /**< per 16tone */
 	CSI_GROUP_NUM_MAX
-} rtw_csi_group_num;
+};
 
 /**
   * @brief csi mode
   */
-typedef enum {
+enum rtw_csi_mode_type {
 	CSI_MODE_NORMAL = 0,   ///<   normal mode
 	CSI_MODE_NDP,                ///<   ndp mode
 	CSI_MODE_RX_RESP,         ///<    rx rsp mode
 	CSI_MODE_MAX,                 ///<    max mode
-} rtw_csi_mode;
+};
 
 /**
   * @brief csi accuracy.
   */
-typedef enum {
+enum rtw_csi_accuracy_type {
 	CSI_ACCU_1BYTE = 0, /**< CSI_ACCU_1BYTE: S(8,4) */
 	CSI_ACCU_2BYTES,  /**< CSI_ACCU_2BYTE: S(16,12) */
 	CSI_ACCU_MAX
-} rtw_csi_accuracy;
+};
 
 /**
   * @brief csi alg_opt.
   */
-typedef enum {
+enum rtw_csi_alg_opt_type {
 	CSI_ALG_LS = 0,  /**< ls algo */
 	CSI_ALG_SMOTHING, /**< smothing algo */
 	CSI_ALG_MAX            /**< other algo */
-} rtw_csi_alg_opt;
+};
 
 /**
   * @brief csi ch_opt.
   */
-typedef enum {
+enum rtw_csi_ch_opt_type {
 	CSI_CH_LEGACY = 0, /**< legacy part(L-LTF) channel estmation result */
 	CSI_CH_NON_LEGACY,  /**< non-legacy(HT-LTF) part */
 	CSI_CH_MAX
-} rtw_csi_ch_opt;
+};
+
+/**
+  * @brief csi play_role for sta mode.
+  */
+enum rtw_csi_op_role {
+	CSI_OP_ROLE_TRX = 0,  /**< both trx */
+	CSI_OP_ROLE_TX  = 1,  /**< only tx csi triggering frame */
+	CSI_OP_ROLE_RX  = 2,  /**< only rx csi triggering frame for fetching csi report */
+	CSI_OP_ROLE_MAX
+};
 
 /**
   * @brief The enumeration lists the power status.
   */
-typedef enum {
+enum rtw_tx_pwr_percentage {
 	RTW_TX_PWR_PERCENTAGE_100	= 0, /**< 100%, default target output power.	 */
 	RTW_TX_PWR_PERCENTAGE_75	= 1, /**< 75% */
 	RTW_TX_PWR_PERCENTAGE_50	= 2, /**< 50% */
 	RTW_TX_PWR_PERCENTAGE_25	= 3, /**< 25% */
 	RTW_TX_PWR_PERCENTAGE_12_5	= 4, /**< 12.5% */
-} rtw_tx_pwr_percentage_t;
+};
 
 /**
   * @brief Power Mgnt
   */
-typedef enum {
+enum power_mgnt_mode {
 	PS_MODE_ACTIVE	= 0	, ///< active mode
 	PS_MODE_LEGACY		,       ///< legacy mode
 	PS_MODE_UAPSD_WMM	, ///< uapsd wmm mode
-} Power_Mgnt;
+};
 
 /**
 * @brief The enumeration lists the trp tis types.
 */
-typedef enum {
+enum rtw_trp_tis_mode {
 	RTW_TRP_TIS_DISABLE = 0,
 	RTW_TRP_TIS_NORMAL = 1,
 	RTW_TRP_TIS_DYNAMIC = 3,					///< enable dynamic mechanism
 	RTW_TRP_TIS_FIX_ACK_RATE = 5,			///< fix ack rate to 6M
 	RTW_TRP_TIS_FIX_PHY_ACK_HIGH_RATE = 9	///< fix phy ack rate to RATE_54M | RATE_48M | RATE_36M | RATE_24M | RATE_18M | RATE_12M | RATE_9M | RATE_6M
-} rtw_trp_tis_mode_t;
+};
+
+/**
+* @brief The enumeration lists the edcca mode types.
+*/
+enum rtw_edcca_mode {
+	RTW_EDCCA_NORM	= 0, /* normal */
+	RTW_EDCCA_ADAPT	= 1, /* adaptivity */
+	RTW_EDCCA_CS	= 2, /* carrier sense */
+	RTW_EDCCA_DISABLE	= 9, /* disable */
+};
+
+/**
+* @brief The enumeration lists the antdiv mode types.
+*/
+enum rtw_antdiv_mode {
+	RTW_ANTDIV_AUTO     = 0,    /* auto antdiv */
+	RTW_ANTDIV_FIX_MAIN = 1,    /* fix main ant */
+	RTW_ANTDIV_FIX_AUX  = 2,    /* fix aux ant */
+	RTW_ANTDIV_DISABLE  = 0xF,  /* disable antdiv*/
+};
 
 /**
 * @brief The enumeration lists band types
 */
-typedef enum {
+enum rtw_802_11_band {
 	RTW_802_11_BAND_5GHZ   = 0, /**< Denotes 5GHz radio band */
 	RTW_802_11_BAND_2_4GHZ = 1  /**< Denotes 2.4GHz radio band */
-} rtw_802_11_band_t;
+};
 
 /**
   * @brief  The enumeration lists the bss types.
   */
-typedef enum {
+enum rtw_bss_type {
 	RTW_BSS_TYPE_INFRASTRUCTURE 	= 0, /**< Denotes infrastructure network                  */
 	RTW_BSS_TYPE_ADHOC          		= 1, /**< Denotes an 802.11 ad-hoc IBSS network           */
 	RTW_BSS_TYPE_ANY            			= 2, /**< Denotes either infrastructure or ad-hoc network */
 	RTW_BSS_TYPE_UNKNOWN        		= -1 /**< May be returned by scan function if BSS type is unknown. Do not pass this to the Join function */
-} rtw_bss_type_t;
+};
 
 /**
   * @brief  The enumeration lists the scan options.
   */
-typedef enum {
+enum rtw_scan_option {
 	RTW_SCAN_NOUSE			= 0x00,  /**< default value */
 	RTW_SCAN_ACTIVE              	= 0x01,     /**< active scan */
 	RTW_SCAN_PASSIVE             	= 0x02,    /**< passive scan*/
 	RTW_SCAN_NO_HIDDEN_SSID	= 0x04, /**< Filter hidden ssid APs*/
-	RTW_SCAN_REPORT_EACH	= 0x08    /**< report each */
-} rtw_scan_option_t;
+	RTW_SCAN_REPORT_EACH	= 0x08,    /**< report each */
+	RTW_SCAN_WITH_P2P		= 0x10    /**< for P2P usage */
+};
 
 /**
   * @brief  The enumeration lists the WPS types.
   */
-typedef enum {
+enum rtw_wps_type {
 	RTW_WPS_TYPE_DEFAULT 		    		= 0x0000,	/**< default type */
 	RTW_WPS_TYPE_USER_SPECIFIED 		= 0x0001,	/**< user specified type */
 	RTW_WPS_TYPE_MACHINE_SPECIFIED   	= 0x0002,	/**< machine specified type */
@@ -779,12 +815,12 @@ typedef enum {
 	RTW_WPS_TYPE_NONE                   		= 0x0006, 	/**< none */
 	RTW_WPS_TYPE_WSC                    		= 0x0007,	/**< wsc type */
 	RTW_WPS_TYPE_NOUSE					= 0x00ff		/**< unsed type */
-} rtw_wps_type_t;
+};
 
 /**
   * @brief The enumeration lists the join status.
   */
-typedef enum {
+enum rtw_join_status_type {
 	RTW_JOINSTATUS_UNKNOWN = 0,				/**< unknown */
 
 	/* The intermediate states of Linking should be added
@@ -803,37 +839,36 @@ typedef enum {
 		in back of RTW_JOINSTATUS_SUCCESS */
 	RTW_JOINSTATUS_FAIL,						/**< join fail  */
 	RTW_JOINSTATUS_DISCONNECT,				/**< disconnect */
-	//TODO: RTW_JOINSTATUS_ABORTED,
-} rtw_join_status_t;
+};
 
 /**
   * @brief The enumeration lists the supported operation mode by WIFI driver,
   *			including station and AP mode.
   */
-typedef enum {
+enum rtw_mode_type {
 	RTW_MODE_NONE	= 0,		///<none
 	RTW_MODE_STA		= 0x0001,	///<sta mode
 	RTW_MODE_AP		= 0x0002,	///<ap mode
 	RTW_MODE_NAN		= 0x0004,	///<nan mode
 	RTW_MODE_MAX
-} rtw_mode_t;
+};
 
 /**
   * @brief  The enumeration lists the supported autoreconnect mode by WIFI driver.
   */
-typedef enum {
+enum rtw_autoreconnect_mode {
 	RTW_AUTORECONNECT_DISABLE,  ///< disable auto reconnect
 	RTW_AUTORECONNECT_FINITE,    ///< finite auto reconnect
 	RTW_AUTORECONNECT_INFINITE ///< infinite auto reconnect
-} rtw_autoreconnect_mode_t;
+};
 
 /**
   * @brief  The enumeration lists the interfaces.
   */
-typedef enum {
+enum rtw_interface_type {
 	RTW_STA_INTERFACE     = 0, /**<  STA or Client Interface  */
 	RTW_AP_INTERFACE      = 1 /**<  SoftAP Interface         */
-} rtw_interface_t;
+};
 
 /* For freertos, core, hal, rf, halbb. */
 enum phl_phy_idx {
@@ -845,32 +880,23 @@ enum phl_phy_idx {
 /**
   * @brief  The enumeration lists the packet filter rules.
   */
-typedef enum {
+enum rtw_packet_filter_rule {
 	RTW_POSITIVE_MATCHING  = 0, /**< Receive the data matching with this pattern and discard the other data   */
 	RTW_NEGATIVE_MATCHING  = 1  /**< Discard the data matching with this pattern and receive the other data */
-} rtw_packet_filter_rule_t;
+};
 
 /**
   * @brief channel switch
   */
-typedef enum {
+enum rtw_channel_switch_res {
 	RTW_CH_SWITCH_FAIL = -1,           ///<channel switch fail
 	RTW_CH_SWITCH_SUCCESS = 0,      ///<channel switch success
-} rtw_channel_switch_res_t;
-
-/**
-  * @brief wowlan option
-  */
-typedef enum {
-	RTW_WOWLAN_CTRL,            ///< control mode
-	RTW_WOWLAN_SET_PATTREN,///< set pattren mode
-	RTW_WOWLAN_REDOWNLOAD_FW,///< redownload fw
-} rtw_wowlan_option_t;
+};
 
 /**
   * @brief  The enumeration is event type indicated from wlan driver.
   */
-typedef enum {
+enum rtw_event_indicate {
 	/* common event */
 	WIFI_EVENT_STA_ASSOC = 0,		///<used in p2p, simple config, 11s, customer
 	WIFI_EVENT_STA_DISASSOC,		///<used in p2p, customer
@@ -902,6 +928,21 @@ typedef enum {
 	WIFI_EVENT_OWE_START_CALC,
 	WIFI_EVENT_OWE_PEER_KEY_RECV,
 #endif
+	/* kvr event */
+#if defined(CONFIG_RTW_WNM) || defined(CONFIG_IEEE80211K) || defined(CONFIG_IEEE80211R)
+	WIFI_EVENT_KVR_CAP_UPDATE,
+#if defined(CONFIG_RTW_WNM) || defined(CONFIG_IEEE80211K)
+	WIFI_EVENT_NB_RESP_RECV,
+#endif
+#ifdef CONFIG_RTW_WNM
+	WIFI_EVENT_BTM_REQ_RECV,
+	WIFI_EVENT_BTM_DEBUG_CMD,
+#endif
+#ifdef CONFIG_IEEE80211R
+	WIFI_EVENT_FT_AUTH_START,
+	WIFI_EVENT_FT_RX_MGNT,
+#endif
+#endif
 
 	/* csi rx done event */
 	WIFI_EVENT_CSI_DONE,
@@ -913,25 +954,34 @@ typedef enum {
 	WIFI_EVENT_CHANNEL_NOT_SUPPORTED,
 #endif
 	WIFI_EVENT_MAX,
-} rtw_event_indicate_t;
+};
 
 /**
   * The enumeration lists the flash operation status.
   */
-typedef enum  {
+enum flash_operation_type {
 	FLASH_READ = 0,   /**< read  flash                       */
 	FLASH_WRITE,       /**< write  flash                       */
-} flash_operation;
+};
 
 /**
   * The enumeration lists the power save status.
   */
-typedef enum {
+enum ips_level_type {
 	IPS_WIFI_OFF = 0,
 	IPS_WIFI_PG,
-	IPS_WIFI_CG,
 	IPS_LEVEL_MAX,
-} ips_level;
+};
+
+/**
+  * The enumeration lists the p2p role type.
+  */
+enum rtw_p2p_role {
+	P2P_ROLE_DISABLE = 0,
+	P2P_ROLE_DEVICE = 1,
+	P2P_ROLE_CLIENT = 2,
+	P2P_ROLE_GO = 3
+};
 
 enum gen_ie_type {
 	P2PWPS_PROBE_REQ_IE = 0,
@@ -940,16 +990,6 @@ enum gen_ie_type {
 	P2PWPS_ASSOC_REQ_IE,
 	P2PWPS_ASSOC_RSP_IE
 };
-
-#ifndef _CUSTOM_IE_TYPE_
-#define _CUSTOM_IE_TYPE_
-typedef enum CUSTOM_IE_TYPE {
-	PROBE_REQ = 0x0001,
-	PROBE_RSP = 0x0002,
-	BEACON	  = 0x0004,
-	ASSOC_REQ = 0x0008,
-} rtw_custom_ie_type_t;
-#endif /* _CUSTOM_IE_TYPE_ */
 
 #ifdef CONFIG_WMMPS_STA
 enum UAPSD_MAX_SP {
