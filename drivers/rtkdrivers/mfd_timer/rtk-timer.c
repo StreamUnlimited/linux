@@ -16,8 +16,6 @@
 #include <linux/of_platform.h>
 #include <linux/of_irq.h>
 #include <linux/clk.h>
-#include <linux/reset.h>
-#include <linux/sched_clock.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/device.h>
@@ -650,7 +648,7 @@ static ssize_t enable_store(struct device *dev,
 							const char *buf, size_t size)
 {
 	struct rtk_tim *tim = dev->driver_data;
-	int ret;
+	int ret = 0;
 	u32 val;
 
 	if (tim->valid != 1) {
@@ -676,7 +674,7 @@ static ssize_t enable_store(struct device *dev,
 		rtk_gtimer_deinit(tim->index);
 	}
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 
 static ssize_t enable_show(struct device *dev,
@@ -700,7 +698,7 @@ static ssize_t time_ms_store(struct device *dev,
 	struct rtk_tim *tim = dev->driver_data;
 
 	int val;
-	int ret;
+	int ret = 0;
 
 	if (tim->valid != 1) {
 		dev_err(dev, "This timer is not valid\n");
@@ -718,7 +716,7 @@ static ssize_t time_ms_store(struct device *dev,
 		rtk_gtimer_change_period(tim->index, (u64) tim->period * 1000000);
 	};
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 
 static ssize_t time_ms_show(struct device *dev,
@@ -752,14 +750,14 @@ static struct attribute *timer_config_attrs[] = {
 ATTRIBUTE_GROUPS(timer_config);
 
 static const struct of_device_id rtk_timer_of_match[] = {
-	{ .compatible = "realtek,amebad2-timer",	},
+	{ .compatible = "realtek,ameba-timer",	},
 	{ /* end node */ },
 };
 
 static struct platform_driver rtk_timer_driver = {
 	.probe	= rtk_gtimer_probe,
 	.driver	= {
-		.name = "realtek-amebad2-timer",
+		.name = "realtek-ameba-timer",
 		.of_match_table = rtk_timer_of_match,
 		.dev_groups = timer_config_groups,
 	},

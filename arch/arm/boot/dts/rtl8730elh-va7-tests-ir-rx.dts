@@ -18,10 +18,12 @@
 	};
 };
 
-// Configure peripherals.
+// Configure peripherals. Parameters described here is for wire-to-wire test.
 &ir {
 	pinctrl-names = "default";
 	pinctrl-0 = <&ir_pins>;
 	rtk,ir-receiver = <1>; // 0: tx only; 1: rx only.
+	rtk,ir-cnt-thred-type = <0>;
+	rtk,rtk,ir-rx-trigger-mode = <1>;
 	status = "okay";
 };

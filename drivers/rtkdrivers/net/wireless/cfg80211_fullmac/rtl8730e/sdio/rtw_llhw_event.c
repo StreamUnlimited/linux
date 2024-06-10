@@ -1,5 +1,9 @@
 #include <rtw_cfg80211_fullmac.h>
 
+#ifdef CONFIG_P2P
+#define rtw_p2p_frame_is_registered(p2p_role, frame_type) global_idev.p2p_global.mgmt_register[p2p_role - 1] & BIT(frame_type >> 4)
+#endif
+
 static void llhw_event_scan_report_indicate(struct event_priv_t *event_priv, u32 *param_buf)
 {
 	u32 channel = param_buf[0];
@@ -16,11 +20,16 @@ static void llhw_event_scan_report_indicate(struct event_priv_t *event_priv, u32
 
 static void llhw_event_join_status_indicate(struct event_priv_t *event_priv, u32 *param_buf)
 {
-	rtw_event_indicate_t event = (rtw_event_indicate_t)param_buf[0];
+	enum rtw_event_indicate event = (enum rtw_event_indicate)param_buf[0];
 	int flags = (int)param_buf[1];
 	int buf_len = (int)param_buf[2];
 	char *buf = (char *) &param_buf[3];
 	u16 disassoc_reason;
+	int channel = 6;/*channel need get, force 6 seems ok temporary*/
+	struct wireless_dev *wdev = global_idev.pwdev_global[0];
+#ifdef CONFIG_P2P
+	u16 frame_type;
+#endif
 
 	if (event == WIFI_EVENT_JOIN_STATUS) {
 		cfg80211_rtw_connect_indicate(flags, buf, buf_len);
@@ -51,14 +60,50 @@ static void llhw_event_join_status_indicate(struct event_priv_t *event_priv, u32
 
 	if (event == WIFI_EVENT_RX_MGNT) {
 		dev_dbg(global_idev.fullmac_dev, "%s: rx mgnt \n", __func__);
+#ifdef CONFIG_P2P
+		channel = (flags > 0) ? (flags & 0x0000FFFF) : 6;
+		frame_type = (u16)(flags >> 16);
+		if (frame_type == IEEE80211_STYPE_PROBE_REQ) {
+			if (global_idev.p2p_global.pd_pwdev && (rtw_p2p_frame_is_registered(P2P_ROLE_DEVICE, IEEE80211_STYPE_PROBE_REQ))) {//P2P_DEV intf registered probe_req
+				wdev =	global_idev.p2p_global.pd_pwdev;
+			}
+		} else if (frame_type == IEEE80211_STYPE_ACTION) {
+			if (global_idev.p2p_global.pd_pwdev && (memcmp((buf + 4), global_idev.p2p_global.pd_pwdev->address, 6) == 0)) {
+				if (rtw_p2p_frame_is_registered(P2P_ROLE_DEVICE, IEEE80211_STYPE_ACTION)) {
+					wdev =	global_idev.p2p_global.pd_pwdev; //DA match P2P_DEV intf, need use P2P_DEV intf to indicate
+				}
+			} else if (rtw_p2p_frame_is_registered(P2P_ROLE_CLIENT, IEEE80211_STYPE_ACTION)) { //GC intf has registered action report
+				wdev = global_idev.pwdev_global[1];
+			}
+		}
+#endif
 		/*channel need get, force 6 seems ok temporary*/
-		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[0]), 6, 0, buf, buf_len, 0);
+		cfg80211_rx_mgmt(wdev, rtw_ch2freq(channel), 0, buf, buf_len, 0);
 	}
 
 	if (event == WIFI_EVENT_RX_MGNT_AP) {
 		dev_dbg(global_idev.fullmac_dev, "%s: rx mgnt \n", __func__);
-		/*channel need get, force 6 seems ok temporary*/
-		cfg80211_rx_mgmt(ndev_to_wdev(global_idev.pndev[1]), 6, 0, buf, buf_len, 0);
+		wdev = ndev_to_wdev(global_idev.pndev[1]);
+#ifdef CONFIG_P2P
+		channel = (flags > 0) ? (flags & 0x0000FFFF) : 6;
+		frame_type = (u16)(flags >> 16);
+		if (frame_type == IEEE80211_STYPE_PROBE_REQ) {
+			if (global_idev.p2p_global.pd_pwdev && (rtw_p2p_frame_is_registered(P2P_ROLE_DEVICE, IEEE80211_STYPE_PROBE_REQ))) {//P2P_DEV intf registered probe_req
+				cfg80211_rx_mgmt(global_idev.p2p_global.pd_pwdev, rtw_ch2freq(channel), 0, buf, buf_len, 0);
+			}
+			if (rtw_p2p_frame_is_registered(P2P_ROLE_GO, IEEE80211_STYPE_PROBE_REQ)) {//P2P_GO intf registered probe_req
+				cfg80211_rx_mgmt(wdev, rtw_ch2freq(channel), 0, buf, buf_len, 0);
+			}
+			return;
+		} else if ((frame_type == IEEE80211_STYPE_ACTION)) {
+			if (rtw_p2p_frame_is_registered(P2P_ROLE_DEVICE, IEEE80211_STYPE_ACTION)) {
+				if (global_idev.p2p_global.pd_pwdev && (memcmp((buf + 4), global_idev.p2p_global.pd_pwdev->address, 6)) == 0) {
+					wdev =	global_idev.p2p_global.pd_pwdev; //DA match P2P_DEV intf, need use P2P_DEV intf to indicate
+				}
+			}
+		}
+#endif
+		cfg80211_rx_mgmt(wdev, rtw_ch2freq(channel), 0, buf, buf_len, 0);
 	}
 
 	return;
@@ -83,17 +128,29 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, u32 *para
 		goto func_exit;
 	}
 
+#ifdef CONFIG_P2P
+	if (global_idev.p2p_global.pd_wlan_idx == 1) {
+		idx = idx ^ 1; /*GC intf is up, linux netdev idx is oppsite to driver wlan_idx*/
+	}
+	if (!global_idev.pndev[idx]) {
+		/*when GC netdev close, need revert mac address in driver, but netdev0 may already be closed*/
+		goto func_exit;
+	}
+#endif
+
 	memcpy((void *)global_idev.pndev[idx]->dev_addr, dev_addr, ETH_ALEN);
 	dev_dbg(global_idev.fullmac_dev, "MAC ADDR [%02x:%02x:%02x:%02x:%02x:%02x]", *global_idev.pndev[idx]->dev_addr,
 			*(global_idev.pndev[idx]->dev_addr + 1), *(global_idev.pndev[idx]->dev_addr + 2),
 			*(global_idev.pndev[idx]->dev_addr + 3), *(global_idev.pndev[idx]->dev_addr + 4),
 			*(global_idev.pndev[idx]->dev_addr + 5));
 
-	/*set ap port mac address*/
-	memcpy((void *)global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
+	if (global_idev.pndev[0]) {
+		/*set ap port mac address*/
+		memcpy((void *)global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
 
-	last = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
-	memcpy((void *)&global_idev.pndev[1]->dev_addr[softap_addr_offset_idx], &last, 1);
+		last = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
+		memcpy((void *)&global_idev.pndev[1]->dev_addr[softap_addr_offset_idx], &last, 1);
+	}
 
 func_exit:
 	return;
@@ -110,9 +167,15 @@ static u8 llhw_event_get_network_info(struct event_priv_t *event_priv, u32 *para
 	struct in_ifaddr *ifa = NULL;
 	uint32_t inic_ip_addr[INIC_MAX_NET_PORT_NUM] = {0};
 	uint32_t inic_ip_mask[INIC_MAX_NET_PORT_NUM] = {0};
-	inic_api_info_t *ret_msg;
+	struct inic_api_info *ret_msg;
 	u8 *buf;
 	u32 buf_len;
+
+#ifdef CONFIG_P2P
+	if (global_idev.p2p_global.pd_wlan_idx == 1) {
+		idx = idx ^ 1; /*GC intf is up, linux netdev idx is oppsite to driver wlan_idx*/
+	}
+#endif
 
 	switch (type) {
 	case INIC_WLAN_GET_IP:
@@ -143,11 +206,11 @@ static u8 llhw_event_get_network_info(struct event_priv_t *event_priv, u32 *para
 		return 0;
 	}
 
-	buf_len = SIZE_TX_DESC + sizeof(inic_api_info_t) + rsp_len;
+	buf_len = SIZE_TX_DESC + sizeof(struct inic_api_info) + rsp_len;
 	buf = kzalloc(buf_len, GFP_KERNEL);
 	if (buf) {
 		/* fill inic_api_info_t */
-		ret_msg = (inic_api_info_t *)(buf + SIZE_TX_DESC);
+		ret_msg = (struct inic_api_info *)(buf + SIZE_TX_DESC);
 		ret_msg->event = INIC_WIFI_EVT_API_RETURN;
 		ret_msg->api_id = INIC_API_GET_LWIP_INFO;
 
@@ -206,21 +269,37 @@ void llhw_event_task(struct work_struct *data)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
 	u8 already_ret = 0;
-	inic_api_info_t *p_recv_msg = (inic_api_info_t *)event_priv->rx_api_msg;
+	struct inic_api_info *p_recv_msg = (struct inic_api_info *)event_priv->rx_api_msg;
 	u32 *param_buf = (u32 *)(p_recv_msg + 1);
-	inic_api_info_t *ret_msg;
+	struct inic_api_info *ret_msg;
 	u8 *buf;
 	u32 buf_len;
+#ifdef CONFIG_P2P
+	struct wireless_dev *wdev = NULL;
+#endif
+
+	dev_dbg(global_idev.fullmac_dev, "-----DEVICE CALLING API %d START\n", p_recv_msg->api_id);
 
 	switch (p_recv_msg->api_id) {
 
 	/* receive callback indication */
 	case INIC_API_SCAN_USER_CALLBACK:
+#ifdef CONFIG_P2P
+		if (global_idev.p2p_global.roch_onging) {
+			global_idev.p2p_global.roch_onging = 0;
+			if (param_buf[1] == 2) {/*scan_userdata=2 means using P2P Device intf*/
+				wdev = global_idev.p2p_global.pd_pwdev;
+			} else {
+				wdev = global_idev.pwdev_global[param_buf[1]];
+			}
+			cfg80211_remain_on_channel_expired(wdev, global_idev.p2p_global.roch_cookie, &global_idev.p2p_global.roch,
+											   GFP_KERNEL);
+			break;
+		}
+#endif
 		/* If user callback provided as NULL, param_buf[1] appears NULL here. Do not make ptr. */
-		spin_lock_bh(&event_priv->event_lock);
 		/* https://jira.realtek.com/browse/AMEBAD2-1543 */
 		cfg80211_rtw_scan_done_indicate(param_buf[0], NULL);
-		spin_unlock_bh(&event_priv->event_lock);
 		break;
 	case INIC_API_SCAN_EACH_REPORT_USER_CALLBACK:
 		//iiha_scan_each_report_cb_hdl(event_priv, p_recv_msg);
@@ -260,17 +339,29 @@ void llhw_event_task(struct work_struct *data)
 		llhw_event_nan_cfgvendor_cmd_reply(event_priv, param_buf);
 		break;
 #endif
+#ifdef CONFIG_P2P
+	case INIC_API_CFG80211_P2P_CH_RDY:
+		if (param_buf[0] == 2) {/*scan_userdata=2 means using P2P Device intf*/
+			wdev = global_idev.p2p_global.pd_pwdev;
+		} else {
+			wdev = global_idev.pwdev_global[param_buf[0]];
+		}
+		cfg80211_ready_on_channel(wdev, global_idev.p2p_global.roch_cookie, &global_idev.p2p_global.roch,
+								  global_idev.p2p_global.roch_duration, GFP_KERNEL);
+		break;
+#endif
+
 	default:
 		dev_err(global_idev.fullmac_dev, "%s: Unknown Device event(%d)!\n\r", "event", p_recv_msg->event);
 		break;
 	}
 
 	if (already_ret == 0) {
-		buf_len = SIZE_TX_DESC + sizeof(inic_api_info_t);
+		buf_len = SIZE_TX_DESC + sizeof(struct inic_api_info);
 		buf = kzalloc(buf_len, GFP_KERNEL);
 		if (buf) {
 			/* fill and send ret_msg */
-			ret_msg = (inic_api_info_t *)(buf + SIZE_TX_DESC);
+			ret_msg = (struct inic_api_info *)(buf + SIZE_TX_DESC);
 			ret_msg->event = INIC_WIFI_EVT_API_RETURN;
 			ret_msg->api_id = p_recv_msg->api_id;
 			llhw_host_send(buf, buf_len);
@@ -282,6 +373,7 @@ void llhw_event_task(struct work_struct *data)
 	/* free rx_event_msg */
 	llhw_free_rxbuf((u8 *)p_recv_msg);
 
+	dev_dbg(global_idev.fullmac_dev, "-----DEVICE CALLING API %d END\n", p_recv_msg->api_id);
 	return;
 }
 
@@ -291,7 +383,6 @@ int llhw_event_init(struct inic_device *idev)
 
 	/* initialize the mutex to send event_priv message. */
 	mutex_init(&(event_priv->send_mutex));
-	spin_lock_init(&event_priv->event_lock);
 	init_completion(&event_priv->api_ret_sema);
 
 	/* initialize event tasklet */

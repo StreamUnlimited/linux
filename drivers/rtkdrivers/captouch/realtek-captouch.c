@@ -9,7 +9,6 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -21,6 +20,7 @@
 #include <linux/suspend.h>
 #include <linux/clk-provider.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/nvmem-consumer.h>
 
 #include "realtek-captouch.h"
 
@@ -228,6 +228,39 @@ exit:
 	return IRQ_HANDLED;
 }
 
+static int realtek_captouch_get_calibration(struct device *dev) {
+	int ret;
+	struct nvmem_cell *cell;
+	unsigned char *efuse_buf;
+	u32 i;
+
+	cell = nvmem_cell_get(dev, "ctc_mbias");
+	if (IS_ERR(cell)) {
+		dev_err(dev, "Fail to get captouch efuse cell.\n");
+		return -EINVAL;
+	}
+
+	efuse_buf = nvmem_cell_read(cell, &ret);
+	nvmem_cell_put(cell);
+
+	if (IS_ERR(efuse_buf)) {
+		dev_err(dev, "Fail to read captouch efuse cell.\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < CT_CHANNEL_NUM; i++) {
+		if (efuse_buf[i] > 0 && efuse_buf[i] < 64 && (captouch->ch_init[i].ch_ena == 1)) {
+			captouch->ch_init[i].mbias_current = (u8)efuse_buf[i];
+		} else {
+			if (efuse_buf[i] != 0xff) {
+				dev_err(dev, "Bad captouch calibration value [%d]=%d.\n", i, efuse_buf[i]);
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int realtek_captouch_pase_dt(struct device *dev)
 {
 	struct device_node *node = dev->of_node;
@@ -398,6 +431,11 @@ static int realtek_captouch_probe(struct platform_device *pdev)
 		goto map_fail;
 	}
 
+	ret = realtek_captouch_get_calibration(&pdev->dev);
+	if (ret < 0) {
+		goto map_fail;
+	}
+
 	captouch->input = devm_input_allocate_device(&pdev->dev);
 	if (!captouch->input) {
 		ret = -ENOMEM;
@@ -518,23 +556,23 @@ static int realtek_ctc_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops realtek_amebad2_ctc_pm_ops = {
+static const struct dev_pm_ops realtek_ameba_ctc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_ctc_suspend, realtek_ctc_resume)
 };
 #endif
 
 static const struct of_device_id realtek_captouch_match[] = {
-	{ .compatible = "realtek,amebad2-captouch"},
+	{ .compatible = "realtek,ameba-captouch"},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, realtek_captouch_match);
 
 static struct platform_driver realtek_captouch_driver = {
 	.driver = {
-		.name	= "realtek-amebad2-captouch",
+		.name	= "realtek-ameba-captouch",
 		.of_match_table = realtek_captouch_match,
 #ifdef CONFIG_PM
-		.pm = &realtek_amebad2_ctc_pm_ops,
+		.pm = &realtek_ameba_ctc_pm_ops,
 #endif
 		.dev_groups = captouch_configs,
 	},

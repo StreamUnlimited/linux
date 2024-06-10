@@ -37,8 +37,8 @@ int llhw_init(void)
 		goto exit;
 	}
 
-	memset(&global_idev.wifi_user_config, sizeof(struct wifi_user_conf), 0);
-	llhw_wifi_get_user_config(&global_idev.wifi_user_config);
+	memset(&global_idev.wifi_user_config, 0, sizeof(struct wifi_user_conf));
+	llhw_wifi_set_user_config(&global_idev.wifi_user_config);
 
 	llhw_xmit_init();
 

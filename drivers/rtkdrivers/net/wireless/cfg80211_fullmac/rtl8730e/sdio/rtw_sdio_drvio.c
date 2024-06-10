@@ -5,7 +5,7 @@
 * @return true:
 * @return false:
 */
-int rtw_inc_and_chk_continual_io_error(inic_sdio_t *priv)
+int rtw_inc_and_chk_continual_io_error(struct inic_sdio *priv)
 {
 	int ret = false;
 	int value;
@@ -20,14 +20,14 @@ int rtw_inc_and_chk_continual_io_error(inic_sdio_t *priv)
 /*
 * Set the continual_io_error of this @param dvobjprive to 0
 */
-void rtw_reset_continual_io_error(inic_sdio_t *priv)
+void rtw_reset_continual_io_error(struct inic_sdio *priv)
 {
 	atomic_set(&priv->continual_io_error, 0);
 }
 
 bool rtw_sdio_claim_host_needed(struct sdio_func *func)
 {
-	inic_sdio_t *priv = sdio_get_drvdata(func);
+	struct inic_sdio *priv = sdio_get_drvdata(func);
 
 	if (priv->sys_sdio_irq_thd && (priv->sys_sdio_irq_thd == current)) {
 		return false;
@@ -41,7 +41,7 @@ bool rtw_sdio_claim_host_needed(struct sdio_func *func)
  *	0		Success
  *	others	Fail
  */
-s32 sd_cmd52_read(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pdata)
+s32 sd_cmd52_read(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pdata)
 {
 
 	int err = 0;
@@ -113,7 +113,7 @@ s32 sd_cmd52_read(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pdata)
  *	0		Success
  *	others	Fail
  */
-s32 sd_cmd52_write(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pdata)
+s32 sd_cmd52_write(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pdata)
 {
 	int err = 0;
 	struct sdio_func *func;
@@ -179,7 +179,7 @@ s32 sd_cmd52_write(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pdata)
 	return err;
 }
 
-u8 sd_read8(inic_sdio_t *priv, u32 addr, s32 *err)
+u8 sd_read8(struct inic_sdio *priv, u32 addr, s32 *err)
 {
 	u8 v = 0;
 	struct sdio_func *func;
@@ -202,7 +202,7 @@ u8 sd_read8(inic_sdio_t *priv, u32 addr, s32 *err)
 	return v;
 }
 
-u8 sd_f0_read8(inic_sdio_t *priv, u32 addr, s32 *err)
+u8 sd_f0_read8(struct inic_sdio *priv, u32 addr, s32 *err)
 {
 	u8 v = 0;
 	struct sdio_func *func;
@@ -225,7 +225,7 @@ u8 sd_f0_read8(inic_sdio_t *priv, u32 addr, s32 *err)
 	return v;
 }
 
-void sd_f0_write8(inic_sdio_t *priv, u32 addr, u8 v, s32 *err)
+void sd_f0_write8(struct inic_sdio *priv, u32 addr, u8 v, s32 *err)
 {
 	struct sdio_func *func;
 	bool claim_needed;
@@ -246,7 +246,7 @@ void sd_f0_write8(inic_sdio_t *priv, u32 addr, u8 v, s32 *err)
 
 }
 
-u16 sd_read16(inic_sdio_t *priv, u32 addr, s32 *err)
+u16 sd_read16(struct inic_sdio *priv, u32 addr, s32 *err)
 {
 	u16 v = 0;
 	struct sdio_func *func;
@@ -302,7 +302,7 @@ u16 sd_read16(inic_sdio_t *priv, u32 addr, s32 *err)
 	return  v;
 }
 
-u32 sd_read32(inic_sdio_t *priv, u32 addr, s32 *err)
+u32 sd_read32(struct inic_sdio *priv, u32 addr, s32 *err)
 {
 	u32 v = 0;
 	struct sdio_func *func;
@@ -358,7 +358,7 @@ u32 sd_read32(inic_sdio_t *priv, u32 addr, s32 *err)
 	return  v;
 }
 
-void sd_write8(inic_sdio_t *priv, u32 addr, u8 v, s32 *err)
+void sd_write8(struct inic_sdio *priv, u32 addr, u8 v, s32 *err)
 {
 	struct sdio_func *func;
 	bool claim_needed;
@@ -411,7 +411,7 @@ void sd_write8(inic_sdio_t *priv, u32 addr, u8 v, s32 *err)
 	}
 }
 
-void sd_write16(inic_sdio_t *priv, u32 addr, u16 v, s32 *err)
+void sd_write16(struct inic_sdio *priv, u32 addr, u16 v, s32 *err)
 {
 	struct sdio_func *func;
 	bool claim_needed;
@@ -464,7 +464,7 @@ void sd_write16(inic_sdio_t *priv, u32 addr, u16 v, s32 *err)
 	}
 }
 
-void sd_write32(inic_sdio_t *priv, u32 addr, u32 v, s32 *err)
+void sd_write32(struct inic_sdio *priv, u32 addr, u32 v, s32 *err)
 {
 	struct sdio_func *func;
 	bool claim_needed;
@@ -531,7 +531,7 @@ void sd_write32(inic_sdio_t *priv, u32 addr, u32 v, s32 *err)
  *	0		Success
  *	others	Fail
  */
-s32 sd_read(inic_sdio_t *priv, u32 addr, u32 cnt, void *pdata)
+s32 sd_read(struct inic_sdio *priv, u32 addr, u32 cnt, void *pdata)
 {
 	struct sdio_func *func;
 	bool claim_needed;
@@ -589,7 +589,7 @@ s32 sd_read(inic_sdio_t *priv, u32 addr, u32 cnt, void *pdata)
  *  0		Success
  *  others	Fail
  */
-s32 sd_write(inic_sdio_t *priv, u32 addr, u32 cnt, void *pdata)
+s32 sd_write(struct inic_sdio *priv, u32 addr, u32 cnt, void *pdata)
 {
 	struct sdio_func *func;
 	bool claim_needed;

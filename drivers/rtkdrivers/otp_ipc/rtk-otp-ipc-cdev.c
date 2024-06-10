@@ -22,9 +22,6 @@
 #include <linux/list.h>
 #include <linux/notifier.h>
 #include <linux/compat.h>
-#include <linux/of.h>
-#include <linux/of_address.h>
-#include <linux/delay.h>
 #include <linux/errno.h>
 
 #include "rtk-otp-ipc.h"
@@ -89,8 +86,12 @@ static long realtek_otp_ioctl(struct file *file, unsigned int cmd, unsigned long
 	preq_msg.addr = otp_req.otp_order.offset;
 	preq_msg.len = otp_req.otp_order.len;
 	preq_msg.write_lock = otp_req.otp_order.tx_lock;
-	if (otp_req.otp_order.otp_id == LINUX_IPC_OTP_PHY_WRITE8 || otp_req.otp_order.otp_id == LINUX_IPC_OTP_LOGI_WRITE_MAP) {
-		memcpy(preq_msg.param_buf, otp_req.otp_order.tx_value, otp_req.otp_order.len);
+	if (preq_msg.otp_id == LINUX_IPC_OTP_PHY_WRITE8 || preq_msg.otp_id == LINUX_IPC_OTP_LOGI_WRITE_MAP) {
+		if (preq_msg.len > OPT_REQ_MSG_PARAM_NUM) {
+			spin_unlock(&lock);
+			return -EFAULT;
+		}
+		memcpy(preq_msg.param_buf, otp_req.otp_order.tx_value, preq_msg.len);
 		write = 1;
 	}
 

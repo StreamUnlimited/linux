@@ -730,9 +730,6 @@ static int rts_qspi_probe(struct platform_device *pdev)
 {
 	struct resource				*res;
 	struct rts_qspi				*rqspi;
-#ifdef AMEBAD2_SPIC_CLK_TODO
-	struct clk				*clk;
-#endif
 	struct spi_nor				*nor;
 	struct spi_board_info			*board_info;
 	struct mtd_info				*mtd;
@@ -774,26 +771,7 @@ static int rts_qspi_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-#ifdef AMEBAD2_SPIC_CLK_TODO
-	//TODO: get spic clock
-
-	clk = devm_clk_get(&pdev->dev, "spi_ck");
-
-	if (IS_ERR(clk)) {
-		dev_err(&pdev->dev, "Failed to get clock\n");
-		return PTR_ERR(clk);
-	}
-
-	spiclk_hz = clk_get_rate(clk);
-	if (!spiclk_hz)  {
-		dev_err(&pdev->dev,
-				"Invalid clock rate: %d\n", spiclk_hz);
-		return -EINVAL;
-	}
-#else
 	spiclk_hz = 40000000;	//default 40M or PLL
-#endif
-
 	board_info = rts_spi_board_info;
 	data = board_info->platform_data;
 	if (!(data && data->type)) {
@@ -842,9 +820,6 @@ static int rts_qspi_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rqspi);
 	rqspi->irq = irq;
-#ifdef AMEBAD2_SPIC_CLK_TODO
-	rqspi->clk = clk;
-#endif
 	rqspi->regs = regs;
 	rqspi->phybase = res->start;
 	rqspi->use_dma = false;

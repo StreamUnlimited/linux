@@ -74,30 +74,6 @@ static unsigned int ameba_uart_tx_empty(struct uart_port *port)
  */
 static void ameba_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
-#ifdef UART_TODO
-	unsigned int val;
-	val = ameba_uart_readl(port, AMEBA_LOGUART_MCR);
-	val &= ~(LOGUART_MCR_DTR | LOGUART_MCR_RTS | LOGUART_MCR_FLOW_ENABLE);
-
-	if (mctrl & TIOCM_DTR) {
-		val |= (LOGUART_MCR_FLOW_ENABLE | LOGUART_MCR_DTR);
-	}
-	if (mctrl & TIOCM_RTS) {
-		val |= (LOGUART_MCR_FLOW_ENABLE | LOGUART_MCR_RTS);
-	}
-
-	ameba_uart_writel(port, val, AMEBA_LOGUART_MCR);
-
-	val = ameba_uart_readl(port, AMEBA_LOGUART_MCR);
-
-	if (mctrl & TIOCM_LOOP) {
-		val |= LOGUART_MCR_LOOPBACK_ENABLE;
-	} else {
-		val &= ~LOGUART_MCR_LOOPBACK_ENABLE;
-	}
-
-	ameba_uart_writel(port, val, AMEBA_LOGUART_MCR);
-#endif
 }
 
 /*
@@ -133,47 +109,10 @@ static unsigned int ameba_uart_get_mctrl(struct uart_port *port)
 static void ameba_uart_stop_tx(struct uart_port *port)
 {
 	unsigned int val;
-#ifdef UART_TODO
-	val = ameba_uart_readl(port, AMEBA_LOGUART_AGGC);
-	val &= ~LOGUART_TP4_EN;
-	ameba_uart_writel(port, val, AMEBA_LOGUART_AGGC);
-#endif
 	val = ameba_uart_readl(port, AMEBA_LOGUART_DLH_INTCR);
 	val &= ~LOGUART_IER_ETPEFI;
 	ameba_uart_writel(port, val, AMEBA_LOGUART_DLH_INTCR);
 }
-
-#ifdef UART_TODO
-/**
- * Handle the bytes to be Txed.
- * @dev_id: Id of the UART port
- * Return: None
- */
-static void ameba_uart_handle_tx(struct uart_port *port)
-{
-
-	unsigned int numbytes;
-	int ch;
-	numbytes = port->fifosize;
-	while (numbytes && !uart_circ_empty(&port->state->xmit)) {
-		ch = port->state->xmit.buf[port->state->xmit.tail];
-		ameba_console_putchar(port, ch);
-
-		port->icount.tx++;
-
-		/*
-		 * Adjust the tail of the UART buffer and wrap
-		 * the buffer if it reaches limit.
-		 */
-		port->state->xmit.tail =
-			(port->state->xmit.tail + 1) &
-			(UART_XMIT_SIZE - 1);
-
-		numbytes--;
-	}
-
-}
-#endif
 
 /*
  * Serial core request to (re)enable TX
@@ -187,13 +126,6 @@ static void ameba_uart_start_tx(struct uart_port *port)
 	val &= ~LOGUART_IER_ETPEFI;
 	val |= LOGUART_TX_PATH4_INT;
 	ameba_uart_writel(port, val, AMEBA_LOGUART_DLH_INTCR);
-#ifdef UART_TODO
-	val = ameba_uart_readl(port, AMEBA_LOGUART_AGGC);
-	val |= LOGUART_TP4_EN;
-	ameba_uart_writel(port, val, AMEBA_LOGUART_AGGC);
-	ameba_uart_handle_tx(port);
-#endif
-
 }
 
 /*
@@ -202,12 +134,6 @@ static void ameba_uart_start_tx(struct uart_port *port)
  */
 static void ameba_uart_stop_rx(struct uart_port *port)
 {
-#ifdef UART_TODO
-	unsigned int val;
-	val = ameba_uart_readl(port, AMEBA_LOGUART_DLH_INTCR);
-	val &= ~(LOGUART_IER_ELSI | LOGUART_IER_ERBI);
-	ameba_uart_writel(port, val, AMEBA_LOGUART_DLH_INTCR);
-#endif
 }
 
 /*
@@ -230,12 +156,6 @@ static void ameba_uart_intr_config(struct uart_port *port, unsigned int intr, in
  */
 static void ameba_uart_enable_ms(struct uart_port *port)
 {
-#ifdef UART_TODO
-	unsigned int val;
-	val = ameba_uart_readl(port, AMEBA_LOGUART_DLH_INTCR);
-	val |= LOGUART_IER_EDSSI;
-	ameba_uart_writel(port, val, AMEBA_LOGUART_DLH_INTCR);
-#endif
 }
 
 /*
@@ -243,21 +163,6 @@ static void ameba_uart_enable_ms(struct uart_port *port)
  */
 static void ameba_uart_break_ctl(struct uart_port *port, int ctl)
 {
-#ifdef UART_TODO
-	unsigned long flags;
-	unsigned int val;
-	spin_lock_irqsave(&port->lock, flags);
-
-	val = ameba_uart_readl(port, AMEBA_LOGUART_LCR);
-	if (ctl) {
-		val |= LOGUART_RP_LCR_BREAK_CTRL;
-	} else {
-		val &= ~LOGUART_RP_LCR_BREAK_CTRL;
-	}
-	ameba_uart_writel(port, val, AMEBA_LOGUART_LCR);
-
-	spin_unlock_irqrestore(&port->lock, flags);
-#endif
 }
 
 /*
@@ -381,13 +286,6 @@ static irqreturn_t ameba_uart_interrupt(int irq, void *dev_id)
  */
 static void ameba_uart_enable(struct uart_port *port)
 {
-#ifdef UART_TODO
-	unsigned int val;
-	// Change later
-	val = ameba_uart_readl(port, AMEBA_LOGUART_AGGC);
-	val |= (LOGUART_IER_ETPEFI | LOGUART_IER_ELSI | LOGUART_IER_ERBI);
-	ameba_uart_writel(port, val, AMEBA_LOGUART_AGGC);
-#endif
 }
 
 /*
@@ -395,13 +293,6 @@ static void ameba_uart_enable(struct uart_port *port)
  */
 static void ameba_uart_disable(struct uart_port *port)
 {
-#ifdef UART_TODO
-	unsigned int val;
-	// Change later
-	val = ameba_uart_readl(port, AMEBA_LOGUART_AGGC);
-	val &= ~(LOGUART_IER_ETPEFI | LOGUART_IER_ELSI | LOGUART_IER_ERBI);
-	ameba_uart_writel(port, val, AMEBA_LOGUART_AGGC);
-#endif
 }
 
 #if 0
@@ -453,10 +344,6 @@ static int ameba_uart_startup(struct uart_port *port)
 static void ameba_uart_shutdown(struct uart_port *port)
 {
 	ameba_uart_intr_config(port, LOGUART_IER_ERBI, 0);
-#ifdef UART_TODO
-	ameba_uart_disable(port);
-	free_irq(port->irq, port);
-#endif
 }
 
 static void ameba_uart_lp_setbaud(struct uart_port *port, u32 bandrate)
@@ -728,11 +615,6 @@ static void ameba_uart_release_port(struct uart_port *port)
 static void ameba_uart_config_port(struct uart_port *port, int flags)
 {
 	if (flags & UART_CONFIG_TYPE) {
-#ifdef UART_TODO
-		if (ameba_uart_request_port(port)) {
-			return;
-		}
-#endif
 		port->type = PORT_AMEBA;
 	}
 }
@@ -898,7 +780,7 @@ static int __init ameba_early_console_setup(struct earlycon_device *device,
 	return 0;
 }
 
-OF_EARLYCON_DECLARE(ameba_uart, "realtek,amebad2-loguart", ameba_early_console_setup);
+OF_EARLYCON_DECLARE(ameba_uart, "realtek,ameba-loguart", ameba_early_console_setup);
 
 #define AMEBA_CONSOLE	(&ameba_console)
 #else
@@ -1027,13 +909,13 @@ static int realtek_loguart_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops realtek_amebad2_loguart_pm_ops = {
+static const struct dev_pm_ops realtek_ameba_loguart_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_loguart_suspend, realtek_loguart_resume)
 };
 #endif
 
 static const struct of_device_id ameba_of_match[] = {
-	{ .compatible = "realtek,amebad2-loguart" },
+	{ .compatible = "realtek,ameba-loguart" },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, ameba_of_match);
@@ -1045,10 +927,10 @@ static struct platform_driver ameba_uart_platform_driver = {
 	.probe	= ameba_uart_probe,
 	.remove	= ameba_uart_remove,
 	.driver	= {
-		.name  = "realtek-amebad2-loguart",
+		.name  = "realtek-ameba-loguart",
 		.of_match_table = ameba_of_match,
 #ifdef CONFIG_PM
-		//.pm = &realtek_amebad2_loguart_pm_ops,
+		//.pm = &realtek_ameba_loguart_pm_ops,
 #endif
 	},
 };

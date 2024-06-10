@@ -29,19 +29,16 @@ static struct aipc_ch_ops console_ipc_console_ops = {
 static u32 console_ipc_host_console_int_hdl(aipc_ch_t *ch, ipc_msg_struct_t *pmsg)
 {
 	struct rtk_console *console_d = piihp_priv;
-	u32 ret = 0;
 
 	if (!console_d) {
-		dev_err(console_d->dev, "Invalid console in interrupt\n");
-		goto func_exit;
+		return -ENODEV;
 	}
 
 	/* Copy ipc_msg from temp memory in IPC interrupt. */
 	memcpy((u8 *) & (console_d->console_ipc_msg), (u8 *)pmsg, sizeof(ipc_msg_struct_t));
 	tasklet_schedule(&(console_d->console_tasklet));
 
-func_exit:
-	return ret;
+	return 0;
 }
 
 static void console_ipc_channel_empty(struct aipc_ch *ch)
@@ -52,12 +49,9 @@ static void console_ipc_channel_empty(struct aipc_ch *ch)
 int console_ipc_host_console_send_msg(char *preq_msg)
 {
 	struct rtk_console *console_d = piihp_priv;
-	int ret = 0;
 
 	if (!console_d) {
-		dev_err(console_d->dev, "Invalid console in send msg\n");
-		ret = -1;
-		goto func_exit;
+		return -ENODEV;
 	}
 
 	memset((u8 *)(console_d->preq_msg), 0, sizeof(console_ipc_host_req_t));
@@ -70,8 +64,7 @@ int console_ipc_host_console_send_msg(char *preq_msg)
 
 	ameba_ipc_channel_send(console_d->pconsole_ipc_ch, &(console_d->console_ipc_msg));
 
-func_exit:
-	return ret;
+	return 0;
 }
 
 static void console_ipc_host_console_task(unsigned long data)
@@ -80,23 +73,19 @@ static void console_ipc_host_console_task(unsigned long data)
 	struct device *pdev = NULL;
 
 	if (!console_d || !console_d->pconsole_ipc_ch) {
-		dev_err(console_d->dev, "Invalid pconsole_ipc_ch\n");
-		goto func_exit;
+		return;
 	}
 
 	pdev = console_d->pconsole_ipc_ch->pdev;
 	if (!pdev) {
 		dev_err(console_d->dev, "Invalid device\n");
-		goto func_exit;
+		return;
 	}
 
 	if (!console_d->console_ipc_msg.msg || !console_d->console_ipc_msg.msg_len) {
 		dev_err(console_d->dev, "Invalid device message\n");
-		goto func_exit;
+		return;
 	}
-
-func_exit:
-	return;
 }
 
 int rtk_console_process(char *data, int len, u8 *result)
@@ -203,14 +192,14 @@ func_exit:
 }
 
 static const struct of_device_id rtk_console_of_match[] = {
-	{ .compatible = "realtek,amebad2-km4-console",	},
+	{ .compatible = "realtek,ameba-km4-console",	},
 	{ /* end node */ },
 };
 
 static struct platform_driver rtk_console_driver = {
 	.probe	= rtk_console_probe,
 	.driver	= {
-		.name = "realtek-amebad2-km4-console",
+		.name = "realtek-ameba-km4-console",
 		.of_match_table = rtk_console_of_match,
 	},
 };

@@ -39,8 +39,6 @@
 #include <linux/irqchip/chained_irq.h>
 #include <linux/irqchip/arm-gic.h>
 
-#include <misc/realtek-misc.h>
-
 #include <asm/cputype.h>
 #include <asm/irq.h>
 #include <asm/exception.h>
@@ -61,40 +59,6 @@ static void gic_check_cpu_features(void)
 #else
 #define gic_check_cpu_features()	do { } while(0)
 #endif
-
-#define RTL8730E_GIC_WORKAROUND
-
-#ifdef RTL8730E_GIC_WORKAROUND
-
-/*
- * RTL8730E GIC workaround
- * A-Cut need gic workaround if AP > 1.12G || GIC > 1.12G/2
- */
-
-#define HSYS_MASK_CKSL_AP       ((u32)0x00000003 << 2)          /* R/W 0  CA7 clock selection 00: ap pll out (1.2G default) 10: ap pll div2 out (1.2G/2) 01/11: np pll out (600M) */
-#define HSYS_CKSL_AP(x)         ((u32)(((x) & 0x00000003) << 2))
-#define HSYS_GET_CKSL_AP(x)     ((u32)(((x >> 2) & 0x00000003)))
-#define HSYS_MASK_CKD_AP        ((u32)0x00000003 << 0)          /* R/WPD 0  CA7 clock divider , this is after clk select by cksl_ap 00: div1 01: div2 10: div3 11: div4 */
-#define HSYS_CKD_AP(x)          ((u32)(((x) & 0x00000003) << 0))
-#define HSYS_GET_CKD_AP(x)      ((u32)(((x >> 0) & 0x00000003)))
-
-#define LSYS_MASK_CHIP_INFO_EN  ((u32)0x0000000F << 28)          /*!<R/W 0  Only when this field set to 4'hA, rl_ver/rl_no can be read out . */
-#define LSYS_CHIP_INFO_EN(x)    ((u32)((x) & 0x0000000F) << 28)
-#define LSYS_GET_RL_VER(x)      ((u32)(((x >> 16) & 0x0000000F)))
-
-#define AP_CLK_DIV1		        0
-#define AP_CLK_DIV2		        1
-#define AP_CLK_DIV3		        2
-#define AP_CLK_DIV4		        3
-
-static DEFINE_RAW_SPINLOCK(gic_freq_lock);
-
-#define gic_freq_lock_irqsave(f)		\
-	raw_spin_lock_irqsave(&gic_freq_lock, (f))
-#define gic_freq_unlock_irqrestore(f)	\
-	raw_spin_unlock_irqrestore(&gic_freq_lock, (f))
-
-#endif // RTL8730E_GIC_WORKAROUND
 
 union gic_base {
 	void __iomem *common_base;
@@ -159,150 +123,6 @@ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
 static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
 
 static struct gic_kvm_info gic_v2_kvm_info;
-
-#ifdef RTL8730E_GIC_WORKAROUND
-
-__attribute__((aligned(64)))
-static atomic_t gic_atomic_data;
-static u32 ap_clk_pre_div;
-static u32 soc_cut_version;
-
-static void __iomem *reg_hsys_hp_clsk;
-
-#endif // RTL8730E_GIC_WORKAROUND
-
-//#define REG_LSYS_SCAN_CTRL           0x274UL
-#define LSYS_MASK_CHIP_INFO_EN      ((u32)0x0000000F << 28)
-#define LSYS_CHIP_INFO_EN(x)        ((u32)((x) & 0x0000000F) << 28)
-#define LSYS_GET_RL_VER(x)          ((u32)(((x >> 16) & 0x0000000F)))
-#define LSYS_GET_RL_NO(x)           ((u32)(((x >> 0) & 0x0000FFFF)))
-
-static void __iomem *reg_lsys_scan_ctrl;
-
-int rtk_misc_get_rl_version(void)
-{
-	int result = -1;
-	u32 value;
-	u32 value32;
-
-	if (reg_lsys_scan_ctrl != NULL) {
-		/* Set LSYS_CHIP_INFO_EN register to get ChipInfo */
-		value = readl(reg_lsys_scan_ctrl);
-		value &= ~(LSYS_MASK_CHIP_INFO_EN);
-		value |= LSYS_CHIP_INFO_EN(0xA);
-		writel(value, reg_lsys_scan_ctrl);
-
-		/* Clear LSYS_CHIP_INFO_EN register */
-		value32 = readl(reg_lsys_scan_ctrl);
-		value &= ~(LSYS_MASK_CHIP_INFO_EN);
-		writel(value, reg_lsys_scan_ctrl);
-
-		result = (int)(LSYS_GET_RL_VER(value32));
-	}
-
-	return result;
-}
-
-EXPORT_SYMBOL(rtk_misc_get_rl_version);
-
-int rtk_misc_get_rl_number(void)
-{
-	int result = -1;
-	u32 value;
-	u32 value32;
-
-	if (reg_lsys_scan_ctrl != NULL) {
-		/* Set LSYS_CHIP_INFO_EN register to get ChipInfo */
-		value = readl(reg_lsys_scan_ctrl);
-		value &= ~(LSYS_MASK_CHIP_INFO_EN);
-		value |= LSYS_CHIP_INFO_EN(0xA);
-		writel(value, reg_lsys_scan_ctrl);
-
-		/* Clear LSYS_CHIP_INFO_EN register */
-		value32 = readl(reg_lsys_scan_ctrl);
-		value &= ~(LSYS_MASK_CHIP_INFO_EN);
-		writel(value, reg_lsys_scan_ctrl);
-
-		result = (int)(LSYS_GET_RL_NO(value32));
-	}
-
-	return result;
-}
-
-EXPORT_SYMBOL(rtk_misc_get_rl_number);
-
-#ifdef RTL8730E_GIC_WORKAROUND
-
-static void gic_freq_init(void)
-{
-	u32 reg;
-	atomic_t *data = &gic_atomic_data;
-
-	atomic_set(data, 0);
-	soc_cut_version = rtk_misc_get_rl_version();
-	reg = readl(reg_hsys_hp_clsk);
-	ap_clk_pre_div = HSYS_GET_CKD_AP(reg);
-}
-
-/* switch AP frequency to ap_pll/2, this function shall be called from privileged mode */
-static void gic_freq_switch(void)
-{
-	u32 temp;
-	unsigned long flags;
-	atomic_t *data = &gic_atomic_data;
-
-	/* if not A-cut, no need workaround */
-	if (soc_cut_version != RTK_CUT_VERSION_A) {
-		return;
-	}
-
-	gic_freq_lock_irqsave(flags);
-
-	atomic_inc(data);
-	dmb();
-
-	/* if div is 1 or 2, then div 3 to access gic */
-	if (ap_clk_pre_div < AP_CLK_DIV3) {
-		temp = readl(reg_hsys_hp_clsk);
-		writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(AP_CLK_DIV3), reg_hsys_hp_clsk);
-		/* Make Sure APPLL is half */
-		if (ap_clk_pre_div == HSYS_GET_CKD_AP(readl(reg_hsys_hp_clsk))) {
-			writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(AP_CLK_DIV3), reg_hsys_hp_clsk);
-		}
-	}
-
-	gic_freq_unlock_irqrestore(flags);
-}
-
-/*restore AP frequency to ap_pll*/
-static void gic_freq_restore(void)
-{
-	uint32_t temp;
-	unsigned long flags;
-	atomic_t *data = &gic_atomic_data;
-
-	/* if not A-cut, no need workaround */
-	if (soc_cut_version != RTK_CUT_VERSION_A) {
-		return;
-	}
-
-	gic_freq_lock_irqsave(flags);
-
-	atomic_dec(data);
-	dmb();
-
-	if ((atomic_read(data) == 0) && (ap_clk_pre_div < AP_CLK_DIV3)) {
-		temp = readl(reg_hsys_hp_clsk);
-		writel((temp & ~HSYS_MASK_CKD_AP) | HSYS_CKD_AP(ap_clk_pre_div), reg_hsys_hp_clsk);
-	}
-
-	gic_freq_unlock_irqrestore(flags);
-}
-#else
-#define gic_freq_init()      do { } while(0)
-#define gic_freq_switch()    do { } while(0)
-#define gic_freq_restore()   do { } while(0)
-#endif
 
 #ifdef CONFIG_GIC_NON_BANKED
 static void __iomem *gic_get_percpu_base(union gic_base *base)
@@ -370,19 +190,13 @@ static inline bool cascading_gic_irq(struct irq_data *d)
 static void gic_poke_irq(struct irq_data *d, u32 offset)
 {
 	u32 mask = 1 << (gic_irq(d) % 32);
-	gic_freq_switch();
 	writel_relaxed(mask, gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4);
-	gic_freq_restore();
 }
 
 static int gic_peek_irq(struct irq_data *d, u32 offset)
 {
-	int val;
 	u32 mask = 1 << (gic_irq(d) % 32);
-	gic_freq_switch();
-	val = !!(readl_relaxed(gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4) & mask);
-	gic_freq_restore();
-	return val;
+	return !!(readl_relaxed(gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4) & mask);
 }
 
 static void gic_mask_irq(struct irq_data *d)
@@ -412,9 +226,7 @@ static void gic_unmask_irq(struct irq_data *d)
 
 static void gic_eoi_irq(struct irq_data *d)
 {
-	gic_freq_switch();
 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
-	gic_freq_restore();
 }
 
 static void gic_eoimode1_eoi_irq(struct irq_data *d)
@@ -423,9 +235,7 @@ static void gic_eoimode1_eoi_irq(struct irq_data *d)
 	if (irqd_is_forwarded_to_vcpu(d))
 		return;
 
-	gic_freq_switch();
 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
-	gic_freq_restore();
 }
 
 static int gic_irq_set_irqchip_state(struct irq_data *d,
@@ -492,16 +302,12 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 			    type != IRQ_TYPE_EDGE_RISING)
 		return -EINVAL;
 
-	gic_freq_switch();
-
 	ret = gic_configure_irq(gicirq, type, base + GIC_DIST_CONFIG, NULL);
 	if (ret && gicirq < 32) {
 		/* Misconfigured PPIs are usually not fatal */
 		pr_warn("GIC: PPI%d is secure or misconfigured\n", gicirq - 16);
 		ret = 0;
 	}
-
-	gic_freq_restore();
 
 	return ret;
 }
@@ -534,9 +340,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
 		return -EINVAL;
 
-	gic_freq_switch();
 	writeb_relaxed(gic_cpu_map[cpu], reg);
-	gic_freq_restore();
 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
 
 	return IRQ_SET_MASK_OK_DONE;
@@ -550,27 +354,20 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 	void __iomem *cpu_base = gic_data_cpu_base(gic);
 
 	do {
-		gic_freq_switch();
 		irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
-		gic_freq_restore();
 		irqnr = irqstat & GICC_IAR_INT_ID_MASK;
 
 		if (likely(irqnr > 15 && irqnr < 1020)) {
-			if (static_branch_likely(&supports_deactivate_key)) {
-				gic_freq_switch();
+			if (static_branch_likely(&supports_deactivate_key))
 				writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
-				gic_freq_restore();
-			}
 			isb();
 			handle_domain_irq(gic->domain, irqnr, regs);
 			continue;
 		}
 		if (irqnr < 16) {
-			gic_freq_switch();
 			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
 			if (static_branch_likely(&supports_deactivate_key))
 				writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
-			gic_freq_restore();
 #ifdef CONFIG_SMP
 			/*
 			 * Ensure any shared data written by the CPU sending
@@ -597,9 +394,7 @@ static void gic_handle_cascade_irq(struct irq_desc *desc)
 
 	chained_irq_enter(chip, desc);
 
-	gic_freq_switch();
 	status = readl_relaxed(gic_data_cpu_base(chip_data) + GIC_CPU_INTACK);
-	gic_freq_restore();
 
 	gic_irq = (status & GICC_IAR_INT_ID_MASK);
 	if (gic_irq == GICC_INT_SPURIOUS)
@@ -692,8 +487,6 @@ static void gic_dist_init(struct gic_chip_data *gic)
 	unsigned int gic_irqs = gic->gic_irqs;
 	void __iomem *base = gic_data_dist_base(gic);
 
-	gic_freq_switch();
-
 	writel_relaxed(GICD_DISABLE, base + GIC_DIST_CTRL);
 
 	/*
@@ -708,8 +501,6 @@ static void gic_dist_init(struct gic_chip_data *gic)
 	gic_dist_config(base, gic_irqs, NULL);
 
 	writel_relaxed(GICD_ENABLE, base + GIC_DIST_CTRL);
-
-	gic_freq_restore();
 }
 
 static int gic_cpu_init(struct gic_chip_data *gic)
@@ -718,8 +509,6 @@ static int gic_cpu_init(struct gic_chip_data *gic)
 	void __iomem *base = gic_data_cpu_base(gic);
 	unsigned int cpu_mask, cpu = smp_processor_id();
 	int i;
-
-	gic_freq_switch();
 
 	/*
 	 * Setting up the CPU map is only relevant for the primary GIC
@@ -749,10 +538,7 @@ static int gic_cpu_init(struct gic_chip_data *gic)
 	gic_cpu_config(dist_base, 32, NULL);
 
 	writel_relaxed(GICC_INT_PRI_THRESHOLD, base + GIC_CPU_PRIMASK);
-
 	gic_cpu_if_up(gic);
-
-	gic_freq_restore();
 
 	return 0;
 }
@@ -765,14 +551,10 @@ int gic_cpu_if_down(unsigned int gic_nr)
 	if (gic_nr >= CONFIG_ARM_GIC_MAX_NR)
 		return -EINVAL;
 
-	gic_freq_switch();
-
 	cpu_base = gic_data_cpu_base(&gic_data[gic_nr]);
 	val = readl(cpu_base + GIC_CPU_CTRL);
 	val &= ~GICC_ENABLE;
 	writel_relaxed(val, cpu_base + GIC_CPU_CTRL);
-
-	gic_freq_restore();
 
 	return 0;
 }
@@ -799,8 +581,6 @@ void gic_dist_save(struct gic_chip_data *gic)
 	if (!dist_base)
 		return;
 
-	gic_freq_switch();
-
 	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 16); i++)
 		gic->saved_spi_conf[i] =
 			readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
@@ -816,8 +596,6 @@ void gic_dist_save(struct gic_chip_data *gic)
 	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
 		gic->saved_spi_active[i] =
 			readl_relaxed(dist_base + GIC_DIST_ACTIVE_SET + i * 4);
-
-	gic_freq_restore();
 }
 
 /*
@@ -841,8 +619,6 @@ void gic_dist_restore(struct gic_chip_data *gic)
 
 	if (!dist_base)
 		return;
-
-	gic_freq_switch();
 
 	writel_relaxed(GICD_DISABLE, dist_base + GIC_DIST_CTRL);
 
@@ -873,8 +649,6 @@ void gic_dist_restore(struct gic_chip_data *gic)
 	}
 
 	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
-
-	gic_freq_restore();
 }
 
 void gic_cpu_save(struct gic_chip_data *gic)
@@ -893,8 +667,6 @@ void gic_cpu_save(struct gic_chip_data *gic)
 	if (!dist_base || !cpu_base)
 		return;
 
-	gic_freq_switch();
-
 	ptr = raw_cpu_ptr(gic->saved_ppi_enable);
 	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
 		ptr[i] = readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
@@ -906,8 +678,6 @@ void gic_cpu_save(struct gic_chip_data *gic)
 	ptr = raw_cpu_ptr(gic->saved_ppi_conf);
 	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
 		ptr[i] = readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
-
-	gic_freq_restore();
 
 }
 
@@ -926,8 +696,6 @@ void gic_cpu_restore(struct gic_chip_data *gic)
 
 	if (!dist_base || !cpu_base)
 		return;
-
-	gic_freq_switch();
 
 	ptr = raw_cpu_ptr(gic->saved_ppi_enable);
 	for (i = 0; i < DIV_ROUND_UP(32, 32); i++) {
@@ -953,8 +721,6 @@ void gic_cpu_restore(struct gic_chip_data *gic)
 
 	writel_relaxed(GICC_INT_PRI_THRESHOLD, cpu_base + GIC_CPU_PRIMASK);
 	gic_cpu_if_up(gic);
-
-	gic_freq_restore();
 }
 
 static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
@@ -1036,10 +802,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 
 	if (unlikely(nr_cpu_ids == 1)) {
 		/* Only one CPU? let's do a self-IPI... */
-		gic_freq_switch();
 		writel_relaxed(2 << 24 | irq,
 			       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-		gic_freq_restore();
 		return;
 	}
 
@@ -1056,9 +820,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 	dmb(ishst);
 
 	/* this always happens on GIC0 */
-	gic_freq_switch();
 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-	gic_freq_restore();
 
 	gic_unlock_irqrestore(flags);
 }
@@ -1076,9 +838,7 @@ void gic_send_sgi(unsigned int cpu_id, unsigned int irq)
 	BUG_ON(cpu_id >= NR_GIC_CPU_IF);
 	cpu_id = 1 << cpu_id;
 	/* this always happens on GIC0 */
-	gic_freq_switch();
 	writel_relaxed((cpu_id << 16) | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-	gic_freq_restore();
 }
 
 /*
@@ -1140,7 +900,6 @@ void gic_migrate_target(unsigned int new_cpu_id)
 	 * CPU interface and migrate them to the new CPU interface.
 	 * We skip DIST_TARGET 0 to 7 as they are read-only.
 	 */
-	gic_freq_switch();
 	for (i = 8; i < DIV_ROUND_UP(gic_irqs, 4); i++) {
 		val = readl_relaxed(dist_base + GIC_DIST_TARGET + i * 4);
 		active_mask = val & cur_target_mask;
@@ -1150,7 +909,6 @@ void gic_migrate_target(unsigned int new_cpu_id)
 			writel_relaxed(val, dist_base + GIC_DIST_TARGET + i*4);
 		}
 	}
-	gic_freq_restore();
 
 	gic_unlock();
 
@@ -1164,7 +922,6 @@ void gic_migrate_target(unsigned int new_cpu_id)
 	 * For the same reason we do not adjust SGI source information
 	 * for previously sent SGIs by us to other CPUs either.
 	 */
-	gic_freq_switch();
 	for (i = 0; i < 16; i += 4) {
 		int j;
 		val = readl_relaxed(dist_base + GIC_DIST_SGI_PENDING_SET + i);
@@ -1178,7 +935,6 @@ void gic_migrate_target(unsigned int new_cpu_id)
 			val >>= 8;
 		}
 	}
-	gic_freq_restore();
 }
 
 /*
@@ -1372,9 +1128,7 @@ static int gic_init_bases(struct gic_chip_data *gic,
 	 * Find out how many interrupts are supported.
 	 * The GIC only supports up to 1020 interrupt sources.
 	 */
-	gic_freq_switch();
 	gic_irqs = readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0x1f;
-	gic_freq_restore();
 	gic_irqs = (gic_irqs + 1) * 32;
 	if (gic_irqs > 1020)
 		gic_irqs = 1020;
@@ -1498,12 +1252,6 @@ static void gic_teardown(struct gic_chip_data *gic)
 		iounmap(gic->raw_dist_base);
 	if (gic->raw_cpu_base)
 		iounmap(gic->raw_cpu_base);
-#ifdef RTL8730E_GIC_WORKAROUND
-	if (reg_hsys_hp_clsk)
-		iounmap(reg_hsys_hp_clsk);
-#endif
-	if (reg_lsys_scan_ctrl)
-		iounmap(reg_lsys_scan_ctrl);
 }
 
 #ifdef CONFIG_OF
@@ -1530,12 +1278,8 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
 		 * Check for a stupid firmware that only exposes the
 		 * first page of a GICv2.
 		 */
-		gic_freq_switch();
-		if (!gic_check_gicv2(*base)) {
-			gic_freq_restore();
+		if (!gic_check_gicv2(*base))
 			return false;
-		}
-		gic_freq_restore();
 
 		if (!gicv2_force_probe) {
 			pr_warn("GIC: GICv2 detected, but range too small and irqchip.gicv2_force_probe not set\n");
@@ -1545,10 +1289,7 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
 		alt = ioremap(cpuif_res.start, SZ_8K);
 		if (!alt)
 			return false;
-
-		gic_freq_switch();
 		if (!gic_check_gicv2(alt + SZ_4K)) {
-			gic_freq_restore();
 			/*
 			 * The first page was that of a GICv2, and
 			 * the second was *something*. Let's trust it
@@ -1560,7 +1301,6 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
 			*base = alt;
 			return true;
 		}
-		gic_freq_restore();
 
 		/*
 		 * We detected *two* initial GICv2 pages in a
@@ -1584,13 +1324,9 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
 		 * aliased over the first 64kB by checking the
 		 * GICC_IIDR register on both ends.
 		 */
-		gic_freq_switch();
 		if (!gic_check_gicv2(*base) ||
-		    !gic_check_gicv2(*base + 0xf000)) {
-			gic_freq_restore();
+		    !gic_check_gicv2(*base + 0xf000))
 			return false;
-		}
-		gic_freq_restore();
 
 		/*
 		 * Move the base up by 60kB, so that we have a 8kB
@@ -1618,18 +1354,6 @@ static int gic_of_setup(struct gic_chip_data *gic, struct device_node *node)
 	gic->raw_cpu_base = of_iomap(node, 1);
 	if (WARN(!gic->raw_cpu_base, "unable to map gic cpu registers\n"))
 		goto error;
-
-	reg_lsys_scan_ctrl = of_iomap(node, 3);
-	if (WARN(!reg_lsys_scan_ctrl, "unable to map reg_lsys_scan_ctrl register for gic\n"))
-		goto error;
-
-#ifdef RTL8730E_GIC_WORKAROUND
-	reg_hsys_hp_clsk = of_iomap(node, 2);
-	if (WARN(!reg_hsys_hp_clsk, "unable to map reg_hsys_hp_clsk register for gic\n"))
-		goto error;
-
-	gic_freq_init();
-#endif
 
 	if (of_property_read_u32(node, "cpu-offset", &gic->percpu_offset))
 		gic->percpu_offset = 0;

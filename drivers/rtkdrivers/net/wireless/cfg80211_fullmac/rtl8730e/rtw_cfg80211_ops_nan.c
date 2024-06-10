@@ -118,7 +118,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 									 struct cfg80211_nan_func *func)
 {
 	int ret = 0;
-	rtw_nan_func_info_t nan_param = {0};
+	struct rtw_nan_func_info_t nan_param = {0};
 	u8 *serv_spec_info_vir = NULL, *srf_bf_vir = NULL, *srf_macs_vir = NULL;
 	dma_addr_t serv_spec_info_phy, srf_bf_phy, srf_macs_phy;
 	u8 *rx_filters_vir = NULL, *tx_filters_vir = NULL;
@@ -126,7 +126,7 @@ static int cfg80211_rtw_add_nan_func(struct wiphy *wiphy,
 
 	printk(" => %s\n", __func__);
 
-	memcpy(&nan_param, func, sizeof(rtw_nan_func_info_t));
+	memcpy(&nan_param, func, sizeof(struct rtw_nan_func_info_t));
 
 	if (func->serv_spec_info) {
 		serv_spec_info_vir = rtw_malloc(func->serv_spec_info_len, &serv_spec_info_phy);

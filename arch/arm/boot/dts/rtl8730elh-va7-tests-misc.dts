@@ -22,7 +22,7 @@
 / {
 	ocp {
 		gpio-test {
-			compatible = "realtek,amebad2-gpio-test";
+			compatible = "realtek,ameba-gpio-test";
 			device_type = "gpio-dev";
 			rtk,test-gpios = <&gpiob 7 0>,<&gpiob 8 0>;
 			rtk,db_enable = "disable";
@@ -38,13 +38,13 @@
 		};
 
 		dma-test {
-			compatible = "realtek,amebad2-rtk-dmac-test";
+			compatible = "realtek,ameba-rtk-dmac-test";
 			dmas = <&dma 0>;
 			dma-names = "dma_test_cyclic";
 		};
 
 		rcc-test {
-			compatible = "realtek,amebad2-rcc-test";
+			compatible = "realtek,ameba-rcc-test";
 			clocks = <&rcc RTK_CKE_ZGB>, <&rcc RTK_CKE_IRDA>,<&rcc RTK_CKD_PSRAM>, <&rcc RTK_CKSL_CTC>, <&clk_osc_131khz>;
 			clock-names = "cke_zgb","cke_irda","ckd_psram","cksl_ctc","osc_131k";
 		};
@@ -83,16 +83,19 @@
 };
 
 &ledc{
-    pinctrl-names = "default";
-    pinctrl-0 = <&ledc_pins>;
-    rtk,led-nums = <1>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&ledc_pins>;
+	rtk,led-nums = <64>;
 	rtk,output-RGB-mode = <0>; // Refer to spec for details
-	rtk,data-tx-time0h = <0xD>;
-	rtk,data-tx-time0l = <0x27>;
-	rtk,data-tx-time1h = <0x27>;
-	rtk,data-tx-time1l = <0xD>;
-	rtk,refresh-time = <0x3A97>;
-    status = "okay";
+	rtk,data-tx-time0h = <0xC>;
+	rtk,data-tx-time0l = <0x18>;
+	rtk,data-tx-time1h = <0x18>;
+	rtk,data-tx-time1l = <0x18>;
+	rtk,refresh-time = <0x3FFF>;
+	rtk,auto-dma-thred = <64>;
+	dmas = <&dma 5>;
+	dma-names = "dma_leds_tx";
+	status = "okay";
 };
 
 &loguart{

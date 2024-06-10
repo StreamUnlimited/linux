@@ -24,61 +24,13 @@
 #define BOOTLOADER_PHYSICAL_ADDR     0x42008D04UL
 #define BOOTLOADER_IMAGE2_PHY_ADDR   0x80220001UL
 
+#define LSYS_MASK_CI_EN              ((u32)0x0000000F << 28)
+#define LSYS_CI_EN(x)                ((u32)((x) & 0x0000000F) << 28)
+#define LSYS_GET_RLV(x)              ((u32)(((x >> 16) & 0x0000000F)))
+
 /* SYSTEM_CTRL_BASE_LP */
 static void __iomem *plat_lsys_base = NULL;
-
-static void __iomem *mapped_boot_addr;
-static u32 boot_slot_addr;
-struct kobject *boot_slotinfo_kobj;
-
-static ssize_t boot_slotinfo_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
-{
-	int slot = 0; // defalut A
-	printk("boot_slotinfo_show enter");
-	if (boot_slot_addr == BOOTLOADER_IMAGE2_PHY_ADDR) { // slota
-		slot = 0;
-	} else {
-		slot = 1;    //slot B
-	}
-
-	return sprintf(buf, "%d\n", slot);
-}
-
-static ssize_t boot_slotinfo_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t n)
-{
-	printk("boot_slotinfo_store enter");
-	boot_slot_addr = (buf[0] == '0') ? BOOTLOADER_IMAGE2_PHY_ADDR : 1;
-	return n;
-}
-
-
-static struct kobj_attribute boot_slotinfo_attr =
-	__ATTR(boot_slotinfo, 0644, boot_slotinfo_show, boot_slotinfo_store);
-
-static void boot_slotinfo_sysfs_create(void)
-{
-	int error = 0;
-	boot_slotinfo_kobj = kobject_create_and_add("boot_slotinfo", NULL);
-	if (!boot_slotinfo_kobj) {
-		printk(KERN_ERR "kobject_create_and_add failed\n");
-		return;
-	}
-	error = sysfs_create_file(boot_slotinfo_kobj, &boot_slotinfo_attr.attr);
-	if (error) {
-		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
-		return;
-	}
-
-	mapped_boot_addr = ioremap(BOOTLOADER_PHYSICAL_ADDR, 1);
-	if (mapped_boot_addr == NULL) {
-		printk("cannot ioremap registers\n");
-		sysfs_remove_file(boot_slotinfo_kobj, &boot_slotinfo_attr.attr);
-		return;
-	}
-
-	boot_slot_addr = readl(mapped_boot_addr);
-	printk("%s: bootloader register value: %x\n", __func__, boot_slot_addr);
-}
+static void __iomem *plat_lsys_base_ctrl = NULL;
 
 /* allocate io resource */
 static struct map_desc bsp_io_desc[] __initdata = {
@@ -95,6 +47,31 @@ static struct map_desc bsp_io_desc[] __initdata = {
 		.type = MT_DEVICE,
 	},
 };
+
+int rtk_misc_get_rlv(void)
+{
+	int result = -1;
+
+	if (plat_lsys_base_ctrl != NULL) {
+		u32 value;
+		u32 value32;
+
+		value = readl(plat_lsys_base_ctrl);
+		value &= ~(LSYS_MASK_CI_EN);
+		value |= LSYS_CI_EN(0xA);
+		writel(value, plat_lsys_base_ctrl);
+
+		value32 = readl(plat_lsys_base_ctrl);
+		value &= ~(LSYS_MASK_CI_EN);
+		writel(value, plat_lsys_base_ctrl);
+
+		result = (int)(LSYS_GET_RLV(value32));
+	}
+
+	return result;
+}
+
+EXPORT_SYMBOL(rtk_misc_get_rlv);
 
 static void __init plat_map_io(void)
 {
@@ -123,24 +100,9 @@ static void plat_arch_restart(enum reboot_mode mode, const char *cmd)
 static void __init plat_init_machine(void)
 {
 	struct device_node *np;
-	int rl_version;
-	int rl_numer;
+	int rlv;
 
-	rl_numer = rtk_misc_get_rl_number();
-	if (rl_numer >= 0) {
-		printk("SoC RL number: 0x%04X\n", rl_numer);
-	} else {
-		pr_err("%s: get rl number failed\n", __func__);
-	}
-
-	rl_version = rtk_misc_get_rl_version();
-	if (rl_version >= 0) {
-		printk("SoC RL version: %d\n", rl_version);
-	} else {
-		pr_err("%s: get rl version failed\n", __func__);
-	}
-
-	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
+	np = of_find_compatible_node(NULL, NULL, "realtek,ameba-system-ctrl-ls");
 	if (np) {
 		plat_lsys_base = of_iomap(np, 0);
 		if (plat_lsys_base) {
@@ -148,12 +110,21 @@ static void __init plat_init_machine(void)
 		} else {
 			pr_err("%s:of_iomap(plat_lsys_base) failed\n", __func__);
 		}
+
+		plat_lsys_base_ctrl = of_iomap(np, 1);
+		if (!plat_lsys_base_ctrl) {
+			pr_err("%s:of_iomap(plat_lsys_base_ctrl) failed\n", __func__);
+		}
+
 		of_node_put(np);
 	}
 
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 
-	boot_slotinfo_sysfs_create();
+	rlv = rtk_misc_get_rlv();
+	if (rlv >= 0) {
+		pr_info("RLV: %d\n", rlv);
+	}
 }
 
 #ifdef CONFIG_SMP

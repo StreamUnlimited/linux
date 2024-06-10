@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _DT_BINDINGS_REALTEK_AMEBAD2_CLOCK_H
-#define _DT_BINDINGS_REALTEK_AMEBAD2_CLOCK_H
+#ifndef _DT_BINDINGS_REALTEK_AMEBA_CLOCK_H
+#define _DT_BINDINGS_REALTEK_AMEBA_CLOCK_H
 
 /* 
  * AON clocks
@@ -179,4 +179,4 @@
 
 #define RTK_CLK_MAX_NUM			RTK_CLK_PLFM
 
-#endif /* _DT_BINDINGS_REALTEK_AMEBAD2_CLOCK_H */
+#endif /* _DT_BINDINGS_REALTEK_AMEBA_CLOCK_H */

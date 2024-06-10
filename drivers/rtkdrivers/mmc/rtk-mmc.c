@@ -14,16 +14,12 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/sizes.h>
-#include <linux/swiotlb.h>
-#include <linux/pm_runtime.h>
 #include <linux/of.h>
 
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/dmaengine.h>
 #include <linux/interrupt.h>
-#include <linux/of_address.h>
-#include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/time.h>
 #include <linux/workqueue.h>
@@ -694,8 +690,10 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	SDIOH_CmdTypeDef cmd_attr;
 	SDIOH_DmaCtl dma_cfg;
 	u32 timeout;
-	u32 data_length;
+	u32 data_length = 0;
 	u8 resp_byte1, resp_byte2, resp_byte3, resp_byte4;
+
+	if (!mrq) return;
 
 	mutex_lock(&host->mutex);
 
@@ -714,7 +712,7 @@ static void rtk_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		mrq->stop->error = 0;
 	}
 
-	if (mrq->cmd->opcode == MMC_SEND_CSD) {
+	if (mrq->cmd && mrq->cmd->opcode == MMC_SEND_CSD) {
 		/* Initial mode disable here */
 		ret = rtk_mmc_sdioh_initial_mode_cmd(mmc, MMC_DISABLE, SDIOH_SIG_VOL_33);
 		if (ret) {
@@ -1247,7 +1245,7 @@ err:
 
 
 static const struct of_device_id rtk_mmc_match[] = {
-	{ .compatible = "realtek,amebad2-sdiohost" },
+	{ .compatible = "realtek,ameba-sdiohost" },
 	{ }
 };
 
@@ -1256,7 +1254,7 @@ MODULE_DEVICE_TABLE(of, rtk_mmc_match);
 static struct platform_driver rtk_mmc_driver = {
 	.probe      = rtk_mmc_probe,
 	.driver     = {
-		.name		= "realtek-amebad2-sdiohost",
+		.name		= "realtek-ameba-sdiohost",
 		.of_match_table	= rtk_mmc_match,
 	},
 };

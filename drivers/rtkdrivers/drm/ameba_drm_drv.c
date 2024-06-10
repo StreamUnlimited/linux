@@ -440,7 +440,6 @@ static int ameba_drm_remove(struct platform_device *pdev)
 /*
 	MIPI CG/PG Issue
 	CG: switch mipi mode to support CG suspend/resume
-	PG: MIPI will power down,TODO
 */
 static int rtk_drm_pm_suspend(struct device *dev)
 {
@@ -487,7 +486,7 @@ static void rtk_drm_pm_resume_complete(struct device *dev)
 }
 
 
-static const struct dev_pm_ops realtek_amebad2_drm_pm_ops = {
+static const struct dev_pm_ops realtek_ameba_drm_pm_ops = {
 	.suspend  = rtk_drm_pm_suspend,          // suspend
 	.resume   = rtk_drm_pm_resume,           // resume
 	.complete = rtk_drm_pm_resume_complete,  // resume last call
@@ -496,7 +495,7 @@ static const struct dev_pm_ops realtek_amebad2_drm_pm_ops = {
 
 static const struct of_device_id ameba_drm_dt_ids[] = {
 	{
-		.compatible = "realtek,amebad2-drm",
+		.compatible = "realtek,ameba-drm",
 		.data = (void *) &ameba_lcdc_driver_data,
 	},
 	{ /* end node */ },
@@ -507,10 +506,10 @@ static struct platform_driver ameba_drm_platform_driver = {
 	.probe  = ameba_drm_probe,
 	.remove = ameba_drm_remove,
 	.driver = {
-		.name = "realtek-amebad2-drm",
+		.name = "realtek-ameba-drm",
 		.of_match_table = ameba_drm_dt_ids,
 #ifdef CONFIG_PM
-		.pm = &realtek_amebad2_drm_pm_ops,
+		.pm = &realtek_ameba_drm_pm_ops,
 #endif
 	},
 };

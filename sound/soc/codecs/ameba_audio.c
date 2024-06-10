@@ -588,7 +588,7 @@ void audio_codec_enable(void __iomem * audio_base_addr,void __iomem	* aud_analog
 
 }
 
-void audio_codec_disable(codec_init_params *codec_init,void __iomem * audio_base_addr,void __iomem	* aud_analog){
+void audio_codec_disable(void __iomem	* aud_analog){
 	u32 tmp;
 
 	/*audio analog clk: AD/DA clock power down control*/

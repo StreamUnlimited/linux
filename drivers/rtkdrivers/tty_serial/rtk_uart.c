@@ -500,7 +500,8 @@ static void rtk_uart_clear_flag(struct uart_port *port, u32 flag)
 static void rtk_uart_do_rx(struct uart_port *port)
 {
 	u8 c = 0;
-	u32 flag, lsr;
+	u32 lsr = 0;
+	u32 flag = TTY_NORMAL;
 	int max_count = 32;
 
 	do {
@@ -550,7 +551,6 @@ static void rtk_uart_do_rx(struct uart_port *port)
 
 		c = rtk_uart_readl(port, RBR_OR_UART_THR) & 0xff;
 		port->icount.rx++;
-		flag = TTY_NORMAL;
 
 		/*This is not console, so no need to handle sysrq.*/
 		//if (uart_handle_sysrq_char(port, c))
@@ -1193,23 +1193,23 @@ static int realtek_uart_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops realtek_amebad2_uart_pm_ops = {
+static const struct dev_pm_ops realtek_ameba_uart_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_uart_suspend, realtek_uart_resume)
 };
 #endif
 
 static const struct of_device_id rtk_uart_of_match[] = {
-	{ .compatible = "realtek,amebad2-uart" },
+	{ .compatible = "realtek,ameba-uart" },
 	{ /* end node */ }
 };
 
 static struct platform_driver rtk_uart_platform_driver = {
 	.probe	= rtk_uart_probe,
 	.driver	= {
-		.name  = "realtek-amebad2-uart",
+		.name  = "realtek-ameba-uart",
 		.of_match_table = rtk_uart_of_match,
 #ifdef CONFIG_PM
-		.pm = &realtek_amebad2_uart_pm_ops,
+		.pm = &realtek_ameba_uart_pm_ops,
 #endif
 	},
 };

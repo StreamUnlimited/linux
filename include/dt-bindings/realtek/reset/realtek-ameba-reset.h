@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _DT_BINDINGS_REALTEK_AMEBAD2_RESET_H
-#define _DT_BINDINGS_REALTEK_AMEBAD2_RESET_H
+#ifndef _DT_BINDINGS_REALTEK_AMEBA_RESET_H
+#define _DT_BINDINGS_REALTEK_AMEBA_RESET_H
 
 /* AON resets */
 #define RTK_POR_SYSON			0	/* POR_SYSON */
@@ -29,4 +29,4 @@
 
 #define RTK_RST_MAX_NUM			15
 
-#endif /* _DT_BINDINGS_REALTEK_AMEBAD2_RESET_H */
+#endif /* _DT_BINDINGS_REALTEK_AMEBA_RESET_H */

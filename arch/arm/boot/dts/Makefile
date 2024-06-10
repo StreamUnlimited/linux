@@ -1,4 +1,4 @@
-dtb-$(CONFIG_ARCH_AMEBAD2) += \
+dtb-$(CONFIG_ARCH_AMEBASMART) += \
 	rtl8730elh-va7-generic.dtb \
 	rtl8730elh-va7-full.dtb \
 	rtl8730elh-va7-ranging.dtb \

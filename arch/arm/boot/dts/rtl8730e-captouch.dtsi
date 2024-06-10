@@ -5,13 +5,13 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
+#include <dt-bindings/realtek/clock/realtek-ameba-clock.h>
 #include <dt-bindings/input/input.h>
 
  / {
 	ocp {
 		captouch: captouch@42010000 {
-			compatible = "realtek,amebad2-captouch";
+			compatible = "realtek,ameba-captouch";
 			reg = <0x42010000 0x500>,
 				<0x420082F8 0x4>;//Control digital path input for ADC and CTC pad
 			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
@@ -23,6 +23,8 @@
 			rtk,ctc-pnoise = <400>, <400>, <400>, <400>, <1000>, <1000>, <1000>, <1000>, <1000>;
 			rtk,ctc-ch-status = <1>, <1>, <1>, <1>, <0>, <0>,<0>, <0>, <0>;
 			rtk,ctc-keycodes = <KEY_1>, <KEY_2>, <KEY_3>, <KEY_4>, <KEY_5>, <KEY_6>, <KEY_7>, <KEY_8>, <KEY_9>;
+			nvmem-cells = <&efuse_ctc_mbias>;
+			nvmem-cell-names = "ctc_mbias";
 			status = "disabled";
 		};
 	};

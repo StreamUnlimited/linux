@@ -420,13 +420,13 @@ static const struct rtc_class_ops ameba_rtc_ops = {
 	.alarm_irq_enable	= ameba_rtc_alarm_irq_enable
 };
 
-static const struct of_device_id amebad2_rtc_dt_ids[] = {
-	{ .compatible = "realsil,amebad2-rtc", .data = &data_year_param[0] },
+static const struct of_device_id ameba_rtc_dt_ids[] = {
+	{ .compatible = "realsil,ameba-rtc", .data = &data_year_param[0] },
 	{ /* sentinel */ },
 };
-MODULE_DEVICE_TABLE(of, amebad2_rtc_dt_ids);
+MODULE_DEVICE_TABLE(of, ameba_rtc_dt_ids);
 
-static int amebad2_rtc_probe(struct platform_device *pdev)
+static int ameba_rtc_probe(struct platform_device *pdev)
 {
 	struct ameba_rtc_dev *chip;
 	struct resource *res;
@@ -483,15 +483,15 @@ static int amebad2_rtc_probe(struct platform_device *pdev)
 	return rtc_register_device(chip->rtc);
 }
 
-static struct platform_driver amebad2_rtc_driver = {
-	.probe		= amebad2_rtc_probe,
+static struct platform_driver ameba_rtc_driver = {
+	.probe		= ameba_rtc_probe,
 	.driver		= {
-		.name		= "amebad2-rtc",
-		.of_match_table = amebad2_rtc_dt_ids,
+		.name		= "ameba-rtc",
+		.of_match_table = ameba_rtc_dt_ids,
 	},
 };
 
-module_platform_driver(amebad2_rtc_driver);
+module_platform_driver(ameba_rtc_driver);
 
 MODULE_DESCRIPTION("Realtek RTC driver");
 MODULE_AUTHOR("Jingjun WU <jingjun_wu@realsil.com.cn>");

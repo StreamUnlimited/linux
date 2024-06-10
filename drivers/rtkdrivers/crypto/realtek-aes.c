@@ -213,7 +213,7 @@ static int realtek_aes_cmd_key_iv(struct realtek_aes_ctx *ctx)
 	memcpy((void *)&ctx->cl_key_iv[12], ctx->key, ctx->keylen);
 	realtek_aes_mem_dump(ctx->adev->dev, (const u8 *)(&(ctx->cl_key_iv)[12]), ctx->keylen, "Key: ");
 	// Set IV array
-	if (ctx->iv != NULL && ctx->ivlen > 0) {
+	if (ctx->ivlen > 0) {
 		src_desc.b.iv_len = ctx->ivlen / 4;
 		memcpy((void *)&ctx->cl_key_iv[12 + ctx->keylen], ctx->iv, ctx->ivlen);
 		realtek_aes_mem_dump(ctx->adev->dev, (const u8 *)(&(ctx->cl_key_iv)[12 + ctx->keylen]), ctx->keylen, "IV: ");
@@ -1247,7 +1247,7 @@ static int realtek_aes_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id realtek_aes_of_match[] = {
-	{.compatible = "realtek,amebad2-aes",},
+	{.compatible = "realtek,ameba-aes",},
 	{ }
 };
 
@@ -1257,7 +1257,7 @@ static struct platform_driver realtek_aes_driver = {
 	.probe		= realtek_aes_probe,
 	.remove		= realtek_aes_remove,
 	.driver		= {
-		.name	= "realtek-amebad2-aes",
+		.name	= "realtek-ameba-aes",
 		.of_match_table	= realtek_aes_of_match,
 	}
 };

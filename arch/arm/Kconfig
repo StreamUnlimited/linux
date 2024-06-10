@@ -345,8 +345,8 @@ config ARCH_AMEBA
 	select ARCH_HAS_CPUFREQ
 	select USE_OF
 
-config ARCH_AMEBAD2
-	bool "Realtek AmebaD2 platform"
+config ARCH_AMEBASMART
+	bool "Realtek AmebaSmart platform"
 	depends on MMU
 	select COMMON_CLK
 	select CLKDEV_LOOKUP
@@ -788,7 +788,7 @@ source "arch/arm/mach-zx/Kconfig"
 
 source "arch/arm/mach-zynq/Kconfig"
 
-source "arch/arm/mach-amebad2/Kconfig"
+source "arch/arm/mach-amebasmart/Kconfig"
 
 # ARMv7-M architecture
 config ARCH_EFM32

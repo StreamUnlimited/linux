@@ -5,8 +5,8 @@
 * Copyright (C) 2021, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_AUDIO_H_
-#define _AMEBAD2_AUDIO_H_
+#ifndef _AMEBA_AUDIO_H_
+#define _AMEBA_AUDIO_H_
 
 #include <linux/types.h>
 #include <linux/types.h>
@@ -5212,7 +5212,7 @@ void audio_codec_i2s_deinit(void __iomem * audio_base_addr,u32 channel);
 void audio_codec_deinit(void __iomem	* audio_base_addr,void __iomem	* aud_analog);
 void audio_codec_amic_deinit(void __iomem	* audio_base_addr,void __iomem	* aud_analog);
 void audio_codec_dmic_deinit(void __iomem	* audio_base_addr,void __iomem	* aud_analog);
-void audio_codec_disable(codec_init_params *codec_init, void __iomem	* audio_base_addr,void __iomem	* aud_analog);
+void audio_codec_disable(void __iomem	* aud_analog);
 void audio_codec_enable_dmic_dchpf(bool NewState, u32 ad_channel_num, void __iomem	* audio_base_addr);
 void audio_codec_mute_dmic_input(bool NewState, u32 ad_channel_num, u32 sel_dmic_num, void __iomem * audio_base_addr);
 void audio_codec_sel_dmic_channel(u32 ad_channel_num,void __iomem	* audio_base_addr);

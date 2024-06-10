@@ -173,7 +173,7 @@ int rtk_bt_cdev_init(void)
 
 	memset(btdev, 0, sizeof(struct rtk_bt_cdev));
 
-	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-bt-ctrl");
+	np = of_find_compatible_node(NULL, NULL, "realtek,ameba-bt-ctrl");
 	if (!np) {
 		pr_err("Bt-cdev: %s: of find node error\n", __FUNCTION__);
 		goto of_error;

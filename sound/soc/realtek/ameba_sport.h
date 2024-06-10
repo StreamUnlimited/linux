@@ -5,8 +5,8 @@
 * Copyright (C) 2021, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_SPORT_H_
-#define _AMEBAD2_SPORT_H_
+#ifndef _AMEBA_SPORT_H_
+#define _AMEBA_SPORT_H_
 
 #include <linux/types.h>
 #include <linux/io.h>
@@ -554,9 +554,9 @@
 
 
 /**************************************************************************//**
- * @defgroup AMEBAD2_SPORT
+ * @defgroup AMEBA_SPORT
  * @{
- * @brief AMEBAD2_SPORT Register Declaration
+ * @brief AMEBA_SPORT Register Declaration
  *****************************************************************************/
 typedef struct {
 	volatile uint32_t SP_REG_MUX;                             /*!<  Register,  Address offset: 0x0000 */

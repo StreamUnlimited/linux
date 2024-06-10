@@ -228,7 +228,6 @@ void MIPI_DPHY_Timing_Set(void __iomem *MIPIx_, u32 dataLane_freq)
 	writel(Value32, (void*)(MIPIx + MIPI_ESCAPE_TX_DATA_6_OFFSET));
 #else
 //https://yarchive.net/comp/linux/kernel_fp.html
-//todo fixme yiyuan @20210916 , not support some aeabi apis
 	u8 tmp1, tmp2, tmp3;
 	u8 clk_hs_prpr, hs_trail_0, hs_trail_1, hs_trail, hs_prpr;
 	u32 Value32;

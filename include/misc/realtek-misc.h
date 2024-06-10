@@ -10,7 +10,6 @@
 
 #include <uapi/misc/realtek-misc.h>
 
-int rtk_misc_get_rl_version(void);
-int rtk_misc_get_rl_number(void);
+int rtk_misc_get_rlv(void);
 
 #endif

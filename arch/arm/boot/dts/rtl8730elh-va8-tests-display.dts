@@ -71,7 +71,7 @@
 	status = "okay";
 
 	rtk_ts@1a {
-		compatible = "realtek,amebad2-ts";
+		compatible = "realtek,ameba-ts";
 		reg = <0x1a>;
 		ts-reset-gpios = <&gpioa 10 0>;
 		ts-irq-gpios = <&gpioa 9 0>;

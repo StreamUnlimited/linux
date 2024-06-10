@@ -16,17 +16,17 @@
 #define RTW_PRIV_MP_CMD (SIOCDEVPRIVATE + 1)
 #define WIFI_MP_MSG_BUF_SIZE (4096)
 
-typedef struct rtw_priv_ioctl {
+struct rtw_priv_ioctl {
 	unsigned char __user *data;
 	unsigned short len;
-} rtw_priv_ioctl;
+};
 
 /*
  * Set wlan0 mac address: 1) ip link set dev wlan0 down, 2) ip link set dev wlan0 address 86:EF:EB:92:A2:FF, 3) ip link set dev wlan0 up
  * Set wlan1 mac address: 1) ifconfig wlan1 up, 2) ip link set dev wlan0 address 86:EF:EB:92:A2:F0, 3) hostapd /etc/hostapd.conf -B -i wlan1
  * NOTE for Soft AP: when wlan1 down, cannot set mac address. but if mac address changed, need restart hostapd. Recomment to change bssid inside hostapd.conf.
 */
-static int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *p)
+int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *p)
 {
 	int ret = 0;
 	struct sockaddr *addr = p;
@@ -52,7 +52,7 @@ static int rtw_ndev_set_mac_address(struct net_device *pnetdev, void *p)
 	return ret;
 }
 
-static struct net_device_stats *rtw_ndev_get_stats(struct net_device *pnetdev)
+struct net_device_stats *rtw_ndev_get_stats(struct net_device *pnetdev)
 {
 	dev_dbg(global_idev.fullmac_dev, "[netdev]: %s", __func__);
 	return &global_idev.stats[rtw_netdev_idx(pnetdev)];
@@ -125,7 +125,7 @@ u8 qos_acm(u8 acm_mask, u8 priority)
  * AC_BE -> queue 2
  * AC_BK -> queue 3
  */
-static u16 rtw_ndev_select_queue(struct net_device *pnetdev, struct sk_buff *skb, struct net_device *sb_dev)
+u16 rtw_ndev_select_queue(struct net_device *pnetdev, struct sk_buff *skb, struct net_device *sb_dev)
 {
 	/* int acm_mask = 0;*/
 	u16 rtw_1d_to_queue[8] = { 2, 3, 3, 2, 1, 1, 0, 0 };
@@ -142,19 +142,19 @@ static u16 rtw_ndev_select_queue(struct net_device *pnetdev, struct sk_buff *skb
 
 int rtw_ndev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd_id)
 {
-	rtw_priv_ioctl *wrq_data = (rtw_priv_ioctl *)rq->ifr_data;
-	rtw_priv_ioctl cmd = {0};
+	struct rtw_priv_ioctl *wrq_data = rq->ifr_data;
+	struct rtw_priv_ioctl cmd = {NULL, 0};
 	unsigned char *cmd_buf = NULL, *user_buf = NULL;
 	static dma_addr_t cmd_buf_phy = 0, user_buf_phy = 0;
 	int ret = 0;
 
-	if (copy_from_user(&cmd, wrq_data, sizeof(struct rtw_priv_ioctl))) {
+	if (copy_from_user(&cmd, rq->ifr_data, sizeof(struct rtw_priv_ioctl))) {
 		dev_err(global_idev.fullmac_dev, "[fullmac]: %s copy_from_user failed\n", __func__);
 		ret = -EFAULT;
 		goto out;
 	}
 
-	if (!cmd.data || !cmd.len) {
+	if (!cmd.data || (cmd.len <= 0) || (cmd.len > WIFI_MP_MSG_BUF_SIZE)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -244,14 +244,12 @@ int rtw_ndev_open(struct net_device *pnetdev)
 
 static int rtw_ndev_close(struct net_device *pnetdev)
 {
-	struct event_priv_t *event_priv = &global_idev.event_priv;
 	struct cfg80211_scan_info info;
 	int ret = 0;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 
-	spin_lock_bh(&event_priv->event_lock);
-	ret = llhw_wifi_scan_abort();
+	ret = llhw_wifi_scan_abort(0);
 	if (ret) {
 		dev_err(global_idev.fullmac_dev, "[fullmac]: %s abort wifi scan failed!\n", __func__);
 		return -EPERM;
@@ -264,7 +262,6 @@ static int rtw_ndev_close(struct net_device *pnetdev)
 	netif_tx_stop_all_queues(pnetdev);
 	netif_carrier_off(pnetdev);
 	rtw_netdev_priv_is_on(pnetdev) = false;
-	spin_unlock_bh(&event_priv->event_lock);
 
 	return 0;
 }
@@ -297,7 +294,7 @@ static int rtw_ndev_close_ap(struct net_device *pnetdev)
 	return 0;
 }
 
-static enum netdev_tx rtw_xmit_entry(struct sk_buff *skb, struct net_device *pnetdev)
+enum netdev_tx rtw_xmit_entry(struct sk_buff *skb, struct net_device *pnetdev)
 {
 	int ret = 0;
 	int wlan_idx = 0;
@@ -466,11 +463,10 @@ exit:
 
 #endif
 
-int rtw_ndev_register(void)
+int rtw_ndev_alloc(void)
 {
 	int i, ret = false;
 	/* TODO: Customer names, get them from dts instead. */
-	char *wlan_name[TOTAL_IFACE_NUM] = {"wlan0", "wlan1"};
 	struct net_device *ndev = NULL;
 	struct wireless_dev *wdev;
 
@@ -478,7 +474,7 @@ int rtw_ndev_register(void)
 		/* alloc and init netdev */
 		ndev = alloc_etherdev_mq(sizeof(struct netdev_priv_t), 1);
 		if (!ndev) {
-			goto dev_fail;
+			goto fail;
 		}
 		global_idev.pndev[i] = ndev;
 		rtw_netdev_idx(ndev) = i;
@@ -489,7 +485,7 @@ int rtw_ndev_register(void)
 		/* alloc and init wireless_dev */
 		wdev = (struct wireless_dev *)kzalloc(sizeof(struct wireless_dev), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 		if (!wdev) {
-			goto dev_fail;
+			goto fail;
 		}
 		wdev->wiphy = global_idev.pwiphy_global;
 		wdev->netdev = ndev;
@@ -497,23 +493,12 @@ int rtw_ndev_register(void)
 		wdev->iftype = (i ? NL80211_IFTYPE_AP : NL80211_IFTYPE_STATION);
 		ndev->ieee80211_ptr = wdev;
 		global_idev.pwdev_global[i] = wdev;
-
-		rtw_ethtool_ops_init();
-		netdev_set_default_ethtool_ops(global_idev.pndev[i], &global_idev.rtw_ethtool_ops);
-		if (dev_alloc_name(global_idev.pndev[i], wlan_name[i]) < 0) {
-			dev_err(global_idev.fullmac_dev, "dev_alloc_name, fail!\n");
-		}
-		netif_carrier_off(global_idev.pndev[i]);
-		ret = (register_netdev(global_idev.pndev[i]) == 0) ? true : false;
-		if (ret != true) {
-			dev_err(global_idev.fullmac_dev, "netdevice register fail!\n");
-			goto dev_fail;
-		}
 	}
+	global_idev.mlme_priv.b_in_scan = false;
 
 	return ret;
 
-dev_fail:
+fail:
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
 		if (global_idev.pwdev_global[i]) { //wdev
 			kfree((u8 *)global_idev.pwdev_global[i]);
@@ -529,12 +514,33 @@ dev_fail:
 
 }
 
+int rtw_ndev_register(void)
+{
+	int i, ret = false;
+	char *wlan_name = "wlan%d";
+
+	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
+		rtw_ethtool_ops_init();
+		netdev_set_default_ethtool_ops(global_idev.pndev[i], &global_idev.rtw_ethtool_ops);
+		if (dev_alloc_name(global_idev.pndev[i], wlan_name) < 0) {
+			dev_err(global_idev.fullmac_dev, "dev_alloc_name, fail!\n");
+		}
+		netif_carrier_off(global_idev.pndev[i]);
+		if (register_netdev(global_idev.pndev[i]) != 0) {
+			dev_err(global_idev.fullmac_dev, "netdevice register fail!\n");
+			return -ENODEV;
+		}
+	}
+
+	return ret;
+}
+
 void rtw_ndev_unregister(void)
 {
 	int i;
 
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
-		if (global_idev.pndev[i]) {
+		if (global_idev.pndev[i] && (global_idev.pndev[i]->reg_state != NETREG_UNREGISTERED)) {
 			/* hold rtnl_lock in unregister_netdev. */
 			unregister_netdev(global_idev.pndev[i]);
 		}
@@ -553,6 +559,9 @@ void rtw_ndev_unregister(void)
 		}
 		dev_dbg(global_idev.fullmac_dev, "free netdev %d ok.", i);
 	}
+#ifdef CONFIG_P2P
+	rtw_p2p_pdwdev_free();
+#endif
 }
 
 MODULE_DESCRIPTION("Realtek Wireless Lan Driver");

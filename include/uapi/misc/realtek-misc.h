@@ -18,12 +18,7 @@
 /* IOCTL commands */
 #define MISC_IOC_MAGIC              'm'
 
-#define RTK_MISC_IOC_RL_VERSION     _IOR(MISC_IOC_MAGIC, 1, __u32)
+#define RTK_MISC_IOC_RLV            _IOR(MISC_IOC_MAGIC, 1, __u32)
 #define RTK_MISC_IOC_UUID           _IOR(MISC_IOC_MAGIC, 2, __u32)
-
-/* RTK_CMD_GET_RL_INFO */
-#define RTK_CUT_VERSION_A           0
-#define RTK_CUT_VERSION_B           1
-#define RTK_CUT_VERSION_C           2
 
 #endif

@@ -5,12 +5,12 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
+#include <dt-bindings/realtek/clock/realtek-ameba-clock.h>
 
  / {
 	ocp {
 		drm:drm@0x400D8000 {
-			compatible = "realtek,amebad2-drm";
+			compatible = "realtek,ameba-drm";
 			reg = <0x400D8000 0xE0>;
 			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_LCDCMIPI>;
@@ -32,7 +32,7 @@
 		};
 
 		dsi: dsi@0x400EA000 {
-			compatible = "realtek,amebad2-dsi";
+			compatible = "realtek,ameba-dsi";
 			reg = <0x400EA000 0xC10>,
 			      <0x4200825C 0x04>;
 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;

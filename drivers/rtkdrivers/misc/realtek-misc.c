@@ -28,7 +28,7 @@ struct rtk_misc_dev {
 	void __iomem *base;
 	struct mutex misc_mutex;
 	u32 uuid;
-	int rl_version;
+	int rlv;
 };
 
 struct rtk_misc_dev *mdev;
@@ -36,10 +36,9 @@ static struct class *misc_class;
 
 /* proc fs dir entry */
 static struct proc_dir_entry *misc_proc_dir;
-static struct proc_dir_entry *rl_version_proc_ent;
 static struct proc_dir_entry *uuid_proc_ent;
 
-extern int rtk_misc_get_rl_version(void);
+extern int rtk_misc_get_rlv(void);
 
 /*
 * uuid proc ops
@@ -62,27 +61,6 @@ static const struct file_operations rtk_uuid_proc_fops = {
 	.release = single_release,
 };
 
-/*
-* rl_version proc ops
-*/
-static int rtk_rl_version_proc_show(struct seq_file *m, void *v)
-{
-	seq_printf(m, "%d\n", mdev->rl_version);
-	return 0;
-}
-
-static int rtk_rl_verion_proc_open(struct inode *inode, struct file *filp)
-{
-	return single_open(filp, rtk_rl_version_proc_show, NULL);
-}
-
-static const struct file_operations rtk_rl_verion_proc_fops = {
-	.open = rtk_rl_verion_proc_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
 static long rtk_misc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
@@ -93,8 +71,8 @@ static long rtk_misc_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	}
 
 	switch (cmd) {
-	case RTK_MISC_IOC_RL_VERSION:
-		val = (u32)mdev->rl_version;
+	case RTK_MISC_IOC_RLV:
+		val = (u32)mdev->rlv;
 		ret = put_user(val, (__u32 __user *)arg);
 		break;
 	case RTK_MISC_IOC_UUID:
@@ -118,13 +96,11 @@ static void rtk_misc_create_proc(struct device *dev)
 		return;
 	}
 
-	rl_version_proc_ent = proc_create("rl_version", 0644, misc_proc_dir, &rtk_rl_verion_proc_fops);
 	uuid_proc_ent = proc_create("uuid", 0644, misc_proc_dir, &rtk_uuid_proc_fops);
 }
 
 static void rtk_misc_remove_proc(void)
 {
-	proc_remove(rl_version_proc_ent);
 	proc_remove(uuid_proc_ent);
 	proc_remove(misc_proc_dir);
 }
@@ -177,7 +153,7 @@ int rtk_misc_init(void)
 
 	memset(mdev, 0, sizeof(struct rtk_misc_dev));
 
-	np = of_find_compatible_node(NULL, NULL, "realtek,amebad2-system-ctrl-ls");
+	np = of_find_compatible_node(NULL, NULL, "realtek,ameba-system-ctrl-ls");
 	if (!np) {
 		pr_err("MISC: Failed to find node\n");
 		goto of_error;
@@ -220,7 +196,7 @@ int rtk_misc_init(void)
 	rtk_misc_create_proc(dev);
 
 	rtk_misc_get_uuid(dev, &mdev->uuid);
-	mdev->rl_version = rtk_misc_get_rl_version();
+	mdev->rlv = rtk_misc_get_rlv();
 
 	return 0;
 

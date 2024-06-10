@@ -10,9 +10,9 @@
 # Ameba
 #
 textofs-y	:= 0x00388000
-core-y		+= arch/arm/mach-amebad2/
+core-y		+= arch/arm/mach-amebasmart/
 
-KBUILD_CPPFLAGS += -I$(srctree)/arch/arm/mach-amebad2/ -I$(srctree)/arch/arm/mach-amebad2/include
+KBUILD_CPPFLAGS += -I$(srctree)/arch/arm/mach-amebasmart/ -I$(srctree)/arch/arm/mach-amebasmart/include
 
 obj-y := setup.o
 obj-$(CONFIG_SMP) += smp.o headsmp.o

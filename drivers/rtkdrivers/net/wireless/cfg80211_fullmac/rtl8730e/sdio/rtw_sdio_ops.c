@@ -1,6 +1,6 @@
 #include <rtw_cfg80211_fullmac.h>
 
-extern inic_sdio_t inic_sdio_priv;
+extern struct inic_sdio inic_sdio_priv;
 
 //
 // Description:
@@ -96,7 +96,7 @@ static u32 sdio_convert_to_cmdaddr(const u32 addr, u8 *pdeviceId, u16 *poffset)
 	return ftaddr;
 }
 
-u8 sdio_read8(inic_sdio_t *priv, u32 addr)
+u8 sdio_read8(struct inic_sdio *priv, u32 addr)
 {
 	u32 ftaddr;
 	u8 val;
@@ -107,7 +107,7 @@ u8 sdio_read8(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-u8 sdio_f0_read8(inic_sdio_t *priv, u32 addr)
+u8 sdio_f0_read8(struct inic_sdio *priv, u32 addr)
 {
 	u8 val;
 
@@ -116,7 +116,7 @@ u8 sdio_f0_read8(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-u16 sdio_read16(inic_sdio_t *priv, u32 addr)
+u16 sdio_read16(struct inic_sdio *priv, u32 addr)
 {
 	u32 ftaddr;
 	u16 val;
@@ -129,7 +129,7 @@ u16 sdio_read16(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-u32 sdio_read32(inic_sdio_t *priv, u32 addr)
+u32 sdio_read32(struct inic_sdio *priv, u32 addr)
 {
 	u32 ftaddr;
 	u32 val;
@@ -162,7 +162,7 @@ u32 sdio_read32(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-s32 sdio_readN(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf)
+s32 sdio_readN(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pbuf)
 {
 
 	u8 deviceId;
@@ -197,7 +197,7 @@ s32 sdio_readN(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf)
 	return err;
 }
 
-void sdio_read_mem(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *rmem)
+void sdio_read_mem(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *rmem)
 {
 	s32 err;
 
@@ -222,7 +222,7 @@ void sdio_read_mem(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *rmem)
  */
 
 u32 sdio_read_port(
-	inic_sdio_t *priv,
+	struct inic_sdio *priv,
 	u32 addr,
 	u32 cnt,
 	u8 *mem)
@@ -245,7 +245,7 @@ u32 sdio_read_port(
 }
 
 
-s32 sdio_write8(inic_sdio_t *priv, u32 addr, u8 val)
+s32 sdio_write8(struct inic_sdio *priv, u32 addr, u8 val)
 {
 	u32 ftaddr;
 	s32 err;
@@ -256,7 +256,7 @@ s32 sdio_write8(inic_sdio_t *priv, u32 addr, u8 val)
 	return err;
 }
 
-s32 sdio_write16(inic_sdio_t *priv, u32 addr, u16 val)
+s32 sdio_write16(struct inic_sdio *priv, u32 addr, u16 val)
 {
 	u32 ftaddr;
 	s32 err;
@@ -268,7 +268,7 @@ s32 sdio_write16(inic_sdio_t *priv, u32 addr, u16 val)
 	return err;
 }
 
-s32 sdio_write32(inic_sdio_t *priv, u32 addr, u32 val)
+s32 sdio_write32(struct inic_sdio *priv, u32 addr, u32 val)
 {
 	u8 deviceId;
 	u16 offset;
@@ -291,7 +291,7 @@ s32 sdio_write32(inic_sdio_t *priv, u32 addr, u32 val)
 	return err;
 }
 
-s32 sdio_writeN(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf)
+s32 sdio_writeN(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pbuf)
 {
 
 	u8 deviceId;
@@ -328,7 +328,7 @@ s32 sdio_writeN(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf)
 	return err;
 }
 
-void sdio_write_mem(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *wmem)
+void sdio_write_mem(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *wmem)
 {
 	sdio_writeN(priv, addr, cnt, wmem);
 }
@@ -350,7 +350,7 @@ void sdio_write_mem(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *wmem)
  *	false(0)		Fail
  */
 u32 sdio_write_port(
-	inic_sdio_t *priv,
+	struct inic_sdio *priv,
 	u32 addr,
 	u32 cnt,
 	u8 *mem)
@@ -377,7 +377,7 @@ u32 sdio_write_port(
  * Todo: align address to 4 bytes.
  */
 s32 sdio_local_read(
-	inic_sdio_t *priv,
+	struct inic_sdio *priv,
 	u32		addr,
 	u32		cnt,
 	u8		*pbuf)
@@ -418,7 +418,7 @@ s32 sdio_local_read(
  * Todo: align address to 4 bytes.
  */
 s32 sdio_local_write(
-	inic_sdio_t *priv,
+	struct inic_sdio *priv,
 	u32		addr,
 	u32		cnt,
 	u8		*pbuf)
@@ -452,7 +452,7 @@ s32 sdio_local_write(
 }
 
 
-u8 sdio_cmd52_read1byte_local(inic_sdio_t *priv, u32 addr)
+u8 sdio_cmd52_read1byte_local(struct inic_sdio *priv, u32 addr)
 {
 
 	u8 val = 0;
@@ -463,7 +463,7 @@ u8 sdio_cmd52_read1byte_local(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-u16 sdio_cmd52_read2byte_local(inic_sdio_t *priv, u32 addr)
+u16 sdio_cmd52_read2byte_local(struct inic_sdio *priv, u32 addr)
 {
 
 	u16 val = 0;
@@ -476,7 +476,7 @@ u16 sdio_cmd52_read2byte_local(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-u32 sdio_cmd52_read4byte_local(inic_sdio_t *priv, u32 addr)
+u32 sdio_cmd52_read4byte_local(struct inic_sdio *priv, u32 addr)
 {
 	u32 val = 0;
 
@@ -488,7 +488,7 @@ u32 sdio_cmd52_read4byte_local(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-u32 sdio_cmd53_read4byte_local(inic_sdio_t *priv, u32 addr)
+u32 sdio_cmd53_read4byte_local(struct inic_sdio *priv, u32 addr)
 {
 	u32 val = 0;
 
@@ -499,20 +499,20 @@ u32 sdio_cmd53_read4byte_local(inic_sdio_t *priv, u32 addr)
 	return val;
 }
 
-void sdio_cmd52_write1byte_local(inic_sdio_t *priv, u32 addr, u8 v)
+void sdio_cmd52_write1byte_local(struct inic_sdio *priv, u32 addr, u8 v)
 {
 	sdio_get_cmdaddr(SDIO_LOCAL_DOMAIN_ID, addr, &addr);
 	sd_cmd52_write(priv, addr, 1, &v);
 }
 
-void sdio_cmd52_write2byte_local(inic_sdio_t *priv, u32 addr, u16 v)
+void sdio_cmd52_write2byte_local(struct inic_sdio *priv, u32 addr, u16 v)
 {
 	sdio_get_cmdaddr(SDIO_LOCAL_DOMAIN_ID, addr, &addr);
 	v = cpu_to_le16(v);
 	sd_cmd52_write(priv, addr, 2, (u8 *)&v);
 }
 
-void sdio_cmd52_write4byte_local(inic_sdio_t *priv, u32 addr, u32 v)
+void sdio_cmd52_write4byte_local(struct inic_sdio *priv, u32 addr, u32 v)
 {
 	sdio_get_cmdaddr(SDIO_LOCAL_DOMAIN_ID, addr, &addr);
 	v = cpu_to_le32(v);

@@ -84,7 +84,6 @@ static void rtk_i2c_struct_init(
 	char s4[] = "rtk,use-poll-type";
 	char s5[] = "rtk,i2c-reg-slave-num";
 	u32 user_set_poll_mode;
-	bool hs_lock = 0;
 
 	rtk_get_dts_info(i2c_dev, np, &i2c_param->i2c_index, 0, s1);
 	rtk_get_dts_info(i2c_dev, np, &i2c_dev->i2c_manage.user_set_timeout, 0x1000, s3);
@@ -146,12 +145,8 @@ static void rtk_i2c_struct_init(
 			dev_warn(i2c_dev->dev, "Only <one-master-and-one-slave> mode is supported by this speed\n");
 			dev_warn(i2c_dev->dev, "Please confirm your devices and delete hs_lock in code manually to use HS Mode\n");
 			dev_warn(i2c_dev->dev, "Otherwise, the speed will be cut down to 1M\n");
-			if (hs_lock) {
-				i2c_param->i2c_speed_mode = I2C_HS_MODE;
-			} else {
-				i2c_param->i2c_clk = 1000000;
-				i2c_param->i2c_speed_mode = I2C_FS_MODE;
-			}
+			i2c_param->i2c_clk = 1000000;
+			i2c_param->i2c_speed_mode = I2C_FS_MODE;
 		} else if (i2c_param->i2c_clk >= 400000) {
 			i2c_param->i2c_speed_mode = I2C_FS_MODE;
 		} else {
@@ -859,14 +854,14 @@ static const struct dev_pm_ops rtk_i2c_pm_ops = {
 };
 
 static const struct of_device_id rtk_i2c_match[] = {
-	{ .compatible = "realtek,amebad2-i2c"},
+	{ .compatible = "realtek,ameba-i2c"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, rtk_i2c_match);
 
 static struct platform_driver rtk_i2c_driver = {
 	.driver = {
-		.name = "realtek-amebad2-i2c",
+		.name = "realtek-ameba-i2c",
 		.of_match_table = rtk_i2c_match,
 		.pm = &rtk_i2c_pm_ops,
 	},

@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _OTP_IPC_AMEBAD2_H
-#define _OTP_IPC_AMEBAD2_H
+#ifndef _OTP_IPC_AMEBA_H
+#define _OTP_IPC_AMEBA_H
 
 #include <linux/types.h>
 

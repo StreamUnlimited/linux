@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_MIPI_H_
-#define _AMEBAD2_MIPI_H_
+#ifndef _AMEBA_MIPI_H_
+#define _AMEBA_MIPI_H_
 
 /*
 	micro define
@@ -1237,7 +1237,7 @@
 /**
  * @defgroup MIPI_Exported_Types MIPI Exported Types
  * @{
- * @brief AMEBAD2_MIPI Register Declaration
+ * @brief AMEBA_MIPI Register Declaration
  **/
 typedef struct {
 	__IO uint32_t MIPI_MAIN_CTRL;                         /*!<  Register,  Address offset: 0x00 */
@@ -1441,7 +1441,7 @@ typedef struct {
 /**
  * @defgroup MIPI_Exported_Types MIPI Exported Types
  * @{
- * @brief AMEBAD2_MIPI Register Declaration
+ * @brief AMEBA_MIPI Register Declaration
  **/
 
 typedef struct {

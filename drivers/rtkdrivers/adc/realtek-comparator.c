@@ -318,13 +318,13 @@ static int realtek_comp_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops realtek_amebad2_comp_pm_ops = {
+static const struct dev_pm_ops realtek_ameba_comp_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_comp_suspend, realtek_comp_resume)
 };
 #endif
 
 static const struct of_device_id realtek_comp_match[] = {
-	{.compatible = "realtek,amebad2-comparator",},
+	{.compatible = "realtek,ameba-comparator",},
 	{},
 };
 MODULE_DEVICE_TABLE(of, realtek_comp_match);
@@ -333,10 +333,10 @@ static struct platform_driver realtek_comp_driver = {
 	.probe	= realtek_comp_probe,
 	.remove	= realtek_comp_remove,
 	.driver = {
-		.name = "realtek-amebad2-comparator",
+		.name = "realtek-ameba-comparator",
 		.of_match_table = of_match_ptr(realtek_comp_match),
 #ifdef CONFIG_PM
-		.pm = &realtek_amebad2_comp_pm_ops,
+		.pm = &realtek_ameba_comp_pm_ops,
 #endif
 	},
 };

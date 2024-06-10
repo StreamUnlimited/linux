@@ -4,10 +4,17 @@ void llhw_recv_pkts(void *buf)
 {
 	struct sk_buff *pskb = NULL;
 	struct inic_device *idev = &global_idev;
-	inic_msg_info_t *msg = (inic_msg_info_t *) buf;
+	struct inic_msg_info *msg = (struct inic_msg_info *) buf;
 	u8 wlan_idx = msg->wlan_idx;
 	u32 pkt_len;
 	struct net_device_stats *pstats = &global_idev.stats[wlan_idx];
+
+#ifdef CONFIG_P2P
+	if (global_idev.p2p_global.pd_wlan_idx == 1) {
+		wlan_idx = wlan_idx ^ 1; /*GC intf is up, linux netdev idx is oppsite to driver wlan_idx*/
+		pstats = &global_idev.stats[wlan_idx];
+	}
+#endif
 
 	/* allocate skb to store ethernet data from sdio. */
 	pkt_len = msg->data_len;

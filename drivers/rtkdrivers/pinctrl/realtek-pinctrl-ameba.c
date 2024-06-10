@@ -49,7 +49,7 @@ enum {
 };
 
 #ifdef CONFIG_SOC_CPU_ARMA7
-static const struct realtek_desc_pin realtek_amebad2_pins[] = {
+static const struct realtek_desc_pin realtek_ameba_pins[] = {
 	REALTEK_PIN(REALTEK_PINCTRL_PIN(A, 0),
 				REALTEK_FUNCTION(FUNC_GPIO, "PA0"),
 				REALTEK_FUNCTION(FUNC_UART_DATA, "UART2_RXD"),
@@ -626,7 +626,7 @@ static const struct realtek_desc_pin realtek_amebad2_pins[] = {
 #endif
 
 #ifdef CONFIG_SOC_CPU_ARMA32
-static const struct realtek_desc_pin realtek_amebad2_pins[] = {
+static const struct realtek_desc_pin realtek_ameba_pins[] = {
 	REALTEK_PIN(REALTEK_PINCTRL_PIN(A, 0),
 				REALTEK_FUNCTION(FUNC_GPIO, "PA0"),
 				REALTEK_FUNCTION(FUNC_UART_DATA, "UART2_RXD"),
@@ -1224,30 +1224,30 @@ static const struct realtek_desc_pin realtek_amebad2_pins[] = {
 };
 #endif
 
-static struct realtek_pinctrl_match_data realtek_amebad2_pctrl_match = {
-	.pins = realtek_amebad2_pins,
-	.npins = ARRAY_SIZE(realtek_amebad2_pins),
+static struct realtek_pinctrl_match_data realtek_ameba_pctrl_match = {
+	.pins = realtek_ameba_pins,
+	.npins = ARRAY_SIZE(realtek_ameba_pins),
 };
 
-static const struct of_device_id realtek_amebad2_pctrl_of_match[] = {
+static const struct of_device_id realtek_ameba_pctrl_of_match[] = {
 	{
-		.compatible = "realtek,amebad2-pinctrl",
-		.data = &realtek_amebad2_pctrl_match,
+		.compatible = "realtek,ameba-pinctrl",
+		.data = &realtek_ameba_pctrl_match,
 	},
 	{ }
 };
 
-static struct platform_driver realtek_amebad2_pinctrl_driver = {
+static struct platform_driver realtek_ameba_pinctrl_driver = {
 	.probe = realtek_pctl_probe,
 	.driver = {
-		.name = "realtek-amebad2-pinctrl",
-		.of_match_table = realtek_amebad2_pctrl_of_match,
+		.name = "realtek-ameba-pinctrl",
+		.of_match_table = realtek_ameba_pctrl_of_match,
 	},
 };
 
-static int __init realtek_amebad2_pinctrl_init(void)
+static int __init realtek_ameba_pinctrl_init(void)
 {
-	return platform_driver_register(&realtek_amebad2_pinctrl_driver);
+	return platform_driver_register(&realtek_ameba_pinctrl_driver);
 }
-arch_initcall(realtek_amebad2_pinctrl_init);
+arch_initcall(realtek_ameba_pinctrl_init);
 

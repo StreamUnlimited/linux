@@ -17,17 +17,16 @@
 #include <linux/spi/spi.h>
 #include <linux/completion.h>
 
-#include <dt-bindings/realtek/dmac/realtek-amebad2-dmac.h>
+#include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
-#define RTK_SPI_TODO                        0
 #define RTK_SPI_DEBUG_DETAILS			    0
 #define RTK_SPI_REG_DUMP			        0
 #define RTK_SPI_HW_CONTROL_FOR_FUTURE_USE	0
 
 /**************************************************************************//**
- * @defgroup AMEBAD2_SPI
+ * @defgroup AMEBA_SPI
  * @{
- * @brief AMEBAD2_SPI Register Declaration
+ * @brief AMEBA_SPI Register Declaration
  *****************************************************************************/
 #define SPI_CTRLR0			0X00
 #define SPI_CTRLR1			0X04

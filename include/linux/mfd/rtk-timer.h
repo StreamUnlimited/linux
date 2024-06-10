@@ -273,7 +273,7 @@ struct rtk_tim{
 	struct clk * tim_clk;
 	void __iomem * base;
 	u32 clk_rate;
-	u32 irq;
+	int irq;
 	int valid;
 	int index;
 

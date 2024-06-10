@@ -740,42 +740,12 @@ static int ir_rtk_tx_carrier_send(
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_PM) && RTK_IR_TODO
-static int ir_rtk_suspend(
-	struct platform_device *dev, pm_message_t state)
-{
-	/*
-	 * In case the device is still open, do not suspend. Normally
-	 * this should not be a problem as lircd only keeps the device
-	 * open only for short periods of time. We also don't want to
-	 * get involved with race conditions that might happen if we
-	 * were in a middle of a transmit. Thus, we defer any suspend
-	 * actions until transmit has completed.
-	 */
-
-	if (test_and_set_bit(1, &ir_rtk->ir_manage.device_is_open)) {
-		return -EAGAIN;
-	}
-
-	clear_bit(1, &ir_rtk->device_is_open);
-
-	return 0;
-}
-
-static int ir_rtk_resume(struct platform_device *dev)
-{
-	return 0;
-}
-#else // IS_ENABLED(CONFIG_PM) && RTK_IR_TODO
-
 #define ir_rtk_suspend	NULL
 #define ir_rtk_resume	NULL
 
-#endif // IS_ENABLED(CONFIG_PM) && RTK_IR_TODO
-
 static const struct of_device_id rtk_ir_match[] = {
 	{
-		.compatible = "realtek,amebad2-ir",
+		.compatible = "realtek,ameba-ir",
 	},
 	{},
 };
@@ -880,10 +850,6 @@ static int ir_rtk_remove(struct platform_device *pdev)
 static struct platform_driver rtk_ir_platform_driver = {
 	.probe		= ir_rtk_probe,
 	.remove		= ir_rtk_remove,
-#if IS_ENABLED(CONFIG_PM) && RTK_IR_TODO
-	.suspend	= ir_rtk_suspend,
-	.resume		= ir_rtk_resume,
-#endif // IS_ENABLED(CONFIG_PM) && RTK_IR_TODO
 	.driver		= {
 		.name	= KBUILD_MODNAME,
 		.of_match_table = of_match_ptr(rtk_ir_match),

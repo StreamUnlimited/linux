@@ -47,11 +47,11 @@
 	status = "okay";
 
 	i2c-test1 {
-		compatible = "realtek,amebad2-i2c-slave-test";
+		compatible = "realtek,ameba-i2c-slave-test";
 		reg = <0x23>;
 		};
 	i2c-test2 {
-		compatible = "realtek,amebad2-i2c-slave-test-append";
+		compatible = "realtek,ameba-i2c-slave-test-append";
 		reg = <0x25>;
 	};
 };

@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_DRM_BASE_COMMON_H_
-#define _AMEBAD2_DRM_BASE_COMMON_H_
+#ifndef _AMEBA_DRM_BASE_COMMON_H_
+#define _AMEBA_DRM_BASE_COMMON_H_
 
 #include "ameba_drm_base.h"
 #include "ameba_lcdc.h"
@@ -73,4 +73,4 @@ void ameba_dsi_reg_dump(void __iomem * address);
 void ameba_dsi_do_init(void __iomem *address, MIPI_InitTypeDef *MIPI_InitStruct,u32* txdone,u32 *rxcmd,void *init_table);
 void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd);
 
-#endif  /*_AMEBAD2_DRM_BASE_COMMON_H_*/
+#endif  /*_AMEBA_DRM_BASE_COMMON_H_*/

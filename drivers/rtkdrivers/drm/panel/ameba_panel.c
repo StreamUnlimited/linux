@@ -126,7 +126,7 @@ static struct platform_driver ameba_panel_driver = {
 	.probe = ameba_panel_probe,
 	.remove = ameba_panel_remove,
 	.driver = {
-		.name = "realtek-amebad2-drm-panel",
+		.name = "realtek-ameba-drm-panel",
 		.of_match_table = ameba_panel_match,
 	},
 };

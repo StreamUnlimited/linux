@@ -162,7 +162,7 @@ textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
 textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
 textofs-$(CONFIG_ARCH_MESON) := 0x00208000
 textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
-textofs-$(CONFIG_ARCH_AMEBAD2) := 0x00388000
+textofs-$(CONFIG_ARCH_AMEBASMART) := 0x00388000
 
 # Machine directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
@@ -237,7 +237,7 @@ machine-$(CONFIG_ARCH_VT8500)		+= vt8500
 machine-$(CONFIG_ARCH_ZX)		+= zx
 machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
 machine-$(CONFIG_PLAT_SPEAR)		+= spear
-machine-$(CONFIG_ARCH_AMEBAD2)		+= amebad2
+machine-$(CONFIG_ARCH_AMEBASMART)		+= amebasmart
 
 # Platform directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
@@ -267,8 +267,8 @@ endif
 
 # Board Makefile
 ifeq ($(CONFIG_ARCH_AMEBA)$(CONFIG_ARCH_AMEBA_M),y)
-MACHINE := $(srctree)/arch/$(VAR_ARCH)/mach-amebad2
-include $(srctree)/arch/$(VAR_ARCH)/mach-amebad2/Makefile
+MACHINE := $(srctree)/arch/$(VAR_ARCH)/mach-amebasmart
+include $(srctree)/arch/$(VAR_ARCH)/mach-amebasmart/Makefile
 endif
 
 # The byte offset of the kernel image in RAM from the start of RAM.

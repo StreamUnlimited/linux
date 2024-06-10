@@ -67,7 +67,7 @@ static u32 otp_ipc_host_otp_int_hdl(aipc_ch_t *ch, ipc_msg_struct_t *pmsg)
 	u32 ret = 0;
 
 	if (!otp_d) {
-		dev_err(otp_d->dev, "Host_otp_priv is NULL in interrupt!\n");
+		pr_err("Host_otp_priv is NULL in interrupt!\n");
 		goto func_exit;
 	}
 
@@ -85,7 +85,7 @@ int otp_ipc_host_otp_send_msg(otp_ipc_host_req_t *preq_msg)
 	int ret, retry = 0;
 
 	if (!otp_d) {
-		dev_err(otp_d->dev, "Host_otp_priv is NULL when to send msg!\n");
+		pr_err("Host_otp_priv is NULL when to send msg!\n");
 		ret = -1;
 		goto func_exit;
 	}
@@ -128,7 +128,11 @@ static void otp_ipc_host_otp_task(unsigned long data) {
 	int msg_len = 0;
 
 	if (!otp_d || !otp_d->potp_ipc_ch) {
-		dev_err(otp_d->dev, "Potp_ipc_ch is NULL!\n");
+		if (!otp_d) {
+			pr_err("Host_otp_priv is NULL when to send msg!\n");
+		} else {
+			dev_err(otp_d->dev, "Potp_ipc_ch is NULL!\n");
+		}
 		goto func_exit;
 	}
 
@@ -274,7 +278,7 @@ func_exit:
 }
 
 static const struct of_device_id rtk_otp_of_match[] = {
-	{ .compatible = "realtek,amebad2-otp-ipc",	},
+	{ .compatible = "realtek,ameba-otp-ipc",	},
 	{ /* end node */ },
 };
 

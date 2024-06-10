@@ -15,7 +15,7 @@ static struct wps_str wps_info;
 static int cfg80211_rtw_get_station(struct wiphy *wiphy, struct net_device *ndev, const u8 *mac, struct station_info *sinfo)
 {
 	int ret = 0;
-	rtw_phy_statistics_t *statistic_vir = NULL;
+	struct _rtw_phy_statistics_t *statistic_vir = NULL;
 	dma_addr_t statistic_phy;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
@@ -24,7 +24,7 @@ static int cfg80211_rtw_get_station(struct wiphy *wiphy, struct net_device *ndev
 		dev_dbg(global_idev.fullmac_dev, "Only net device-0 is used for STA.");
 	}
 
-	statistic_vir = rtw_malloc(sizeof(rtw_phy_statistics_t), &statistic_phy);
+	statistic_vir = rtw_malloc(sizeof(struct _rtw_phy_statistics_t), &statistic_phy);
 	if (!statistic_vir) {
 		dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;
@@ -38,7 +38,7 @@ static int cfg80211_rtw_get_station(struct wiphy *wiphy, struct net_device *ndev
 	sinfo->filled |= BIT(NL80211_STA_INFO_TX_BITRATE);
 	sinfo->txrate.legacy = statistic_vir->supported_max_rate;
 
-	rtw_mfree(sizeof(rtw_phy_statistics_t), statistic_vir, statistic_phy);
+	rtw_mfree(sizeof(struct _rtw_phy_statistics_t), statistic_vir, statistic_phy);
 
 	return ret;
 }
@@ -46,9 +46,29 @@ static int cfg80211_rtw_get_station(struct wiphy *wiphy, struct net_device *ndev
 static int cfg80211_rtw_change_iface(struct wiphy *wiphy, struct net_device *ndev, enum nl80211_iftype type, struct vif_params *params)
 {
 #ifdef CONFIG_NAN
-	if (ndev->ieee80211_ptr->iftype != NL80211_IFTYPE_NAN)
+	if (ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_NAN) {
+		return 0;
+	}
 #endif
-		ndev->ieee80211_ptr->iftype = type;
+#ifdef CONFIG_P2P //P2P_TODO: check if other cases needed
+	if (type == NL80211_IFTYPE_P2P_GO) {
+		if (ndev_to_wdev(ndev)->iftype == NL80211_IFTYPE_P2P_CLIENT) { /*change from GC to GO*/
+			rtw_p2p_gc_intf_revert(0);
+		}
+		global_idev.p2p_global.p2p_role = P2P_ROLE_GO;
+		llhw_wifi_set_p2p_role(P2P_ROLE_GO);
+	} else if (type == NL80211_IFTYPE_P2P_CLIENT) {
+		if (ndev_to_wdev(ndev)->iftype == NL80211_IFTYPE_P2P_GO) {
+			/*change from GO to GC(P2P_TODO: below setting not suitable when STA port connected)*/
+			global_idev.p2p_global.pd_wlan_idx = 1;
+			rtw_p2p_driver_macaddr_switch();
+		}
+		global_idev.p2p_global.p2p_role = P2P_ROLE_CLIENT;
+		llhw_wifi_set_p2p_role(P2P_ROLE_CLIENT);
+	}
+#endif
+
+	ndev->ieee80211_ptr->iftype = type;
 	return 0;
 }
 
@@ -57,7 +77,7 @@ int cfg80211_rtw_scan_done_indicate(unsigned int scanned_AP_num, void *user_data
 	//LINUX_TODO: aborted need to be realized
 	struct cfg80211_scan_info info;
 
-	if (!rtw_netdev_priv_is_on(global_idev.pndev[0])) {
+	if (!rtw_netdev_priv_is_on(global_idev.pndev[0]) && !rtw_netdev_priv_is_on(global_idev.pndev[1])) {
 		dev_dbg(global_idev.fullmac_dev, "sta is down, finish scan.");
 		return -1;
 	}
@@ -74,6 +94,8 @@ int cfg80211_rtw_scan_done_indicate(unsigned int scanned_AP_num, void *user_data
 
 	/* cfg80211_scan_done will clear last request. Clean global scan request as well. */
 	global_idev.mlme_priv.pscan_req_global = NULL;
+	global_idev.mlme_priv.b_in_scan = false;
+
 	return 0;
 }
 
@@ -131,7 +153,7 @@ void cfg80211_rtw_inform_bss(u32 channel, u32 frame_is_bcn, s32 rssi, u8 *mac_ad
 		memcpy(pwlanhdr->addr1, bc_addr, ETH_ALEN);
 		set_frame_sub_type(pbuf, BIT(7));
 	} else {
-		memcpy(pwlanhdr->addr1, global_idev.pndev[0]->dev_addr, ETH_ALEN);
+		memcpy(pwlanhdr->addr1, global_idev.pndev[0]->dev_addr, ETH_ALEN);//P2P_TODO: may not always pndev[0]
 		set_frame_sub_type(pbuf, BIT(6) | BIT(4));
 	}
 
@@ -162,10 +184,10 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 	int ret = 0;
 	struct cfg80211_ssid *ssids = request->ssids;
 	struct wireless_dev *wdev;
-	struct element *wps_ptr = NULL;
+	struct element *target_ptr = NULL;
 	u32 wlan_idx = 0;
 	struct net_device *pnetdev = NULL;
-	rtw_scan_param_t scan_param = {0};
+	struct _rtw_scan_param_t scan_param = {0};
 
 	/* coherent alloc: revise vir addr will be mapped to phy addr. Send phy addr to rtos by ipc. */
 	u8 *channel_list_vir = NULL;
@@ -180,21 +202,31 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 
 	wdev = request->wdev;
 	pnetdev = wdev_to_ndev(wdev);
-	if (pnetdev) {
-		wlan_idx = rtw_netdev_idx(pnetdev);
-	} else {
-		ret = -EINVAL;
-		goto exit;
-	}
+#ifdef CONFIG_P2P
+	if (wdev == global_idev.p2p_global.pd_pwdev) {
+		wlan_idx = global_idev.p2p_global.pd_wlan_idx;
+	} else
+#endif
+		if (pnetdev) {
+			wlan_idx = rtw_netdev_idx(pnetdev);
+		} else {
+			ret = -EINVAL;
+			goto exit;
+		}
 
 	dev_dbg(global_idev.fullmac_dev, "cfg80211_rtw_scan enter\n");
 
-	memset(&scan_param, 0, sizeof(rtw_scan_param_t));
+	memset(&scan_param, 0, sizeof(struct _rtw_scan_param_t));
 
 	/* Add fake callback to inform rots give scan indicate when scan done. */
-	scan_param.scan_user_callback = (rtw_result_t (*)(unsigned int,  void *))0xffffffff;
+	scan_param.scan_user_callback = (enum _rtw_result_t (*)(unsigned int,  void *))0xffffffff;
 	scan_param.ssid = NULL;
-
+#ifdef CONFIG_P2P
+	scan_param.scan_user_data = (void *)(uintptr_t)rtw_p2p_get_wdex_idx(wdev); /*for later cfg80211 indicate*/
+	if ((wdev == global_idev.p2p_global.pd_pwdev) && (wlan_idx == 1)) {
+		scan_param.options |= RTW_SCAN_WITH_P2P;
+	}
+#endif
 	//LINUX_TODO: do we need to support multi ssid scan?
 	for (i = 0; i < request->n_ssids && ssids && i < RTW_SSID_SCAN_AMOUNT; i++) {
 		if (ssids[i].ssid_len) {
@@ -207,6 +239,18 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 			ssid_len = ssids[0].ssid_len;
 			/* Only hidden ssid scan has ssid param. */
 			scan_param.ssid = (char *)ssid_phy;
+#ifdef CONFIG_P2P
+			if (memcmp(ssids[i].ssid, "DIRECT-", 7) == 0) {
+				target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_WFA, WLAN_OUI_TYPE_WFA_P2P, request->ie, request->ie_len);
+				if (target_ptr) {
+					if (global_idev.p2p_global.p2p_role == P2P_ROLE_DISABLE) { /* enable P2P role first */
+						global_idev.p2p_global.p2p_role = P2P_ROLE_DEVICE;
+						llhw_wifi_set_p2p_role(P2P_ROLE_DEVICE);
+					}
+					llhw_wifi_set_gen_ie(wlan_idx, (u8 *)target_ptr, ((u16)target_ptr->datalen + 2), P2PWPS_PROBE_REQ_IE);
+				}
+			}
+#endif
 			/* Multi ssid need other operation here. Only support one here. */
 			break;
 		}
@@ -241,10 +285,10 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 		scan_param.channel_list = (unsigned char *)channel_list_phy;
 	}
 
-	wps_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT, WLAN_OUI_TYPE_MICROSOFT_WPS, request->ie, request->ie_len);
-	if (wps_ptr) {
-		wps_info.wps_probe_ielen = (u16)wps_ptr->datalen + 2;
-		memcpy(wps_info.wps_probe_ie, wps_ptr, wps_info.wps_probe_ielen);
+	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT, WLAN_OUI_TYPE_MICROSOFT_WPS, request->ie, request->ie_len);
+	if (target_ptr) {
+		wps_info.wps_probe_ielen = (u16)target_ptr->datalen + 2;
+		memcpy(wps_info.wps_probe_ie, target_ptr, wps_info.wps_probe_ielen);
 		llhw_wifi_set_gen_ie(wlan_idx, wps_info.wps_probe_ie, wps_info.wps_probe_ielen, P2PWPS_PROBE_REQ_IE);
 	}
 
@@ -256,8 +300,11 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 		info.aborted = 0;
 		cfg80211_scan_done(request, &info);
 		dev_dbg(global_idev.fullmac_dev, "%s: scan request(%p) fail.", __FUNCTION__, request);
-		global_idev.mlme_priv.pscan_req_global = NULL;
+		if (!global_idev.mlme_priv.b_in_scan) {
+			global_idev.mlme_priv.pscan_req_global = NULL;
+		}
 	} else {
+		global_idev.mlme_priv.b_in_scan = true;
 		global_idev.mlme_priv.pscan_req_global = request;
 		dev_dbg(global_idev.fullmac_dev, "%s: scan request(%p) start.", __FUNCTION__, request);
 	}
@@ -298,9 +345,10 @@ static int cfg80211_rtw_leave_ibss(struct wiphy *wiphy, struct net_device *ndev)
 	return 0;
 }
 
-void cfg80211_rtw_connect_indicate(fullmac_join_status join_status, void *user_data, size_t user_data_len)
+void cfg80211_rtw_connect_indicate(unsigned int join_status, void *user_data, size_t user_data_len)
 {
 	struct mlme_priv_t *mlme_priv = &global_idev.mlme_priv;
+	u8 wlan_idx = 0;
 
 	mlme_priv->rtw_join_status = join_status;
 
@@ -335,38 +383,54 @@ void cfg80211_rtw_connect_indicate(fullmac_join_status join_status, void *user_d
 			memcpy(mlme_priv->assoc_rsp_ie, (u8 *)user_data, user_data_len);
 			mlme_priv->assoc_rsp_ie_len = user_data_len;
 			dev_dbg(global_idev.fullmac_dev, "[fullmac] --- %s --- %s success.", __func__, (*(u8 *)mlme_priv->assoc_req_ie == 0 ? "association" : "re-association"));
+#ifdef CONFIG_P2P
+			if ((global_idev.p2p_global.pd_wlan_idx == 1) && (memcmp(mlme_priv->assoc_rsp_ie + 4, global_idev.pndev[1]->dev_addr, 6) == 0)) {
+				wlan_idx = 1; //address match GC, then use GC's netdev
+			}
+#endif
 			/* Inform connect information. */
 			/* Different between cfg80211_connect_result and cfg80211_connect_bss are described in net/cfg80211.h. */
 			/* if connect_result warning, that means get_bss fail (need check), one reason is WPA_S calls disconnect ops, which resulting in wdev->ssid_len = 0 */
-			cfg80211_connect_result(global_idev.pndev[0], mlme_priv->assoc_rsp_ie + 16,
+			cfg80211_connect_result(global_idev.pndev[wlan_idx], mlme_priv->assoc_rsp_ie + 16,
 									mlme_priv->assoc_req_ie + WLAN_HDR_A3_LEN + 4/* fixed parameters */
 									+ (*(u8 *)mlme_priv->assoc_req_ie == 0 ? 0 : 6)/* re-assoc: current ap */,
 									mlme_priv->assoc_req_ie_len - WLAN_HDR_A3_LEN - 4 - (*(u8 *)mlme_priv->assoc_req_ie == 0 ? 0 : 6),
 									mlme_priv->assoc_rsp_ie + WLAN_HDR_A3_LEN + 6, mlme_priv->assoc_rsp_ie_len -  WLAN_HDR_A3_LEN - 6,
 									WLAN_STATUS_SUCCESS, GFP_ATOMIC);
-			netif_carrier_on(global_idev.pndev[0]);
+			netif_carrier_on(global_idev.pndev[wlan_idx]);
 		}
 		return;
 	}
 
 	if (join_status == RTW_JOINSTATUS_FAIL) {
+#ifdef CONFIG_P2P
+		if (global_idev.p2p_global.pd_wlan_idx == 1) {
+			wlan_idx = 1;// GC intf is up, then use GC's netdev
+		}
+#endif
 		dev_dbg(global_idev.fullmac_dev, "[fullmac] --- %s --- join failed up sema.", __func__);
 		/* merge from wifi_join_status_indicate if synchronous connection, up sema when connect fail*/
 		if (mlme_priv->join_block_param && mlme_priv->join_block_param->block) {
 			complete(&mlme_priv->join_block_param->join_sema);
 		}
 		dev_dbg(global_idev.fullmac_dev, "[fullmac] --- %s --- join failed inform cfg80211.", __func__);
-		cfg80211_connect_result(global_idev.pndev[0], NULL, NULL, 0, NULL, 0, WLAN_STATUS_UNSPECIFIED_FAILURE, GFP_ATOMIC);
+		cfg80211_connect_result(global_idev.pndev[wlan_idx], NULL, NULL, 0, NULL, 0, WLAN_STATUS_UNSPECIFIED_FAILURE, GFP_ATOMIC);
 		return;
 	}
 }
 
 void cfg80211_rtw_disconnect_indicate(u16 reason, u8 locally_generated)
 {
+	u8 wlan_idx = 0;
+#ifdef CONFIG_P2P
+	if (global_idev.p2p_global.p2p_role == P2P_ROLE_CLIENT) {
+		wlan_idx = 1;// GC intf is up, then use GC's netdev
+	}
+#endif
 	/* Do it first for tx broadcast pkt after disconnection issue! */
-	netif_carrier_off(global_idev.pndev[0]);
+	netif_carrier_off(global_idev.pndev[wlan_idx]);
 	dev_dbg(global_idev.fullmac_dev, "%s reason:%d\n", __func__, reason);
-	cfg80211_disconnected(global_idev.pndev[0], reason, NULL, 0, locally_generated, GFP_ATOMIC);
+	cfg80211_disconnected(global_idev.pndev[wlan_idx], reason, NULL, 0, locally_generated, GFP_ATOMIC);
 }
 
 void cfg80211_rtw_external_auth_request(char *buf, int buf_len)
@@ -386,7 +450,7 @@ void cfg80211_rtw_external_auth_request(char *buf, int buf_len)
 static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_connect_params *sme)
 {
 	int ret = 0;
-	rtw_network_info_t connect_param = {0};
+	struct _rtw_network_info_t connect_param = {0};
 	u32 wlan_idx = 0;
 	/* coherent alloc: revise vir addr will be mapped to phy addr. Send phy addr to rtos by ipc. */
 	u8 *vir_pwd = NULL;
@@ -395,7 +459,7 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	int rsnx_ielen = 0, rsn_ielen = 0;
 	u8 pmf_mode = 0, spp_opt = 0;
 	u8 *prsnx, *prsn;
-	struct element *wps_ptr;
+	struct element *target_ptr;
 	struct cfg80211_external_auth_params *auth_ext_para = &global_idev.mlme_priv.auth_ext_para;
 
 	if (sme->bssid == NULL) {
@@ -420,7 +484,7 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	dev_dbg(global_idev.fullmac_dev, " ciphers_pairwise=0x%x, cipher_group=0x%x,, akm_suites=0x%x\n",
 			sme->crypto.ciphers_pairwise[0], sme->crypto.cipher_group, sme->crypto.akm_suites[0]);
 
-	memset(&connect_param, 0, sizeof(rtw_network_info_t));
+	memset(&connect_param, 0, sizeof(struct _rtw_network_info_t));
 	connect_param.security_type = 0;
 	// Todo: WPA3_SERITY_ENTERPRISE EAP
 	if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_3) {
@@ -542,13 +606,13 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	}
 
 	/* set wps phase */
-	wps_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT, WLAN_OUI_TYPE_MICROSOFT_WPS, sme->ie, sme->ie_len);
-	if (wps_ptr) {
+	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT, WLAN_OUI_TYPE_MICROSOFT_WPS, sme->ie, sme->ie_len);
+	if (target_ptr) {
 		u8 wps_ie[258];
 		u16 wps_ielen = 0;
 		wps_info.wps_phase = 1;
-		wps_ielen = (u16)wps_ptr->datalen + 2;
-		memcpy(wps_ie, wps_ptr, wps_ielen);
+		wps_ielen = (u16)target_ptr->datalen + 2;
+		memcpy(wps_ie, target_ptr, wps_ielen);
 		llhw_wifi_set_gen_ie(wlan_idx, wps_info.wps_probe_ie, wps_info.wps_probe_ielen, P2PWPS_PROBE_REQ_IE);
 		llhw_wifi_set_gen_ie(wlan_idx, wps_ie, wps_ielen, P2PWPS_ASSOC_REQ_IE);
 	} else if (wps_info.wps_phase) {
@@ -556,6 +620,13 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 		connect_param.is_wps_trigger = 1;
 	}
 	llhw_wifi_set_wps_phase(wps_info.wps_phase);
+
+#ifdef CONFIG_P2P
+	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_WFA, WLAN_OUI_TYPE_WFA_P2P, sme->ie, sme->ie_len);
+	if (target_ptr) {
+		llhw_wifi_set_gen_ie(wlan_idx, (u8 *)target_ptr, ((u16)target_ptr->datalen + 2), P2PWPS_ASSOC_REQ_IE);
+	}
+#endif
 
 	connect_param.joinstatus_user_callback = NULL;
 
@@ -730,37 +801,120 @@ static int cfg80211_rtw_disassoc(struct wiphy *wiphy, struct net_device *ndev, s
 
 static s32 cfg80211_rtw_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev, struct ieee80211_channel *channel, unsigned int duration, u64 *cookie)
 {
+#ifdef CONFIG_P2P
+	int ret = 0;
+	u32 wlan_idx = 0;
+	struct net_device *pnetdev = NULL;
+	struct _rtw_scan_param_t scan_param = {0};
+
+	/* coherent alloc: revise vir addr will be mapped to phy addr. Send phy addr to rtos by ipc. */
+	u8 *channel_list_vir = NULL;
+	dma_addr_t channel_list_phy;
+
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
+
+	pnetdev = wdev_to_ndev(wdev);
+	if (wdev == global_idev.p2p_global.pd_pwdev) {
+		wlan_idx = global_idev.p2p_global.pd_wlan_idx;
+	} else if (pnetdev) {
+		wlan_idx = rtw_netdev_idx(pnetdev);
+	} else {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	llhw_wifi_scan_abort(1);
+
+	memset(&scan_param, 0, sizeof(struct _rtw_scan_param_t));
+	/* Add fake callback to inform rots give scan indicate when scan done. */
+	scan_param.scan_user_callback = (enum _rtw_result_t (*)(unsigned int,  void *))0xffffffff;
+	scan_param.ssid = NULL;
+	scan_param.options = RTW_SCAN_PASSIVE;
+	scan_param.chan_scan_time.passive_scan_time = duration;
+	scan_param.scan_user_data = (void *)(uintptr_t)rtw_p2p_get_wdex_idx(wdev); /*for later cfg80211 indicate*/
+	if (wlan_idx == 1) {
+		scan_param.options |= RTW_SCAN_WITH_P2P;
+	}
+
+	if (channel) {
+		channel_list_vir = rtw_malloc(1, &channel_list_phy);
+		if (!channel_list_vir) {
+			dev_dbg(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
+			return -ENOMEM;
+		}
+
+		*(channel_list_vir) = channel->hw_value;
+		scan_param.channel_list_num = 1;
+		scan_param.channel_list = (unsigned char *)channel_list_phy;
+	}
+
+	global_idev.p2p_global.roch_onging = 1;
+	global_idev.p2p_global.roch_duration = duration;
+	memcpy(&global_idev.p2p_global.roch, channel, sizeof(struct ieee80211_channel));
+	global_idev.p2p_global.roch_cookie++;
+	*cookie = global_idev.p2p_global.roch_cookie;
+
+	llhw_wifi_set_p2p_remain_on_ch(wlan_idx, 1);
+	ret = llhw_wifi_scan(&scan_param, 0, 0);
+	if (ret < 0) {
+		return -EBUSY;
+	}
+
+
+	if (channel_list_vir) {
+		rtw_mfree(1, channel_list_vir, channel_list_phy);
+	}
+
+exit:
+	return ret;
+#else
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
 	return 0;
+#endif
+
 }
 
 static s32 cfg80211_rtw_cancel_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev, u64 cookie)
 {
+#ifdef CONFIG_P2P
+	if (global_idev.p2p_global.roch_onging) {
+		llhw_wifi_scan_abort(1);
+	}
+	return 0;
+#else
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
 	return 0;
+#endif
 }
 
 static int cfg80211_rtw_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev, struct cfg80211_mgmt_tx_params *params, u64 *cookie)
 {
 	struct net_device *ndev = wdev_to_ndev(wdev);
-	u8 wlan_idx = rtw_netdev_idx(ndev);
+	u8 wlan_idx = 0;
 	struct ieee80211_channel *chan = params->chan;
 	const u8 *buf = params->buf;
 	size_t len = params->len;
 	int ret = 0;
 	bool ack = true;
-	u8 tx_ch;
+	u8 tx_ch = 0;
 	u8 frame_styp;
 	static u32 mgmt_tx_cookie = 0;
+	u8 need_wait_ack = 0;
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
 
-	if (chan == NULL) {
-		ret = -EINVAL;
-		goto exit;
-	}
+#ifdef CONFIG_P2P
+	if (wdev == global_idev.p2p_global.pd_pwdev) {/*P2P Device intf not have ndev, wlanidx need fetch from other way*/
+		wlan_idx = global_idev.p2p_global.pd_wlan_idx;
+	} else
+#endif
+		if (ndev) {
+			wlan_idx = rtw_netdev_idx(ndev);
+		}
 
-	tx_ch = (u8)ieee80211_frequency_to_channel(chan->center_freq);
+	if (chan != NULL) {
+		tx_ch = (u8)ieee80211_frequency_to_channel(chan->center_freq);
+	}
 
 	/* cookie generation */
 	*cookie = mgmt_tx_cookie++;
@@ -777,25 +931,76 @@ static int cfg80211_rtw_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev, 
 	} else if (frame_styp == IEEE80211_STYPE_ACTION) {
 		dev_dbg(global_idev.fullmac_dev, "issue action.\n");
 		goto dump;
-	} else {
+	}
+#ifdef CONFIG_P2P
+	else if (frame_styp == IEEE80211_STYPE_PROBE_RESP) {
+		goto dump;
+	}
+#endif
+	else {
 		dev_dbg(global_idev.fullmac_dev, "mgmt tx todo, frame_type:0x%x\n", frame_styp);
 		return ret;
 	}
 
 	/*LINUX_TODO, action frame, probe response*/
-
 dump:
-	/*ignore tx_ch/ no_cck/ wait_ack temporary*/
-	llhw_wifi_tx_mgnt(wlan_idx, buf, len);
+#ifdef CONFIG_P2P
+	if (params->dont_wait_for_ack == 0) {
+		need_wait_ack = 1;
+	}
+#endif
 
-exit:
+	/*ignore tx_ch/ no_cck/ wait_ack temporary*/
+	llhw_wifi_tx_mgnt(wlan_idx, buf, len, need_wait_ack);
+
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0))
 void cfg80211_rtw_mgmt_frame_register(struct wiphy *wiphy, struct wireless_dev *wdev, u16 frame_type, bool reg)
 {
 	//dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s reg = %d", __func__, reg);
+#ifdef CONFIG_P2P
+	int p2p_idx = -1;
+	if (wdev->iftype == NL80211_IFTYPE_P2P_DEVICE) {
+		p2p_idx = 0;
+	} else if (wdev->iftype == NL80211_IFTYPE_P2P_CLIENT) {
+		p2p_idx = 1;
+	} else if (wdev->iftype == NL80211_IFTYPE_P2P_GO) {
+		p2p_idx = 2;
+	}
+
+	if ((p2p_idx >= 0) && (frame_type == IEEE80211_STYPE_PROBE_REQ || frame_type == IEEE80211_STYPE_ACTION)) {
+		if (reg > 0) {
+			global_idev.p2p_global.mgmt_register[p2p_idx] |= BIT(frame_type >> 4);
+		} else {
+			global_idev.p2p_global.mgmt_register[p2p_idx] &= ~(BIT(frame_type >> 4));
+		}
+	}
+#endif
 }
+#else
+void cfg80211_rtw_update_mgmt_frame_register(struct wiphy *wiphy, struct wireless_dev *wdev, struct mgmt_frame_regs *upd)
+{
+#ifdef CONFIG_P2P
+	u16 frame_type_mask = 0;
+	int p2p_idx = -1;
+
+	if (wdev->iftype == NL80211_IFTYPE_P2P_DEVICE) {
+		p2p_idx = 0;
+	} else if (wdev->iftype == NL80211_IFTYPE_P2P_CLIENT) {
+		p2p_idx = 1;
+	} else if (wdev->iftype == NL80211_IFTYPE_P2P_GO) {
+		p2p_idx = 2;
+	}
+
+	frame_type_mask = (u16)(upd->interface_stypes & (BIT(IEEE80211_STYPE_PROBE_REQ >> 4) | BIT(IEEE80211_STYPE_ACTION >> 4)));
+	if ((p2p_idx >= 0) && (global_idev.p2p_global.mgmt_register[p2p_idx] != frame_type_mask)) {
+		global_idev.p2p_global.mgmt_register[p2p_idx] = frame_type_mask;
+	}
+#endif
+}
+#endif
 
 void cfg80211_rtw_ops_sta_init(void)
 {
@@ -822,6 +1027,8 @@ void cfg80211_rtw_ops_sta_init(void)
 	ops->mgmt_tx = cfg80211_rtw_mgmt_tx;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0))
 	ops->mgmt_frame_register = cfg80211_rtw_mgmt_frame_register;
+#else
+	ops->update_mgmt_frame_registrations = cfg80211_rtw_update_mgmt_frame_register;
 #endif
 	ops->external_auth = cfg80211_rtw_external_auth_status;
 #ifdef CONFIG_CFG80211_SME_OFFLOAD
@@ -831,3 +1038,4 @@ void cfg80211_rtw_ops_sta_init(void)
 	ops->disassoc = cfg80211_rtw_disassoc;
 #endif	/* CONFIG_CFG80211_SME_OFFLOAD */
 }
+

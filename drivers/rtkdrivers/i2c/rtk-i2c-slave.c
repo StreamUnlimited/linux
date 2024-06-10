@@ -354,7 +354,7 @@ int rtk_i2c_slave_probe(
 	int i;
 
 	i2c_dev->slave_dev = devm_kzalloc(&pdev->dev, sizeof(struct rtk_i2c_slave_dev), GFP_KERNEL);
-	if (!i2c_dev) {
+	if (!i2c_dev->slave_dev) {
 		return -ENOMEM;
 	}
 

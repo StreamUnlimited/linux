@@ -49,7 +49,7 @@ static const struct i2c_device_id rtk_ts_id[] = {
 MODULE_DEVICE_TABLE(i2c, rtk_ts_id);
 
 static const struct of_device_id rtk_dt_match[] = {
-	{.compatible = "realtek,amebad2-ts", },
+	{.compatible = "realtek,ameba-ts", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, rtk_dt_match);

@@ -10,16 +10,11 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/usb/otg.h>
-#include <linux/stmp_device.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/of_device.h>
-#include <linux/regmap.h>
-#include <linux/mfd/syscon.h>
-#include <linux/iopoll.h>
 #include <linux/export.h>
-#include <misc/realtek-misc.h>
 #include "phy-rtk-usb.h"
 
 #define USB_CAL_OTP_EN 0
@@ -55,22 +50,7 @@ static const struct of_device_id rtk_phy_dt_ids[] = {
 
 MODULE_DEVICE_TABLE(of, rtk_phy_dt_ids);
 
-static const struct rtk_usb_phy_cal_data_t rtk_usb_cut_a_cal_data[] = {
-	{0x00, 0xE0, 0x9D},
-	{0x00, 0xE1, 0x19},
-	{0x00, 0xE2, 0xDB},
-	{0x00, 0xE4, 0x6D},
-	{0x01, 0xE5, 0x0A},
-	{0x01, 0xE6, 0xD8},
-	{0x02, 0xE7, 0x32},
-	{0x01, 0xE0, 0x04},
-	{0x01, 0xE0, 0x00},
-	{0x01, 0xE0, 0x04},
-
-	{0xFF, 0x00, 0x00}
-};
-
-static const struct rtk_usb_phy_cal_data_t rtk_usb_cut_b_cal_data[] = {
+static const struct rtk_usb_phy_cal_data_t rtk_usb_cal_data[] = {
 	{0x00, 0xE0, 0x9D},
 	{0x00, 0xE1, 0x19},
 	{0x00, 0xE2, 0xDB},
@@ -209,7 +189,7 @@ int rtk_phy_calibrate(struct dwc2_hsotg *hsotg)
 	u8 reg;
 #endif
 	u8 old_page = 0xFF;
-	struct rtk_usb_phy_cal_data_t *data;
+	struct rtk_usb_phy_cal_data_t *data = (struct rtk_usb_phy_cal_data_t *)rtk_usb_cal_data;
 	struct rtk_phy *rtk_phy;
 
 	if (!hsotg || !hsotg->uphy) {
@@ -247,12 +227,6 @@ int rtk_phy_calibrate(struct dwc2_hsotg *hsotg)
 	/* 3ms + 2.5us from DD, 3ms already delayed after soft disconnect */
 	usleep_range(3, 4);
 
-	if (rtk_misc_get_rl_version() != RTK_CUT_VERSION_A) {
-		data = (struct rtk_usb_phy_cal_data_t *)rtk_usb_cut_b_cal_data;
-	} else {
-		data = (struct rtk_usb_phy_cal_data_t *)rtk_usb_cut_a_cal_data;
-	}
-
 	while (data->page != 0xFF) {
 		if (data->page != old_page) {
 			ret = rtk_phy_page_set(hsotg, data->page);
@@ -286,10 +260,8 @@ static int rtk_phy_init(struct usb_phy *phy)
 
 	reg = readl(lsys_aip_ctrl1);
 	reg |= (LSYS_BIT_BG_PWR | LSYS_BIT_BG_ON_USB2);
-	if (rtk_misc_get_rl_version() != RTK_CUT_VERSION_A) {
-		reg &= ~LSYS_MASK_BG_ALL;
-		reg |= LSYS_BG_ALL(0x2);
-	}
+	reg &= ~LSYS_MASK_BG_ALL;
+	reg |= LSYS_BG_ALL(0x2);
 	writel(reg, lsys_aip_ctrl1);
 
 	ret = clk_prepare_enable(rtk_phy->clk);

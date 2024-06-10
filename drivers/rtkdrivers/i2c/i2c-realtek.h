@@ -50,9 +50,9 @@
 #define I2C2_REG_BASE			0x400F0000
 
 /**************************************************************************//**
- * @defgroup AMEBAD2_I2C
+ * @defgroup AMEBA_I2C
  * @{
- * @brief AMEBAD2_I2C Register Declaration
+ * @brief AMEBA_I2C Register Declaration
  *****************************************************************************/
 #define IC_CON				0x000
 #define IC_TAR				0x004

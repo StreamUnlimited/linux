@@ -52,27 +52,27 @@ inline static u32 _RND128(u32 sz)
 #define rtw_write_port(priv, addr, cnt, mem) sdio_write_port((priv), (addr), (cnt), (mem))
 
 
-u8 sdio_read8(inic_sdio_t *priv, u32 addr);
-u16 sdio_read16(inic_sdio_t *priv, u32 addr);
-u32 sdio_read32(inic_sdio_t *priv, u32 addr);
-void sdio_read_mem(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *rmem);
-u32 sdio_read_port(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *mem);
-u8 sdio_f0_read8(inic_sdio_t *priv, u32 addr);
-s32 sdio_write8(inic_sdio_t *priv, u32 addr, u8 val);
-s32 sdio_write16(inic_sdio_t *priv, u32 addr, u16 val);
-s32 sdio_write32(inic_sdio_t *priv, u32 addr, u32 val);
-s32 sdio_writeN(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf);
-void sdio_write_mem(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *wmem);
-u32 sdio_write_port(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *mem);
-s32 sdio_local_read(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf);
-s32 sdio_local_write(inic_sdio_t *priv, u32 addr, u32 cnt, u8 *pbuf);
-u8 sdio_cmd52_read1byte_local(inic_sdio_t *priv, u32 addr);
-u16 sdio_cmd52_read2byte_local(inic_sdio_t *priv, u32 addr);
-u32 sdio_cmd52_read4byte_local(inic_sdio_t *priv, u32 addr);
-u32 sdio_cmd53_read4byte_local(inic_sdio_t *priv, u32 addr);
-void sdio_cmd52_write1byte_local(inic_sdio_t *priv, u32 addr, u8 v);
-void sdio_cmd52_write2byte_local(inic_sdio_t *priv, u32 addr, u16 v);
-void sdio_cmd52_write4byte_local(inic_sdio_t *priv, u32 addr, u32 v);
+u8 sdio_read8(struct inic_sdio *priv, u32 addr);
+u16 sdio_read16(struct inic_sdio *priv, u32 addr);
+u32 sdio_read32(struct inic_sdio *priv, u32 addr);
+void sdio_read_mem(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *rmem);
+u32 sdio_read_port(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *mem);
+u8 sdio_f0_read8(struct inic_sdio *priv, u32 addr);
+s32 sdio_write8(struct inic_sdio *priv, u32 addr, u8 val);
+s32 sdio_write16(struct inic_sdio *priv, u32 addr, u16 val);
+s32 sdio_write32(struct inic_sdio *priv, u32 addr, u32 val);
+s32 sdio_writeN(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pbuf);
+void sdio_write_mem(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *wmem);
+u32 sdio_write_port(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *mem);
+s32 sdio_local_read(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pbuf);
+s32 sdio_local_write(struct inic_sdio *priv, u32 addr, u32 cnt, u8 *pbuf);
+u8 sdio_cmd52_read1byte_local(struct inic_sdio *priv, u32 addr);
+u16 sdio_cmd52_read2byte_local(struct inic_sdio *priv, u32 addr);
+u32 sdio_cmd52_read4byte_local(struct inic_sdio *priv, u32 addr);
+u32 sdio_cmd53_read4byte_local(struct inic_sdio *priv, u32 addr);
+void sdio_cmd52_write1byte_local(struct inic_sdio *priv, u32 addr, u8 v);
+void sdio_cmd52_write2byte_local(struct inic_sdio *priv, u32 addr, u16 v);
+void sdio_cmd52_write4byte_local(struct inic_sdio *priv, u32 addr, u32 v);
 
 /**************************************************/
 #endif

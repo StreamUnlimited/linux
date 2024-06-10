@@ -9,7 +9,6 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -352,14 +351,14 @@ static int realtek_thermal_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id realtek_thermal_match[] = {
-	{ .compatible = "realtek,amebad2-thermal"},
+	{ .compatible = "realtek,ameba-thermal"},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, realtek_thermal_match);
 
 static struct platform_driver realtek_thermal_driver = {
 	.driver = {
-		.name	= "realtek-amebad2-thermal",
+		.name	= "realtek-ameba-thermal",
 		.of_match_table = realtek_thermal_match,
 	},
 	.probe		= realtek_thermal_probe,

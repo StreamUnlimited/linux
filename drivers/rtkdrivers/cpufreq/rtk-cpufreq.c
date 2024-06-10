@@ -13,15 +13,9 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/clk.h>
-#include <linux/of_clk.h>
 #include <linux/err.h>
 #include <linux/regulator/consumer.h>
-#include <linux/pm_opp.h>
-#include <asm/cacheflush.h>
 #include <linux/slab.h>
-#include <linux/delay.h>
-
-
 
 struct rtk_cpufreq {
 	struct device *cpu;
@@ -68,6 +62,8 @@ static int rtk_cpufreq_apll(struct cpufreq_policy *policy, unsigned int index)
 		pr_err("CPU%d: Failed to re-parent CPU clock\n", policy->cpu);
 		return ret;
 	}
+
+	return ret;
 }
 
 
@@ -261,7 +257,7 @@ static int rtk_cpufreq_resume(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver rtk_cpufreq_driver = {
-	.name         = "realtek-amebad2-cpufreq",
+	.name         = "realtek-ameba-cpufreq",
 	.flags        = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.init         = rtk_cpufreq_init,
 	.get          = cpufreq_generic_get,

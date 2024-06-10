@@ -4,8 +4,8 @@
 *
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
-#ifndef _DT_BINDINGS_REALTEK_AMEBAD2_PINFUNC_H
-#define _DT_BINDINGS_REALTEK_AMEBAD2_PINFUNC_H
+#ifndef _DT_BINDINGS_REALTEK_AMEBA_PINFUNC_H
+#define _DT_BINDINGS_REALTEK_AMEBA_PINFUNC_H
 
 /*  define PIN modes */
 #define GPIO                                     0x0

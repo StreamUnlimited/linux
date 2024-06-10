@@ -893,7 +893,7 @@ static int rtk_dsi_pm_suspend(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops amebad2_dsi_pm_ops = {
+static const struct dev_pm_ops ameba_dsi_pm_ops = {
 	.resume_early = rtk_dsi_pm_resume_early,   // resume  begin
 	.complete     = rtk_dsi_pm_resume_complete,// resume  complete
 	.prepare      = rtk_dsi_pm_prepare,        // suspend begin
@@ -902,7 +902,7 @@ static const struct dev_pm_ops amebad2_dsi_pm_ops = {
 #endif
 
 static const struct of_device_id ameba_dsi_of_match[] = {
-	{.compatible = "realtek,amebad2-dsi"},
+	{.compatible = "realtek,ameba-dsi"},
 	{ }
 };
 
@@ -912,10 +912,10 @@ static struct platform_driver ameba_dsi_driver_struct = {
 	.probe  = ameba_dsi_probe,
 	.remove = ameba_dsi_remove,
 	.driver = {
-		.name = "realtek-amebad2-dsi",
+		.name = "realtek-ameba-dsi",
 		.of_match_table = ameba_dsi_of_match,
 #ifdef CONFIG_PM
-		.pm = &amebad2_dsi_pm_ops,
+		.pm = &ameba_dsi_pm_ops,
 #endif
 	},
 };

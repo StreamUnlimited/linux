@@ -11,7 +11,7 @@
 #ifdef CONFIG_NAN
 #define OUI_REALTEK 0x00E04C
 
-typedef enum {
+enum ANDROID_VENDOR_SUB_COMMAND {
 	/* don't use 0 as a valid subcommand */
 	VENDOR_NL80211_SUBCMD_UNSPECIFIED,
 
@@ -20,7 +20,7 @@ typedef enum {
 	NL80211_SUBCMD_NAN_RANGE_END   = 0x19FF,
 
 	/* This is reserved for future usage */
-} ANDROID_VENDOR_SUB_COMMAND;
+};
 
 enum rtw_vendor_subcmd {
 	NAN_SUBCMD_SRVC_EXT_INFO = NL80211_SUBCMD_NAN_RANGE_START,	/* 0x1900 */
@@ -37,7 +37,7 @@ enum rtw_vendor_subcmd {
 	VENDOR_SUBCMD_MAX
 };
 
-typedef enum rtw_vendor_event {
+enum rtw_vendor_event {
 	NAN_EVENT_DATA_COMFIRM,
 #ifdef NAN_CUSTOMER_NANDOW
 	NAN_EVENT_NANDOW_MAX    =   WFPAL_M_SET_INFRA_CHANNEL,
@@ -47,7 +47,7 @@ typedef enum rtw_vendor_event {
 	NAN_EVENT_PASN_START,
 	NAN_EVENT_PASN_RX,
 	NAN_EVENT_PASN_UPD_PMKID,
-} rtw_vendor_event_t;
+};
 
 void rtw_cfgvendor_attach(struct wiphy *wiphy);
 void rtw_cfgvendor_detach(struct wiphy *wiphy);

@@ -32,7 +32,7 @@
 
 #include "core.h"
 #include "hw.h"
-#ifdef CONFIG_ARCH_AMEBAD2
+#ifdef CONFIG_ARCH_AMEBASMART
 #include "phy-rtk-usb.h"
 #endif
 
@@ -4639,7 +4639,7 @@ static int dwc2_hsotg_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct dwc2_hsotg *hsotg = to_hsotg(gadget);
 	unsigned long flags = 0;
-#ifdef CONFIG_ARCH_AMEBAD2
+#ifdef CONFIG_ARCH_AMEBASMART
 	int ret = 0;
 #endif
 
@@ -4656,7 +4656,7 @@ static int dwc2_hsotg_pullup(struct usb_gadget *gadget, int is_on)
 	if (is_on) {
 		hsotg->enabled = 1;
 		dwc2_hsotg_core_init_disconnected(hsotg, false);
-	#ifdef CONFIG_ARCH_AMEBAD2
+	#ifdef CONFIG_ARCH_AMEBASMART
 		ret = rtk_phy_calibrate(hsotg);
 		if (ret != 0) {
 			dev_err(hsotg->dev,"PHY calibration fail\n");

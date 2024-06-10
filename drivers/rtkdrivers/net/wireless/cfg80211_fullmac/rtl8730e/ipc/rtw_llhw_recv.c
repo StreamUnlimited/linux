@@ -21,6 +21,13 @@ void llhw_recv_task_from_msg_recv_pkts(int idx_wlan, struct dev_sk_buff *skb_phy
 	dma_addr_t dma_skb = 0, dma_data_addr = 0;
 	struct net_device_stats *pstats = &global_idev.stats[idx_wlan];
 
+#ifdef CONFIG_P2P
+	if (global_idev.p2p_global.pd_wlan_idx == 1) {
+		idx_wlan = idx_wlan ^ 1; /*GC intf is up, linux netdev idx is oppsite to driver wlan_idx*/
+		pstats = &global_idev.stats[idx_wlan];
+	}
+#endif
+
 	/* get the rx queue. */
 	if (!pdev) {
 		dev_err(global_idev.fullmac_dev, "%s: device or inic device is NULL!\n", __func__);
@@ -81,20 +88,15 @@ func_exit:
 	return;
 }
 
-void llhw_recv_task_from_msg(struct inic_ipc_ex_msg *p_ipc_msg)
+void llhw_recv_task_from_msg(u8 event_num, u32 msg_addr, u8 wlan_idx)
 {
-	if (p_ipc_msg == NULL) {
-		dev_err(global_idev.fullmac_dev, "Device IPC message is NULL, invalid!\n\r");
-		return;
-	}
-
-	switch (p_ipc_msg->event_num) {
+	switch (event_num) {
 	/* receive the data from device */
 	case IPC_WIFI_EVT_RECV_PKTS:
-		llhw_recv_task_from_msg_recv_pkts(p_ipc_msg->wlan_idx, (struct dev_sk_buff *)(p_ipc_msg->msg_addr));
+		llhw_recv_task_from_msg_recv_pkts(wlan_idx, (struct dev_sk_buff *)(msg_addr));
 		break;
 	default:
-		dev_err(global_idev.fullmac_dev, "Host Unknown event(%d)!\n\r", p_ipc_msg->event_num);
+		dev_err(global_idev.fullmac_dev, "Host Unknown event(%d)!\n\r", event_num);
 		break;
 	}
 }

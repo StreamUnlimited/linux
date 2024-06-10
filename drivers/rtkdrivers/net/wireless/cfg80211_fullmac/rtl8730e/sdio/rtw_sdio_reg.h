@@ -61,6 +61,9 @@
 *BIT MAP FOR SOME REGISTERS
 *
 ************************************************/
+// SDIO_REG_TX_CTRL
+#define SDIO_EN_HISR_MASK_TIMER					(BIT(1))
+
 // SDIO_REG_HISR: SDIO Host Interrupt Service Routine
 #define SDIO_HISR_RX_REQUEST					(BIT(0))
 #define SDIO_HISR_AVAL_INT					(BIT(1))

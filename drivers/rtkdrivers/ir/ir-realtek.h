@@ -25,16 +25,15 @@
 #include <media/rc-core.h>
 #include "../../media/rc/rc-core-priv.h"
 
-#define RTK_IR_TODO				0
 #define RTK_IR_REG_DUMP				0
 #define RTK_IR_HW_CONTROL_FOR_FUTURE_USE	0
 
 #define RTK_IR_DEBUG_DETAILS			0
 
 /**************************************************************************//**
- * @defgroup AMEBAD2_IR
+ * @defgroup AMEBA_IR
  * @{
- * @brief AMEBAD2_IR Register Declaration
+ * @brief AMEBA_IR Register Declaration
  *****************************************************************************/
 #define IR_CLK_DIV				0x000
 #define IR_TX_CONFIG				0x004
