@@ -209,7 +209,8 @@
 		otp_phy: otp_phy@42000000 {
 			compatible = "realtek,ameba-otp-phy";
 			#address-cells = <1>;
-			#size-cells = <0>;
+			#size-cells = <1>;
+
 			reg = <0x42000000 0x800>,
 				<0x42008000 0x1000>;
 
@@ -227,6 +228,9 @@
 		};
 
 		otp_logical: otp_logical@42000000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
 			compatible = "realtek,ameba-otp-logical";
 			reg = <0x42000000 0x400>,
 				<0x42008000 0x1000>;
