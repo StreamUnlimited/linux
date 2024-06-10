@@ -208,7 +208,7 @@ static void platform_device_init(struct platform_device *pdev)
 	paxi_data_global = axi_data;
 
 	ocp_node = of_get_parent(pdev->dev.of_node);
-	sys_node = of_get_compatible_child(ocp_node, "realtek,amebad2-system-ctrl-ls");
+	sys_node = of_get_compatible_child(ocp_node, "realtek,ameba-system-ctrl-ls");
 	if (!sys_node) {
 		pr_err("Can't get sys_node\n");
 		goto free_dvobj;
