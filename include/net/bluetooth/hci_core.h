@@ -1688,13 +1688,15 @@ void hci_conn_del_sysfs(struct hci_conn *conn);
 	 !test_bit(HCI_QUIRK_BROKEN_ENHANCED_SETUP_SYNC_CONN, &(dev)->quirks))
 
 /* Use ext scanning if set ext scan param and ext scan enable is supported */
-#define use_ext_scan(dev) 0
+#define use_ext_scan(dev) (((dev)->commands[37] & 0x20) && \
+			   ((dev)->commands[37] & 0x40) && \
+			   !test_bit(HCI_QUIRK_BROKEN_EXT_SCAN, &(dev)->quirks))
 
 /* Use ext create connection if command is supported */
-#define use_ext_conn(dev) 0
+#define use_ext_conn(dev) ((dev)->commands[37] & 0x80)
 
 /* Extended advertising support */
-#define ext_adv_capable(dev) 0
+#define ext_adv_capable(dev) (((dev)->le_features[1] & HCI_LE_EXT_ADV))
 
 /* BLUETOOTH CORE SPECIFICATION Version 5.3 | Vol 4, Part E page 1789:
  *
