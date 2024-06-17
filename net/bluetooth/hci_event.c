@@ -5929,14 +5929,6 @@ static struct hci_conn *check_pending_le_conn(struct hci_dev *hdev,
 	    hdev->suspended)
 		return NULL;
 
-	/* Most controller will fail if we try to create new connections
-	 * while we have an existing one in peripheral role.
-	 */
-	if (hdev->conn_hash.le_num_peripheral > 0 &&
-	    (!test_bit(HCI_QUIRK_VALID_LE_STATES, &hdev->quirks) ||
-	     !(hdev->le_states[3] & 0x10)))
-		return NULL;
-
 	/* If we're not connectable only connect devices that we have in
 	 * our pend_le_conns list.
 	 */
