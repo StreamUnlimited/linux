@@ -11,7 +11,6 @@
 /* External head files */
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/kern_levels.h>

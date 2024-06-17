@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 export CONFIG_NAN = n
+export CONFIG_P2P = n
 export CONFIG_FULLMAC_HCI_IPC = y
 export CONFIG_FULLMAC_HCI_SDIO = n
 
@@ -19,12 +20,14 @@ fullmac-8730e-objs			:= rtw_drv_probe.o \
 					rtw_regd.o \
 					rtw_ethtool_ops.o \
 					rtw_netdev_ops.o \
+					rtw_netdev_ops_p2p.o \
 					rtw_cfgvendor.o \
 					rtw_proc.o \
 					rtw_cfg80211_ops.o \
 					rtw_cfg80211_ops_ap.o \
 					rtw_cfg80211_ops_key.o \
 					rtw_cfg80211_ops_nan.o \
+					rtw_cfg80211_ops_p2p.o \
 
 else ifeq ($(CONFIG_FULLMAC_HCI_SDIO),y)
 

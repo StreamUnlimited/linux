@@ -14,23 +14,16 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
-#include <linux/clk.h>
-#include <linux/reset.h>
-#include <linux/sched_clock.h>
 #include <linux/slab.h>
-#include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/time.h>
-#include <linux/module.h>
 #include <linux/mfd/rtk-timer.h>
 
 #include "timer-of.h"
 
-
 #define TIMER_CLK_DISABLE 0
 #define TIMER_CLK_ENABLE 1
-
 
 /*change timer period*/
 static void rtk_timer_change_period(void __iomem *base, u32 period)
@@ -260,5 +253,5 @@ err:
 	return ret;
 }
 
-TIMER_OF_DECLARE(rtk_timer, "realtek,amebad2-timer-clk", rtk_timer_probe);
+TIMER_OF_DECLARE(rtk_timer, "realtek,ameba-timer-clk", rtk_timer_probe);
 

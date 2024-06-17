@@ -11,13 +11,11 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/sizes.h>
-#include <linux/swiotlb.h>
 #include <linux/of.h>
 
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
-#include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/time.h>
@@ -278,7 +276,7 @@ exit:
 static const struct pwm_ops rtk_pwm_ops = {
 	.owner = THIS_MODULE,
 	.apply = rtk_pwm_apply,
-	// .capture = rtk_pwm_capture,  //todo_eric: note that pwm timer can only capture period
+	// .capture = rtk_pwm_capture, //pwm timer can only capture period
 	//and capture timer can only capture pulse or width. So
 	//tim8 and tim9 are not fit to linux pwm capture function.
 };
@@ -293,7 +291,7 @@ static int rtk_pwm_probe(struct platform_device *pdev)
 	struct rtk_tim *tim = dev_get_drvdata(pdev->dev.parent);
 	int ret;
 
-	pwm = devm_kzalloc(&pdev->dev, sizeof(struct rtk_pwm), GFP_KERNEL);  //todo_eric
+	pwm = devm_kzalloc(&pdev->dev, sizeof(struct rtk_pwm), GFP_KERNEL);
 	if (!pwm) {
 		return -ENOMEM;
 	}
@@ -321,14 +319,14 @@ static int rtk_pwm_probe(struct platform_device *pdev)
 
 
 static const struct of_device_id rtk_pwm_of_match[] = {
-	{ .compatible = "realtek,amebad2-pwm",	},
+	{ .compatible = "realtek,ameba-pwm",	},
 	{ /* end node */ },
 };
 
 static struct platform_driver rtk_pwm_driver = {
 	.probe	= rtk_pwm_probe,
 	.driver	= {
-		.name = "realtek-amebad2-pwm",
+		.name = "realtek-ameba-pwm",
 		.of_match_table = rtk_pwm_of_match,
 	},
 };

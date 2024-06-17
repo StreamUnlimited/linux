@@ -5,8 +5,8 @@
 * Copyright (C) 2021, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_AUDIO_CLOCK_DRIVER_H_
-#define _AMEBAD2_AUDIO_CLOCK_DRIVER_H_
+#ifndef _AMEBA_AUDIO_CLOCK_DRIVER_H_
+#define _AMEBA_AUDIO_CLOCK_DRIVER_H_
 
 
 /**************************************************************************//**
@@ -475,9 +475,9 @@
 #define REG_PLL_STATE                              0x03C
 
 /**************************************************************************//**
- * @defgroup AMEBAD2_PLL
+ * @defgroup AMEBA_PLL
  * @{
- * @brief AMEBAD2_PLL Register Declaration
+ * @brief AMEBA_PLL Register Declaration
  *****************************************************************************/
 typedef struct {
 	uint32_t PLL_NPPLL_CTRL0;                        /*!<  Register,  Address offset: 0x000 */

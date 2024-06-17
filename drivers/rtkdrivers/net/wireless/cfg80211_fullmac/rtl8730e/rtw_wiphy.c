@@ -95,6 +95,30 @@ static const struct ieee80211_txrx_stypes
 		BIT(IEEE80211_STYPE_DEAUTH >> 4) |
 		BIT(IEEE80211_STYPE_ACTION >> 4)
 	},
+#ifdef CONFIG_P2P
+	[NL80211_IFTYPE_P2P_CLIENT] = {
+		.tx = 0xffff,
+		.rx = BIT(IEEE80211_STYPE_ACTION >> 4) |
+		BIT(IEEE80211_STYPE_AUTH >> 4) |
+		BIT(IEEE80211_STYPE_PROBE_REQ >> 4)
+	},
+	[NL80211_IFTYPE_P2P_GO] = {
+		.tx = 0xffff,
+		.rx = BIT(IEEE80211_STYPE_ASSOC_REQ >> 4) |
+		BIT(IEEE80211_STYPE_REASSOC_REQ >> 4) |
+		BIT(IEEE80211_STYPE_PROBE_REQ >> 4) |
+		BIT(IEEE80211_STYPE_DISASSOC >> 4) |
+		BIT(IEEE80211_STYPE_AUTH >> 4) |
+		BIT(IEEE80211_STYPE_DEAUTH >> 4) |
+		BIT(IEEE80211_STYPE_ACTION >> 4)
+	},
+	[NL80211_IFTYPE_P2P_DEVICE] = {
+		.tx = 0xffff,
+		.rx = BIT(IEEE80211_STYPE_ACTION >> 4) |
+		BIT(IEEE80211_STYPE_PROBE_REQ >> 4)
+	},
+#endif
+
 };
 
 /* if wowlan is not supported, kernel generate a disconnect at each suspend
@@ -109,6 +133,34 @@ static const struct wiphy_wowlan_support rtw_wowlan_stub = {
 	.pattern_min_len = 0,
 	.max_pkt_offset = 0,
 };
+
+#ifdef CONFIG_P2P /*for wpa_supplicant set WPA_DRIVER_FLAGS_P2P_CONCURRENT and P2P_MGMT_AND_NON_P2P*/
+struct ieee80211_iface_limit rtw_limits[] = {
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION)
+		| BIT(NL80211_IFTYPE_P2P_CLIENT)
+	},
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_AP)
+		| BIT(NL80211_IFTYPE_P2P_GO)
+	},
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_P2P_DEVICE)
+	},
+};
+
+struct ieee80211_iface_combination rtw_combinations[] = {
+	{
+		.limits = rtw_limits,
+		.n_limits = ARRAY_SIZE(rtw_limits),
+		.max_interfaces = 2,
+		.num_different_channels = 1,
+	},
+};
+#endif
 
 int rtw_wiphy_band_init(struct wiphy *pwiphy, u32 band_type)
 {
@@ -171,6 +223,11 @@ int rtw_wiphy_init_params(struct wiphy *pwiphy)
 #ifdef CONFIG_NAN
 							  | BIT(NL80211_IFTYPE_NAN)
 #endif
+#ifdef CONFIG_P2P
+							  | BIT(NL80211_IFTYPE_P2P_CLIENT)
+							  | BIT(NL80211_IFTYPE_P2P_GO)
+							  | BIT(NL80211_IFTYPE_P2P_DEVICE)
+#endif
 							  ;
 	pwiphy->cipher_suites = rtw_cipher_suites;
 	pwiphy->n_cipher_suites = sizeof(rtw_cipher_suites) / sizeof((rtw_cipher_suites)[0]);
@@ -188,6 +245,12 @@ int rtw_wiphy_init_params(struct wiphy *pwiphy)
 #ifdef CONFIG_NAN
 	pwiphy->nan_supported_bands |= BIT(NL80211_BAND_2GHZ);
 	pwiphy->nan_supported_bands |= BIT(NL80211_BAND_5GHZ);
+#endif
+#ifdef CONFIG_P2P
+	pwiphy->iface_combinations = rtw_combinations;
+	pwiphy->n_iface_combinations = ARRAY_SIZE(rtw_combinations);
+	pwiphy->flags |= WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL;
+	pwiphy->max_remain_on_channel_duration = RTW_MAX_REMAIN_ON_CHANNEL_DURATION;
 #endif
 
 	/* Support for AP mode. */
@@ -243,6 +306,9 @@ int rtw_wiphy_init(void)
 	cfg80211_rtw_ops_key_init();
 #ifdef CONFIG_NAN
 	cfg80211_rtw_ops_nan_init();
+#endif
+#ifdef CONFIG_P2P
+	cfg80211_rtw_ops_p2p_init();
 #endif
 	pwiphy = wiphy_new(&global_idev.rtw_cfg80211_ops, 0);
 	if (!pwiphy) {

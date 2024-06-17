@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_LCDC_H_
-#define _AMEBAD2_LCDC_H_ 
+#ifndef _AMEBA_LCDC_H_
+#define _AMEBA_LCDC_H_ 
 
 /*
 	micro define

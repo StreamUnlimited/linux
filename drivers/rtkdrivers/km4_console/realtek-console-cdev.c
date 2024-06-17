@@ -56,7 +56,8 @@ static long realtek_console_ioctl(struct file *file, unsigned int cmd, unsigned 
 
 	spin_lock(&lock);
 
-	if (copy_from_user(&preq_msg, (char __user *)arg, CONSOLE_MAX_CHAR)) {
+	memset(preq_msg, 0, CONSOLE_MAX_CHAR);
+	if (copy_from_user(&preq_msg, (char __user *)arg, CONSOLE_MAX_CHAR - 1)) {
 		return -EFAULT;
 	}
 

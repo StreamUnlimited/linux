@@ -1,5 +1,5 @@
-#ifndef _AMEBAD2_AUD_H_
-#define _AMEBAD2_AUD_H_
+#ifndef _AMEBA_AUD_H_
+#define _AMEBA_AUD_H_
 
 /* AUTO_GEN_START */
 
@@ -338,9 +338,9 @@
 
 
 /**************************************************************************//**
- * @defgroup AMEBAD2_AUD
+ * @defgroup AMEBA_AUD
  * @{
- * @brief AMEBAD2_AUD Register Declaration
+ * @brief AMEBA_AUD Register Declaration
  *****************************************************************************/
 typedef struct {
 	volatile uint32_t AUD_ADDA_CTL;                           /*!<  Register,  Address offset: 0x00 */

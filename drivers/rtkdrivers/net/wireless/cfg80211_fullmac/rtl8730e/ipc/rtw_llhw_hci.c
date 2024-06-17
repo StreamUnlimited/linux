@@ -14,7 +14,8 @@ struct inic_device global_idev;
 
 extern struct aipc_ch_ops llhw_ipc_recv_ops;
 extern struct aipc_ch_ops llhw_ipc_event_ops;
-
+extern struct wifi_user_conf wifi_user_config __attribute__((aligned(64)));
+_WEAK void wifi_set_user_config(void);
 static aipc_ch_t *llhw_ipc_data_ch_init(struct aipc_ch_ops *ops)
 {
 	aipc_ch_t *data_ch = NULL;
@@ -137,10 +138,11 @@ int llhw_init(void __iomem *km4_map_start)
 		goto ipc_deinit;
 	}
 
-	memset(&global_idev.wifi_user_config, 0, sizeof(struct wifi_user_conf));
-	ret = llhw_wifi_get_user_config(&global_idev.wifi_user_config);
+	wifi_set_user_config();
+	memcpy(&global_idev.wifi_user_config, &wifi_user_config, sizeof(struct wifi_user_conf));
+	ret = llhw_wifi_set_user_config(&global_idev.wifi_user_config);
 	if (ret < 0) {
-		dev_err(global_idev.fullmac_dev, "get wifi user config failed.(%d).\n", ret);
+		dev_err(global_idev.fullmac_dev, "set wifi user config failed.(%d).\n", ret);
 		goto ipc_deinit;
 	}
 

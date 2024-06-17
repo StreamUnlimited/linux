@@ -18,8 +18,6 @@
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
-#include <linux/of_address.h>
-#include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/time.h>
 
@@ -213,7 +211,15 @@ static inline bool rtk_is_leap_year(unsigned int year)
 static u8 days_in_month(u8 month, u8 year)
 {
 	u8 dim[12] = {31, 0, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-	u8 ret = dim[month];
+	u8 ret = 0;
+
+	if (month > 11) {
+		pr_err("Out of month table.\n");
+		return 0; //Illegal month
+	}
+
+	ret = dim[month];
+
 	if (ret == 0) {
 		ret = rtk_is_leap_year(year) ? 29 : 28;
 	}
@@ -419,8 +425,9 @@ static int rtk_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	void __iomem *base = rtc->ioaddr;
 	u32 reg;
 	volatile u32 year_flag = 0;
-	struct rtc_time tm_temp;
-	u32 alarm_en, ydays;
+	struct rtc_time tm_temp = {0};
+	u32 alarm_en;
+	u32 ydays = 365;
 
 	reg = readl(base + RTK_RTC_TR) & RTC_TR_RESERVED_MASK;
 
@@ -864,7 +871,7 @@ fail:
 
 
 static const struct of_device_id rtk_rtc_of_match[] = {
-	{ .compatible = "realtek,amebad2-rtc",	},
+	{ .compatible = "realtek,ameba-rtc",	},
 	{ /* end node */ },
 };
 
@@ -872,7 +879,7 @@ static const struct of_device_id rtk_rtc_of_match[] = {
 static struct platform_driver rtk_rtc_driver = {
 	.probe	= rtk_rtc_probe,
 	.driver	= {
-		.name = "realtek-amebad2-rtc",
+		.name = "realtek-ameba-rtc",
 		.of_match_table = rtk_rtc_of_match,
 	},
 };

@@ -1489,6 +1489,6 @@ config SND_SOC_TPA6130A2
 	depends on I2C
 
 config SND_SOC_CODEC_RTK_AMEBA
-        tristate "Realtek Amebad2 Codec interface support"
+        tristate "Realtek Ameba Codec interface support"
 
 endmenu

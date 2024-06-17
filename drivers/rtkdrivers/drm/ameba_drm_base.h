@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_DRM_BASE_H_
-#define _AMEBAD2_DRM_BASE_H_
+#ifndef _AMEBA_DRM_BASE_H_
+#define _AMEBA_DRM_BASE_H_
 
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -32,4 +32,4 @@
 #define assert_param(expr)                  ((expr) ? (void)0 : printk("[DRM]assert issue:%s,%d",__func__,__LINE__))
 #define AMEBA_DRM_DEBUG()                   if(DRM_DEBUG_VALUE == drm_debug)DRM_INFO("%s Enter %d\n", __func__, __LINE__)
 
-#endif  /*_AMEBAD2_DRM_BASE_H_*/
+#endif  /*_AMEBA_DRM_BASE_H_*/

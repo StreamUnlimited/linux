@@ -16,7 +16,7 @@
 #include <linux/of_address.h>
 #include <linux/nvmem-provider.h>
 
-#include <misc/realtek-otp-core.h>
+#include "../otp_ipc/rtk-otp-ipc.h"
 
 #define READONLY					0
 #define RETRY_COUNT					3
@@ -815,11 +815,11 @@ static const struct rtk_otp_params otp_logical_params = {
 
 static const struct of_device_id rtk_otp_of_match[] = {
 	{
-		.compatible = "realtek,amebad2-otp-phy",
+		.compatible = "realtek,ameba-otp-phy",
 		.data = (void *) &otp_physical_params,
 	},
 	{
-		.compatible = "realtek,amebad2-otp-logical",
+		.compatible = "realtek,ameba-otp-logical",
 		.data = (void *) &otp_logical_params,
 	},
 	{ /* end node */ },
@@ -828,7 +828,7 @@ static const struct of_device_id rtk_otp_of_match[] = {
 static struct platform_driver rtk_otp_driver = {
 	.probe	= rtk_otp_probe,
 	.driver	= {
-		.name = "realtek-amebad2-otp",
+		.name = "realtek-ameba-otp",
 		.of_match_table = rtk_otp_of_match,
 	},
 };

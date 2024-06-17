@@ -11,7 +11,8 @@ llhw-ipc-y := rtw_llhw_hci.o \
 		rtw_llhw_recv.o \
 		rtw_llhw_xmit.o \
 		rtw_llhw_msg.o \
-		rtw_llhw_memory.o
+		rtw_llhw_memory.o \
+		ameba_wificfg.o
  
 obj-y += llhw-ipc.o
 

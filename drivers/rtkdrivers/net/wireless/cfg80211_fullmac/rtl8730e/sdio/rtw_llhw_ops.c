@@ -4,8 +4,8 @@
 void llhw_send_msg(u32 id, u8 *param, u32 param_len, u8 *ret, u32 ret_len)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
-	inic_api_info_t *ret_msg;
-	inic_api_info_t *api_info;
+	struct inic_api_info *ret_msg;
+	struct inic_api_info *api_info;
 	u8 *buf;
 	u32 buf_len;
 
@@ -14,11 +14,11 @@ void llhw_send_msg(u32 id, u8 *param, u32 param_len, u8 *ret, u32 ret_len)
 	mutex_lock(&(event_priv->send_mutex));
 
 	/* send TX_DESC + info + data(param, param_len) */
-	buf_len = SIZE_TX_DESC + sizeof(inic_api_info_t) + param_len;
+	buf_len = SIZE_TX_DESC + sizeof(struct inic_api_info) + param_len;
 	buf = kzalloc(buf_len, GFP_KERNEL);
 	if (buf) {
 		/* fill inic_api_info_t */
-		api_info = (inic_api_info_t *)(buf + SIZE_TX_DESC);
+		api_info = (struct inic_api_info *)(buf + SIZE_TX_DESC);
 		api_info->event = INIC_WIFI_EVT_API_CALL;
 		api_info->api_id = id;
 
@@ -35,9 +35,12 @@ void llhw_send_msg(u32 id, u8 *param, u32 param_len, u8 *ret, u32 ret_len)
 	}
 
 	/* wait for API calling done */
-	wait_for_completion(&event_priv->api_ret_sema);
+	if (wait_for_completion_timeout(&event_priv->api_ret_sema, msecs_to_jiffies(2000)) == 0) {
+		dev_err(global_idev.fullmac_dev, "wait ret value timeout!!\n");
+		goto exit;
+	}
 
-	ret_msg = (inic_api_info_t *)event_priv->rx_api_ret_msg;
+	ret_msg = (struct inic_api_info *)event_priv->rx_api_ret_msg;
 	if (ret_msg != NULL) {
 		/* check api_id of return msg */
 		if (ret_msg->api_id != id) {
@@ -63,7 +66,7 @@ exit:
 
 }
 
-int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg)
+int llhw_wifi_set_user_config(struct wifi_user_conf *pwifi_usrcfg)
 {
 	u32 size;
 	u32 param_buf[1];
@@ -71,7 +74,7 @@ int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg)
 	size = sizeof(struct wifi_user_conf);
 	param_buf[0] = 0;
 
-	llhw_send_msg(INIC_API_WIFI_GET_USR_CFG, (u8 *)param_buf, sizeof(param_buf), (u8 *)pwifi_usrcfg, size);
+	llhw_send_msg(INIC_API_WIFI_SET_USR_CFG, (u8 *)param_buf, sizeof(param_buf), (u8 *)pwifi_usrcfg, size);
 
 	return 0;
 }
@@ -105,7 +108,7 @@ int llhw_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
 	return ret;
 }
 
-int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
+int llhw_wifi_scan(struct _rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 {
 	int ret = 0;
 	u32 size;
@@ -117,7 +120,8 @@ int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 		   sizeof(scan_param->chan_scan_time) +
 		   sizeof(scan_param->max_ap_record_num) +
 		   sizeof(u32) +
-		   ssid_length + scan_param->channel_list_num;
+		   ssid_length + scan_param->channel_list_num +
+		   sizeof(u32);
 
 	ptr = param = kzalloc(size, GFP_KERNEL);
 
@@ -149,6 +153,9 @@ int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 	memcpy(ptr, scan_param->channel_list, scan_param->channel_list_num);
 	ptr += scan_param->channel_list_num;
 
+	memcpy(ptr, &scan_param->scan_user_data, sizeof(u32)); /* for P2P roch related indicate */
+	ptr += sizeof(u32);
+
 	llhw_send_msg(INIC_API_WIFI_SCAN_NETWROKS, (u8 *)param, size, (u8 *)&ret, sizeof(int));
 
 	kfree((void *)param);
@@ -156,19 +163,23 @@ int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 	return ret;
 }
 
-int llhw_wifi_scan_abort(void)
+int llhw_wifi_scan_abort(u8 block)
 {
 	int ret = 0;
 
-	llhw_send_msg(INIC_API_WIFI_SCAN_ABORT, NULL, 0, (u8 *)&ret, sizeof(int));
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)block;
+
+	llhw_send_msg(INIC_API_WIFI_SCAN_ABORT, (u8 *)param_buf, sizeof(param_buf), (u8 *)&ret, sizeof(int));
 
 	return ret;
 }
 
-int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
+int llhw_wifi_connect(struct _rtw_network_info_t *connect_param, unsigned char block)
 {
 	int ret = 0;
-	internal_join_block_param_t *block_param = NULL;
+	struct internal_join_block_param *block_param = NULL;
 	int is_connected = -1;
 	u32 size;
 	u8 *param, *ptr;
@@ -186,7 +197,7 @@ int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
 
 	/* step2: malloc and set synchronous connection related variables*/
 	if (block) {
-		block_param = (internal_join_block_param_t *)kzalloc(sizeof(internal_join_block_param_t), GFP_KERNEL);
+		block_param = (struct internal_join_block_param *)kzalloc(sizeof(struct internal_join_block_param), GFP_KERNEL);
 		if (!block_param) {
 			ret = -ENOMEM;
 			global_idev.mlme_priv.rtw_join_status = RTW_JOINSTATUS_FAIL;
@@ -356,7 +367,7 @@ int llhw_wifi_del_sta(u8 wlan_idx, u8 *mac)
 	return ret;
 }
 
-int llhw_wifi_start_ap(rtw_softap_info_t *softAP_config)
+int llhw_wifi_start_ap(struct _rtw_softap_info_t *softAP_config)
 {
 	int ret = 0;
 	u32 size;
@@ -435,7 +446,7 @@ int llhw_wifi_get_chplan(u8 *chplan)
 	return ret;
 }
 
-int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
+int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len, u8 need_wait_ack)
 {
 	int ret = 0;
 	u32 size;
@@ -446,7 +457,11 @@ int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 
 	param[0] = wlan_idx;
 	param[1] = buf_len;
-	param[2] = 0;	/* flags*/
+	if (need_wait_ack) {
+		param[2] |= RTW_SEND_AND_WAIT_ACK;
+	} else {
+		param[2] = 0;	/* flags*/
+	}
 	memcpy((void *)(param + 3), buf, buf_len);
 
 	llhw_send_msg(INIC_API_WIFI_SEND_MGNT, (u8 *)param, size, (u8 *)&ret, sizeof(int));
@@ -498,7 +513,7 @@ int llhw_wifi_get_statistics(dma_addr_t statistic_addr)
 {
 	int ret = 0;
 
-	llhw_send_msg(INIC_API_WIFI_GET_PHY_STATISTIC, NULL, 0, (u8 *)statistic_addr, sizeof(rtw_phy_statistics_t));
+	llhw_send_msg(INIC_API_WIFI_GET_PHY_STATISTIC, NULL, 0, (u8 *)statistic_addr, sizeof(struct _rtw_phy_statistics_t));
 
 	return ret;
 }
@@ -507,7 +522,7 @@ int llhw_wifi_channel_switch(dma_addr_t csa_param_addr)
 {
 	int ret = 0;
 
-	llhw_send_msg(INIC_API_WIFI_AP_CH_SWITCH, (u8 *)csa_param_addr, sizeof(rtw_csa_parm_t), (u8 *)&ret, sizeof(int));
+	llhw_send_msg(INIC_API_WIFI_AP_CH_SWITCH, (u8 *)csa_param_addr, sizeof(struct _rtw_csa_parm_t), (u8 *)&ret, sizeof(int));
 
 	return ret;
 }
@@ -637,19 +652,19 @@ int llhw_wifi_stop_nan(void)
 	return ret;
 }
 
-int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
+int llhw_wifi_add_nan_func(struct rtw_nan_func_info_t *func, void *nan_func_pointer)
 {
 	int ret = 0;
 	u32 size;
 	u8 *ptr, *param;
 
-	size = sizeof(rtw_nan_func_info_t) + func->serv_spec_info_len + func->srf_bf_len + func->srf_num_macs * sizeof(struct mac_address)
+	size = sizeof(struct rtw_nan_func_info_t) + func->serv_spec_info_len + func->srf_bf_len + func->srf_num_macs * sizeof(struct mac_address)
 		   + (func->num_tx_filters + func->num_rx_filters) * sizeof(struct cfg80211_nan_func_filter) + sizeof(void *);
 	param = (u8 *)kzalloc(size, GFP_KERNEL);
 	ptr = param;
 
-	memcpy(ptr, func, sizeof(rtw_nan_func_info_t));
-	ptr += sizeof(rtw_nan_func_info_t);
+	memcpy(ptr, func, sizeof(struct rtw_nan_func_info_t));
+	ptr += sizeof(struct rtw_nan_func_info_t);
 
 	memcpy(ptr, func->serv_spec_info, func->serv_spec_info_len);
 	ptr += func->serv_spec_info_len;
@@ -708,7 +723,7 @@ int llhw_wifi_nan_cfgvendor_cmd(u16 vendor_cmd, const void *data, int len)
 	return ret;
 }
 
-#if NAN_TODO
+#ifdef NAN_TODO
 int llhw_cfgvendor_nandow_entry(const void *data, int len)
 {
 
@@ -728,13 +743,12 @@ int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 	return ret;
 }
 
-int llhw_wifi_set_ch_plan(u8 ch_plan, u8 tx_power_lmt)
+int llhw_wifi_set_ch_plan(u8 ch_plan)
 {
 	int ret = 0;
-	u32 param_buf[2];
+	u32 param_buf[1];
 
 	param_buf[0] = (u32)ch_plan;
-	param_buf[1] = (u32)tx_power_lmt;
 
 	llhw_send_msg(INIC_API_WIFI_SET_CHPLAN, (u8 *)param_buf, sizeof(param_buf), (u8 *)&ret, sizeof(int));
 	return ret;
@@ -843,6 +857,157 @@ int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
 	memcpy(ptr, ie, 2 + ie[1]);
 
 	llhw_send_msg(INIC_API_WIFI_CUS_IE, param, size, (u8 *)&ret, sizeof(int));
+
+	kfree((void *)param);
+
+	return ret;
+}
+
+int llhw_wifi_set_edcca_mode(u8 edcca_mode)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	switch (edcca_mode) {
+	case RTW_EDCCA_NORM:
+	case RTW_EDCCA_ADAPT:
+	case RTW_EDCCA_CS:
+	case RTW_EDCCA_DISABLE:
+		param_buf[0] = (u32)edcca_mode;
+		llhw_send_msg(INIC_API_WIFI_SET_EDCCA_MODE, (u8 *)param_buf, sizeof(param_buf), (u8 *)&ret, sizeof(int));
+		break;
+	default:
+		dev_info(global_idev.fullmac_dev, "Wrong EDCCA mode %d!", edcca_mode);
+		dev_info(global_idev.fullmac_dev, "0: normal; 1: ETSI; 2: Japan; 9: Disable.");
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
+int llhw_wifi_get_edcca_mode(u8 *edcca_mode)
+{
+	int ret = 0;
+
+	llhw_send_msg(INIC_API_WIFI_GET_EDCCA_MODE, NULL, 0, edcca_mode, sizeof(u8));
+
+	return ret;
+}
+
+int llhw_wifi_get_ant_info(u8 *antdiv_mode, u8 *curr_ant)
+{
+	int ret = 0;
+	u8 value[2];
+
+	llhw_send_msg(INIC_API_WIFI_GET_ANTENNA_INFO, NULL, 0, value, sizeof(value));
+	*antdiv_mode = value[0];
+	*curr_ant = value[1];
+
+	return ret;
+}
+
+int llhw_wifi_set_country_code(char *cc)
+{
+	int ret = 0;
+	u8 param[2];
+
+	if (strlen(cc) != 2) {
+		dev_err(global_idev.fullmac_dev, "%s: the length of country is not 2.\n", __func__);
+		return -EINVAL;
+	}
+
+	if ((cc[0] == '0') && (cc[1] == '0')) {
+		param[0] = 0xff;
+		param[1] = 0xff;
+	} else {
+		memcpy(param, cc, 2);
+	}
+
+	llhw_send_msg(INIC_API_WIFI_SET_COUNTRY_CODE, param, sizeof(param), (u8 *)&ret, sizeof(int));
+
+	return ret;
+}
+
+int llhw_wifi_get_country_code(struct country_code_table_t *table)
+{
+	int ret = 0;
+
+	if (table == NULL) {
+		dev_err(global_idev.fullmac_dev, "%s: input is NULL.\n", __func__);
+		return -EINVAL;
+	}
+
+	llhw_send_msg(INIC_API_WIFI_GET_COUNTRY_CODE, NULL, 0, (u8 *)table, sizeof(struct country_code_table_t));
+
+	if ((table->char2[0] == 0xff) && (table->char2[1] == 0xff)) {
+		table->char2[0] = '0';
+		table->char2[1] = '0';
+	}
+
+	return ret;
+}
+
+
+#ifdef CONFIG_P2P
+void llhw_wifi_set_p2p_role(enum rtw_p2p_role role)
+{
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)role;
+
+	llhw_send_msg(INIC_API_P2P_ROLE, (u8 *)param_buf, sizeof(param_buf), NULL, 0);
+}
+
+int llhw_wifi_set_p2p_remain_on_ch(unsigned char wlan_idx, u8 enable)
+{
+	int ret = 0;
+	u32 param_buf[2];
+
+	param_buf[0] = (u32)wlan_idx;
+	param_buf[1] = (u32)enable;
+
+	llhw_send_msg(INIC_API_P2P_REMAIN_ON_CH, (u8 *)param_buf, sizeof(param_buf), (u8 *)&ret, sizeof(int));
+	return ret;
+}
+#endif
+
+int llhw_war_offload_ctrl(struct H2C_WAROFFLOAD_PARM *offload_parm)
+{
+	int ret = 0;
+	u32 size = 0, mdns_para_len = 0;
+	u8 *ptr, *param;
+
+	size = sizeof(struct H2C_WAROFFLOAD_PARM) + RTW_IP_ADDR_LEN + IPv6_ALEN + 4096;
+	ptr = param = (u8 *)kzalloc(size, GFP_KERNEL);
+
+	memcpy(ptr, offload_parm, sizeof(struct H2C_WAROFFLOAD_PARM));
+	ptr += sizeof(struct H2C_WAROFFLOAD_PARM);
+
+	memcpy(ptr, global_idev.ip_addr, RTW_IP_ADDR_LEN);
+	ptr += RTW_IP_ADDR_LEN;
+
+	/* TODO: copy IPv6 addr to send*/
+	ptr += IPv6_ALEN;
+
+	if (offload_parm->offload_en) {
+		if (offload_parm->sd_mdns_v4_rsp_en || offload_parm->sd_mdns_v4_wake_en ||
+			offload_parm->sd_mdns_v6_rsp_en || offload_parm->sd_mdns_v6_wake_en) {
+			rtw_wow_prepare_mdns_para(ptr + 4, &mdns_para_len);
+		} else {
+			mdns_para_len = 0;
+		}
+	} else {
+		mdns_para_len = 0;
+	}
+
+	printk("%s, mdns_para_len:%d\n", __func__, mdns_para_len);
+
+	*(u32 *)ptr = mdns_para_len;
+	size = size - 4096 + (mdns_para_len + 4);
+
+	print_hex_dump_bytes("mdns_para: ", DUMP_PREFIX_NONE, param, size);
+
+	llhw_send_msg(INIC_API_WAR_OFFLOAD_CTRL, param, size, (u8 *)&ret, sizeof(int));
 
 	kfree((void *)param);
 

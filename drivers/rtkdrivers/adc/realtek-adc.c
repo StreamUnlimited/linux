@@ -320,10 +320,11 @@ static int realtek_adc_read_efuse_caldata(struct iio_dev *indio_dev, u16 otp_add
 				adc->k_coeff_normal[0], adc->k_coeff_normal[1], adc->k_coeff_normal[2]);
 		/*
 		 * Offset for differential channel which corresponds to 0V input.
-		 * To be read from OTP once calibration OTP params are added for
-		 * differential channel mode as well. For now, fixing it to 1650.
-		 * Actual input range: -1.65V<->0V<->+1.65V --> ADC range:
-		 * 0V<->1.65V<->3.3V.
+		 * To be read from OTP once calibration OTP params are added for differential channel mode as well. (Currently, not provided by hardware.)
+		 * Bcut: fixing it to 1650.
+		 * Actual diff-input range: -1.65V<->0V<->+1.65V --> ADC REG count: 0V<->1.65V<->3.3V, shift back to userspace.
+		 * Ccut: fixing it to 900.
+		 * Actual diff-input range: -0.9V<->0V<->+0.9V --> ADC REG count: 0V<->0.9V<->1.8V, shift back to userspace.
 		 */
 		adc->diff_ch_offset = ADC_DIFF_CH_DEFAULT_OFFSET;
 	} else {
@@ -496,17 +497,18 @@ static int realtek_adc_update_scan_mode(struct iio_dev *indio_dev,
 
 		dev_info(&indio_dev->dev, "Update scan mode chan %d to seq %d\n", chan->channel, i);
 
-		if (i > 8) {
+		/*  For channel 8~15, not used now.
 			reg_value = readl(adc->base + RTK_ADC_CHSW_LIST_1);
 			reg_value &= ~(ADC_MASK_CHSW << ADC_SHIFT_CHSW1((i - 1)));
 			reg_value |= (u32)(chan->channel << ADC_SHIFT_CHSW1((i - 1)));
 			writel(reg_value, adc->base + RTK_ADC_CHSW_LIST_1);
-		} else {
-			reg_value = readl(adc->base + RTK_ADC_CHSW_LIST_0);
-			reg_value &= ~(ADC_MASK_CHSW << ADC_SHIFT_CHSW0((i - 1)));
-			reg_value |= (u32)(chan->channel << ADC_SHIFT_CHSW0((i - 1)));
-			writel(reg_value, adc->base + RTK_ADC_CHSW_LIST_0);
-		}
+		*/
+
+		/* For channel 0~7 */
+		reg_value = readl(adc->base + RTK_ADC_CHSW_LIST_0);
+		reg_value &= ~(ADC_MASK_CHSW << ADC_SHIFT_CHSW0((i - 1)));
+		reg_value |= (u32)(chan->channel << ADC_SHIFT_CHSW0((i - 1)));
+		writel(reg_value, adc->base + RTK_ADC_CHSW_LIST_0);
 	}
 
 	if (!i) {
@@ -1082,7 +1084,7 @@ static int realtek_adc_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id realtek_adc_match[] = {
-	{.compatible = "realtek,amebad2-adc",},
+	{.compatible = "realtek,ameba-adc",},
 	{},
 };
 MODULE_DEVICE_TABLE(of, realtek_adc_match);
@@ -1091,7 +1093,7 @@ static struct platform_driver realtek_adc_driver = {
 	.probe	= realtek_adc_probe,
 	.remove	= realtek_adc_remove,
 	.driver = {
-		.name = "realtek-amebad2-adc",
+		.name = "realtek-ameba-adc",
 		.of_match_table = of_match_ptr(realtek_adc_match),
 	},
 };

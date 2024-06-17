@@ -7,7 +7,7 @@
 
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/realtek/ameba_ipc/ameba_ipc_resource.h>
-#include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
+#include <dt-bindings/realtek/clock/realtek-ameba-clock.h>
 
 #include "rtl8730e-rcc.dtsi"
 #include "rtl8730e-pinctrl.dtsi"
@@ -21,7 +21,7 @@
 		ranges;
 
 		adc: adc@42012000 {
-			compatible = "realtek,amebad2-adc";
+			compatible = "realtek,ameba-adc";
 			#io-channel-cells = <1>;
 			reg = <0x42012000 0x100>,
 				<0x42012800 0x100>,
@@ -38,7 +38,7 @@
 			status = "disabled";
 
 			comparator: comparator@0 {
-				compatible = "realtek,amebad2-comparator";
+				compatible = "realtek,ameba-comparator";
 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
 				rtk,cmp-ref0 = <10>;
 				rtk,cmp-ref1 = <30>;
@@ -46,7 +46,7 @@
 		};
 
 		aes: aes@400C0000 {
-			compatible = "realtek,amebad2-aes";
+			compatible = "realtek,ameba-aes";
 			reg = <0x400C0000 0x2000>;
 			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
@@ -75,7 +75,7 @@
 		};
 
 		dma: dma@400E0000 {
-			compatible = "realtek,amebad2-dmac";
+			compatible = "realtek,ameba-dmac";
 			reg = <0x400E0000 0x000400>;
 			clocks = <&rcc RTK_CKE_GDMA>;
 			#dma-cells = <1>;
@@ -92,14 +92,14 @@
 		};
 
 		hash: hash@400C8000 {
-			compatible = "realtek,amebad2-hash";
+			compatible = "realtek,ameba-hash";
 			reg = <0x400C8000 0x2000>;
 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
 
 		ir: ir@0x400EE000 {
-			compatible = "realtek,amebad2-ir";
+			compatible = "realtek,ameba-ir";
 			reg = <0x400EE000 0x30>;
 			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_IRDA>;
@@ -115,7 +115,7 @@
 		};
 
 		i2c0: i2c0@4200F000 {
-			compatible = "realtek,amebad2-i2c";
+			compatible = "realtek,ameba-i2c";
 			reg = <0x4200F000 0x100>;
 			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_I2C0>;
@@ -128,7 +128,7 @@
 		};
 
 		i2c1: i2c1@400EF000 {
-			compatible = "realtek,amebad2-i2c";
+			compatible = "realtek,ameba-i2c";
 			reg = <0x400EF000 0x100>;
 			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_I2C1>;
@@ -141,7 +141,7 @@
 		};
 
 		i2c2: i2c2@400F0000 {
-			compatible = "realtek,amebad2-i2c";
+			compatible = "realtek,ameba-i2c";
 			reg = <0x400F0000 0x100>;
 			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_I2C2>;
@@ -154,11 +154,11 @@
 		};
 
 		km4_console: km4_console@0 {
-			compatible = "realtek,amebad2-km4-console";
+			compatible = "realtek,ameba-km4-console";
 		};
 
 		ledc: led-controller@41008000 {
-			compatible = "realtek,amebad2-ws28xxx-led";
+			compatible = "realtek,ameba-ws28xxx-led";
 			reg = <0x41008000 0x1000>;
 			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
 			#address-cells = <1>;
@@ -183,7 +183,7 @@
 		};
 
 		loguart: dwapb@4200c000 {
-			compatible = "realtek,amebad2-loguart";
+			compatible = "realtek,ameba-loguart";
 			reg = <0x4200c000 0x100>;
 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
@@ -193,20 +193,21 @@
 		};
 
 		lsys: lsys@42008000 {
-			compatible = "realtek,amebad2-system-ctrl-ls";
-			reg = <0x42008000 0x2000>;
+			compatible = "realtek,ameba-system-ctrl-ls";
+			reg = <0x42008000 0x2000>,
+				<0x42008274 0x4>;
 			nvmem-cells = <&efuse_uuid>;
 			nvmem-cell-names = "uuid";
 		};
 
 		btctrl: btctrl@42008000 {
-			compatible = "realtek,amebad2-bt-ctrl";
+			compatible = "realtek,ameba-bt-ctrl";
 			reg = <0x42008000 0x1000>;
 		};
 
 
 		otp_phy: otp_phy@42000000 {
-			compatible = "realtek,amebad2-otp-phy";
+			compatible = "realtek,ameba-otp-phy";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x42000000 0x800>,
@@ -226,24 +227,28 @@
 		};
 
 		otp_logical: otp_logical@42000000 {
-			compatible = "realtek,amebad2-otp-logical";
+			compatible = "realtek,ameba-otp-logical";
 			reg = <0x42000000 0x400>,
 				<0x42008000 0x1000>;
+
+			efuse_ctc_mbias: ctc_mbias@120 {
+				reg = <0x0120 0x10>;
+			};
 		};
 
 		otp_ipc: otp_ipc@0 {
-			compatible = "realtek,amebad2-otp-ipc";
+			compatible = "realtek,ameba-otp-ipc";
 		};
 
 		rtc: rtc@4200E000 {
-			compatible = "realtek,amebad2-rtc";
+			compatible = "realtek,ameba-rtc";
 			reg = <0x4200E000 0x1000>;
 			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_RTC>;
 		};
 
 		sdioh: sdioh@400D0000 {
-			compatible = "realtek,amebad2-sdiohost";
+			compatible = "realtek,ameba-sdiohost";
 			reg = <0x400D0000 0x8000>;
 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_SDH>;
@@ -251,7 +256,7 @@
 		};
 
 		spi0: spi@0x400E8000 {
-			compatible = "realtek,amebad2-spi";
+			compatible = "realtek,ameba-spi";
 			rtk,spi-index = <0>;
 			reg = <0x400E8000 0x100>,
 					<0x41000000 0x30>; // reg base for spi role setting.
@@ -274,7 +279,7 @@
 		};
 
 		spi1: spi@0x400E9000 {
-			compatible = "realtek,amebad2-spi";
+			compatible = "realtek,ameba-spi";
 			rtk,spi-index = <1>;
 			reg = <0x400E9000 0x100>,
 					<0x41000000 0x30>; // reg base for spi role setting.
@@ -296,7 +301,7 @@
 		};
 
 		thermal: thermal@42013000 {
-			compatible = "realtek,amebad2-thermal";
+			compatible = "realtek,ameba-thermal";
 			reg = <0x42013000 0x100>;
 			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>; // use timer7, MP chip: 21
 			clocks = <&rcc RTK_CKE_ATIM>, <&rcc RTK_CKE_THM>;
@@ -305,42 +310,42 @@
 		};
 
 		timer1: timer@4200B200 {
-			compatible = "realtek,amebad2-timer-clk";
+			compatible = "realtek,ameba-timer-clk";
 			reg = <0x4200B200 0x200>;
 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM1>;
 		};
 
 		timer2: timer@4200B400 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4200B400 0x200>;
 			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM2>;
 		};
 
 		timer3: timer@4200B600 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4200B600 0x200>;
 			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM3>;
 		};
 
 		timer4: timer@4200B800 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4200B800 0x200>;
 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM4>;
 		};
 
 		timer5: timer@4200BA00 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4200BA00 0x200>;
 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM5>;
 		};
 
 		timer6: timer@4200BC00 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4200BC00 0x200>;
 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM6>;
@@ -348,7 +353,7 @@
 		};
 
 		timer7: timer@4200BE00 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4200BE00 0x200>;
 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM7>;
@@ -356,21 +361,21 @@
 		};
 
 		timer8: timer@4100A000 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4100A000 0x200>;
 			interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM8>;
 			status = "disabled";
 
 			pwm: pwm@0 {
-				compatible = "realtek,amebad2-pwm";
+				compatible = "realtek,ameba-pwm";
 				status = "disabled";
 			};
 		};
 
 		// Cannot be enabled simultaneously with captimer node
 		timer9: timer@4100A200 {
-			compatible = "realtek,amebad2-timer";
+			compatible = "realtek,ameba-timer";
 			reg = <0x4100A200 0x200>;
 			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_TIM9>;
@@ -378,7 +383,7 @@
 		};
 
 		uart0: serial@41004000 {
-			compatible = "realtek,amebad2-uart";
+			compatible = "realtek,ameba-uart";
 			reg = <0x41004000 0x100>;
 			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_UART0>;
@@ -386,7 +391,7 @@
 		};
 
 		uart1: serial@41005000 {
-			compatible = "realtek,amebad2-uart";
+			compatible = "realtek,ameba-uart";
 			reg = <0x41005000 0x100>;
 			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_UART1>;
@@ -394,7 +399,7 @@
 		};
 
 		uart2: serial@41006000 {
-			compatible = "realtek,amebad2-uart";
+			compatible = "realtek,ameba-uart";
 			reg = <0x41006000 0x100>;
 			clocks = <&rcc RTK_CKE_UART2>;
 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
@@ -402,7 +407,7 @@
 		};
 
 		uart3: serial@41007000 {
-			compatible = "realtek,amebad2-uart";
+			compatible = "realtek,ameba-uart";
 			reg = <0x41007000 0x100>;
 			clocks = <&rcc RTK_CKE_UART3>;
 			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
@@ -431,7 +436,7 @@
 
 		// Watchdog4 is non-secure for linux system.
 		watchdog: wdg@410004C0 {
-			compatible = "realtek,amebad2-watchdog";
+			compatible = "realtek,ameba-watchdog";
 			reg = <0x410004C0 0x000010>;
 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
 			rtk,wdg-index = <4>;

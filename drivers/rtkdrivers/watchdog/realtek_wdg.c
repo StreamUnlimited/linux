@@ -16,8 +16,6 @@
 #include <linux/of_device.h>
 #include <linux/workqueue.h>
 
-#define RTK_WDG_TODO			0
-
 enum RTK_WDG_DEVICES {
 	IWDG_DEV,
 	WDG1_DEV,
@@ -323,30 +321,6 @@ static void rtk_wdg_clear_interrupt(struct rtk_wdg *wdg, u32 interrupt_bit)
 	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
 }
 
-#if RTK_WDG_TODO
-/* Low power mode, whether wdg keep running in sleep mode. */
-static void rtk_iwdg_lp_enable(struct rtk_wdg *wdg, u32 new_state)
-{
-	if (IS_IWDG_PERIPH(wdg->wdg_index)) {
-		dev_err(wdg->dev, "Invalid IWDG index\n");
-		return;
-	}
-	rtk_wdg_wait_busy_check(wdg);
-
-	/* Enable Register access */
-	rtk_wdg_writel(wdg->base, WDG_MKEYR, WDG_ACCESS_EN);
-
-	if (new_state == 1) {
-		rtk_wdg_reg_update(wdg->base, WDG_CR, WDG_BIT_LPEN, WDG_BIT_LPEN);
-	} else {
-		rtk_wdg_reg_update(wdg->base, WDG_CR, WDG_BIT_LPEN, ~WDG_BIT_LPEN);
-	}
-
-	/* Disable Register access */
-	rtk_wdg_writel(wdg->base, WDG_MKEYR, 0xFFFF);
-}
-#endif // RTK_WDG_TODO
-
 static irqreturn_t rtk_wdg_isr_event(int irq, void *data)
 {
 	struct rtk_wdg *wdg = data;
@@ -470,7 +444,7 @@ static const struct watchdog_info rtk_wdg_info = {
 };
 
 static const struct of_device_id rtk_wdg_of_table[] = {
-	{.compatible = "realtek,amebad2-watchdog"},
+	{.compatible = "realtek,ameba-watchdog"},
 	{},
 };
 

@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _DT_BINDINGS_REALTEK_AMEBAD2_DMAC_H
-#define _DT_BINDINGS_REALTEK_AMEBAD2_DMAC_H
+#ifndef _DT_BINDINGS_REALTEK_AMEBA_DMAC_H
+#define _DT_BINDINGS_REALTEK_AMEBA_DMAC_H
 
 /** @defgroup GDMA0_HS_Interface_definition GDMA HandShake Interface Definition
   * @{

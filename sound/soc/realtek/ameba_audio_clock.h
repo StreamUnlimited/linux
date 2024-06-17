@@ -5,8 +5,8 @@
 * Copyright (C) 2021, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_AUDIO_CLOCK_H_
-#define _AMEBAD2_AUDIO_CLOCK_H_
+#ifndef _AMEBA_AUDIO_CLOCK_H_
+#define _AMEBA_AUDIO_CLOCK_H_
 
 #define CKSL_I2S_PLL98M				0x00
 #define CKSL_I2S_PLL45M				0x01

@@ -73,11 +73,73 @@ static int proc_get_dummy(struct seq_file *m, void *v)
 	return 0;
 }
 
+static ssize_t proc_write_edcca_mode(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	char tmp[32];
+	u8 edcca_mode;
+
+	if (count != 2) {
+		return -EFAULT;
+	}
+
+	if (count > sizeof(tmp)) {
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		sscanf(tmp, "%u", (unsigned int *)&edcca_mode);
+		if (llhw_wifi_set_edcca_mode(edcca_mode) < 0) {
+			return -EFAULT;
+		}
+	}
+
+	return count;
+}
+
+int llhw_wifi_get_ant_info(u8 *antdiv_mode, u8 *curr_ant);
+static int proc_read_edcca_mode(struct seq_file *m, void *v)
+{
+	u8 edcca_mode = 0;
+	int ret = 0;
+
+	ret = llhw_wifi_get_edcca_mode(&edcca_mode);
+	seq_printf(m, "%d\n", edcca_mode);
+
+	return ret;
+}
+
+static int proc_read_antdiv_mode(struct seq_file *m, void *v)
+{
+	u8 antdiv_mode = 0;
+	u8 curr_ant = 0;
+	int ret = 0;
+
+	ret = llhw_wifi_get_ant_info(&antdiv_mode, &curr_ant);
+	seq_printf(m, "%d\n", antdiv_mode);
+
+	return ret;
+}
+
+static int proc_read_curr_ant(struct seq_file *m, void *v)
+{
+	u8 antdiv_mode = 0;
+	u8 curr_ant = 0;
+	int ret = 0;
+
+	ret = llhw_wifi_get_ant_info(&antdiv_mode, &curr_ant);
+	seq_printf(m, "%d\n", curr_ant);
+
+	return ret;
+}
+
 /*
 * rtw_ndev_ap_proc
 */
 const struct rtw_proc_hdl ndev_ap_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("bcn_time", proc_get_ap_tsf, NULL),
+	RTW_PROC_HDL_SSEQ("edcca_mode", proc_read_edcca_mode, proc_write_edcca_mode),
+	RTW_PROC_HDL_SSEQ("antdiv_mode", proc_read_antdiv_mode, NULL),
+	RTW_PROC_HDL_SSEQ("current_ant", proc_read_curr_ant, NULL),
 };
 
 const int ndev_ap_proc_hdls_num = sizeof(ndev_ap_proc_hdls) / sizeof(struct rtw_proc_hdl);
@@ -228,6 +290,12 @@ static void rtw_ndev_ap_proc_deinit(void)
 */
 const struct rtw_proc_hdl ndev_sta_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("bcn_time", proc_get_sta_tsf, NULL),
+	RTW_PROC_HDL_SSEQ("edcca_mode", proc_read_edcca_mode, proc_write_edcca_mode),
+	RTW_PROC_HDL_SSEQ("antdiv_mode", proc_read_antdiv_mode, NULL),
+	RTW_PROC_HDL_SSEQ("current_ant", proc_read_curr_ant, NULL),
+#if defined(CONFIG_OFFLOAD_MDNS_V4) || defined(CONFIG_OFFLOAD_MDNS_V6)
+	RTW_PROC_HDL_SSEQ("mdns_offload", NULL, proc_set_mdns_offload),
+#endif
 };
 
 const int ndev_sta_proc_hdls_num = sizeof(ndev_sta_proc_hdls) / sizeof(struct rtw_proc_hdl);
@@ -485,19 +553,21 @@ int rtw_drv_proc_init(void)
 		goto exit;
 	}
 
-	for (i = 0; i < drv_proc_hdls_num; i++) {
-		if (drv_proc_hdls[i].type == RTW_PROC_HDL_TYPE_SEQ) {
-			entry = rtw_proc_create_entry(drv_proc_hdls[i].name, rtw_proc, &rtw_drv_proc_seq_fops, (void *)i);
-		} else if (drv_proc_hdls[i].type == RTW_PROC_HDL_TYPE_SSEQ ||
-				   drv_proc_hdls[i].type == RTW_PROC_HDL_TYPE_SZSEQ) {
-			entry = rtw_proc_create_entry(drv_proc_hdls[i].name, rtw_proc, &rtw_drv_proc_sseq_fops, (void *)i);
-		} else {
-			entry = NULL;
-		}
+	if (drv_proc_hdls_num > 0) {
+		for (i = 0; i < drv_proc_hdls_num; i++) {
+			if (drv_proc_hdls[i].type == RTW_PROC_HDL_TYPE_SEQ) {
+				entry = rtw_proc_create_entry(drv_proc_hdls[i].name, rtw_proc, &rtw_drv_proc_seq_fops, (void *)(uintptr_t)i);
+			} else if (drv_proc_hdls[i].type == RTW_PROC_HDL_TYPE_SSEQ ||
+					   drv_proc_hdls[i].type == RTW_PROC_HDL_TYPE_SZSEQ) {
+				entry = rtw_proc_create_entry(drv_proc_hdls[i].name, rtw_proc, &rtw_drv_proc_sseq_fops, (void *)(uintptr_t)i);
+			} else {
+				entry = NULL;
+			}
 
-		if (!entry) {
-			dev_err(global_idev.fullmac_dev, "rtw driver proc create entry failed");
-			goto exit;
+			if (!entry) {
+				dev_err(global_idev.fullmac_dev, "rtw driver proc create entry failed");
+				goto exit;
+			}
 		}
 	}
 
@@ -521,8 +591,10 @@ void rtw_drv_proc_deinit(void)
 	rtw_ndev_sta_proc_deinit();
 	rtw_ndev_ap_proc_deinit();
 
-	for (i = 0; i < drv_proc_hdls_num; i++) {
-		remove_proc_entry(drv_proc_hdls[i].name, rtw_proc);
+	if (drv_proc_hdls_num > 0) {
+		for (i = 0; i < drv_proc_hdls_num; i++) {
+			remove_proc_entry(drv_proc_hdls[i].name, rtw_proc);
+		}
 	}
 
 	remove_proc_entry(RTW_PROC_NAME, get_proc_net);

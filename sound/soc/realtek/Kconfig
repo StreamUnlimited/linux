@@ -9,19 +9,19 @@ menuconfig SND_SOC_REALTEK
 if SND_SOC_REALTEK
 
 config SND_SOC_SPORT_RTK_AMEBA
-	tristate "Realtek Amebad2 Sport interface support"
+	tristate "Realtek Ameba Sport interface support"
 
 
 config SND_SOC_DMA_RTK_AMEBA
-        tristate "Realtek Amebad2 DMA interface support"
+        tristate "Realtek Ameba DMA interface support"
 
 config SND_SOC_RTK_AMEBA
-	tristate "Realtek Amebad2 Total Audio Support"
+	tristate "Realtek Ameba Total Audio Support"
 	select SND_SOC_CODEC_RTK_AMEBA
 	select SND_SOC_SPORT_RTK_AMEBA
 	select SND_SOC_DMA_RTK_AMEBA
 	help
-	Say Y if you want to add support for SoC audio on the AMEBAD2.
+	Say Y if you want to add support for SoC audio on the AMEBA.
 
 
 

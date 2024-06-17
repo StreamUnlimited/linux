@@ -1,8 +1,8 @@
 #include <rtw_cfg80211_fullmac.h>
 
-inic_sdio_t inic_sdio_priv = {0};
+struct inic_sdio inic_sdio_priv = {0};
 
-static u8 rtw_sdio_get_tx_max_size(inic_sdio_t *priv)
+static u8 rtw_sdio_get_tx_max_size(struct inic_sdio *priv)
 {
 	u8 TxUnitCnt = 0;
 	TxUnitCnt = sdio_cmd52_read1byte_local(priv, SDIO_REG_TXBUF_UNIT_SZ);
@@ -17,7 +17,7 @@ static u8 rtw_sdio_get_tx_max_size(inic_sdio_t *priv)
 	return true;
 }
 
-static u8 rtw_sdio_query_txbd_status(inic_sdio_t *priv)
+static u8 rtw_sdio_query_txbd_status(struct inic_sdio *priv)
 {
 	u16 wptr;
 	u16 rptr;
@@ -48,7 +48,7 @@ static u8 rtw_sdio_query_txbd_status(inic_sdio_t *priv)
 void rtw_sdio_send_msg(u8 *buf, u32 len)
 {
 	u32 polling_num = 0, try_cnt = 0;
-	inic_sdio_t *priv = &inic_sdio_priv;
+	struct inic_sdio *priv = &inic_sdio_priv;
 	INIC_TX_DESC *ptxdesc;
 
 	(void) polling_num;
@@ -61,6 +61,7 @@ void rtw_sdio_send_msg(u8 *buf, u32 len)
 		if (try_cnt ++ > 0) {
 			priv->tx_avail_int_triggered = 0;
 			if (!wait_event_timeout(priv->txbd_wq, priv->tx_avail_int_triggered == 1, msecs_to_jiffies(1000))) {
+				dev_err(&priv->func->dev, "%s: TXBD unavailable, TX FAIL\n", __FUNCTION__);
 				goto exit;
 			}
 		}
@@ -107,19 +108,17 @@ void rtw_sdio_free_rxbuf(u8 *rx_payload)
 }
 
 #ifdef CONFIG_SDIO_RX_AGGREGATION
-static struct recv_buf *rtw_sdio_recv_rxfifo(inic_sdio_t *priv, u32 size)
+static struct recv_buf *rtw_sdio_recv_rxfifo(struct inic_sdio *priv, u32 size)
 {
 	u32 readsize, ret;
 	u8 *preadbuf;
-	struct recv_priv *precvpriv;
 	struct recv_buf	*precvbuf;
 
 
 	readsize = size;
 
 	//3 1. alloc recvbuf
-	precvpriv = &padapter->recvpriv;
-	precvbuf = rtw_dequeue_recvbuf(&precvpriv->free_recv_buf_queue);
+	precvbuf = rtw_dequeue_recvbuf(&shared_adapter.recvpriv.free_recv_buf_queue);
 	if (precvbuf == NULL) {
 		dev_err(&priv->func->dev, "%s: alloc recvbuf FAIL!\n", __FUNCTION__);
 		return NULL;
@@ -161,7 +160,7 @@ static struct recv_buf *rtw_sdio_recv_rxfifo(inic_sdio_t *priv, u32 size)
 #if 0//def CONFIG_POWER_SAVING
 #ifdef CONFIG_PS_DYNAMIC_CHK
 	rtw_ps_deny(padapter, PS_DENY_DRV_RXDATA);
-	rtw_set_ps_mode(padapter, PS_MODE_ACTIVE);
+	rtw_set_ps_mode(PS_MODE_ACTIVE);
 #endif
 #endif
 
@@ -170,7 +169,7 @@ static struct recv_buf *rtw_sdio_recv_rxfifo(inic_sdio_t *priv, u32 size)
 #if 0//def CONFIG_POWER_SAVING
 #ifdef CONFIG_PS_DYNAMIC_CHK
 	rtw_ps_deny_cancel(padapter, PS_DENY_DRV_RXDATA);
-	rtw_set_ps_mode(padapter, PS_MODE_SLEEP);
+	rtw_set_ps_mode(PS_MODE_SLEEP);
 #endif
 #endif
 	if (ret == false) {
@@ -185,7 +184,7 @@ static struct recv_buf *rtw_sdio_recv_rxfifo(inic_sdio_t *priv, u32 size)
 	return precvbuf;
 }
 #else
-static u8 *rtw_sdio_recv_rxfifo(inic_sdio_t *priv, u32 size)
+static u8 *rtw_sdio_recv_rxfifo(struct inic_sdio *priv, u32 size)
 {
 	u8 *rx_buf = NULL;
 	u32 allocsize, ret;
@@ -219,7 +218,7 @@ static u8 *rtw_sdio_recv_rxfifo(inic_sdio_t *priv, u32 size)
 
 #endif
 
-void rtw_sdio_isr_dispatch(inic_sdio_t *priv)
+void rtw_sdio_isr_dispatch(struct inic_sdio *priv)
 {
 	u8 data[4];
 	u32 rx_len_rdy;
@@ -242,9 +241,10 @@ void rtw_sdio_isr_dispatch(inic_sdio_t *priv)
 
 		do {
 			/* validate RX_LEN_RDY before reading RX0_REQ_LEN */
-			sdio_local_read(priv, SDIO_REG_RX0_REQ_LEN, 4, data);
-			rx_len_rdy = le32_to_cpu(*(u32 *)data) & BIT(31);
+			rx_len_rdy = sdio_read8(priv, SDIO_REG_RX0_REQ_LEN + 3) & BIT(7);
+
 			if (rx_len_rdy) {
+				sdio_local_read(priv, SDIO_REG_RX0_REQ_LEN, 4, data);
 				SdioRxFIFOSize = le16_to_cpu(*(u16 *)data);
 
 				if (SdioRxFIFOSize == 0) {
@@ -272,11 +272,11 @@ void rtw_sdio_isr_dispatch(inic_sdio_t *priv)
 
 static void rtw_sdio_interrupt_handler(struct sdio_func *func)
 {
-	inic_sdio_t *priv;
+	struct inic_sdio *priv;
 	u8 data[4];
 	u32 value;
 
-	priv = (inic_sdio_t *) sdio_get_drvdata(func);
+	priv = (struct inic_sdio *) sdio_get_drvdata(func);
 
 	//dev_dbg(&priv->func->dev, "%s: IRQ arrived!\n", __FUNCTION__);
 
@@ -314,7 +314,7 @@ static void rtw_sdio_interrupt_handler(struct sdio_func *func)
 	priv->sys_sdio_irq_thd = NULL;
 }
 
-static int rtw_sdio_alloc_irq(inic_sdio_t *priv)
+static int rtw_sdio_alloc_irq(struct inic_sdio *priv)
 {
 	struct sdio_func *func;
 	int err = 0;
@@ -336,7 +336,7 @@ static int rtw_sdio_alloc_irq(inic_sdio_t *priv)
 	return err ? false : true;
 }
 
-static void rtw_sdio_init_txavailbd_threshold(inic_sdio_t *priv)
+static void rtw_sdio_init_txavailbd_threshold(struct inic_sdio *priv)
 {
 	u32 freeBDNum;
 	u16 txBDTh_l;
@@ -355,7 +355,7 @@ static void rtw_sdio_init_txavailbd_threshold(inic_sdio_t *priv)
 			rtw_read16(priv, SDIO_REG_AVAI_BD_NUM_TH_H));
 }
 
-u32 rtw_sdio_init_agg_setting(inic_sdio_t *priv)
+u32 rtw_sdio_init_agg_setting(struct inic_sdio *priv)
 {
 	u8	valueTimeout;
 	u8	valueBDCount;
@@ -386,7 +386,7 @@ u32 rtw_sdio_init_agg_setting(inic_sdio_t *priv)
 	return true;
 }
 
-static void rtw_sdio_init_interrupt(inic_sdio_t *priv)
+static void rtw_sdio_init_interrupt(struct inic_sdio *priv)
 {
 	u32 himr;
 
@@ -415,7 +415,7 @@ static void rtw_sdio_init_interrupt(inic_sdio_t *priv)
 
 }
 
-static u32 rtw_sdio_enable_func(inic_sdio_t *priv)
+static u32 rtw_sdio_enable_func(struct inic_sdio *priv)
 {
 	struct sdio_func *func = priv->func;
 	int err;
@@ -444,11 +444,12 @@ static u32 rtw_sdio_enable_func(inic_sdio_t *priv)
 	return true;
 }
 
-static u32 rtw_sdio_init(inic_sdio_t *priv)
+static u32 rtw_sdio_init(struct inic_sdio *priv)
 {
 	struct sdio_func *func = priv->func;
 	u8 fw_ready;
 	u32 i;
+	u8 value;
 
 	/* enable func and set block size */
 	if (rtw_sdio_enable_func(priv) == false) {
@@ -467,6 +468,11 @@ static u32 rtw_sdio_init(inic_sdio_t *priv)
 		dev_err(&func->dev, "%s: Wait Device Firmware Ready Timeout!!SDIO_REG_CPU_IND @ 0x%04x\n", __FUNCTION__, fw_ready);
 		return false;
 	}
+
+	value = rtw_read8(priv, SDIO_REG_TX_CTRL) | SDIO_EN_HISR_MASK_TIMER;
+	rtw_write8(priv, SDIO_REG_TX_CTRL, value);
+
+	rtw_write16(priv, SDIO_REG_STATIS_RECOVERY_TIMOUT, 0x10); //500us
 
 #ifdef CONFIG_SDIO_TX_ENABLE_AVAL_INT
 	rtw_sdio_init_txavailbd_threshold(priv);
@@ -488,7 +494,7 @@ static u32 rtw_sdio_init(inic_sdio_t *priv)
 	return true;
 }
 
-static void rtw_sdio_deinit(inic_sdio_t *priv)
+static void rtw_sdio_deinit(struct inic_sdio *priv)
 {
 	struct sdio_func *func;
 	int err;
@@ -515,7 +521,7 @@ static void rtw_sdio_deinit(inic_sdio_t *priv)
 
 static int rtw_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 {
-	inic_sdio_t *priv = &inic_sdio_priv;
+	struct inic_sdio *priv = &inic_sdio_priv;
 	int status = false;
 
 	dev_info(&func->dev, "rtw_sdio_probe: vendor=0x%04x device=0x%04x class=0x%02x\n", func->vendor, func->device, func->class);
@@ -549,7 +555,7 @@ exit:
 static void rtw_sdio_remove(struct sdio_func *func)
 {
 	int err;
-	inic_sdio_t *priv = (inic_sdio_t *) sdio_get_drvdata(func);
+	struct inic_sdio *priv = (struct inic_sdio *) sdio_get_drvdata(func);
 
 	dev_info(&func->dev, "rtw_sdio_remove: vendor=0x%04x device=0x%04x class=0x%02x\n", func->vendor, func->device, func->class);
 

@@ -514,29 +514,29 @@ static int realtek_gpio_resume(struct device *dev)
 }
 
 
-static const struct dev_pm_ops realtek_amebad2_gpio_pm_ops = {
+static const struct dev_pm_ops realtek_ameba_gpio_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(realtek_gpio_suspend, realtek_gpio_resume)
 };
 #endif
 
-static const struct of_device_id realtek_amebad2_gpio_of_match[] = {
-	{ .compatible = "realtek,amebad2-gpio", },
+static const struct of_device_id realtek_ameba_gpio_of_match[] = {
+	{ .compatible = "realtek,ameba-gpio", },
 	{ },
 };
 
-static struct platform_driver realtek_amebad2_gpio_driver = {
+static struct platform_driver realtek_ameba_gpio_driver = {
 	.probe = realtek_gpio_probe,
 	.driver = {
-		.name = "realtek-amebad2-gpio",
-		.of_match_table = realtek_amebad2_gpio_of_match,
+		.name = "realtek-ameba-gpio",
+		.of_match_table = realtek_ameba_gpio_of_match,
 #ifdef CONFIG_PM
-		.pm = &realtek_amebad2_gpio_pm_ops,
+		.pm = &realtek_ameba_gpio_pm_ops,
 #endif
 	},
 };
 
-static int __init realtek_amebad2_gpio_register(void)
+static int __init realtek_ameba_gpio_register(void)
 {
-	return platform_driver_register(&realtek_amebad2_gpio_driver);
+	return platform_driver_register(&realtek_ameba_gpio_driver);
 }
-arch_initcall(realtek_amebad2_gpio_register);
+arch_initcall(realtek_ameba_gpio_register);

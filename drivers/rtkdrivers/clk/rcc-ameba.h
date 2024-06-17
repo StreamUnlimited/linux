@@ -5,11 +5,11 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _RCC_AMEBAD2_H
-#define _RCC_AMEBAD2_H
+#ifndef _RCC_AMEBA_H
+#define _RCC_AMEBA_H
 
 /******************************
- * AmebaD2 System Definitions *
+ * Ameda System Definitions *
  *****************************/
 #define RTK_SYS_NO							(0x00 << 24)
 #define RTK_SYS_AON							(0x01 << 24)
@@ -27,14 +27,14 @@
 #define RTK_REG_GET_OFFSET(_reg)			((_reg) & ~(RTK_SYS_MASK))
 
 /******************************
- * AmebaD2 AON RCC registers  *
+ * Ameda AON RCC registers  *
  *****************************/
-#define AMEBAD2_REG_AON_PWC					(RTK_SYS_AON | 0x00)
-#define AMEBAD2_REG_AON_ISO					(RTK_SYS_AON | 0x04)
-#define AMEBAD2_REG_AON_ROR					(RTK_SYS_AON | 0x06)
-#define AMEBAD2_REG_AON_FEN					(RTK_SYS_AON | 0x08)
-#define AMEBAD2_REG_AON_CLK					(RTK_SYS_AON | 0x0C)
-#define AMEBAD2_REG_AON_CKSL				(RTK_SYS_AON | 0x10)
+#define AMEBA_REG_AON_PWC					(RTK_SYS_AON | 0x00)
+#define AMEBA_REG_AON_ISO					(RTK_SYS_AON | 0x04)
+#define AMEBA_REG_AON_ROR					(RTK_SYS_AON | 0x06)
+#define AMEBA_REG_AON_FEN					(RTK_SYS_AON | 0x08)
+#define AMEBA_REG_AON_CLK					(RTK_SYS_AON | 0x0C)
+#define AMEBA_REG_AON_CKSL				(RTK_SYS_AON | 0x10)
 
 /* REG_AON_ROR (AON Power Reset Register) */
 #define POR_SYSON							0
@@ -73,22 +73,22 @@
 #define CKSL_32K_MASK						2
 
 /******************************
- * AmebaD2 LSYS RCC registers *
+ * Ameda LSYS RCC registers *
  *****************************/
-#define AMEBAD2_REG_LSYS_PWC				(RTK_SYS_LS | 0x00)
-#define AMEBAD2_REG_LSYS_POR				(RTK_SYS_LS | 0x02)
-#define AMEBAD2_REG_LSYS_ISO				(RTK_SYS_LS | 0x04)
-#define AMEBAD2_REG_LSYS_FEN_GRP0			(RTK_SYS_LS | 0x08)
-#define AMEBAD2_REG_LSYS_FEN_GRP1			(RTK_SYS_LS | 0x0C)
-#define AMEBAD2_REG_LSYS_FEN_GRP2			(RTK_SYS_LS | 0x10)
-#define AMEBAD2_REG_LSYS_CKE_GRP0			(RTK_SYS_LS | 0x14)
-#define AMEBAD2_REG_LSYS_CKE_GRP1			(RTK_SYS_LS | 0x18)
-#define AMEBAD2_REG_LSYS_CKE_GRP2			(RTK_SYS_LS | 0x1C)
-#define AMEBAD2_REG_LSYS_CKE_GRP			(RTK_SYS_LS | 0x20)
-#define AMEBAD2_REG_LSYS_CKSL_GRP0			(RTK_SYS_LS | 0x24)
-#define AMEBAD2_REG_LSYS_CKD_GRP0			(RTK_SYS_LS | 0x28)
-#define AMEBAD2_REG_LSYS_CKD_GRP1			(RTK_SYS_LS | 0x2C)
-#define AMEBAD2_REG_SPORT_CLK				(RTK_SYS_LS | 0x4C)
+#define AMEBA_REG_LSYS_PWC				(RTK_SYS_LS | 0x00)
+#define AMEBA_REG_LSYS_POR				(RTK_SYS_LS | 0x02)
+#define AMEBA_REG_LSYS_ISO				(RTK_SYS_LS | 0x04)
+#define AMEBA_REG_LSYS_FEN_GRP0			(RTK_SYS_LS | 0x08)
+#define AMEBA_REG_LSYS_FEN_GRP1			(RTK_SYS_LS | 0x0C)
+#define AMEBA_REG_LSYS_FEN_GRP2			(RTK_SYS_LS | 0x10)
+#define AMEBA_REG_LSYS_CKE_GRP0			(RTK_SYS_LS | 0x14)
+#define AMEBA_REG_LSYS_CKE_GRP1			(RTK_SYS_LS | 0x18)
+#define AMEBA_REG_LSYS_CKE_GRP2			(RTK_SYS_LS | 0x1C)
+#define AMEBA_REG_LSYS_CKE_GRP			(RTK_SYS_LS | 0x20)
+#define AMEBA_REG_LSYS_CKSL_GRP0			(RTK_SYS_LS | 0x24)
+#define AMEBA_REG_LSYS_CKD_GRP0			(RTK_SYS_LS | 0x28)
+#define AMEBA_REG_LSYS_CKD_GRP1			(RTK_SYS_LS | 0x2C)
+#define AMEBA_REG_SPORT_CLK				(RTK_SYS_LS | 0x4C)
 
 /* REG_LSYS_POR (LSYS Function Power Reset Register) */
 #define POR_LP_PLAT							1
@@ -335,9 +335,9 @@
 #define CKD_SPORT3_WIDTH					3
 
 /*******************************
- * AmebaD2 CA32 RCC registers *
+ * Ameda CA32 RCC registers *
  ******************************/
-#define AMEBAD2_REG_APLL_BASE			(RTK_SYS_AP | 0x100)
+#define AMEBA_REG_APLL_BASE			(RTK_SYS_AP | 0x100)
 
 
 #define REG_APLL_CTRL0		0x0
@@ -351,34 +351,34 @@
 
 
 /*******************************
- * AmebaD2 HP RCC registers *
+ * Ameda HP RCC registers *
  ******************************/
-#define AMEBAD2_REG_HP_CKE				(RTK_SYS_HP | 0xC)
-#define AMEBAD2_REG_HP_CKSL				(RTK_SYS_HP | 0x10)
-#define AMEBAD2_REG_DUMMY_1E0			(RTK_SYS_HP | 0x1E0)
+#define AMEBA_REG_HP_CKE				(RTK_SYS_HP | 0xC)
+#define AMEBA_REG_HP_CKSL				(RTK_SYS_HP | 0x10)
+#define AMEBA_REG_DUMMY_1E0			(RTK_SYS_HP | 0x1E0)
 
-/* AMEBAD2_REG_HP_CKE */
+/* AMEBA_REG_HP_CKE */
 #define CKE_AP_CPU							0
 
-/* AMEBAD2_REG_HP_CKSL */
+/* AMEBA_REG_HP_CKSL */
 #define CKSL_AP_CPU_SHIFT					2
 #define CKSL_AP_CPU_MASK					1
 #define CKD_AP_CPU_SHIFT					0
 #define CKD_AP_CPU_WIDTH					2
 
 
-/* AMEBAD2_REG_DUMMY_1E0 */
+/* AMEBA_REG_DUMMY_1E0 */
 #define CKSL_TIM9_SHIFT		2
 #define CKSL_TIM9_MASK		1
 
-/* AmebaD2 PLL registers */
+/* Ameda PLL registers */
 
-/* AmebaD2 SDM registers */
+/* Ameda SDM registers */
 
-/* AmebaD2 Regulator registers */
+/* Ameda Regulator registers */
 
-/* AmebaD2 SWR registers */
+/* Ameda SWR registers */
 
-/* AmebaD2 XTAL registers */
+/* Ameda XTAL registers */
 
-#endif /* _RCC_AMEBAD2_H */
+#endif /* _RCC_AMEBA_H */

@@ -8,9 +8,9 @@
 /dts-v1/;
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
-#include <dt-bindings/realtek/clock/realtek-amebad2-clock.h>
+#include <dt-bindings/realtek/clock/realtek-ameba-clock.h>
 #include <dt-bindings/interrupt-controller/irq.h>
-#include <dt-bindings/realtek/pinctrl/realtek-amebad2-pinfunc.h>
+#include <dt-bindings/realtek/pinctrl/realtek-ameba-pinfunc.h>
 
 / {
 	model = "Ameba Platform";
@@ -193,7 +193,7 @@
 		ranges;
 
 		rcc: rcc@41000000 {
-			compatible = "realtek,amebad2-rcc";
+			compatible = "realtek,ameba-rcc";
 			#reset-cells = <1>;
 			#clock-cells = <1>;
 			reg = <0x42008000 0x200>,
@@ -203,7 +203,7 @@
 		};
 
 		loguart: dwapb@4200c000 {
-			compatible = "realtek,amebad2-loguart";
+			compatible = "realtek,ameba-loguart";
 			reg = <0x4200c000 0x100>;
 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
 			reg-shift = <2>;
@@ -211,7 +211,7 @@
 			clock-frequency = <40000000>;
 		};
 		pinctrl: pinctrl@42008A00 {
-			compatible = "realtek,amebad2-pinctrl";
+			compatible = "realtek,ameba-pinctrl";
 			#address-cells = <1>;
 			#size-cells = <1>;
 			reg = <0x42008A00 0x120>;
@@ -233,7 +233,7 @@
 		};
 
 		sdioh: sdioh@400D0000 {
-			compatible = "realtek,amebad2-sdiohost";
+			compatible = "realtek,ameba-sdiohost";
 			reg = <0x400D0000 0x8000>;
 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_SDH>;
@@ -243,7 +243,7 @@
 
 		// Watchdog4 is non-secure for linux system.
 		watchdog: wdg@410004C0 {
-			compatible = "realtek,amebad2-watchdog";
+			compatible = "realtek,ameba-watchdog";
 			reg = <0x410004C0 0x000010>;
 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
 			rtk,wdg-index = <4>;
@@ -254,7 +254,7 @@
 		};
 
 		otp: otp@0 {
-			compatible = "realtek,amebad2-otp";
+			compatible = "realtek,ameba-otp";
 		};
 
 		usb_phy: usb-phy@41000000 {
@@ -279,7 +279,7 @@
 		};
 
 		lsys: lsys@42008000 {
-			compatible = "realtek,amebad2-system-ctrl-ls";
+			compatible = "realtek,ameba-system-ctrl-ls";
 			reg = <0x42008000 0x2000>;
 		};
 

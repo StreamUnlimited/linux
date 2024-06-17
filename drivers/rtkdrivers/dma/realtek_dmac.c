@@ -1346,7 +1346,7 @@ static struct dma_chan *rtk_dma_of_xlate(
 /**************************************************************************/
 
 static const struct of_device_id rtk_dma_match[] = {
-	{.compatible = "realtek,amebad2-dmac",},
+	{.compatible = "realtek,ameba-dmac",},
 	{},
 };
 MODULE_DEVICE_TABLE(of, rtk_dma_match);
@@ -1564,7 +1564,7 @@ static struct platform_driver rtk_dma_driver = {
 	.probe	= rtk_dma_probe,
 	.remove	= rtk_dma_remove,
 	.driver = {
-		.name = "realtek-amebad2-dmac",
+		.name = "realtek-ameba-dmac",
 		.of_match_table = of_match_ptr(rtk_dma_match),
 	},
 };

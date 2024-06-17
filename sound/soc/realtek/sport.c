@@ -60,6 +60,7 @@ struct sport_dai {
 	unsigned int sport_multi_io;
 	unsigned int sport_mode;
 	int	irq;
+	int clock_enabled;
 
 	/* total frames delivered through LRCLK */
 	u64 total_rx_counter;
@@ -186,11 +187,11 @@ void dumpSportRegs(struct device *dev,void __iomem * sportx){
 	}
 }
 
-static const struct of_device_id amebad2_sport_match[] = {
-	{ .compatible = "realtek,amebad2-sport", },
+static const struct of_device_id ameba_sport_match[] = {
+	{ .compatible = "realtek,ameba-sport", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, amebad2_sport_match);
+MODULE_DEVICE_TABLE(of, ameba_sport_match);
 
 static int sport_trigger(struct snd_pcm_substream *substream,
 	int cmd, struct snd_soc_dai *dai)
@@ -731,6 +732,7 @@ static int sport_startup(struct snd_pcm_substream *substream,
 		dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
 	}
 
+	sport->clock_enabled = 1;
 	if ((sport -> sport_debug) >= 1 && (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0))
 		audio_clock_dump();
 
@@ -745,6 +747,7 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
 	clk_disable_unprepare(sport->clock);
+	sport->clock_enabled = 0;
 	//below to be done
 	if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
 		/* disable sport clock */
@@ -757,7 +760,50 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 	sport_info(1, &sport->pdev->dev,"close");
 }
 
-static const struct snd_soc_dai_ops amebad2_sport_dai_ops = {
+#ifdef CONFIG_PM
+static int ameba_sport_suspend(struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+
+	sport_info(1, &sport->pdev->dev, "%s, clock enabled: %d", __func__, sport->clock_enabled);
+
+	if (sport->clock_enabled) {
+		clk_disable_unprepare(sport->clock);
+		sport->clock_enabled = 0;
+	}
+
+	//below to be done
+	if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
+		/* disable sport clock */
+		update_fen_cke_sport_status(sport->id, false);
+	}
+
+	return 0;
+}
+
+static int ameba_sport_resume(struct snd_soc_dai *dai)
+{
+	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+	int ret;
+
+	sport_info(1, &sport->pdev->dev, "%s", __func__);
+
+	/* enable sport clock */
+	ret = clk_prepare_enable(sport->clock);
+	if (ret < 0) {
+		dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
+	}
+
+	sport->clock_enabled = 1;
+
+	return ret;
+}
+#else
+#define ameba_sport_suspend NULL
+#define ameba_sport_resume NULL
+#endif
+
+static const struct snd_soc_dai_ops ameba_sport_dai_ops = {
 	.trigger   = sport_trigger,
 	#if USING_COUNTER
 	.delay     = sport_delay,
@@ -774,7 +820,7 @@ static const struct snd_kcontrol_new sport_controls[] = {
 
 };
 
-static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
+static int ameba_sport_dai_probe(struct snd_soc_dai *dai)
 {
 	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 
@@ -844,6 +890,8 @@ static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
 		break;
 	}
 
+	sport->clock_enabled = 0;
+
 	sport_info(1,&sport->pdev->dev,"%s, play phyaddr:%x,cap phyaddr:%x\n",__func__,sport->dma_playback.dev_phys_0,sport->dma_capture.dev_phys_0);
 
 	snd_soc_add_component_controls(dai->component, sport_controls,
@@ -851,14 +899,14 @@ static int amebad2_sport_dai_probe(struct snd_soc_dai *dai)
 	return 0;
 }
 
-static int amebad2_sport_dai_remove(struct snd_soc_dai *dai)
+static int ameba_sport_dai_remove(struct snd_soc_dai *dai)
 {
 	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 	iounmap(sport->addr);
 	return 0;
 }
 
-static struct snd_soc_dai_driver amebad2_sport_dai_drv[] = {
+static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 	{
 		.name = "4100d000.sport",
 		.id = 0,
@@ -875,9 +923,11 @@ static struct snd_soc_dai_driver amebad2_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = amebad2_sport_dai_probe,
-		.remove = amebad2_sport_dai_remove,
-		.ops = &amebad2_sport_dai_ops,
+		.probe = ameba_sport_dai_probe,
+		.remove = ameba_sport_dai_remove,
+		.ops = &ameba_sport_dai_ops,
+		.suspend = ameba_sport_suspend,
+		.resume = ameba_sport_resume,
 	},
 	{
 		.name = "4100e000.sport",
@@ -895,9 +945,11 @@ static struct snd_soc_dai_driver amebad2_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = amebad2_sport_dai_probe,
-		.remove = amebad2_sport_dai_remove,
-		.ops = &amebad2_sport_dai_ops,
+		.probe = ameba_sport_dai_probe,
+		.remove = ameba_sport_dai_remove,
+		.ops = &ameba_sport_dai_ops,
+		.suspend = ameba_sport_suspend,
+		.resume = ameba_sport_resume,
 	},
 	{
 		.name = "4100f000.sport",
@@ -928,9 +980,11 @@ static struct snd_soc_dai_driver amebad2_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = amebad2_sport_dai_probe,
-		.remove = amebad2_sport_dai_remove,
-		.ops = &amebad2_sport_dai_ops,
+		.probe = ameba_sport_dai_probe,
+		.remove = ameba_sport_dai_remove,
+		.ops = &ameba_sport_dai_ops,
+		.suspend = ameba_sport_suspend,
+		.resume = ameba_sport_resume,
 	},
 	{
 		.name = "41010000.sport",
@@ -961,14 +1015,16 @@ static struct snd_soc_dai_driver amebad2_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = amebad2_sport_dai_probe,
-		.remove = amebad2_sport_dai_remove,
-		.ops = &amebad2_sport_dai_ops,
+		.probe = ameba_sport_dai_probe,
+		.remove = ameba_sport_dai_remove,
+		.ops = &ameba_sport_dai_ops,
+		.suspend = ameba_sport_suspend,
+		.resume = ameba_sport_resume,
 	},
 };
 
-static const struct snd_soc_component_driver amebad2_sport_component = {
-	.name = "amebad2,sport",
+static const struct snd_soc_component_driver ameba_sport_component = {
+	.name = "ameba,sport",
 };
 
 
@@ -1046,7 +1102,7 @@ err:
 }
 
 
-static int amebad2_sport_probe(struct platform_device *pdev)
+static int ameba_sport_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
@@ -1079,7 +1135,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sport_info(1,&pdev->dev,"%s,sportx_reg_base:%x,sportx_reg_size:%x \n",__func__,sportx_regs_base,sportx_reg_size);
 
 	if (!request_mem_region(sport->base, sportx_reg_size,
-							"amebad2-sport")) {
+							"ameba-sport")) {
 		dev_err(&pdev->dev, "Unable to request SFR region\n");
 		ret = -EBUSY;
 		goto err;
@@ -1126,6 +1182,7 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	sport->rx_sport_compare_val = 6144;
 	sport->dai_fmt = SND_SOC_DAIFMT_LEFT_J;
 	sport->fifo_num = 0;
+	sport->clock_enabled = 0;
 
 	spin_lock_init(&sport->lock);
 
@@ -1151,8 +1208,8 @@ static int amebad2_sport_probe(struct platform_device *pdev)
 	dev_set_drvdata(&sport->pdev->dev, sport);       // set drv data, for sport_startup to get
 
 	ret = devm_snd_soc_register_component(&pdev->dev,
-					&amebad2_sport_component,
-					&amebad2_sport_dai_drv[sport->id], 1);
+					&ameba_sport_component,
+					&ameba_sport_dai_drv[sport->id], 1);
 	return 0;
 
 err:
@@ -1160,7 +1217,7 @@ err:
 	return ret;
 }
 
-static int amebad2_sport_remove(struct platform_device *pdev)
+static int ameba_sport_remove(struct platform_device *pdev)
 {
     //do we need to release sport here?? need check
 	struct sport_dai *sport;
@@ -1177,16 +1234,16 @@ static int amebad2_sport_remove(struct platform_device *pdev)
 }
 
 
-static struct platform_driver amebad2_sport_driver = {
-	.probe  = amebad2_sport_probe,
-	.remove = amebad2_sport_remove,
+static struct platform_driver ameba_sport_driver = {
+	.probe  = ameba_sport_probe,
+	.remove = ameba_sport_remove,
 	.driver = {
-		.name = "amebad2-sport",
-		.of_match_table = of_match_ptr(amebad2_sport_match),
+		.name = "ameba-sport",
+		.of_match_table = of_match_ptr(ameba_sport_match),
 	},
 };
 
-module_platform_driver(amebad2_sport_driver);
+module_platform_driver(ameba_sport_driver);
 
 /* Module information */
 MODULE_DESCRIPTION("Realtek Ameba ALSA driver");

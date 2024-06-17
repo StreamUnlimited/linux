@@ -540,7 +540,7 @@ static ssize_t ch_num_store(struct device *dev,
 
 	ch_num = val;
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_WO(ch_num);
 
@@ -569,7 +569,7 @@ static ssize_t chx_enable_store(struct device *dev,
 		ctc_set_chx_en(ch_num, true);
 	}
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 
 DEVICE_ATTR_RW(chx_enable);
@@ -593,7 +593,7 @@ static ssize_t chx_mbias_store(struct device *dev,
 	}
 	ctc_set_mbias(ch_num, val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(chx_mbias);
 
@@ -617,7 +617,7 @@ static ssize_t chx_diff_th_store(struct device *dev,
 	}
 	ctc_set_diff_thres(ch_num, val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(chx_diff_th);
 
@@ -641,7 +641,7 @@ static ssize_t chx_abs_th_store(struct device *dev,
 	}
 	ctc_set_abs_thres(ch_num, val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(chx_abs_th);
 
@@ -665,7 +665,7 @@ static ssize_t chx_n_noise_th_store(struct device *dev,
 	}
 	ctc_set_n_noise_thres(ch_num, val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(chx_n_noise_th);
 
@@ -689,7 +689,7 @@ static ssize_t chx_p_noise_th_store(struct device *dev,
 	}
 	ctc_set_p_noise_thres(ch_num, val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 
 DEVICE_ATTR_RW(chx_p_noise_th);
@@ -714,7 +714,7 @@ static ssize_t chx_baseline_store(struct device *dev,
 	}
 	ctc_set_baseline(ch_num, val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 
 DEVICE_ATTR_RW(chx_baseline);
@@ -770,7 +770,7 @@ static ssize_t etc_enable_store(struct device *dev,
 		ctc_set_etc_en(false);
 	}
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(etc_enable);
 
@@ -794,7 +794,7 @@ static ssize_t etc_interval_store(struct device *dev,
 	}
 	ctc_set_etc_interval(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(etc_interval);
 
@@ -818,7 +818,7 @@ static ssize_t etc_factor_store(struct device *dev,
 	}
 	ctc_set_etc_factor(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(etc_factor);
 
@@ -842,7 +842,7 @@ static ssize_t etc_step_store(struct device *dev,
 	}
 	ctc_set_etc_step(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(etc_step);
 
@@ -876,7 +876,7 @@ static ssize_t ctc_enable_store(struct device *dev,
 		realtek_captouch_set_en(false);
 	}
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_WO(ctc_enable);
 
@@ -900,7 +900,7 @@ static ssize_t scan_interval_store(struct device *dev,
 	}
 	ctc_set_scan_interval(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(scan_interval);
 
@@ -924,7 +924,7 @@ static ssize_t sample_num_store(struct device *dev,
 	}
 	ctc_set_sample_num(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(sample_num);
 
@@ -948,7 +948,7 @@ static ssize_t debounce_en_store(struct device *dev,
 	}
 	ctc_set_debounce_en(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(debounce_en);
 
@@ -972,7 +972,7 @@ static ssize_t debounce_times_store(struct device *dev,
 	}
 	ctc_set_debounce_times(val);
 
-	return (ret < 0) ? ret : size;
+	return size;
 }
 DEVICE_ATTR_RW(debounce_times);
 

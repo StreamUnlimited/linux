@@ -339,7 +339,6 @@ static void ameba_crtc_atomic_disable(struct drm_crtc *crtc,
 		DRM_DEBUG("Close lcdc clk\n");
 		clk_disable_unprepare(ctx->lcdc_clk);
 
-		// TODO
 		ctx->lcdc_config = 0;
 
 		ameba_lcdc_enable(ctx->lcdc_reg, 0);
@@ -944,8 +943,8 @@ static struct drm_driver ameba_lcdc_driver = {
 	.gem_prime_vunmap	    = drm_gem_cma_prime_vunmap,
 	.gem_prime_mmap		    = drm_gem_cma_prime_mmap,
 
-	.name   = "amebad2",
-	.desc   = "Realtek AmebaD2 SoC DRM Driver",
+	.name   = "ameba",
+	.desc   = "Realtek Ameba SoC DRM Driver",
 	.date   = "20210916",
 	.major  = 1,
 	.minor  = 0,

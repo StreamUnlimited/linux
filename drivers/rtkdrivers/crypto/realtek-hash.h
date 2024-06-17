@@ -19,6 +19,8 @@
 /* Buffer length */
 #define HASH_HMAC_MAX_KLEN			(255 * 4)
 
+#define IOPAD_LEN				(128 * 2 + 4)
+
 /**
  * struct realtek_hash_pdata - hash data
  * @algs_list: hash algorithms list
@@ -26,7 +28,7 @@
  */
 struct realtek_hash_pdata {
 	struct ahash_alg	*algs_list;
-	size_t				algs_list_size;
+	size_t			algs_list_size;
 };
 
 /**
@@ -41,7 +43,7 @@ struct realtek_hash_ctx {
 	unsigned int		flags;
 	u8 *ipad;						/*HMAC ipad */
 	u8 *opad;						/*HMAC opad */
-	u8 g_IOPAD[128 * 2 + 4] __aligned(sizeof(u32));
+	u8 g_IOPAD[IOPAD_LEN] __aligned(sizeof(u32));
 	dma_addr_t dma_handle_io;
 };
 

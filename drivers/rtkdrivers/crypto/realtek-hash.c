@@ -325,7 +325,7 @@ static int realtek_hash_process(struct ahash_request *req, u8 *message, u32 msgl
 	struct realtek_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct realtek_hash_request_ctx *rctx = ahash_request_ctx(req);
 	int ret = 0;
-	dma_addr_t dma_handle_msg;
+	dma_addr_t dma_handle_msg = NULL;
 
 	// Use only one scatter
 	enl = msglen;
@@ -802,7 +802,7 @@ static int realtek_hash_finup(struct ahash_request *req)
 	 */
 	err2 = realtek_hash_final(req);
 
-	return err1 ? : err2;
+	return err2;
 }
 
 static int realtek_hash_digest(struct ahash_request *req)
@@ -906,10 +906,9 @@ static int realtek_hash_key_process(struct realtek_hash_dev *hdev, struct crypto
 	rtl_crypto_cl_t CL;
 	u32 enc_last_data_size;
 	u32 apl;
-	dma_addr_t dma_handle_dig;
-	dma_addr_t dma_handle_msg;
-	dma_addr_t dma_handle_cl, dma_handle_pad;
-
+	dma_addr_t dma_handle_dig = NULL;
+	dma_addr_t dma_handle_msg = NULL;
+	dma_addr_t dma_handle_cl = NULL, dma_handle_pad = NULL;
 
 	// Use only one scatter
 	enl = msglen;
@@ -1113,6 +1112,10 @@ static int realtek_hash_setkey(struct crypto_ahash *tfm, const u8 *key, unsigned
 			}
 		} else {
 			for (i = 0; i < keylen; i++) {
+				if (i >= IOPAD_LEN) {
+					dev_err(realtek_hash.dev, "Invalid padsize.");
+					break;
+				}
 				ctx->ipad[i] ^= ((u8 *) key)[i];
 				ctx->opad[i] ^= ((u8 *) key)[i];
 			}
@@ -1376,7 +1379,7 @@ static const struct realtek_hash_pdata realtek_hash_match_data = {
 
 static const struct of_device_id realtek_hash_of_match[] = {
 	{
-		.compatible = "realtek,amebad2-hash",
+		.compatible = "realtek,ameba-hash",
 		.data = &realtek_hash_match_data,
 	},
 	{ }
@@ -1388,7 +1391,7 @@ static struct platform_driver realtek_hash_driver = {
 	.probe		= realtek_hash_probe,
 	.remove		= realtek_hash_remove,
 	.driver		= {
-		.name	= "realtek-amebad2-hash",
+		.name	= "realtek-ameba-hash",
 		.of_match_table	= realtek_hash_of_match,
 	}
 };

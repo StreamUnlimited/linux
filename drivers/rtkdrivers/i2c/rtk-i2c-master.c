@@ -462,7 +462,7 @@ static hal_status rtk_i2c_send_poll_master(
 	struct rtk_i2c_dev *i2c_dev)
 {
 	u32 data_send;
-	int retry;
+	int retry = 0;
 
 	/* Send data till the TX buffer data length is zero */
 	i2c_dev->i2c_manage.dev_status = I2C_STS_TX_ING;

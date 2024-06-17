@@ -11,7 +11,7 @@
 #ifndef __RTW_DRV_PROBE_H__
 #define __RTW_DRV_PROBE_H__
 
-typedef struct axi_data {
+struct axi_data {
 	struct platform_device	*pdev;
 
 	/* AXI MEM map */
@@ -26,14 +26,14 @@ typedef struct axi_data {
 	void __iomem		*km4_mem_start;
 
 	u8			bdma64;
-} AXI_DATA, *PAXI_DATA;
+};
 
 struct axi_drv_priv {
 	struct platform_driver	rtw_axi_drv;
 	int			drv_registered;
 };
 
-extern PAXI_DATA paxi_data_global;
+extern struct axi_data *paxi_data_global;
 
 int __init rtw_drv_entry(void);
 void __exit rtw_drv_halt(void);

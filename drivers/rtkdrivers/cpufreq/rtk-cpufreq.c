@@ -13,15 +13,9 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/clk.h>
-#include <linux/of_clk.h>
 #include <linux/err.h>
 #include <linux/regulator/consumer.h>
-#include <linux/pm_opp.h>
-#include <asm/cacheflush.h>
 #include <linux/slab.h>
-#include <linux/delay.h>
-
-
 
 struct rtk_cpufreq {
 	struct device *cpu;
@@ -69,7 +63,7 @@ static int rtk_cpufreq_apll(struct cpufreq_policy *policy, unsigned int index)
 		return ret;
 	}
 
-	return 0;
+	return ret;
 }
 
 

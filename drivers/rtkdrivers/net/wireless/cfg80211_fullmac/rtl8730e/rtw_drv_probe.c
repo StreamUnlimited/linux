@@ -18,7 +18,177 @@ static const struct of_device_id rtw_axi_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, rtw_axi_of_match);
 
-PAXI_DATA paxi_data_global;
+struct axi_data *paxi_data_global;
+
+/* IPv4, IPv6 IP addr notifier */
+static int rtw_inetaddr_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
+{
+	struct in_ifaddr *ifa = (struct in_ifaddr *)data;
+	struct net_device *ndev;
+
+	if (!ifa || !ifa->ifa_dev || !ifa->ifa_dev->dev) {
+		return NOTIFY_DONE;
+	}
+
+	ndev = ifa->ifa_dev->dev;
+
+	switch (action) {
+	case NETDEV_UP:
+		memcpy(global_idev.ip_addr, &ifa->ifa_address, RTW_IP_ADDR_LEN);
+		dev_dbg(global_idev.fullmac_dev, "%s[%s]: up IP: [%pI4]\n", __func__, ifa->ifa_label, global_idev.ip_addr);
+		break;
+	case NETDEV_DOWN:
+		memset(global_idev.ip_addr, 0, RTW_IP_ADDR_LEN);
+		dev_dbg(global_idev.fullmac_dev, "%s[%s]: down IP: [%pI4]\n", __func__, ifa->ifa_label, global_idev.ip_addr);
+		break;
+	default:
+		dev_dbg(global_idev.fullmac_dev, "%s: default action\n", __func__);
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+#ifdef CONFIG_IPV6
+static int rtw_inet6addr_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
+{
+	struct inet6_ifaddr *inet6_ifa = (struct inet6_ifaddr *)data;
+	struct net_device *ndev;
+
+	if (!inet6_ifa || !inet6_ifa->idev || !inet6_ifa->idev->dev) {
+		return NOTIFY_DONE;
+	}
+
+	ndev = inet6_ifa->idev->dev;
+
+	switch (action) {
+	case NETDEV_UP:
+		memcpy(global_idev.ipv6_addr, &inet6_ifa->addr, RTW_IPv6_ADDR_LEN);
+		dev_dbg(global_idev.fullmac_dev, "%s: up IP: [%pI6]\n", __func__, global_idev.ipv6_addr);
+		break;
+	case NETDEV_DOWN:
+		memset(global_idev.ipv6_addr, 0, RTW_IPv6_ADDR_LEN);
+		dev_dbg(global_idev.fullmac_dev, "%s: down IP: [%pI6]\n", __func__, global_idev.ipv6_addr);
+		break;
+	default:
+		dev_dbg(global_idev.fullmac_dev, "%s: default action\n", __func__);
+		break;
+	}
+	return NOTIFY_DONE;
+}
+#endif
+
+static struct notifier_block rtw_inetaddr_notifier = {
+	.notifier_call = rtw_inetaddr_notifier_call
+};
+
+#ifdef CONFIG_IPV6
+static struct notifier_block rtw_inet6addr_notifier = {
+	.notifier_call = rtw_inet6addr_notifier_call
+};
+#endif
+
+void rtw_inetaddr_notifier_register(void)
+{
+	register_inetaddr_notifier(&rtw_inetaddr_notifier);
+#ifdef CONFIG_IPV6
+	register_inet6addr_notifier(&rtw_inet6addr_notifier);
+#endif
+}
+
+void rtw_inetaddr_notifier_unregister(void)
+{
+	unregister_inetaddr_notifier(&rtw_inetaddr_notifier);
+#ifdef CONFIG_IPV6
+	unregister_inet6addr_notifier(&rtw_inet6addr_notifier);
+#endif
+}
+
+int rtw_netdev_probe(struct device *pdev)
+{
+	int ret = false;
+
+	memset(&global_idev, 0, sizeof(struct inic_device));
+
+	/* Initialize axi_priv */
+	global_idev.fullmac_dev = pdev;
+
+	dev_dbg(global_idev.fullmac_dev, "rtw_dev_probe start\n");
+
+	/*step1: alloc and init wiphy */
+	ret = rtw_wiphy_init();
+	if (ret == false) {
+		dev_err(global_idev.fullmac_dev, "wiphy init fail");
+		goto exit;
+	}
+
+	/*step3: register wiphy */
+	if (wiphy_register(global_idev.pwiphy_global) != 0) {
+		dev_err(global_idev.fullmac_dev, "wiphy register fail");
+		goto os_ndevs_deinit;
+	}
+
+	/*step4: register netdev */
+	ret = rtw_ndev_alloc();
+	if (ret < 0) {
+		dev_err(global_idev.fullmac_dev, "ndev alloc fail");
+		goto os_ndevs_deinit;
+	}
+
+	ret = llhw_init(paxi_data_global->km4_mem_start);
+	if (ret < 0) {
+		dev_err(global_idev.fullmac_dev, "llhw init fail");
+		goto os_ndevs_deinit;
+	}
+
+	ret = rtw_ndev_register();
+	if (ret < 0) {
+		dev_err(global_idev.fullmac_dev, "ndev register fail");
+		goto os_ndevs_deinit;
+	}
+
+	rtw_regd_init();
+	rtw_drv_proc_init();
+
+#ifdef CONFIG_WAR_OFFLOAD
+	rtw_proxy_init();
+#endif
+
+	return 0; /* probe success */
+
+os_ndevs_deinit:
+	rtw_ndev_unregister();
+	rtw_wiphy_deinit();
+
+exit:
+
+	return -ENODEV;
+}
+
+int rtw_netdev_remove(struct device *pdev)
+{
+	dev_dbg(global_idev.fullmac_dev, "%s start.", __func__);
+
+	rtw_ndev_unregister();
+	dev_dbg(global_idev.fullmac_dev, "unregister netdev done.");
+
+	rtw_regd_deinit();
+	wiphy_unregister(global_idev.pwiphy_global);
+
+	rtw_wiphy_deinit();
+	dev_dbg(global_idev.fullmac_dev, "unregister and deinit wiphy done.");
+
+	llhw_deinit();
+	dev_dbg(global_idev.fullmac_dev, "remove llhw done.");
+
+	rtw_drv_proc_deinit();
+
+	pr_info("%s done\n", __func__);
+	memset(&global_idev, 0, sizeof(struct inic_device));
+
+	return 0;
+}
+
+#ifdef CONFIG_FULLMAC_HCI_IPC
 
 static void platform_device_init(struct platform_device *pdev)
 {
@@ -27,10 +197,10 @@ static void platform_device_init(struct platform_device *pdev)
 	struct device_node *sys_node = NULL, *ocp_node = NULL;
 	unsigned long pmem_len = 0;
 	struct resource res_sys = {0};
-	PAXI_DATA axi_data;
+	struct axi_data *axi_data;
 
 	/* TODO: axi_data useless in fullmac, clear later. */
-	axi_data = (PAXI_DATA)kzalloc(sizeof(AXI_DATA), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	axi_data = (struct axi_data *)kzalloc(sizeof(struct axi_data), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 	if (!axi_data) {
 		pr_err("Can't get axi_data\n");
 		goto exit;
@@ -115,7 +285,7 @@ exit:
 
 static void platform_device_deinit(struct platform_device *pdev)
 {
-	PAXI_DATA axi_data = paxi_data_global;
+	struct axi_data *axi_data = paxi_data_global;
 
 	platform_set_drvdata(pdev, NULL);
 	if (axi_data) {
@@ -133,125 +303,6 @@ static void platform_device_deinit(struct platform_device *pdev)
 		paxi_data_global = NULL;
 	}
 }
-
-/* IPv4, IPv6 IP addr notifier */
-static int rtw_inetaddr_notifier_call(struct notifier_block *nb,
-									  unsigned long action, void *data)
-{
-	struct in_ifaddr *ifa = (struct in_ifaddr *)data;
-	struct net_device *ndev;
-
-	if (!ifa || !ifa->ifa_dev || !ifa->ifa_dev->dev) {
-		return NOTIFY_DONE;
-	}
-
-	ndev = ifa->ifa_dev->dev;
-
-	switch (action) {
-	case NETDEV_UP:
-		memcpy(global_idev.ip_addr, &ifa->ifa_address, RTW_IP_ADDR_LEN);
-		dev_dbg(global_idev.fullmac_dev, "%s[%s]: up IP: [%pI4]\n", __func__, ifa->ifa_label, global_idev.ip_addr);
-		break;
-	case NETDEV_DOWN:
-		memset(global_idev.ip_addr, 0, RTW_IP_ADDR_LEN);
-		dev_dbg(global_idev.fullmac_dev, "%s[%s]: down IP: [%pI4]\n", __func__, ifa->ifa_label, global_idev.ip_addr);
-		break;
-	default:
-		dev_dbg(global_idev.fullmac_dev, "%s: default action\n", __func__);
-		break;
-	}
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block rtw_inetaddr_notifier = {
-	.notifier_call = rtw_inetaddr_notifier_call
-};
-
-void rtw_inetaddr_notifier_register(void)
-{
-	register_inetaddr_notifier(&rtw_inetaddr_notifier);
-}
-
-void rtw_inetaddr_notifier_unregister(void)
-{
-	unregister_inetaddr_notifier(&rtw_inetaddr_notifier);
-}
-
-int rtw_netdev_probe(struct device *pdev)
-{
-	int ret = false;
-
-	memset(&global_idev, 0, sizeof(struct inic_device));
-
-	/* Initialize axi_priv */
-	global_idev.fullmac_dev = pdev;
-
-	dev_dbg(global_idev.fullmac_dev, "rtw_dev_probe start\n");
-
-	/*step1: alloc and init wiphy */
-	ret = rtw_wiphy_init();
-	if (ret == false) {
-		dev_err(global_idev.fullmac_dev, "wiphy init fail");
-		goto exit;
-	}
-
-	/*step3: register wiphy */
-	if (wiphy_register(global_idev.pwiphy_global) != 0) {
-		dev_err(global_idev.fullmac_dev, "wiphy register fail");
-		goto os_ndevs_deinit;
-	}
-
-	/*step4: register netdev */
-	ret = rtw_ndev_register();
-	if (ret < 0) {
-		dev_err(global_idev.fullmac_dev, "ndev register fail");
-		goto os_ndevs_deinit;
-	}
-
-	ret = llhw_init(paxi_data_global->km4_mem_start);
-	if (ret < 0) {
-		dev_err(global_idev.fullmac_dev, "ipc init fail");
-		goto exit;
-	}
-
-	rtw_regd_init();
-	rtw_drv_proc_init();
-
-	return 0; /* probe success */
-
-os_ndevs_deinit:
-	rtw_ndev_unregister();
-	rtw_wiphy_deinit();
-
-exit:
-
-	return -ENODEV;
-}
-
-int rtw_netdev_remove(struct device *pdev)
-{
-	dev_dbg(global_idev.fullmac_dev, "rtw_dev_remove start.");
-
-	rtw_ndev_unregister();
-	dev_dbg(global_idev.fullmac_dev, "unregister netdev done.");
-
-	wiphy_unregister(global_idev.pwiphy_global);
-
-	rtw_wiphy_deinit();
-	dev_dbg(global_idev.fullmac_dev, "unregister and deinit wiphy done.");
-
-	llhw_deinit();
-	dev_dbg(global_idev.fullmac_dev, "remove ipc done.");
-
-	rtw_drv_proc_deinit();
-
-	pr_info("-%s done\n", __func__);
-	memset(&global_idev, 0, sizeof(struct inic_device));
-
-	return 0;
-}
-
-#ifdef CONFIG_FULLMAC_HCI_IPC
 
 static int rtw_dev_probe(struct platform_device *pdev)
 {

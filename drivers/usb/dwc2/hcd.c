@@ -55,7 +55,7 @@
 
 #include "core.h"
 #include "hcd.h"
-#ifdef CONFIG_ARCH_AMEBAD2
+#ifdef CONFIG_ARCH_AMEBASMART
 #include "phy-rtk-usb.h"
 #endif
 
@@ -5234,7 +5234,7 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg)
 	if (retval < 0)
 		goto error4;
 
-#ifdef CONFIG_ARCH_AMEBAD2
+#ifdef CONFIG_ARCH_AMEBASMART
 	retval = rtk_phy_calibrate(hsotg);
 	if (retval != 0) {
 		dev_err(hsotg->dev,"PHY calibration fail\n");

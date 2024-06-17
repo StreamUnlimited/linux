@@ -236,7 +236,7 @@ machine-$(CONFIG_ARCH_VT8500)		+= vt8500
 machine-$(CONFIG_ARCH_ZX)		+= zx
 machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
 machine-$(CONFIG_PLAT_SPEAR)		+= spear
-machine-$(CONFIG_ARCH_AMEBAD2)		+= amebad2
+machine-$(CONFIG_ARCH_AMEBASMART)		+= amebasmart
 
 # Platform directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
@@ -266,8 +266,8 @@ endif
 
 # Board Makefile
 ifeq ($(CONFIG_ARCH_AMEBA)$(CONFIG_ARCH_AMEBA_M),y)
-MACHINE := $(srctree)/arch/$(VAR_ARCH)/mach-amebad2
-include $(srctree)/arch/$(VAR_ARCH)/mach-amebad2/Makefile
+MACHINE := $(srctree)/arch/$(VAR_ARCH)/mach-amebasmart
+include $(srctree)/arch/$(VAR_ARCH)/mach-amebasmart/Makefile
 endif
 
 # The byte offset of the kernel image in RAM from the start of RAM.

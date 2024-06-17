@@ -53,32 +53,22 @@ func_exit:
 	return ret;
 }
 
-int llhw_wifi_get_user_config(struct wifi_user_conf *pwifi_usrcfg)
+int llhw_wifi_set_user_config(struct wifi_user_conf *pwifi_usrcfg)
 {
 	u32 param_buf[1];
 	dma_addr_t phy_addr;
-	int *pusrcfg_temp = NULL;
 	int ret = 0;
 	struct device *pdev = global_idev.ipc_dev;
-	pusrcfg_temp = kzalloc(sizeof(struct wifi_user_conf), GFP_KERNEL);
-	if (pusrcfg_temp == NULL) {
-		return -1;
-	}
 
-	phy_addr = dma_map_single(pdev, (void *)pusrcfg_temp, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
+	phy_addr = dma_map_single(pdev, (void *)pwifi_usrcfg, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
 	if (dma_mapping_error(pdev, phy_addr)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		ret = -1;
-		goto free_buf;
+		return -1;
 	}
 	param_buf[0] = (u32)phy_addr;
 
-	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_USR_CFG, param_buf, 1);
-	dma_unmap_single(pdev, phy_addr, sizeof(struct wifi_user_conf), DMA_FROM_DEVICE);
-	memcpy(pwifi_usrcfg, pusrcfg_temp, sizeof(struct wifi_user_conf));
-
-free_buf:
-	kfree((u8 *)pusrcfg_temp);
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_USR_CFG, param_buf, 1);
+	dma_unmap_single(pdev, phy_addr, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
 
 	return ret;
 }
@@ -111,19 +101,19 @@ int llhw_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
 	param_buf[2] = 0;
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_MAC_ADDR, param_buf, 3);
-	dma_unmap_single(pdev, phy_addr, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
+	dma_unmap_single(pdev, phy_addr, sizeof(struct _rtw_scan_param_t), DMA_TO_DEVICE);
 
 	return ret;
 }
 
-int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
+int llhw_wifi_scan(struct _rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 {
 	int ret = 0;
 	u32 param_buf[3];
 	dma_addr_t dma_addr_scan_param = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
-	dma_addr_scan_param = dma_map_single(pdev, scan_param, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
+	dma_addr_scan_param = dma_map_single(pdev, scan_param, sizeof(struct _rtw_scan_param_t), DMA_TO_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr_scan_param)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		return -1;
@@ -134,24 +124,27 @@ int llhw_wifi_scan(rtw_scan_param_t *scan_param, u32 ssid_length, u32 block)
 	param_buf[2] = ssid_length;
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_NETWROKS, param_buf, 3);
-	dma_unmap_single(pdev, dma_addr_scan_param, sizeof(rtw_scan_param_t), DMA_TO_DEVICE);
+	dma_unmap_single(pdev, dma_addr_scan_param, sizeof(struct _rtw_scan_param_t), DMA_TO_DEVICE);
 
 	return ret;
 }
 
-int llhw_wifi_scan_abort(void)
+int llhw_wifi_scan_abort(u8 block)
 {
 	int ret = 0;
+	u32 param_buf[1];
 
-	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_ABORT, NULL, 0);
+	param_buf[0] = (u32)block;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SCAN_ABORT, param_buf, 1);
 
 	return ret;
 }
 
-int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
+int llhw_wifi_connect(struct _rtw_network_info_t *connect_param, unsigned char block)
 {
 	int ret = 0;
-	internal_join_block_param_t *block_param = NULL;
+	struct internal_join_block_param *block_param = NULL;
 	u32 param_buf[1] = {0};
 	dma_addr_t dma_addr_connect_param = 0;
 	struct device *pdev = global_idev.ipc_dev;
@@ -170,7 +163,7 @@ int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
 
 	/* step2: malloc and set synchronous connection related variables*/
 	if (block) {
-		block_param = (internal_join_block_param_t *)kzalloc(sizeof(internal_join_block_param_t), GFP_KERNEL);
+		block_param = (struct internal_join_block_param *)kzalloc(sizeof(struct internal_join_block_param), GFP_KERNEL);
 		if (!block_param) {
 			ret = -ENOMEM;
 			global_idev.mlme_priv.rtw_join_status = RTW_JOINSTATUS_FAIL;
@@ -182,7 +175,7 @@ int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
 	}
 
 	/* step3: set connect cmd to driver*/
-	dma_addr_connect_param = dma_map_single(pdev, connect_param, sizeof(rtw_network_info_t), DMA_TO_DEVICE);
+	dma_addr_connect_param = dma_map_single(pdev, connect_param, sizeof(struct _rtw_network_info_t), DMA_TO_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr_connect_param)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		return -1;
@@ -190,7 +183,7 @@ int llhw_wifi_connect(rtw_network_info_t *connect_param, unsigned char block)
 	param_buf[0] = (u32)dma_addr_connect_param;
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_CONNECT, param_buf, 1);
-	dma_unmap_single(pdev, dma_addr_connect_param, sizeof(rtw_network_info_t), DMA_TO_DEVICE);
+	dma_unmap_single(pdev, dma_addr_connect_param, sizeof(struct _rtw_network_info_t), DMA_TO_DEVICE);
 
 	/* step4: wait connect finished for synchronous connection*/
 	if (block) {
@@ -305,7 +298,7 @@ int llhw_wifi_del_sta(u8 wlan_idx, u8 *mac)
 	return ret;
 }
 
-int llhw_wifi_start_ap(rtw_softap_info_t *softAP_config)
+int llhw_wifi_start_ap(struct _rtw_softap_info_t *softAP_config)
 {
 	int ret = 0;
 	u32 param_buf[1];
@@ -313,7 +306,7 @@ int llhw_wifi_start_ap(rtw_softap_info_t *softAP_config)
 	dma_addr_t dma_addr_softap_config = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
-	dma_addr_softap_config = dma_map_single(pdev, softAP_config, sizeof(rtw_softap_info_t), DMA_TO_DEVICE);
+	dma_addr_softap_config = dma_map_single(pdev, softAP_config, sizeof(struct _rtw_softap_info_t), DMA_TO_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr_password)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		return -1;
@@ -323,7 +316,7 @@ int llhw_wifi_start_ap(rtw_softap_info_t *softAP_config)
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_START_AP, param_buf, 1);
 
-	dma_unmap_single(pdev, dma_addr_softap_config, sizeof(rtw_softap_info_t), DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, dma_addr_softap_config, sizeof(struct _rtw_softap_info_t), DMA_FROM_DEVICE);
 
 	return ret;
 }
@@ -378,46 +371,13 @@ int llhw_wifi_add_key(struct rtw_crypt_info *crypt)
 	return ret;
 }
 
-int llhw_wifi_get_chplan(u8 *chplan)
-{
-	int ret = -1;
-	u32 param_buf[1];
-	int *chplan_temp = NULL;
-	dma_addr_t dma_addr = 0;
-	struct device *pdev = global_idev.ipc_dev;
-
-	chplan_temp = kzalloc(sizeof(u8), GFP_KERNEL);
-	if (chplan_temp == NULL) {
-		goto func_exit;
-	}
-
-	dma_addr = dma_map_single(pdev, chplan_temp, sizeof(u8), DMA_TO_DEVICE);
-	if (dma_mapping_error(pdev, dma_addr)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		ret = -EINVAL;
-		goto free_buf;
-	}
-	param_buf[0] = dma_addr;
-
-	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_CHPLAN, param_buf, 1);
-	/* need do cache invalidate before get value */
-	dma_unmap_single(pdev, dma_addr, sizeof(u8), DMA_FROM_DEVICE);
-	*chplan = *chplan_temp;
-
-free_buf:
-	kfree((u8 *)chplan_temp);
-
-func_exit:
-	return ret;
-}
-
-int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
+int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len, u8 need_wait_ack)
 {
 	int ret = 0;
 	u32 param_buf[1];
 	dma_addr_t dma_addr_buf = 0;
 	dma_addr_t dma_addr_desc = 0;
-	raw_data_desc_t raw_data_desc = {0};
+	struct _raw_data_desc_t raw_data_desc = {0};
 
 	struct device *pdev = global_idev.ipc_dev;
 
@@ -430,8 +390,11 @@ int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 	raw_data_desc.buf = (unsigned char *)dma_addr_buf;
 	raw_data_desc.buf_len = buf_len;
 	raw_data_desc.wlan_idx = wlan_idx;
+	if (need_wait_ack) {
+		raw_data_desc.flags |= RTW_SEND_AND_WAIT_ACK;
+	}
 
-	dma_addr_desc = dma_map_single(pdev, &raw_data_desc, sizeof(raw_data_desc_t), DMA_TO_DEVICE);
+	dma_addr_desc = dma_map_single(pdev, &raw_data_desc, sizeof(struct _raw_data_desc_t), DMA_TO_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr_desc)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		return -1;
@@ -440,7 +403,7 @@ int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len)
 	param_buf[0] = (u32)dma_addr_desc;
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SEND_MGNT, param_buf, 1);
 
-	dma_unmap_single(pdev, dma_addr_desc, sizeof(raw_data_desc_t), DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, dma_addr_desc, sizeof(struct _raw_data_desc_t), DMA_FROM_DEVICE);
 	dma_unmap_single(pdev, dma_addr_buf, buf_len, DMA_FROM_DEVICE);
 
 	return ret;
@@ -706,14 +669,14 @@ int llhw_wifi_stop_nan(void)
 	return ret;
 }
 
-int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
+int llhw_wifi_add_nan_func(struct rtw_nan_func_info_t *func, void *nan_func_pointer)
 {
 	int ret = 0;
 	u32 param_buf[3];
 	dma_addr_t dma_addr_func = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
-	dma_addr_func = dma_map_single(pdev, func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
+	dma_addr_func = dma_map_single(pdev, func, sizeof(struct rtw_nan_func_info_t), DMA_TO_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr_func)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		return -1;
@@ -721,10 +684,10 @@ int llhw_wifi_add_nan_func(rtw_nan_func_info_t *func, void *nan_func_pointer)
 
 	param_buf[0] = (u32)dma_addr_func;
 	param_buf[1] = (u32)nan_func_pointer;
-	param_buf[2] = (u32)sizeof(rtw_nan_func_info_t);
+	param_buf[2] = (u32)sizeof(struct rtw_nan_func_info_t);
 
 	ret = llhw_ipc_send_msg(INIC_API_NAN_ADD_FUNC, param_buf, 3);
-	dma_unmap_single(pdev, dma_addr_func, sizeof(rtw_nan_func_info_t), DMA_TO_DEVICE);
+	dma_unmap_single(pdev, dma_addr_func, sizeof(struct rtw_nan_func_info_t), DMA_TO_DEVICE);
 	return ret;
 }
 
@@ -770,6 +733,30 @@ int llhw_cfgvendor_nandow_entry(const void *data, int len)
 #endif
 #endif
 
+#ifdef CONFIG_P2P
+void llhw_wifi_set_p2p_role(enum rtw_p2p_role role)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	param_buf[0] = (u32)role;
+
+	llhw_ipc_send_msg(INIC_API_P2P_ROLE, param_buf, 1);
+}
+
+int llhw_wifi_set_p2p_remain_on_ch(unsigned char wlan_idx, u8 enable)
+{
+	int ret = 0;
+	u32 param_buf[2];
+
+	param_buf[0] = (u32)wlan_idx;
+	param_buf[1] = (u32)enable;
+
+	ret = llhw_ipc_send_msg(INIC_API_P2P_REMAIN_ON_CH, param_buf, 2);
+	return ret;
+}
+#endif
+
 int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 {
 	int ret = 0;
@@ -778,18 +765,6 @@ int llhw_wifi_set_pmf_mode(u8 pmf_mode)
 	param_buf[0] = (u32)pmf_mode;
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_PMF_MODE, param_buf, 1);
-	return ret;
-}
-
-int llhw_wifi_set_ch_plan(u8 ch_plan, u8 tx_power_lmt)
-{
-	int ret = 0;
-	u32 param_buf[2];
-
-	param_buf[0] = (u32)ch_plan;
-	param_buf[1] = (u32)tx_power_lmt;
-
-	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHPLAN, param_buf, 2);
 	return ret;
 }
 
@@ -842,7 +817,7 @@ int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
 	u32 param_buf[3];
 	dma_addr_t cus_ie_aphy = 0, ie_phy = 0;
 	u8 *ie_vir = NULL, *vir_array = NULL;
-	rtw_custom_ie_t *cus_ie_array = NULL;
+	struct custom_ie *cus_ie_array = NULL;
 	u8 i = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
@@ -852,7 +827,7 @@ int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
 		return -ENOMEM;
 	}
 
-	cus_ie_array = rtw_malloc(sizeof(rtw_custom_ie_t) * num, &cus_ie_aphy);
+	cus_ie_array = rtw_malloc(sizeof(struct custom_ie) * num, &cus_ie_aphy);
 	if (!cus_ie_array) {
 		dev_err(global_idev.fullmac_dev, "%s: malloc custom ie failed.", __func__);
 		kfree(vir_array);
@@ -864,7 +839,7 @@ int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
 		ie_vir = rtw_malloc(elem[i]->datalen + 2, &ie_phy);
 		if (!ie_vir) {
 			dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
-			rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie_array, cus_ie_aphy);
+			rtw_mfree(sizeof(struct custom_ie), cus_ie_array, cus_ie_aphy);
 			kfree(vir_array);
 			return -ENOMEM;
 		}
@@ -884,7 +859,7 @@ int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type)
 	for (i = 0; i < num; i++) {
 		rtw_mfree(elem[i]->datalen + 2, (void *)vir_array[i], cus_ie_array[i].ie);
 	}
-	rtw_mfree(sizeof(rtw_custom_ie_t) * num, (void *)cus_ie_array, cus_ie_aphy);
+	rtw_mfree(sizeof(struct custom_ie) * num, (void *)cus_ie_array, cus_ie_aphy);
 	kfree(vir_array);
 
 	return ret;
@@ -908,10 +883,10 @@ int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
 	u32 param_buf[3];
 	dma_addr_t cus_ie_aphy = 0, ie_phy = 0;
 	u8 *ie_vir = NULL;
-	rtw_custom_ie_t *cus_ie_array = NULL;
+	struct custom_ie *cus_ie_array = NULL;
 	struct device *pdev = global_idev.ipc_dev;
 
-	cus_ie_array = rtw_malloc(sizeof(rtw_custom_ie_t), &cus_ie_aphy);
+	cus_ie_array = rtw_malloc(sizeof(struct custom_ie), &cus_ie_aphy);
 	if (!cus_ie_array) {
 		dev_err(global_idev.fullmac_dev, "%s: malloc custom ie failed.", __func__);
 		return -ENOMEM;
@@ -920,7 +895,7 @@ int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
 	ie_vir = rtw_malloc(ie[1] + 2, &ie_phy);
 	if (!ie_vir) {
 		dev_err(global_idev.fullmac_dev, "%s: malloc custom sub ie failed.", __func__);
-		rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie_array, cus_ie_aphy);
+		rtw_mfree(sizeof(struct custom_ie), cus_ie_array, cus_ie_aphy);
 		return -ENOMEM;
 	}
 	memcpy(ie_vir, ie, ie[1] + 2);
@@ -933,7 +908,182 @@ int llhw_wifi_update_custom_ie(u8 *ie, int ie_index)
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_CUS_IE, param_buf, 3);
 
 	rtw_mfree(ie[1] + 2, ie_vir, ie_phy);
-	rtw_mfree(sizeof(rtw_custom_ie_t), cus_ie_array, cus_ie_aphy);
+	rtw_mfree(sizeof(struct custom_ie), cus_ie_array, cus_ie_aphy);
+
+	return ret;
+}
+
+int llhw_wifi_set_edcca_mode(u8 edcca_mode)
+{
+	int ret = 0;
+	u32 param_buf[1];
+
+	switch (edcca_mode) {
+	case RTW_EDCCA_NORM:
+	case RTW_EDCCA_ADAPT:
+	case RTW_EDCCA_CS:
+	case RTW_EDCCA_DISABLE:
+		param_buf[0] = (u32)edcca_mode;
+		ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_EDCCA_MODE, param_buf, 1);
+		break;
+	default:
+		dev_info(global_idev.fullmac_dev, "Wrong EDCCA mode %d!", edcca_mode);
+		dev_info(global_idev.fullmac_dev, "0: normal; 1: ETSI; 2: Japan; 9: Disable.");
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
+int llhw_wifi_get_edcca_mode(u8 *edcca_mode)
+{
+	int ret = 0;
+	u32 param_buf[1];
+	u8 *virt_addr = NULL;
+	dma_addr_t dma_addr = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	virt_addr = kzalloc(sizeof(u8), GFP_KERNEL);
+	if (virt_addr == NULL) {
+		ret = -ENOMEM;
+		goto func_exit;
+	}
+
+	dma_addr = dma_map_single(pdev, virt_addr, sizeof(u8), DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		ret = -EINVAL;
+		goto free_buf;
+	}
+	param_buf[0] = dma_addr;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_EDCCA_MODE, param_buf, 1);
+	/* need do cache invalidate before get value */
+	dma_unmap_single(pdev, dma_addr, sizeof(u8), DMA_FROM_DEVICE);
+	*edcca_mode = *virt_addr;
+
+free_buf:
+	kfree((u8 *)virt_addr);
+
+func_exit:
+	return ret;
+}
+
+int llhw_wifi_get_ant_info(u8 *antdiv_mode, u8 *curr_ant)
+{
+	int ret = 0;
+	u32 param_buf[2];
+	u8 *virt_addr = NULL;
+	dma_addr_t dma_addr = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	virt_addr = kzalloc(2 * sizeof(u8), GFP_KERNEL);
+	if (virt_addr == NULL) {
+		ret = -ENOMEM;
+		goto func_exit;
+	}
+
+	dma_addr = dma_map_single(pdev, virt_addr, sizeof(u8), DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		ret = -EINVAL;
+		goto free_buf;
+	}
+	param_buf[0] = dma_addr;
+	param_buf[1] = dma_addr + 1;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_ANTENNA_INFO, param_buf, 2);
+	/* need do cache invalidate before get value */
+	dma_unmap_single(pdev, dma_addr, 2 * sizeof(u8), DMA_FROM_DEVICE);
+	*antdiv_mode = virt_addr[0];
+	*curr_ant = virt_addr[1];
+
+free_buf:
+	kfree((u8 *)virt_addr);
+
+func_exit:
+	return ret;
+}
+
+int llhw_wifi_set_country_code(char *cc)
+{
+	int ret = 0;
+	u32 param_buf[1];
+	dma_addr_t phy_addr = 0;
+	char *virt_addr = NULL;
+	struct device *pdev = global_idev.ipc_dev;
+
+	if (strlen(cc) != 2) {
+		dev_err(global_idev.fullmac_dev, "%s: the length of country is not 2.\n", __func__);
+		return -EINVAL;
+	}
+
+	if ((cc[0] == '0') && (cc[1] == '0')) {
+		virt_addr = kzalloc(2, GFP_KERNEL);
+		if (virt_addr == NULL) {
+			dev_err(global_idev.fullmac_dev, "%s: allocate memory failed!\n", __func__);
+			return -EPERM;
+		}
+		virt_addr[0] = 0xff;
+		virt_addr[1] = 0xff;
+	} else {
+		virt_addr = cc;
+	}
+
+	phy_addr = dma_map_single(pdev, virt_addr, 2, DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, phy_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		if (virt_addr != cc) {
+			kfree(virt_addr);
+		}
+		return -EPERM;
+	}
+
+	param_buf[0] = (u32)phy_addr;
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_COUNTRY_CODE, param_buf, 1);
+	dma_unmap_single(pdev, phy_addr, 2, DMA_TO_DEVICE);
+	if (virt_addr != cc) {
+		kfree(virt_addr);
+	}
+
+	return ret;
+}
+
+int llhw_wifi_get_country_code(struct country_code_table_t *table)
+{
+	int ret = 0;
+	u32 param_buf[1];
+	dma_addr_t phy_addr = 0;
+	struct country_code_table_t *virt_addr = NULL;
+	struct device *pdev = global_idev.ipc_dev;
+
+	if (table == NULL) {
+		dev_err(global_idev.fullmac_dev, "%s: input is NULL.\n", __func__);
+		return -EINVAL;
+	}
+
+	virt_addr = kzalloc(sizeof(struct country_code_table_t), GFP_KERNEL);
+	if (virt_addr == NULL) {
+		dev_err(global_idev.fullmac_dev, "%s: allocate memory failed!\n", __func__);
+		return -EPERM;
+	}
+
+	phy_addr = dma_map_single(pdev, virt_addr, sizeof(struct country_code_table_t), DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, phy_addr)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		kfree(virt_addr);
+		return -EPERM;
+	}
+
+	param_buf[0] = (u32)phy_addr;
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_GET_COUNTRY_CODE, param_buf, 1);
+	dma_unmap_single(pdev, phy_addr, sizeof(struct country_code_table_t), DMA_FROM_DEVICE);
+	memcpy(table, virt_addr, sizeof(struct country_code_table_t));
+	if ((virt_addr->char2[0] == 0xff) && (virt_addr->char2[1] == 0xff)) {
+		table->char2[0] = '0';
+		table->char2[1] = '0';
+	}
+	kfree(virt_addr);
 
 	return ret;
 }

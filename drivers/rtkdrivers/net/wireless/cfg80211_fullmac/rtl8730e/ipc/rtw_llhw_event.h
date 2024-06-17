@@ -14,14 +14,14 @@
 /**
  * @brief  The enumeration is join block param.
  */
-typedef struct {
+struct internal_join_block_param {
 	struct completion	join_sema;
 	unsigned int		join_timeout;
 	unsigned char		block;
-} internal_join_block_param_t;
+};
 
 #ifdef CONFIG_NAN
-typedef struct {
+struct rtw_nan_func_info_t {
 	u8 type;
 	u8 service_id[NL80211_NAN_FUNC_SERVICE_ID_LEN];
 	u8 publish_type;
@@ -46,7 +46,7 @@ typedef struct {
 	u8 num_rx_filters;
 	u8 instance_id;
 	u64 cookie;
-} rtw_nan_func_info_t;
+};
 #endif
 
 #endif //__RTW_LLHW_EVENT_H__

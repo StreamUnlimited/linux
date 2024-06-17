@@ -17,9 +17,8 @@
 #include <asm/io.h>
 #include <linux/of_device.h>
 
-#include <dt-bindings/realtek/dmac/realtek-amebad2-dmac.h>
+#include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
-#define RTK_LEDC_TODO				1
 #define RTK_LEDC_TEST_FOR_DMA_MODE		0
 
 /***********************************************************************/

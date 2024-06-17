@@ -351,7 +351,6 @@ void rtk_spi_clean_interrupt(
 
 	if (int_status & SPI_BIT_MSTIS_FAEIS) {
 		/* Another master is actively transferring data */
-		/* TODO: Do reading data... */
 		rtk_spi_readl(rtk_spi->base, SPI_MSTICR_FAEICR);
 	}
 
@@ -987,10 +986,16 @@ static bool rtk_spi_can_dma(struct spi_controller *controller,
 static int rtk_spi_calculate_dmatimeout(struct spi_transfer *transfer)
 {
 	unsigned long timeout = 0;
+	int ret = 0;
 
-	timeout = SPI_DMASHIFT_WAIT_MSECS * transfer->len / transfer->speed_hz;
-	timeout += SPI_DMAWAIT_TOLERANCE;
-	return msecs_to_jiffies(SPI_DMAWAIT_TOLERANCE * timeout * MSEC_PER_SEC);
+	if (transfer->speed_hz) {
+		timeout = SPI_DMASHIFT_WAIT_MSECS * transfer->len / transfer->speed_hz;
+		timeout += SPI_DMAWAIT_TOLERANCE;
+		ret = msecs_to_jiffies(SPI_DMAWAIT_TOLERANCE * timeout * MSEC_PER_SEC);
+	} else {
+		ret = msecs_to_jiffies(2000); // 2s for default when speed_hz = 0.
+	}
+	return ret;
 }
 
 /* Accept only 8-bit-rule data here. */
@@ -1578,13 +1583,6 @@ static int rtk_spi_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-#if RTK_SPI_TODO
-	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-	pm_runtime_use_autosuspend(&pdev->dev);
-	pm_runtime_set_active(&pdev->dev);
-	pm_runtime_enable(&pdev->dev);
-#endif // RTK_SPI_TODO
-
 	/* Register with the SPI framework */
 	platform_set_drvdata(pdev, rtk_spi);
 	spi_controller_set_devdata(controller, rtk_spi);
@@ -1599,20 +1597,11 @@ static int rtk_spi_probe(struct platform_device *pdev)
 	status = spi_register_controller(controller);
 	if (status != 0) {
 		dev_err(&pdev->dev, "Failed to register SPI controller\n");
-#if RTK_SPI_TODO
-		goto out_error_pm_runtime_enabled;
-#else
 		goto out_error_controller_alloc;
-#endif // RTK_SPI_TODO
 	}
 	dev_info(&pdev->dev, "SPI%d initialized successfully\n", controller->bus_num);
 
 	return status;
-
-#if RTK_SPI_TODO
-out_error_pm_runtime_enabled:
-	pm_runtime_disable(&pdev->dev);
-#endif // RTK_SPI_TODO
 
 out_error_controller_alloc:
 	spi_controller_put(controller);
@@ -1643,78 +1632,15 @@ static int rtk_spi_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#if RTK_SPI_TODO
-static int rtk_spi_suspend(struct device *dev)
-{
-	struct rtk_spi_controller *rtk_spi = dev_get_drvdata(dev);
-	int status;
-
-	status = spi_controller_suspend(rtk_spi->controller);
-	if (status != 0) {
-		return status;
-	}
-	//rtk_spi_write(rtk_spi, REG, 0);
-
-	if (!pm_runtime_suspended(dev)) {
-		clk_disable_unprepare(rtk_spi->clk);
-	}
-
-	return 0;
-}
-
-static int rtk_spi_resume(struct device *dev)
-{
-	struct rtk_spi_controller *rtk_spi = dev_get_drvdata(dev);
-	int status;
-
-	/* Enable the SSP clock */
-	if (!pm_runtime_suspended(dev)) {
-		status = clk_prepare_enable(rtk_spi->clk);
-		if (status) {
-			return status;
-		}
-	}
-
-	/* Start the queue running */
-	return spi_controller_resume(rtk_spi->controller);
-}
-
-static int rtk_spi_runtime_suspend(struct device *dev)
-{
-	struct rtk_spi_controller *rtk_spi = dev_get_drvdata(dev);
-
-	clk_disable_unprepare(rtk_spi->clk);
-	return 0;
-}
-
-static int rtk_spi_runtime_resume(struct device *dev)
-{
-	struct rtk_spi_controller *rtk_spi = dev_get_drvdata(dev);
-	int status;
-
-	status = clk_prepare_enable(rtk_spi->clk);
-	return status;
-}
-
-static const struct dev_pm_ops rtk_spi_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(rtk_spi_suspend, rtk_spi_resume)
-	SET_RUNTIME_PM_OPS(rtk_spi_runtime_suspend,
-					   rtk_spi_runtime_resume, NULL)
-};
-#endif // RTK_SPI_TODO
-
 static const struct of_device_id rtk_spi_of_match[] = {
-	{.compatible = "realtek,amebad2-spi"},
+	{.compatible = "realtek,ameba-spi"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, rtk_spi_of_match);
 
 static struct platform_driver rtk_spi_driver = {
 	.driver = {
-		.name	= "realtek-amebad2-spi",
-#if RTK_SPI_TODO
-		.pm	= &rtk_spi_pm_ops,
-#endif // RTK_SPI_TODO
+		.name	= "realtek-ameba-spi",
 		.of_match_table = of_match_ptr(rtk_spi_of_match),
 	},
 	.probe = rtk_spi_probe,

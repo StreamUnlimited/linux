@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_DRM_PANEL_PRIV_H_
-#define _AMEBAD2_DRM_PANEL_PRIV_H_
+#ifndef _AMEBA_DRM_PANEL_PRIV_H_
+#define _AMEBA_DRM_PANEL_PRIV_H_
 
 struct ameba_panel_desc {
 	struct device                   *dev;
@@ -25,4 +25,4 @@ static inline struct ameba_panel_desc *panel_to_desc(struct drm_panel *panel)
 	return container_of(panel, struct ameba_panel_desc, panel);
 }
 
-#endif  /*_AMEBAD2_DRM_PANEL_PRIV_H_*/
+#endif  /*_AMEBA_DRM_PANEL_PRIV_H_*/

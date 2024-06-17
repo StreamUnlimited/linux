@@ -30,8 +30,9 @@
 /* -------------------------- Function declaration -------------------------- */
 
 /* ---------------------------- Global Variables ---------------------------- */
-#define QUEUE_STOP_THRES	3
-#define QUEUE_WAKE_THRES	6
+#define PKT_DROP_THRES		10
+#define QUEUE_STOP_THRES	7
+#define QUEUE_WAKE_THRES	4
 
 struct  dev_sk_buff_head {
 	struct list_head	*next, *prev;

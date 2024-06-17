@@ -43,13 +43,13 @@
 
 static const struct hci_uart_proto *hup[HCI_UART_MAX_PROTO];
 
-#define AMEBAD2_PHY_ADDR          0x42008250
-#define AMEBAD2_ACTIVE_PHY_ADDR   0x42008254
+#define AMEBA_PHY_ADDR          0x42008250
+#define AMEBA_ACTIVE_PHY_ADDR   0x42008254
 #define BIT13	                  0x2000
 #define BIT14	                  0x4000
 
-void __iomem *amebad2_virtu_addr;
-void __iomem *amebad2_active_virtu_addr;
+void __iomem *ameba_virtu_addr;
+void __iomem *ameba_active_virtu_addr;
 
 int hci_uart_register_proto(const struct hci_uart_proto *p)
 {
@@ -191,9 +191,9 @@ static void hci_uart_write_work(struct work_struct *work)
 		/* acquire host wake up bt */
 		uint32_t data;
 
-		set_reg_value(amebad2_virtu_addr, BIT13 | BIT14, 3); // enable HOST_WAKE_BT No GPIO | HOST_WAKE_BT
+		set_reg_value(ameba_virtu_addr, BIT13 | BIT14, 3); // enable HOST_WAKE_BT No GPIO | HOST_WAKE_BT
 		while (1) {
-			data = readl(amebad2_active_virtu_addr) & 0x1F; // 0x42008254 [0:4]
+			data = readl(ameba_active_virtu_addr) & 0x1F; // 0x42008254 [0:4]
 			if (data == 4) {
 				/* bt active */
 				break;
@@ -227,7 +227,7 @@ restart:
 
 	if (1) {
 		/* release host wake up bt */
-		set_reg_value(amebad2_virtu_addr, BIT13 | BIT14, 0); // disable HOST_WAKE_BT No GPIO | HOST_WAKE_BT
+		set_reg_value(ameba_virtu_addr, BIT13 | BIT14, 0); // disable HOST_WAKE_BT No GPIO | HOST_WAKE_BT
 	}
 
 	wake_up_bit(&hu->tx_state, HCI_UART_SENDING);
@@ -934,8 +934,8 @@ static int __init hci_uart_init(void)
 	rtk_btcoex_init();
 #endif
 
-	amebad2_virtu_addr = ioremap(AMEBAD2_PHY_ADDR, 32);
-	amebad2_active_virtu_addr = ioremap(AMEBAD2_ACTIVE_PHY_ADDR, 32);
+	ameba_virtu_addr = ioremap(AMEBA_PHY_ADDR, 32);
+	ameba_active_virtu_addr = ioremap(AMEBA_ACTIVE_PHY_ADDR, 32);
 
 	return 0;
 }
@@ -957,8 +957,8 @@ static void __exit hci_uart_exit(void)
 	rtk_btcoex_exit();
 #endif
 
-	iounmap(amebad2_virtu_addr);
-	iounmap(amebad2_active_virtu_addr);
+	iounmap(ameba_virtu_addr);
+	iounmap(ameba_active_virtu_addr);
 }
 
 module_init(hci_uart_init);

@@ -16,6 +16,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <stddef.h>
@@ -813,7 +814,7 @@ static const struct audio_clock_driver clk_driver = {
 	.dump = ameba_clock_dump,
 };
 
-static int amebad2_audio_clock_probe(struct platform_device *pdev)
+static int ameba_audio_clock_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct audio_clock_data *clock_priv;
@@ -899,7 +900,7 @@ static int amebad2_audio_clock_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int amebad2_audio_clock_remove(struct platform_device *pdev)
+static int ameba_audio_clock_remove(struct platform_device *pdev)
 {
 	int res = 0;
 	device_destroy(realtek_audio_pll_class, devno);
@@ -912,21 +913,50 @@ static int amebad2_audio_clock_remove(struct platform_device *pdev)
 	return res;
 }
 
-static const struct of_device_id amebad2_audio_clock_match[] = {
-	{ .compatible = "realtek,amebad2-audio-clock", },
+#ifdef CONFIG_PM
+static int ameba_audio_clock_suspend(struct device *dev)
+{
+	update_98MP304M_input_clock_status(false);
+	update_45MP158_input_clock_status(false);
+	update_24MP576_input_clock_status(false);
+
+	return 0;
+}
+
+static int ameba_audio_clock_resume(struct device *dev)
+{
+	update_98MP304M_input_clock_status(true);
+	update_45MP158_input_clock_status(true);
+	update_24MP576_input_clock_status(true);
+
+	return 0;
+}
+#else
+#define ameba_audio_clock_suspend NULL
+#define ameba_audio_clock_resume NULL
+#endif
+
+static const struct dev_pm_ops ameba_audio_clock_pm_ops = {
+	.suspend = ameba_audio_clock_suspend,
+	.resume = ameba_audio_clock_resume,
+};
+
+static const struct of_device_id ameba_audio_clock_match[] = {
+	{ .compatible = "realtek,ameba-audio-clock", },
 	{},
 };
 
-static struct platform_driver amebad2_audio_clock_driver = {
-	.probe  = amebad2_audio_clock_probe,
-	.remove = amebad2_audio_clock_remove,
+static struct platform_driver ameba_audio_clock_driver = {
+	.probe  = ameba_audio_clock_probe,
+	.remove = ameba_audio_clock_remove,
 	.driver = {
-		.name = "amebad2-audio-clock",
-		.of_match_table = of_match_ptr(amebad2_audio_clock_match),
+		.name = "ameba-audio-clock",
+		.of_match_table = of_match_ptr(ameba_audio_clock_match),
+		.pm = &ameba_audio_clock_pm_ops,
 	},
 };
 
-module_platform_driver(amebad2_audio_clock_driver);
+module_platform_driver(ameba_audio_clock_driver);
 
 /* Module information */
 MODULE_DESCRIPTION("Realtek Ameba ALSA driver");

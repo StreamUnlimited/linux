@@ -7,7 +7,7 @@
 
 #ifndef _UNCOMPRESS_H_
 #define _UNCOMPRESS_H_
-//#ifndef CONFIG_AMEBAD2
+//#ifndef CONFIG_AMEBASMART
 #if 0
 #include <linux/serial_reg.h>
 

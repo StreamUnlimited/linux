@@ -2,8 +2,6 @@
 #define _RTW_SDIO_H_
 
 struct inic_sdio;
-typedef struct inic_sdio inic_sdio_t;
-typedef void		*_thread_hdl_;
 
 #include "ameba_inic.h"
 #include "rtw_sdio_reg.h"
@@ -49,7 +47,7 @@ struct inic_sdio {
 	s32 bSurpriseRemoved;
 	u8	irq_alloc;
 
-	_thread_hdl_ sys_sdio_irq_thd;
+	void *sys_sdio_irq_thd;
 
 	atomic_t continual_io_error;
 

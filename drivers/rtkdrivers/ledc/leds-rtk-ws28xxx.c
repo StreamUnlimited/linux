@@ -1120,7 +1120,7 @@ static int rtk_ws28xxx_led_register(struct device *dev,
 }
 
 static const struct of_device_id rtk_ws28xxx_led_of_match[] = {
-	{ .compatible = "realtek,amebad2-ws28xxx-led", },
+	{ .compatible = "realtek,ameba-ws28xxx-led", },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, rtk_ws28xxx_led_of_match);
@@ -1218,7 +1218,7 @@ static int rtk_ws28xxx_led_remove(struct platform_device *pdev)
 
 static struct platform_driver rtk_ws28xxx_led_driver = {
 	.driver = {
-		.name = "realtek-amebad2-ws28xxx-ledc",
+		.name = "realtek-ameba-ws28xxx-ledc",
 		.of_match_table = rtk_ws28xxx_led_of_match,
 	},
 	.probe = rtk_ws28xxx_led_probe,

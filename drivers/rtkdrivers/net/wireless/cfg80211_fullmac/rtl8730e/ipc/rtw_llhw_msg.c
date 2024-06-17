@@ -58,7 +58,7 @@ static void inic_msg_q_task(struct work_struct *data)
 			}
 			/* haddle the message */
 			if (priv->task_hdl) {
-				priv->task_hdl(&(p_node->ipc_msg));
+				priv->task_hdl(p_node->event_num, p_node->msg_addr, p_node->wlan_idx);
 			}
 
 			spin_lock_irq(&(priv->lock));
@@ -71,7 +71,7 @@ static void inic_msg_q_task(struct work_struct *data)
 	mutex_unlock(&(priv->msg_work_lock));
 }
 
-int inic_msg_q_init(struct device *pdev, void (*task_hdl)(struct inic_ipc_ex_msg *))
+int inic_msg_q_init(struct device *pdev, void (*task_hdl)(u8 event_num, u32 msg_addr, u8 wlan_idx))
 {
 	int i = 0;
 	struct ipc_msg_q_priv *msg_priv = &global_idev.msg_priv;
@@ -131,10 +131,9 @@ int inic_msg_enqueue(struct inic_ipc_ex_msg *p_ipc_msg)
 	}
 
 	/* To store the ipc message to queue's node. */
-	p_node->ipc_msg.event_num = p_ipc_msg->event_num;
-	p_node->ipc_msg.msg_addr = p_ipc_msg->msg_addr;
-	p_node->ipc_msg.msg_queue_status = p_ipc_msg->msg_queue_status;
-	p_node->ipc_msg.wlan_idx = p_ipc_msg->wlan_idx;
+	p_node->event_num = p_ipc_msg->event_num;
+	p_node->msg_addr = p_ipc_msg->msg_addr;
+	p_node->wlan_idx = p_ipc_msg->wlan_idx;
 
 	/* put the ipc message to the queue */
 	ret = enqueue_ipc_msg_node(priv, p_node);

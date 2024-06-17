@@ -23,18 +23,16 @@
 #define IPC_MSG_QUEUE_WARNING_DEPTH	(4)
 
 #define RTW_IP_ADDR_LEN 4
+#define RTW_IPv6_ADDR_LEN 16
 
 /* TODO: typeof */
 /* Layer 2 structs. */
-
-typedef unsigned int fullmac_join_status;
 
 /* Layer 1 structs. */
 struct event_priv_t {
 	struct tasklet_struct		api_tasklet; /* event_priv task to haddle event_priv msg */
 	ipc_msg_struct_t		api_ipc_msg; /* to store ipc msg for event_priv */
 	struct mutex			iiha_send_mutex; /* mutex to protect send host event_priv message */
-	spinlock_t			event_lock; /* lock to protect indicate event */
 	struct inic_ipc_host_req_msg	*preq_msg;/* host event_priv message to send to device */
 	dma_addr_t			req_msg_phy_addr;/* host event_priv message to send to device */
 	uint32_t			*dev_req_network_info;
@@ -47,7 +45,7 @@ struct ipc_msg_q_priv {
 	spinlock_t			lock; /* queue lock */
 	struct work_struct		msg_work; /* message task in linux */
 	struct mutex			msg_work_lock; /* tx lock lock */
-	void	(*task_hdl)(struct inic_ipc_ex_msg *);    /* the haddle function of task */
+	void	(*task_hdl)(u8 event_num, u32 msg_addr, u8 wlan_idx);    /* the haddle function of task */
 	bool				b_queue_working; /* flag to notice the queue is working */
 	struct ipc_msg_node		ipc_msg_pool[IPC_MSG_QUEUE_DEPTH]; /* static pool for queue node */
 	int				queue_free; /* the free size of queue */
@@ -70,16 +68,32 @@ struct xmit_priv_t {
 struct mlme_priv_t {
 	/* scan parameters. */
 	struct cfg80211_scan_request	*pscan_req_global;
+	bool b_in_scan;
 
 	/* join parameters. */
-	internal_join_block_param_t	*join_block_param;
-	fullmac_join_status		rtw_join_status;
+	struct internal_join_block_param	*join_block_param;
+	unsigned int		rtw_join_status;
 	u8				assoc_req_ie[ASSOC_IE_MAX_LEN];
 	u8				assoc_rsp_ie[ASSOC_IE_MAX_LEN];
 	size_t				assoc_req_ie_len;
 	size_t				assoc_rsp_ie_len;
 	struct cfg80211_external_auth_params auth_ext_para;
 };
+
+#ifdef CONFIG_P2P
+struct p2p_priv_t {
+	struct wireless_dev 	*pd_pwdev; /*wdev of P2P Device intf*/
+	u8						pd_wlan_idx;
+	enum rtw_p2p_role			p2p_role;
+	u16 					mgmt_register[3]; /* 0 for P2P_DEV, 1 for P2P_GO, 2 for P2P_GC */
+	u8						beacon_p2p_ie_idx;
+	u8						beacon_wps_ie_idx;
+	u8						roch_onging;
+	unsigned int			roch_duration;
+	u64						roch_cookie;
+	struct ieee80211_channel roch;
+};
+#endif
 
 struct inic_device {
 	/* device register to upper layer. */
@@ -104,12 +118,16 @@ struct inic_device {
 	struct mlme_priv_t		mlme_priv;
 	struct net_device_stats		stats[INIC_MAX_NET_PORT_NUM];
 	u8				ip_addr[RTW_IP_ADDR_LEN];
+	u8				ipv6_addr[RTW_IPv6_ADDR_LEN];
 	u8				wowlan_state; /* 0: resume, 1: suspend */
-
-	void __iomem			*km4_map_start;
 
 	/* wifi user config */
 	struct  wifi_user_conf	wifi_user_config;
+#ifdef CONFIG_P2P
+	struct p2p_priv_t		p2p_global;
+#endif
+
+	void __iomem			*km4_map_start;
 };
 /* TODO: kzalloc to platform device private data instead of axi_data. */
 extern struct inic_device global_idev;

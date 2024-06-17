@@ -6,6 +6,7 @@ static int enqueue_msg_node(struct msg_priv_t *priv, struct inic_msg_node *p_nod
 {
 	spin_lock(&(priv->lock));
 	list_add_tail(&(p_node->list), &(priv->queue_head));
+	atomic_inc(&priv->msg_num);
 	spin_unlock(&(priv->lock));
 
 	return 0;
@@ -26,6 +27,7 @@ static struct inic_msg_node *dequeue_msg_node(struct msg_priv_t *priv)
 		plist = phead->next;
 		p_node = list_entry(plist, struct inic_msg_node, list);
 		list_del(&(p_node->list));
+		atomic_dec(&priv->msg_num);
 	}
 
 	spin_unlock_irq(&(priv->lock));
@@ -65,6 +67,7 @@ int inic_msg_q_init(struct msg_priv_t *priv, void (*task_hdl)(void *))
 	/* initialize queue. */
 	spin_lock_init(&priv->lock);
 	INIT_LIST_HEAD(&priv->queue_head);
+	atomic_set(&priv->msg_num, 0);
 
 	/* assign the haddle function for the task */
 	priv->task_hdl = task_hdl;

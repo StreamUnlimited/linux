@@ -205,7 +205,7 @@ static int gdma_open(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_component *component =
-		snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+		snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 
 	struct device *dev = component->dev;
 	struct ameba_pcm_dma_private *dma_private;
@@ -240,7 +240,7 @@ static int gdma_close(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	struct device *dev = component->dev;
 
 	dma_info(1,component->dev,"%s",__func__);
@@ -269,7 +269,7 @@ static void ameba_pcm_release_dma_channel(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_data *data_0 = NULL;
@@ -297,7 +297,7 @@ static int ameba_pcm_request_dma_channel(struct snd_pcm_substream *substream, st
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	struct device *dev = component->dev;
 	struct ameba_pcm_dma_params *dma_params = dma_private->pcm_params;
 	struct ameba_pcm_dma_data *data_0 = NULL;
@@ -369,7 +369,7 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_params *dma_params;
 	struct dma_chan *chan;
@@ -460,7 +460,7 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 static void restart_dma_transfer(struct snd_pcm_substream *substream, struct ameba_pcm_dma_data *data)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	int ret;
 
 	load_dma_period(substream, data);
@@ -537,7 +537,7 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_data *data_0 = NULL;
 	struct ameba_pcm_dma_data *data_1 = NULL;
@@ -624,7 +624,7 @@ static int gdma_prepare(struct snd_pcm_substream *substream)
 static int gdma_trigger_start(struct snd_pcm_substream *substream, struct ameba_pcm_dma_data *data)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	int ret;
 
 	if (data == NULL) {
@@ -668,7 +668,7 @@ static int gdma_trigger(struct snd_pcm_substream *substream, int cmd)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	int ret = 0;
 	struct ameba_pcm_dma_data *data_0 = NULL;
 	struct ameba_pcm_dma_data *data_1 = NULL;
@@ -767,7 +767,7 @@ static snd_pcm_uframes_t
 
 /* calculate the target DMA-buffer position to be written/read
  * this function is only for interleaved data format.Because current
- * realtek amebad2 audio sport only support interleaved data.
+ * realtek ameba audio sport only support interleaved data.
  *
  * param channel here means to copy which channel, not the channel number.
  * For interleaved data, this channel always be 0.
@@ -832,7 +832,7 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	unsigned int frame_num = 0;
 	unsigned int format_bytes = 0;
 	unsigned long offset_bytes = hwoff;
@@ -877,7 +877,7 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 
 /*
  * this function is only for interleaved data format.Because current
- * realtek amebad2 audio sport only support interleaved data.
+ * realtek ameba audio sport only support interleaved data.
  *
  * param channel here means to copy which channel, not the channel number.
  * For interleaved data, this channel always be 0.
@@ -891,7 +891,7 @@ static int gdma_copy(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "amebad2-gdma");
+	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 
 	if (runtime->channels == 1 || runtime->channels == 2 || runtime->channels == 4) {
 		if (is_playback) {
@@ -996,7 +996,7 @@ static void gdma_free(struct snd_pcm *pcm)
 
 }
 static const struct snd_soc_component_driver asoc_gdma_platform = {
-	.name = "amebad2-gdma",
+	.name = "ameba-gdma",
 	.ops = &gdma_ops,
 	.pcm_new = gdma_new,
 	.pcm_free = gdma_free,
@@ -1027,16 +1027,16 @@ static int asoc_gdma_platform_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id amebad2_gdma_of_match[] = {
-	{ .compatible = "realtek,amebad2-audiodma", },
+static const struct of_device_id ameba_gdma_of_match[] = {
+	{ .compatible = "realtek,ameba-audiodma", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, amebad2_gdma_of_match);
+MODULE_DEVICE_TABLE(of, ameba_gdma_of_match);
 
 static struct platform_driver asoc_gdma_driver = {
 	.driver = {
-		.name = "amebad2-gdma",
-		.of_match_table = of_match_ptr(amebad2_gdma_of_match),
+		.name = "ameba-gdma",
+		.of_match_table = of_match_ptr(ameba_gdma_of_match),
 	},
 
 	.probe = asoc_gdma_platform_probe,

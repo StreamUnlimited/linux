@@ -345,13 +345,13 @@ static const struct snd_kcontrol_new common_snd_controls[] = {
 				alsa_dmic_number_put),
 };
 
-static int amebad2_codec_dai_set_dai_sysclk(struct snd_soc_dai *dai,
+static int ameba_codec_dai_set_dai_sysclk(struct snd_soc_dai *dai,
 		int clk_id, unsigned int freq, int dir)
 {
 	return 0;
 }
 
-static int amebad2_codec_dai_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+static int ameba_codec_dai_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
 	struct snd_soc_component *component = dai->component;
 	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
@@ -388,7 +388,7 @@ static unsigned int get_df_for_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	return sp_df;
 }
 
-static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
+static int ameba_codec_dai_hw_params(struct snd_pcm_substream *substream,
 			    struct snd_pcm_hw_params *params,
 			    struct snd_soc_dai *dai)
 {
@@ -426,7 +426,7 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 				i2s_init.codec_sel_i2s_tx_word_len = WL_24;
 				i2s_init.codec_sel_i2s_tx_ch_len = CL_32;
 				break;
-			//spec shows that amebad2 codec does not support 32bit
+			//spec shows that ameba codec does not support 32bit
 			default:
 				dev_err(component->dev, "Format(%d) not supported\n",
 						params_format(params));
@@ -489,23 +489,23 @@ static int amebad2_codec_dai_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int amebad2_codec_dai_aif_mute(struct snd_soc_dai *codec_dai, int mute)
+static int ameba_codec_dai_aif_mute(struct snd_soc_dai *codec_dai, int mute)
 {
 	return 0;
 }
 
-static int amebad2_codec_dai_set_fll(struct snd_soc_dai *dai, int id, int src,
+static int ameba_codec_dai_set_fll(struct snd_soc_dai *dai, int id, int src,
 			  unsigned int freq_in, unsigned int freq_out)
 {
 	return 0;
 }
 
-static int amebad2_codec_dai_set_tristate(struct snd_soc_dai *codec_dai, int tristate)
+static int ameba_codec_dai_set_tristate(struct snd_soc_dai *codec_dai, int tristate)
 {
 	return 0;
 }
 
-static int amebad2_codec_dai_startup(struct snd_pcm_substream *substream,struct snd_soc_dai *dai)
+static int ameba_codec_dai_startup(struct snd_pcm_substream *substream,struct snd_soc_dai *dai)
 {
 
 	struct snd_soc_component *component = dai->component;
@@ -514,13 +514,13 @@ static int amebad2_codec_dai_startup(struct snd_pcm_substream *substream,struct 
 	return 0;
 }
 
-static snd_pcm_sframes_t amebad2_codec_delay(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
+static snd_pcm_sframes_t ameba_codec_delay(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
 {
-	//amebad2 codec's delay is 36 samples for all sample rates.
+	//ameba codec's delay is 36 samples for all sample rates.
 	return 36;
 }
 
-static int amebad2_codec_dai_hw_free(struct snd_pcm_substream *substream,struct snd_soc_dai *dai)
+static int ameba_codec_dai_hw_free(struct snd_pcm_substream *substream,struct snd_soc_dai *dai)
 {
 	codec_init_params codec_init;
 	struct snd_soc_component *component = dai->component;
@@ -541,25 +541,25 @@ static int amebad2_codec_dai_hw_free(struct snd_pcm_substream *substream,struct 
 }
 
 
-static const struct snd_soc_dai_ops amebad2_aif_dai_ops = {
-	.set_sysclk		= amebad2_codec_dai_set_dai_sysclk,
-	.set_fmt		= amebad2_codec_dai_set_dai_fmt,
-	.hw_params		= amebad2_codec_dai_hw_params,
-	.startup		= amebad2_codec_dai_startup,
-	.delay			= amebad2_codec_delay,
-	.digital_mute	= amebad2_codec_dai_aif_mute,
-	.set_pll		= amebad2_codec_dai_set_fll,
-	.set_tristate	= amebad2_codec_dai_set_tristate,
-	.hw_free		= amebad2_codec_dai_hw_free,
+static const struct snd_soc_dai_ops ameba_aif_dai_ops = {
+	.set_sysclk		= ameba_codec_dai_set_dai_sysclk,
+	.set_fmt		= ameba_codec_dai_set_dai_fmt,
+	.hw_params		= ameba_codec_dai_hw_params,
+	.startup		= ameba_codec_dai_startup,
+	.delay			= ameba_codec_delay,
+	.digital_mute	= ameba_codec_dai_aif_mute,
+	.set_pll		= ameba_codec_dai_set_fll,
+	.set_tristate	= ameba_codec_dai_set_tristate,
+	.hw_free		= ameba_codec_dai_hw_free,
 };
 
 
 
-static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
+static int ameba_codec_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component =snd_soc_rtdcom_lookup(rtd, "amebad2-codec");
+	struct snd_soc_component *component =snd_soc_rtdcom_lookup(rtd, "ameba-codec");
 	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
 	codec_init_params codec_init =
@@ -763,10 +763,10 @@ static int amebad2_codec_hw_params(struct snd_pcm_substream *substream,
 
 }
 
-static int amebad2_codec_hw_free(struct snd_pcm_substream *substream)
+static int ameba_codec_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component =snd_soc_rtdcom_lookup(rtd, "amebad2-codec");
+	struct snd_soc_component *component =snd_soc_rtdcom_lookup(rtd, "ameba-codec");
 
 	codec_info(1,component->dev,"%s",__func__);
 
@@ -774,13 +774,13 @@ static int amebad2_codec_hw_free(struct snd_pcm_substream *substream)
 }
 
 static const struct snd_pcm_ops codec_ops = {
-	.hw_params	= amebad2_codec_hw_params,
-	.hw_free = amebad2_codec_hw_free,
+	.hw_params	= ameba_codec_hw_params,
+	.hw_free = ameba_codec_hw_free,
 };
 
-static struct snd_soc_dai_driver amebad2_dai[] = {
+static struct snd_soc_dai_driver ameba_dai[] = {
 	{
-		.name = "amebad2-aif1",
+		.name = "ameba-aif1",
 		.id = 0,
 		.playback = {
 			.stream_name = "AIF1 Playback",
@@ -794,10 +794,10 @@ static struct snd_soc_dai_driver amebad2_dai[] = {
 						SNDRV_PCM_FMTBIT_S32_LE,
 			.sig_bits = 24,
 		},
-		.ops = &amebad2_aif_dai_ops,
+		.ops = &ameba_aif_dai_ops,
 	},
 	{
-		.name = "amebad2-aif2",
+		.name = "ameba-aif2",
 		.id = 1,
 		.capture = {
 			.stream_name = "AIF2 Capture",
@@ -811,12 +811,12 @@ static struct snd_soc_dai_driver amebad2_dai[] = {
 						SNDRV_PCM_FMTBIT_S32_LE,
 			.sig_bits = 24,
 		},
-		.ops = &amebad2_aif_dai_ops,
+		.ops = &ameba_aif_dai_ops,
 	}
 };
 
 
-static int amebad2_codec_component_probe(struct snd_soc_component *component)
+static int ameba_codec_component_probe(struct snd_soc_component *component)
 {
 	struct ameba_priv *codec_priv = snd_soc_component_get_drvdata(component);
 
@@ -849,24 +849,53 @@ static int amebad2_codec_component_probe(struct snd_soc_component *component)
 	return 0;
 }
 
-static void amebad2_codec_component_remove(struct snd_soc_component *component)
+static void ameba_codec_component_remove(struct snd_soc_component *component)
 {
 	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
 	audio_codec_deinit(codec_priv->digital_addr,codec_priv->analog_addr);
 	audio_codec_amic_deinit(codec_priv->digital_addr,codec_priv->analog_addr);
 }
 
-static int amebad2_codec_component_suspend(struct snd_soc_component *component)
+static int ameba_codec_component_suspend(struct snd_soc_component *component)
 {
+	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
+
+	codec_info(1, component->dev,"%s",__func__);
+
+	audio_codec_deinit(codec_priv->digital_addr,codec_priv->analog_addr);
+	audio_codec_amic_deinit(codec_priv->digital_addr,codec_priv->analog_addr);
+	audio_codec_disable(codec_priv->analog_addr);
+
+	//clk_disable_unprepare(codec_priv->clock);
+
 	return 0;
 }
 
-static int amebad2_codec_component_resume(struct snd_soc_component *component)
+static int ameba_codec_component_resume(struct snd_soc_component *component)
 {
+	struct ameba_priv *codec_priv = snd_soc_component_get_drvdata(component);
+
+	codec_info(1, component->dev,"%s,digital_addr:%x",__func__,(u32)codec_priv->digital_addr);
+
+	//clk_prepare_enable(codec_priv->clock);
+
+	audio_codec_enable(codec_priv->digital_addr,codec_priv->analog_addr);
+
+	audio_codec_init(codec_priv->digital_addr,codec_priv->analog_addr);
+
+	audio_codec_set_hpo_diff(codec_priv->analog_addr);
+
+	audio_codec_set_dac_volume(0, MAX_VOLUME, codec_priv->digital_addr);
+	audio_codec_set_dac_volume(1, MAX_VOLUME, codec_priv->digital_addr);
+
+	audio_codec_zdet_init(DA_ZDET_TOUT_LEVEL1, codec_priv->digital_addr);
+
+	audio_codec_amic_power(codec_priv->digital_addr,codec_priv->analog_addr);
+
 	return 0;
 }
 
-static int amebad2_write_reg(struct snd_soc_component *component,
+static int ameba_write_reg(struct snd_soc_component *component,
 		     unsigned int reg, unsigned int val)
 {
 	u32 tmp;
@@ -881,7 +910,7 @@ static int amebad2_write_reg(struct snd_soc_component *component,
 	return 0;
 }
 
-static unsigned int amebad2_read_reg(struct snd_soc_component *component,
+static unsigned int ameba_read_reg(struct snd_soc_component *component,
 			     unsigned int reg)
 {
 	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
@@ -894,13 +923,13 @@ static unsigned int amebad2_read_reg(struct snd_soc_component *component,
 
 
 static const struct snd_soc_component_driver soc_component_drv_codec = {
-	.name = "amebad2-codec",
-	.probe			= amebad2_codec_component_probe,
-	.remove			= amebad2_codec_component_remove,
-	.suspend		= amebad2_codec_component_suspend,
-	.resume			= amebad2_codec_component_resume,
-	.write          = amebad2_write_reg,
-	.read           = amebad2_read_reg,
+	.name = "ameba-codec",
+	.probe			= ameba_codec_component_probe,
+	.remove			= ameba_codec_component_remove,
+	.suspend		= ameba_codec_component_suspend,
+	.resume			= ameba_codec_component_resume,
+	.write          = ameba_write_reg,
+	.read           = ameba_read_reg,
 	.ops 		    = &codec_ops,
 };
 
@@ -929,7 +958,7 @@ err:
 	return ret;
 }
 
-static int amebad2_codec_probe(struct platform_device *pdev)
+static int ameba_codec_probe(struct platform_device *pdev)
 {
 	struct ameba_priv *codec_priv;
 	struct resource *resource_reg_digital;
@@ -1046,10 +1075,10 @@ static int amebad2_codec_probe(struct platform_device *pdev)
 	dev_set_drvdata(&pdev->dev, codec_priv);
 
 	return devm_snd_soc_register_component(&pdev->dev, &soc_component_drv_codec,
-			amebad2_dai, ARRAY_SIZE(amebad2_dai));
+			ameba_dai, ARRAY_SIZE(ameba_dai));
 	return 0;
 }
-static int amebad2_codec_remove(struct platform_device *pdev)
+static int ameba_codec_remove(struct platform_device *pdev)
 {
 	struct ameba_priv *codec_priv;
     codec_info(1,&pdev->dev,"%s\n",__func__);
@@ -1062,23 +1091,23 @@ static int amebad2_codec_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id amebad2_codec_of_match[] = {
-	{ .compatible = "realtek,amebad2-codec", },
+static const struct of_device_id ameba_codec_of_match[] = {
+	{ .compatible = "realtek,ameba-codec", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, amebad2_codec_of_match);
+MODULE_DEVICE_TABLE(of, ameba_codec_of_match);
 
 
-static struct platform_driver amebad2_codec_driver = {
+static struct platform_driver ameba_codec_driver = {
 	.driver = {
-		.name = "amebad2-codec",
-		.of_match_table = of_match_ptr(amebad2_codec_of_match),
+		.name = "ameba-codec",
+		.of_match_table = of_match_ptr(ameba_codec_of_match),
 	},
-	.probe = amebad2_codec_probe,
-	.remove = amebad2_codec_remove,
+	.probe = ameba_codec_probe,
+	.remove = ameba_codec_remove,
 };
 
-module_platform_driver(amebad2_codec_driver);
+module_platform_driver(ameba_codec_driver);
 
 MODULE_DESCRIPTION("Realtek Ameba ALSA driver");
 MODULE_LICENSE("GPL v2");

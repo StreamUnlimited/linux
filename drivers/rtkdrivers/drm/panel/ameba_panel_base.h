@@ -5,8 +5,8 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#ifndef _AMEBAD2_DRM_PANEL_BASE_H_
-#define _AMEBAD2_DRM_PANEL_BASE_H_
+#ifndef _AMEBA_DRM_PANEL_BASE_H_
+#define _AMEBA_DRM_PANEL_BASE_H_
 
 #include "../ameba_drm_base.h"
 
@@ -25,4 +25,4 @@ struct ameba_drm_panel_struct {
 	LCM_setting_table_t     *init_table;
 };
 
-#endif  /*_AMEBAD2_DRM_PANEL_BASE_H_*/
+#endif  /*_AMEBA_DRM_PANEL_BASE_H_*/

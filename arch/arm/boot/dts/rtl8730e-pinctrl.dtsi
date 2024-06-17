@@ -6,12 +6,12 @@
 */
 
 #include <dt-bindings/interrupt-controller/irq.h>
-#include <dt-bindings/realtek/pinctrl/realtek-amebad2-pinfunc.h>
+#include <dt-bindings/realtek/pinctrl/realtek-ameba-pinfunc.h>
 
 / {
 	ocp {
 		pinctrl: pinctrl@42008A00 {
-			compatible = "realtek,amebad2-pinctrl";
+			compatible = "realtek,ameba-pinctrl";
 			#address-cells = <1>;
 			#size-cells = <1>;
 			reg = <0x42008A00 0x120>;
@@ -272,7 +272,7 @@
 		};
 
 		gpioa: gpio@4200D000 {
-			compatible = "realtek,amebad2-gpio";
+			compatible = "realtek,ameba-gpio";
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x4200D000 0x400>;
@@ -284,7 +284,7 @@
 		};
 
 		gpiob: gpio@4200D400 {
-			compatible = "realtek,amebad2-gpio";
+			compatible = "realtek,ameba-gpio";
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x4200D400 0x400>;
@@ -296,7 +296,7 @@
 		};
 
 		gpioc: gpio@4200D800 {
-			compatible = "realtek,amebad2-gpio";
+			compatible = "realtek,ameba-gpio";
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x4200D800 0x400>;
