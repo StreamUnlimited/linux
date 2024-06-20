@@ -28,6 +28,17 @@
 		device_type = "memory";
 		reg = <0x60800000 0xF800000>;  // 256MB -- exclude 8 MiB secure memory
 	};
+
+	reg_usb_drvvbus: reg-usb-drvvbus {
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb_drvvbus_pin>;
+		compatible = "regulator-fixed";
+		regulator-name = "usb_drvvbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio = <&gpiob 28 0>;
+		enable-active-high;
+	};
 };
 
 &aes {
@@ -40,18 +51,6 @@
 	// and create a conflict on our module, so let's remove them.
 	/delete-property/pinctrl-names;
 	/delete-property/pinctrl-0;
-};
-
-&gpiob {
-	pinctrl-names = "default";
-	pinctrl-0 = <&usb_drvvbus_pin>;
-
-	usb_drvvbus {
-		gpio-hog;
-		gpios = <28 GPIO_ACTIVE_HIGH>;
-		output-high;
-		line-name = "USB_DRVVBUS";
-	};
 };
 
 &hash {
@@ -103,6 +102,11 @@
 	// the audio PLLs as the clock sources. The SPORT0 is internally
 	// connected to the internal DAC and does not need any MCLK actually.
 	rtk,sport-mclk-multiplier = <256>;
+};
+
+&usb {
+	vbus-supply = <&reg_usb_drvvbus>;
+	status = "okay";
 };
 
 &watchdog {
