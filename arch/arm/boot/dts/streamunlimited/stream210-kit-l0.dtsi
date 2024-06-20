@@ -158,7 +158,7 @@
 
 &gpiob {
 	pinctrl-names = "default";
-	pinctrl-0 = <&usb_drvvbus_pin &hp_mute_n_pin>;
+	pinctrl-0 = <&hp_mute_n_pin>;
 
 	// TODO: Move this to a driver
 	hp_mute_n {
