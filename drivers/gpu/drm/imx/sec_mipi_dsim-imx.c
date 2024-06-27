@@ -499,8 +499,6 @@ static int imx_sec_dsim_runtime_suspend(struct device *dev)
 	clk_disable_unprepare(dsim_dev->clk_pllref);
 	clk_disable_unprepare(dsim_dev->clk_apb);
 
-	release_bus_freq(BUS_FREQ_HIGH);
-
 	return 0;
 }
 
@@ -520,8 +518,6 @@ static int imx_sec_dsim_runtime_resume(struct device *dev)
 
 	if (!atomic_dec_and_test(&dsim_dev->rpm_suspended))
 		return 0;
-
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	ret = clk_prepare_enable(dsim_dev->clk_pllref);
 	if (WARN_ON(unlikely(ret)))
