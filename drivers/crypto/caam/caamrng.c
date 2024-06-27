@@ -110,6 +110,7 @@ static int caam_rng_read_one(struct device *jrdev,
 		err = 0;
 	}
 
+	// We wait a bit in this function to let the CAAM settle
 	release_bus_freq(BUS_FREQ_HIGH);
 	dma_unmap_single(jrdev, dst_dma, len, DMA_FROM_DEVICE);
 
