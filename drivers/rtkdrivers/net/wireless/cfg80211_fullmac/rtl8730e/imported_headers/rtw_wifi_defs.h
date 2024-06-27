@@ -121,6 +121,7 @@
 #define WSEC_SWFLAG		0x0008		/**< WSEC SWFLAG */
 #define AES_CMAC_ENABLED	0x0010		/**< aes cmac enable */
 #define ENTERPRISE_ENABLED	0x0020		/**< enterprise enable */
+#define OWE_ENABLED		0X0040		/**< owe enable */
 #define SHARED_ENABLED		0x00008000	/**< shared enable */
 #define WPA_SECURITY		0x00200000	/**< wpa */
 #define WPA2_SECURITY		0x00400000	/**< wpa2 */
@@ -475,7 +476,8 @@ enum rtw_security {
 	RTW_SECURITY_WPA_WPA2_TKIP_PSK  = (WPA_SECURITY | WPA2_SECURITY | TKIP_ENABLED),                /**< WPA/WPA2 Security with TKIP             */
 	RTW_SECURITY_WPA_WPA2_AES_PSK   = (WPA_SECURITY | WPA2_SECURITY | AES_ENABLED),                 /**< WPA/WPA2 Security with AES              */
 	RTW_SECURITY_WPA_WPA2_MIXED_PSK = (WPA_SECURITY  | WPA2_SECURITY | TKIP_ENABLED | AES_ENABLED), /**< WPA/WPA2 Security with AES & TKIP       */
-	RTW_SECURITY_WPA3_AES_PSK	 = (WPA3_SECURITY | AES_ENABLED),				  /**< WPA3-SAE with AES security			   */
+	RTW_SECURITY_WPA3_AES_PSK	 = (WPA3_SECURITY | AES_ENABLED),				/**< WPA3-SAE with AES security			   */
+	RTW_SECURITY_WPA3_OWE	 = (WPA3_SECURITY | OWE_ENABLED | AES_ENABLED),				/**< WPA3-OWE with AES security			   */
 	RTW_SECURITY_WPA2_WPA3_MIXED = (WPA2_SECURITY | WPA3_SECURITY | AES_ENABLED), /**< WPA3-SAE/WPA2 with AES security		   */
 	RTW_SECURITY_WPA2_AES_CMAC      = (WPA2_SECURITY | AES_CMAC_ENABLED),                           /**< WPA2 Security with AES and Management Frame Protection */
 };
@@ -777,7 +779,8 @@ enum rtw_antdiv_mode {
 */
 enum rtw_802_11_band {
 	RTW_802_11_BAND_5GHZ   = 0, /**< Denotes 5GHz radio band */
-	RTW_802_11_BAND_2_4GHZ = 1  /**< Denotes 2.4GHz radio band */
+	RTW_802_11_BAND_2_4GHZ = 1,  /**< Denotes 2.4GHz radio band */
+	RTW_802_11_BAND_NOUSE = 0xFFFFFFFF
 };
 
 /**
@@ -787,7 +790,7 @@ enum rtw_bss_type {
 	RTW_BSS_TYPE_INFRASTRUCTURE 	= 0, /**< Denotes infrastructure network                  */
 	RTW_BSS_TYPE_ADHOC          		= 1, /**< Denotes an 802.11 ad-hoc IBSS network           */
 	RTW_BSS_TYPE_ANY            			= 2, /**< Denotes either infrastructure or ad-hoc network */
-	RTW_BSS_TYPE_UNKNOWN        		= -1 /**< May be returned by scan function if BSS type is unknown. Do not pass this to the Join function */
+	RTW_BSS_TYPE_UNKNOWN        		= 0xFFFFFFFF /**< May be returned by scan function if BSS type is unknown. Do not pass this to the Join function */
 };
 
 /**
@@ -814,7 +817,7 @@ enum rtw_wps_type {
 	RTW_WPS_TYPE_REGISTRAR_SPECIFIED 	= 0x0005,	/**< register specified type */
 	RTW_WPS_TYPE_NONE                   		= 0x0006, 	/**< none */
 	RTW_WPS_TYPE_WSC                    		= 0x0007,	/**< wsc type */
-	RTW_WPS_TYPE_NOUSE					= 0x00ff		/**< unsed type */
+	RTW_WPS_TYPE_NOUSE					= 0xffffffff		/**< unsed type */
 };
 
 /**
@@ -929,12 +932,12 @@ enum rtw_event_indicate {
 	WIFI_EVENT_OWE_PEER_KEY_RECV,
 #endif
 	/* kvr event */
-#if defined(CONFIG_RTW_WNM) || defined(CONFIG_IEEE80211K) || defined(CONFIG_IEEE80211R)
+#if defined(CONFIG_IEEE80211V) || defined(CONFIG_IEEE80211K) || defined(CONFIG_IEEE80211R)
 	WIFI_EVENT_KVR_CAP_UPDATE,
-#if defined(CONFIG_RTW_WNM) || defined(CONFIG_IEEE80211K)
+#if defined(CONFIG_IEEE80211V) || defined(CONFIG_IEEE80211K)
 	WIFI_EVENT_NB_RESP_RECV,
 #endif
-#ifdef CONFIG_RTW_WNM
+#ifdef CONFIG_IEEE80211V
 	WIFI_EVENT_BTM_REQ_RECV,
 	WIFI_EVENT_BTM_DEBUG_CMD,
 #endif
