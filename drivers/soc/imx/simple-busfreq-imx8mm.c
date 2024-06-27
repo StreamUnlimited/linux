@@ -12,7 +12,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
+#include <linux/busfreq-imx.h>
+#include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
@@ -34,6 +37,8 @@
 struct simple_busfreq_data
 {
 	bool high;
+	bool user_high;
+	unsigned high_bus_count;
 	u8 low_freq_index;
 
 	struct clk *noc_div;
@@ -42,7 +47,13 @@ struct simple_busfreq_data
 	struct clk *osc_24m;
 	struct clk *sys_pll2_333m;
 	struct clk *dram_pll;
+
+	struct device *dev;
+
+	struct mutex bus_freq_mutex;
 };
+
+static struct simple_busfreq_data pdata;
 
 /*
  * From the original busfreq-imx8mq.c implementation, but renamed
@@ -79,61 +90,123 @@ static void update_ddr_freq(int target)
  *   * AHB:     22 MHz
  *   * AXI:     25 MHz
  */
-static void set_bus_freq(struct simple_busfreq_data *pdata, bool high)
+static void update_bus_freq(void)
 {
-	if (pdata->high == high)
+	bool high = pdata.user_high || pdata.high_bus_count;
+
+	if (high == pdata.high)
 		return;
 
 	if (high) {
 		update_ddr_freq(HIGH_FREQ);
-		clk_set_rate(pdata->noc_div, HIGH_NOC_RATE);
-		clk_set_rate(pdata->ahb_div, HIGH_AHB_RATE);
-		clk_set_parent(pdata->main_axi_src, pdata->sys_pll2_333m);
+		clk_set_rate(pdata.noc_div, HIGH_NOC_RATE);
+		clk_set_rate(pdata.ahb_div, HIGH_AHB_RATE);
+		clk_set_parent(pdata.main_axi_src, pdata.sys_pll2_333m);
 	} else {
-		update_ddr_freq(pdata->low_freq_index);
-		clk_set_rate(pdata->noc_div, LOW_NOC_RATE);
-		clk_set_rate(pdata->ahb_div, LOW_AHB_RATE);
-		clk_set_parent(pdata->main_axi_src, pdata->osc_24m);
+		update_ddr_freq(pdata.low_freq_index);
+		clk_set_rate(pdata.noc_div, LOW_NOC_RATE);
+		clk_set_rate(pdata.ahb_div, LOW_AHB_RATE);
+		clk_set_parent(pdata.main_axi_src, pdata.osc_24m);
 	}
 
-	pdata->high = high;
+	pdata.high = high;
 }
+
+void request_bus_freq(enum bus_freq_mode mode)
+{
+	mutex_lock(&pdata.bus_freq_mutex);
+	if (mode == BUS_FREQ_HIGH) {
+		pdata.high_bus_count++;
+	}
+	update_bus_freq();
+	mutex_unlock(&pdata.bus_freq_mutex);
+}
+EXPORT_SYMBOL(request_bus_freq);
+
+void release_bus_freq(enum bus_freq_mode mode)
+{
+	mutex_lock(&pdata.bus_freq_mutex);
+	if (mode == BUS_FREQ_HIGH) {
+		if (pdata.high_bus_count == 0) {
+			dev_err(pdata.dev, "high bus count mismatch!\n");
+			dump_stack();
+			mutex_unlock(&pdata.bus_freq_mutex);
+			return;
+		}
+		pdata.high_bus_count--;
+	}
+	update_bus_freq();
+	mutex_unlock(&pdata.bus_freq_mutex);
+}
+EXPORT_SYMBOL(release_bus_freq);
+
+int get_bus_freq_mode(void)
+{
+	return pdata.high;
+}
+EXPORT_SYMBOL(get_bus_freq_mode);
+
+static ssize_t is_high_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", pdata.high);
+}
+
+static DEVICE_ATTR_RO(is_high);
+
+static ssize_t high_count_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", pdata.high_bus_count);
+}
+
+static DEVICE_ATTR_RO(high_count);
 
 static ssize_t set_high_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct simple_busfreq_data *pdata = (struct simple_busfreq_data *)dev_get_drvdata(dev);
-
-	return sprintf(buf, "%u\n", pdata->high);
+	return sprintf(buf, "%u\n", pdata.user_high);
 }
 
 static ssize_t set_high_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
 {
-	struct simple_busfreq_data *pdata = (struct simple_busfreq_data *)dev_get_drvdata(dev);
-
-	if (strncmp(buf, "1", 1) == 0)
-		set_bus_freq(pdata, true);
+	mutex_lock(&pdata.bus_freq_mutex);
+	if (strncmp(buf, "1", 1) == 0) 
+		pdata.user_high = true;
 	else if (strncmp(buf, "0", 1) == 0)
-		set_bus_freq(pdata, false);
-	else
+		pdata.user_high = false;
+	else {
+		mutex_unlock(&pdata.bus_freq_mutex);
 		return -EINVAL;
+	}
+
+	update_bus_freq();
+	mutex_unlock(&pdata.bus_freq_mutex);
 
 	return size;
 }
 static DEVICE_ATTR(set_high, 0644, set_high_show, set_high_store);
 
+static struct attribute *busfreq_attrs[] = {
+	&dev_attr_is_high.attr,
+	&dev_attr_high_count.attr,
+	&dev_attr_set_high.attr,
+	NULL,
+};
+
+static struct attribute_group busfreq_group = {
+	.attrs = busfreq_attrs,
+};
+
 static int simple_busfreq_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct device *dev = &pdev->dev;
-	struct simple_busfreq_data *pdata;
 	unsigned int fsp_table[4], i;
 	struct arm_smccc_res res;
 
-	pdata = devm_kzalloc(dev, sizeof(struct simple_busfreq_data), GFP_KERNEL);
-	if (!pdata)
-		return -ENOMEM;
+	memset(&pdata, 0, sizeof(pdata));
+	mutex_init(&pdata.bus_freq_mutex);
+	pdata.dev = dev;
 
-	dev_set_drvdata(dev, pdata);
+	dev_set_drvdata(dev, &pdata);
 
 #define CLK_GET(__clk, __name) \
 	__clk = devm_clk_get(dev, __name); \
@@ -142,11 +215,11 @@ static int simple_busfreq_probe(struct platform_device *pdev)
 		return -EINVAL; \
 	}
 
-	CLK_GET(pdata->noc_div, "noc_div");
-	CLK_GET(pdata->ahb_div, "ahb_div");
-	CLK_GET(pdata->main_axi_src, "main_axi_src");
-	CLK_GET(pdata->osc_24m, "osc_24m");
-	CLK_GET(pdata->sys_pll2_333m, "sys_pll2_333m");
+	CLK_GET(pdata.noc_div, "noc_div");
+	CLK_GET(pdata.ahb_div, "ahb_div");
+	CLK_GET(pdata.main_axi_src, "main_axi_src");
+	CLK_GET(pdata.osc_24m, "osc_24m");
+	CLK_GET(pdata.sys_pll2_333m, "sys_pll2_333m");
 
 #undef CLK_GET
 
@@ -169,11 +242,12 @@ static int simple_busfreq_probe(struct platform_device *pdev)
 		if (fsp_table[i] == 0)
 			break;
 
-	pdata->low_freq_index = i - 1;
+	pdata.low_freq_index = i - 1;
 
-	set_bus_freq(pdata, true);
+	pdata.user_high = true;
+	update_bus_freq();
 
-	ret = sysfs_create_file(&dev->kobj, &dev_attr_set_high.attr);
+	ret = devm_device_add_group(dev, &busfreq_group);
 	if (ret) {
 		dev_err(dev, "Failed to create sysfs entry.\n");
 		return ret;
@@ -185,10 +259,11 @@ static int simple_busfreq_probe(struct platform_device *pdev)
 static int simple_busfreq_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct simple_busfreq_data *pdata = (struct simple_busfreq_data *)dev_get_drvdata(dev);
 
-	set_bus_freq(pdata, true);
-	sysfs_remove_file(&dev->kobj, &dev_attr_set_high.attr);
+	devm_device_remove_group(dev, &busfreq_group);
+	
+	pdata.user_high = true;
+	update_bus_freq();
 
 	return 0;
 }
