@@ -103,6 +103,9 @@ static void update_bus_freq(void)
 		clk_set_rate(pdata.ahb_div, HIGH_AHB_RATE);
 		clk_set_parent(pdata.main_axi_src, pdata.sys_pll2_333m);
 	} else {
+		// Wait here a bit in high mode before returning
+		// Seems like the caamrng can't handle immidiate switch to low freq mode
+		usleep_range(50000, 100000);
 		update_ddr_freq(pdata.low_freq_index);
 		clk_set_rate(pdata.noc_div, LOW_NOC_RATE);
 		clk_set_rate(pdata.ahb_div, LOW_AHB_RATE);
