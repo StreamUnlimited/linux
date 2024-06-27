@@ -786,8 +786,6 @@ static int imx_lcdif_runtime_suspend(struct device *dev)
 
 	lcdif_disable_clocks(lcdif);
 
-	release_bus_freq(BUS_FREQ_HIGH);
-
 	return 0;
 }
 
@@ -804,11 +802,8 @@ static int imx_lcdif_runtime_resume(struct device *dev)
 	if (!atomic_dec_and_test(&lcdif->rpm_suspended))
 		return 0;
 
-	request_bus_freq(BUS_FREQ_HIGH);
-
 	ret = lcdif_enable_clocks(lcdif);
 	if (ret) {
-		release_bus_freq(BUS_FREQ_HIGH);
 		return ret;
 	}
 
