@@ -97,6 +97,10 @@
 	rtk,wait-timeout = <100>;
 };
 
+&misc{
+	rtk,ddr-auto-gating-ctrl = <1>;
+};
+
 &sport {
 	// Setting this parameter will force the SPORT0 interface to use
 	// the audio PLLs as the clock sources. The SPORT0 is internally
