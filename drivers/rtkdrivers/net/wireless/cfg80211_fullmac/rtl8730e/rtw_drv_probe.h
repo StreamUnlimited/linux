@@ -18,10 +18,6 @@ struct axi_data {
 	unsigned long		axi_mem_end; /* shared mem end */
 	unsigned long		axi_mem_start; /* shared mem start */
 
-	/* AXI MEM map */
-	unsigned long		axi_sys_mem_end; /* shared mem end */
-	unsigned long		axi_sys_mem_start; /* shared mem start */
-
 	void __iomem		*km4_mem_end;
 	void __iomem		*km4_mem_start;
 
