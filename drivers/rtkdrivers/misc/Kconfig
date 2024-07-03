@@ -4,3 +4,15 @@ config MISC_RTK_AMEBA
 	help
 		This enables the miscellaneous ioctl affairs.
 
+
+config HAVE_SUE_HSMP
+	bool
+
+config MISC_SUE_HSMP_RTK_MCU_IPC
+	tristate "StreamUnlimited HSMP driver over Realtek IPC"
+	depends on REGMAP
+	select HAVE_SUE_HSMP
+	help
+		This enables the StreamUnlimited HSMP protocol over the Realtek IPC mechanism for the
+		M0 core.
+
