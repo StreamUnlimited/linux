@@ -23,30 +23,6 @@
 		};
 	};
 
-	gpio-leds {
-		compatible = "gpio-leds";
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&rgb_led_pins>;
-		led_r {
-			label = "led_r";
-			gpios = <&gpiob 14 GPIO_ACTIVE_LOW>;
-			default-state = "off";
-		};
-
-		led_g {
-			label = "led_g";
-			gpios = <&gpiob 15 GPIO_ACTIVE_LOW>;
-			default-state = "off";
-		};
-
-		led_b {
-			label = "led_b";
-			gpios = <&gpiob 16 GPIO_ACTIVE_LOW>;
-			default-state = "off";
-		};
-	};
-
 	i2c1_gpio: i2c1_gpio {
 		compatible = "i2c-gpio";
 
@@ -61,6 +37,23 @@
 		i2c-gpio,delay-us = <2>;
 
 		status = "okay";
+	};
+
+	sue-hsmp {
+		compatible = "sue,hsmp-rtk-mcu-ipc";
+		status = "okay";
+
+		state-controller {
+			compatible = "sue,hsmp-state-controller";
+			status = "okay";
+		};
+
+		gpio_hsmp: gpio {
+			gpio-controller;
+			#gpio-cells = <2>;
+			compatible = "sue,hsmp-gpio";
+			status = "okay";
+		};
 	};
 };
 
@@ -199,15 +192,6 @@
 	ledc_pin: ledc_pin {
 		pins {
 			pinmux = <REALTEK_PINMUX('B', 27, LEDC)>;
-			bias-pull-up;
-		};
-	};
-
-	rgb_led_pins: rgb_led_pins {
-		pins {
-			pinmux = <REALTEK_PINMUX('B', 14, GPIO)>,
-				 <REALTEK_PINMUX('B', 15, GPIO)>,
-				 <REALTEK_PINMUX('B', 16, GPIO)>;
 			bias-pull-up;
 		};
 	};
