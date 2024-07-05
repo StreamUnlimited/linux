@@ -91,13 +91,6 @@
 	status = "disabled";
 };
 
-&crypto {
-	/*
-	 * Disable the crypto because it breaks in network standby mode.
-	 */
-	status = "disabled";
-};
-
 &caam_sm {
 	status = "disabled";
 };
