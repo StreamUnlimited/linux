@@ -9760,6 +9760,14 @@ void mgmt_connect_failed(struct hci_dev *hdev, struct hci_conn *conn, u8 status)
 	ev.status = mgmt_status(status);
 
 	mgmt_event(MGMT_EV_CONNECT_FAILED, hdev, &ev, sizeof(ev), NULL);
+
+	/* When the status indicates successful cancelation of connect
+	 * attempt (i.e. Unknown Connection Id) we will also finish
+	 * mgmt disconnect request which could initiated connection
+	 * abort.
+	 */
+	if (status == HCI_ERROR_UNKNOWN_CONN_ID)
+		mgmt_disconnect_failed(hdev, &conn->dst, conn->type, conn->dst_type, status);
 }
 
 void mgmt_pin_code_request(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 secure)
