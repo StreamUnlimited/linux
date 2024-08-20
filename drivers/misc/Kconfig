@@ -562,6 +562,12 @@ config TPS6594_PFSM
 	  This driver can also be built as a module.  If so, the module
 	  will be called tps6594-pfsm.
 
+config MISC_SUE_HSMP_STATE_CONTROLLER
+	tristate "StreamUnlimited state controller driver over HSMP"
+	depends on HAVE_SUE_HSMP && LEDS_CLASS
+	help
+	  This allows userspace to manage the device state using the HSMP protocol.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
