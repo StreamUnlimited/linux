@@ -1,0 +1,10 @@
+/dts-v1/;
+
+#include "fsl-imx8mm-sue-stream195x-internal.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-override-mk2.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit-lcd.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-touchscreen.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-pcmd3180.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-dabfm.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955mk2-override-mk2-dabfm.dtsi"
