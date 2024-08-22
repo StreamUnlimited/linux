@@ -1,0 +1,68 @@
+/*
+ * Copyright (C) 2024 StreamUnlimited, Inc. All rights reserved.
+ */
+
+/ {
+	sue {
+		carrierboard = "streamkit1955mk2";
+	};
+
+	reg_usb2_drvvbus: regulator@1 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usb2_drvvbus>;
+
+		regulator-name = "usb2_drvvbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&gpio4 28 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&fec1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_fec1>;
+	phy-mode = "rgmii-id";
+	phy-handle = <&rtl8211f>;
+	status = "okay";
+
+	phy-reset-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+	mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtl8211f: ethernet-phy@0 {
+			reg = <0>;
+			compatible = "ethernet-phy-id001c.c916";
+		};
+	};
+};
+
+&gpio1 {
+	/delete-node/ i2c_hdmi_en;
+};
+
+&gpio4 {
+	/delete-node/ hdmi_aux_switch;
+};
+
+&iomuxc {
+	imx8mm-s195x-kit-mk2 {
+		pinctrl_usb2_drvvbus: usb2drvvbusgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI3_RXFS_GPIO4_IO28	(PAD_CTL_PE_DOWN | PAD_CTL_HYS)
+			>;
+		};
+	};
+};
+
+/*
+ * The second USB port is provided by the external Programming Debug Adapter
+ */
+&usbotg2 {
+	dr_mode = "host";
+	status = "okay";
+	vbus-supply = <&reg_usb2_drvvbus>;
+	usb-role-switch;
+};
