@@ -24,7 +24,7 @@
 		daughterboard = "dabfm";
 	};
 
-	sound-dabfm {
+	sound_dabfm: sound-dabfm {
 		compatible = "sue,stream195x-audio";
 		sue-card,name = "dabfm";
 
