@@ -1482,6 +1482,13 @@ config GPIO_VIPERBOARD
 
 endmenu
 
+config GPIO_SUE_HSMP
+	tristate "GPIO driver using the StreamUnlimited HSMP protocol"
+	depends on HAVE_SUE_HSMP
+	help
+	  Say yes here to enable support for GPIO functionality using the
+	  StreamUnlimited HSMP protocol.
+
 config GPIO_MOCKUP
 	tristate "GPIO Testing Driver"
 	select IRQ_SIM
