@@ -10,12 +10,17 @@
 #include <linux/of_device.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#include <linux/gpio/consumer.h>
+#include <linux/regulator/consumer.h>
 
 #include <uapi/sound/rtk_audio_pll.h>
 #include "ameba_audio_clock.h"
 
 struct ameba_priv {
 	int cur_pll_ppm;
+	struct gpio_desc *amp_mute_gpio;
+	struct gpio_desc *hp_mute_gpio;
+	struct regulator *enable_regulator;
 };
 
 enum {
@@ -172,6 +177,66 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 	},
 };
 
+static int amp_power_event(struct snd_soc_dapm_widget *w,
+			   struct snd_kcontrol *kcontrol, int event)
+{
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(w->dapm->card);
+	int ret = 0;
+	static int last_event = 0;
+
+	if(last_event == event)
+		return 0;
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		gpiod_set_value_cansleep(priv->amp_mute_gpio, 1);
+		gpiod_set_value_cansleep(priv->hp_mute_gpio, 1);
+		ret = !regulator_is_enabled(priv->enable_regulator) ? regulator_enable(priv->enable_regulator) : 0;
+		msleep(50);
+		gpiod_set_value_cansleep(priv->amp_mute_gpio, 0);
+		gpiod_set_value_cansleep(priv->hp_mute_gpio, 0);
+	break;
+	case SND_SOC_DAPM_PRE_PMD:
+		gpiod_set_value_cansleep(priv->amp_mute_gpio, 1);
+		gpiod_set_value_cansleep(priv->hp_mute_gpio, 1);
+		ret = regulator_is_enabled(priv->enable_regulator) ? regulator_disable(priv->enable_regulator) : 0;
+	break;
+	default:
+		return 0;
+	}
+
+	last_event = event;
+	return ret;
+}
+
+static int ameba_card_probe(struct snd_soc_card *card)
+{
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
+
+	priv->amp_mute_gpio = devm_gpiod_get(card->dev, "amp_mute", GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->amp_mute_gpio))
+		return PTR_ERR(priv->amp_mute_gpio);
+
+	priv->hp_mute_gpio = devm_gpiod_get(card->dev, "hp_mute", GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->hp_mute_gpio))
+		return PTR_ERR(priv->hp_mute_gpio);
+
+	priv->enable_regulator = devm_regulator_get_exclusive(card->dev, "amp");
+	if (IS_ERR(priv->enable_regulator))
+		return PTR_ERR(priv->enable_regulator);
+
+	return 0;
+}
+
+/*
+* HACK: I think ameba does not support proper dapm, so handling AMP power events like this instead
+* Later we could take a look at sound/soc/codecs/simple-amplifier.c which was made for this purpose but needs full dapm
+*/
+static const struct snd_soc_dapm_widget ameba_dapm_widgets[] = {
+	SND_SOC_DAPM_PRE("Amplifier prepare", amp_power_event),
+	SND_SOC_DAPM_POST("Amplifier unprepare", amp_power_event),
+};
+
 static struct snd_soc_card ameba_snd = {
 	.name = "Ameba-snd",
 	.owner = THIS_MODULE,
@@ -179,6 +244,9 @@ static struct snd_soc_card ameba_snd = {
 	.num_links = ARRAY_SIZE(ameba_dai),
 	.controls = snd_soc_ameba_controls,
 	.num_controls = ARRAY_SIZE(snd_soc_ameba_controls),
+	.probe = ameba_card_probe,
+	.dapm_widgets = ameba_dapm_widgets,
+	.num_dapm_widgets	= ARRAY_SIZE(ameba_dapm_widgets),
 };
 
 static int ameba_audio_probe(struct platform_device *pdev)
