@@ -55,6 +55,13 @@
 			status = "okay";
 		};
 	};
+
+	amp_regulator: amp-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "amp-regulator";
+		gpio = <&gpioa 16 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
 };
 
 &captouch {
@@ -109,38 +116,10 @@
 	enable-dac-asrc;
 };
 
-&gpioa {
-	pinctrl-names = "default";
-	pinctrl-0 = <&amp_pins>;
-
-	// TODO: Move this to a driver
-	amp_enable {
-		gpio-hog;
-		gpios = <16 GPIO_ACTIVE_HIGH>;
-		output-high;
-		line-name = "AMP_ENABLE";
-	};
-
-	// TODO: Move this to a driver
-	amp_mute_n {
-		gpio-hog;
-		gpios = <15 GPIO_ACTIVE_LOW>;
-		output-low;
-		line-name = "AMP_MUTE_N";
-	};
-};
-
-&gpiob {
-	pinctrl-names = "default";
-	pinctrl-0 = <&hp_mute_n_pin>;
-
-	// TODO: Move this to a driver
-	hp_mute_n {
-		gpio-hog;
-		gpios = <19 GPIO_ACTIVE_LOW>;
-		output-low;
-		line-name = "HP_MUTE_N";
-	};
+&sound {
+	amp-supply = <&amp_regulator>;
+	amp_mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;
+	hp_mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
 };
 
 &ledc {
@@ -159,26 +138,11 @@
 };
 
 &pinctrl {
-	amp_pins: amp_pins {
-		pins {
-			pinmux = <REALTEK_PINMUX('A', 15, GPIO)>,	// AMP_MUTE_N
-				 <REALTEK_PINMUX('A', 16, GPIO)>;	// AMP_ENABLE
-			bias-pull-down;
-		};
-	};
-
 	i2c1_gpio_pins: i2c1_gpios {
 		pins {
 			pinmux = <REALTEK_PINMUX('B', 12, GPIO)>, // I2C1_SDA
 					<REALTEK_PINMUX('B', 13, GPIO)>;  // I2C1_SCL
 			bias-pull-up;
-		};
-	};
-
-	hp_mute_n_pin: hp_mute_n_pin {
-		pins {
-			pinmux = <REALTEK_PINMUX('B', 19, GPIO)>;
-			bias-pull-down;
 		};
 	};
 
