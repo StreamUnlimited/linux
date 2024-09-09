@@ -109,7 +109,7 @@
 		dma-names = "tx-0","tx-1","rx-0","rx-1";
 	};
 
-	sound {
+	sound:sound {
 		compatible = "realtek,ameba-audio";
 		rtk,sports-controller = <&sport>;
 		rtk,audio-codec = <&codec>;
