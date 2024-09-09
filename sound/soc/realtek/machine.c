@@ -186,6 +186,8 @@ static int ameba_audio_probe(struct platform_device *pdev)
 	int ret;
 	struct ameba_priv *priv;
 	struct snd_soc_card *card = &ameba_snd;
+	struct device_node *np = pdev->dev.of_node;
+	bool disable_analog_links;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -193,8 +195,7 @@ static int ameba_audio_probe(struct platform_device *pdev)
 
 	snd_soc_card_set_drvdata(card, priv);
 
-	struct device_node *np = pdev->dev.of_node;
-	bool disable_analog_links = of_property_read_bool(np, "sue,disable-analog-links");
+	disable_analog_links = of_property_read_bool(np, "sue,disable-analog-links");
 
 	card->dev = &pdev->dev;
 
