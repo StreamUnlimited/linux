@@ -122,6 +122,10 @@
 	rtk,ddr-auto-gating-ctrl = <1>;
 };
 
+&sdioh {
+	status = "disabled";
+};
+
 &sport {
 	// Setting this parameter will force the SPORT0 interface to use
 	// the audio PLLs as the clock sources. The SPORT0 is internally
