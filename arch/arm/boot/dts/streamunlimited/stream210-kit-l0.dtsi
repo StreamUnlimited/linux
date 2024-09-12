@@ -12,10 +12,6 @@
 	};
 
 	reserved-memory {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-
 		// Reserve 6 MiB for graphics, this is enough do drive a
 		// 480x800 32-bpp display with double-buffering using DRM.
 		// There is probably some more optimizations to be done,
@@ -24,21 +20,6 @@
 			compatible = "shared-dma-pool";
 			no-map;
 			reg = <0x64000000 0x600000>;
-		};
-
-		ramoops@0x64600000 {
-			compatible = "ramoops";
-
-			// 128 KiB buffer
-			reg = <0x64600000 0x20000>;
-
-			// We only care about a single crash/entry from the last boot,
-			// so make `record-size` equal to the total size
-			record-size = <0x20000>;
-
-			// Only dump panics, in our configuration we are setting
-			// `panic_on_oops=1` anyway which will log it.
-			no-dump-oops;
 		};
 	};
 

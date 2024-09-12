@@ -29,6 +29,27 @@
 		reg = <0x60800000 0xF800000>;  // 256MB -- exclude 8 MiB secure memory
 	};
 
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		ramoops@64600000 {
+			compatible = "ramoops";
+
+			// 128 KiB buffer
+			reg = <0x64600000 0x20000>;
+
+			// We only care about a single crash/entry from the last boot,
+			// so make `record-size` equal to the total size
+			record-size = <0x20000>;
+
+			// Only dump panics, in our configuration we are setting
+			// `panic_on_oops=1` anyway which will log it.
+			no-dump-oops;
+		};
+	};
+
 	reg_usb_drvvbus: reg-usb-drvvbus {
 		pinctrl-names = "default";
 		pinctrl-0 = <&usb_drvvbus_pin>;
