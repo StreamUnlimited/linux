@@ -521,11 +521,11 @@ static int realtek_captouch_remove(struct platform_device *pdev)
 		device_init_wakeup(&pdev->dev, false);
 	}
 
+	realtek_captouch_set_en(false);
 	clk_disable_unprepare(captouch->adc_clk);
 	clk_disable_unprepare(captouch->ctc_clk);
 	iounmap(captouch->path_base);
 	input_unregister_device(captouch->input);
-	realtek_captouch_set_en(false);
 
 	return 0;
 }
