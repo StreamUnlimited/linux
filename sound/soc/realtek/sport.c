@@ -977,7 +977,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
         .playback = {
                 .channels_min = 2,
                 .channels_max = 8,
-                .rates = SNDRV_PCM_RATE_8000_96000,
+                .rates = SNDRV_PCM_RATE_8000_384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -990,7 +990,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 		.capture = {
                 .channels_min = 2,
                 .channels_max = 8,
-                .rates = SNDRV_PCM_RATE_8000_96000,
+                .rates = SNDRV_PCM_RATE_8000_384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -1008,7 +1008,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
         .playback = {
                 .channels_min = 2,
                 .channels_max = 8,
-                .rates = SNDRV_PCM_RATE_8000_96000,
+                .rates = SNDRV_PCM_RATE_8000_384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -1021,7 +1021,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 		.capture = {
                 .channels_min = 2,
                 .channels_max = 8,
-                .rates = SNDRV_PCM_RATE_8000_96000,
+                .rates = SNDRV_PCM_RATE_8000_384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
