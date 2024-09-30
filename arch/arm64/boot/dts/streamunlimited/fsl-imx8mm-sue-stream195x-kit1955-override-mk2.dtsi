@@ -35,6 +35,7 @@
 		rtl8211f: ethernet-phy@0 {
 			reg = <0>;
 			compatible = "ethernet-phy-id001c.c916";
+			realtek,clkout-disable;
 		};
 	};
 };
