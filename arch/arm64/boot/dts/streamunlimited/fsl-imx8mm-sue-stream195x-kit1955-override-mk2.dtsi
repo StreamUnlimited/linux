@@ -59,11 +59,10 @@
 };
 
 /*
- * The second USB port is provided by the external Programming Debug Adapter
+ * The second USB port is provided by the small breakaway PCB and is used for USB Audio Device.
  */
 &usbotg2 {
-	dr_mode = "host";
+	dr_mode = "device";
 	status = "okay";
 	vbus-supply = <&reg_usb2_drvvbus>;
-	usb-role-switch;
 };
