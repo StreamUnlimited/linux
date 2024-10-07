@@ -150,14 +150,14 @@ static struct snd_soc_dai_link ameba_dai[] = {
 		.name = "codec AIF3",
 		.stream_name = "SPORT2_I2S_Dai",
 		.ops = &ameba_ops,
-		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
+		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif3),
 	},
 	{
 		.name = "codec AIF4",
 		.stream_name = "SPORT3_I2S_Dai",
 		.ops = &ameba_ops,
-		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
+		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif4),
 	},
 };
@@ -167,14 +167,14 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 		.name = "codec AIF3",
 		.stream_name = "SPORT2_I2S_Dai",
 		.ops = &ameba_ops,
-		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
+		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif3),
 	},
 	{
 		.name = "codec AIF4",
 		.stream_name = "SPORT3_I2S_Dai",
 		.ops = &ameba_ops,
-		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
+		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif4),
 	},
 };
