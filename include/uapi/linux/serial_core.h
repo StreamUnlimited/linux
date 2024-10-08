@@ -245,4 +245,10 @@
 /* Sunplus UART */
 #define PORT_SUNPLUS	123
 
+/*Realtek Ameba logUART*/
+#define PORT_AMEBA	123
+
+/*Realtek Ameba UART*/
+#define PORT_RTK	124
+
 #endif /* _UAPILINUX_SERIAL_CORE_H */
