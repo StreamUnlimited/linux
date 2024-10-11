@@ -302,6 +302,7 @@ static inline int rtk_dma_hw_cfg_lli(
 {
 	struct rtk_dma *rsdma = to_rtk_dma(vchan->vc.chan.device);
 	struct rtk_dma_hw_cfg *hw_cfg = &lli->hw;
+	struct dma_peripheral_config *sconfig_prei = sconfig->peripheral_config;
 	bool is_cyclic = txd->cyclic;
 
 	u8 secure = 0;
@@ -316,23 +317,27 @@ static inline int rtk_dma_hw_cfg_lli(
 	u8 dst_handshake_add1 = 0;
 	u8 dst_handshake_add2 = 0;
 
+	if (!sconfig_prei) {
+		return -EINVAL;
+	}
+
 	switch (dir) {
 	case DMA_DEV_TO_MEM:
 		if (is_cyclic) {
 			hw_cfg->src_inc_type = NoChange;
 			hw_cfg->dst_inc_type = IncType;
 		}
-		if (sconfig->slave_id < 16) {
-			src_handshake_interface = sconfig->slave_id;
-		} else if (sconfig->slave_id >= 16 && sconfig->slave_id < 32) {
+		if (sconfig_prei->slave_id < 16) {
+			src_handshake_interface = sconfig_prei->slave_id;
+		} else if (sconfig_prei->slave_id >= 16 && sconfig_prei->slave_id < 32) {
 			src_handshake_add1 = 1;
-			src_handshake_interface = sconfig->slave_id - 16;
-		} else if (sconfig->slave_id >= 32) {
+			src_handshake_interface = sconfig_prei->slave_id - 16;
+		} else if (sconfig_prei->slave_id >= 32) {
 			src_handshake_add2 = 1;
-			if (sconfig->slave_id >= 48) {
+			if (sconfig_prei->slave_id >= 48) {
 				src_handshake_add1 = 1;
 			}
-			src_handshake_interface = sconfig->slave_id - 32;
+			src_handshake_interface = sconfig_prei->slave_id - 32;
 		}
 		break;
 	case DMA_MEM_TO_DEV:
@@ -340,17 +345,17 @@ static inline int rtk_dma_hw_cfg_lli(
 			hw_cfg->src_inc_type = IncType;
 			hw_cfg->dst_inc_type = NoChange;
 		}
-		if (sconfig->slave_id < 16) {
-			dst_handshake_interface = sconfig->slave_id;
-		} else if (sconfig->slave_id >= 16 && sconfig->slave_id < 32) {
+		if (sconfig_prei->slave_id < 16) {
+			dst_handshake_interface = sconfig_prei->slave_id;
+		} else if (sconfig_prei->slave_id >= 16 && sconfig_prei->slave_id < 32) {
 			dst_handshake_add1 = 1;
-			dst_handshake_interface = sconfig->slave_id - 16;
-		} else if (sconfig->slave_id >= 32) {
+			dst_handshake_interface = sconfig_prei->slave_id - 16;
+		} else if (sconfig_prei->slave_id >= 32) {
 			dst_handshake_add2 = 1;
-			if (sconfig->slave_id >= 48) {
+			if (sconfig_prei->slave_id >= 48) {
 				dst_handshake_add1 = 1;
 			}
-			dst_handshake_interface = sconfig->slave_id - 32;
+			dst_handshake_interface = sconfig_prei->slave_id - 32;
 		}
 		break;
 	case DMA_MEM_TO_MEM:

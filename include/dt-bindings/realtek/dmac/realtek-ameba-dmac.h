@@ -76,4 +76,8 @@
   * @}
   */
 
+struct dma_peripheral_config {
+	int slave_id;
+};
+
 #endif

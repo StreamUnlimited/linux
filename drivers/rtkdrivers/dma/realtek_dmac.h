@@ -21,6 +21,7 @@
 #include <linux/of_dma.h>
 #include <linux/slab.h>
 #include "../../dma/virt-dma.h"
+#include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
 #define DEBUG
 #define RTK_DMAC_DEBUG_DETAILS		0
@@ -261,29 +262,6 @@
 #define ErrType				((u32)0x000000010)
 
 #define IS_GDMA_CONFIG_IT(IT) ((((IT) & 0xFFFFFFE0) == 0x00) && ((IT) != 0x00))
-
-/** @defgroup GDMA0_HS_Interface_definition GDMA HandShake Interface Definition
-  * @{
-  */
-#define GDMA_HANDSHAKE_INTERFACE_UART0_TX	(0)
-#define GDMA_HANDSHAKE_INTERFACE_UART0_RX	(1)
-#define GDMA_HANDSHAKE_INTERFACE_UART1_TX	(2)
-#define GDMA_HANDSHAKE_INTERFACE_UART1_RX	(3)
-#define GDMA_HANDSHAKE_INTERFACE_UART3_TX	(6)
-#define GDMA_HANDSHAKE_INTERFACE_UART3_RX	(7)
-#define GDMA_HANDSHAKE_INTERFACE_SPI0_TX	(4)
-#define GDMA_HANDSHAKE_INTERFACE_SPI0_RX	(5)
-#define GDMA_HANDSHAKE_INTERFACE_SPI1_TX	(6)
-#define GDMA_HANDSHAKE_INTERFACE_SPI1_RX	(7)
-#define GDMA_HANDSHAKE_INTERFACE_I2C0_TX	(2)
-#define GDMA_HANDSHAKE_INTERFACE_I2C0_RX	(3)
-#define GDMA_HANDSHAKE_INTERFACE_ADC_RX		(5)
-#define GDMA_HANDSHAKE_INTERFACE_AUDIO_TX	(10)
-#define GDMA_HANDSHAKE_INTERFACE_AUDIO_RX	(11)
-#define GDMA_HANDSHAKE_INTERFACE_USI0_TX	(8)
-#define GDMA_HANDSHAKE_INTERFACE_USI0_RX	(9)
-#define GDMA_HANDSHAKE_INTERFACE_SGPIO_TX	(4)
-
 
 /**************************************************************************/
 
