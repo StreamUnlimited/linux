@@ -295,7 +295,6 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 #endif
 
 	mutex_lock(&spi->lock);
-	local_irq_save(flags);
 
 	nbytes = op->data.nbytes;
 	ctrl0_bak = map->ctrlr0;
@@ -448,7 +447,6 @@ static int rxi312_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	umode_dis_ns = ktime_get_raw_ns() - umode_dis_ns;
 #endif
 
-	local_irq_restore(flags);
 	mutex_unlock(&spi->lock);
 
 #if SPIC_TP_TEST_EN
@@ -490,14 +488,12 @@ static const struct spi_controller_mem_ops rxi312_spi_mem_ops = {
 /* Setup, initialize SPI mode as per bootloader settings */
 static int rxi312_spi_setup(struct spi_device *sdev)
 {
-// printk("[rtk] 000");
 	struct rxi312_spi *spi = spi_master_get_devdata(sdev->master);
 	struct rxi312_spi_map *map = spi->user_base;
 	u32 ctrl0;
 	u32 valid_cmd;
 
 	mutex_lock(&spi->lock);
-// printk("[rtk] 111 spi->user_base = %x", spi->user_base);
 	ctrl0 = map->ctrlr0;
 	valid_cmd = map->valid_cmd;
 
@@ -506,19 +502,18 @@ static int rxi312_spi_setup(struct spi_device *sdev)
 	if (ctrl0 & BIT_SCPOL) {
 		sdev->mode |= SPI_CPOL;
 	}
-// printk("[rtk] 222");
+
 	if (ctrl0 & BIT_SCPH) {
 		sdev->mode |= SPI_CPHA;
 	}
-// printk("[rtk] 333");
+
 	if (((valid_cmd & BIT_RD_QUAD_IO) != 0) || ((valid_cmd & BIT_RD_QUAD_O) != 0)) {
 		sdev->mode |= SPI_TX_QUAD | SPI_RX_QUAD;
 	} else if (((valid_cmd & BIT_RD_DUAL_IO) != 0) || ((valid_cmd & BIT_RD_DUAL_I) != 0)) {
 		sdev->mode |= SPI_TX_DUAL | SPI_RX_DUAL;
 	}
-// printk("[rtk] 444");
+
 	dev_info(&sdev->dev, "SPI mode = 0x%08X\n", sdev->mode);
-// printk("[rtk] 555");
 	mutex_unlock(&spi->lock);
 
 	return 0;
@@ -578,42 +573,17 @@ static int rxi312_spi_probe(struct platform_device *pdev)
 		goto fail_get_resource;
 	}
 
-	// // printk("[spic-nand] mem->start = %x, size = %x", mem->start, resource_size(mem));
-
-	// if (!devm_request_mem_region(&pdev->dev, mem->start, resource_size(mem), pdev->name)) {
-	// 	// printk("[spic-nand] status EBUSY !!!");
-	// 	status = -EBUSY;
-	// 	goto fail_get_resource;
-	// }
-
-	// spi->user_base = devm_ioremap_nocache(&pdev->dev, mem->start, resource_size(mem));
 	spi->user_base = devm_ioremap_resource(&pdev->dev, mem);
-	// printk("[spic-nand] 111. spi->user_base = %x", spi->user_base);
 	if (!spi->user_base) {
-		// printk("[spic-nand] err 1.");
 		status = -ENXIO;
 		goto fail_ioremap_nocache;
 	}
-
-	// printk("[spic-nand] 222.");
 
 	status = devm_spi_register_master(&pdev->dev, master);
 	if (status) {
 		dev_err(&pdev->dev, "Failed to register SPI master: %d\n", status);
 		goto fail_register_master;
 	}
-	// printk("[spic-nand] 333. spi->user_base = %x, spi->user_base");
-
-	// if (!spi->user_base) {
-	// 	// printk("[spi-nand] no user_base, ioremap...");
-	// 	spi->user_base = devm_ioremap_resource(&pdev->dev, mem);
-	// 	if (!spi->user_base) {
-	// 		// printk("[spic-nand] err 1.");
-	// 		status = -ENXIO;
-	// 		goto fail_ioremap_nocache;
-	// 	}
-	// }
-
 	return status;
 
 fail_register_master:
