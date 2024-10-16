@@ -423,23 +423,23 @@ void ir_recv_end(struct rtk_ir_dev *ir_rtk)
 	int i, us_duration = 0;
 	struct ir_raw_event rx_ev;
 
-	ir_raw_event_reset(ir_rtk->rcdev);
+	ir_raw_event_overflow(ir_rtk->rcdev);
 
 	ir_rtk->rcdev->raw->dev->enabled_protocols = RC_PROTO_BIT_NEC;
 	rx_ev.carrier = ir_rtk->ir_param.ir_freq;
 	rx_ev.duty_cycle = 1 / ir_rtk->ir_param.ir_duty_cycle;
-	rx_ev.reset = 0;
+	rx_ev.overflow = 0;
 	rx_ev.carrier_report = 0;
 
 	for (i = 0; i < ir_rtk->ir_manage.wbuf_index; i++) {
 		if (ir_rtk->ir_manage.wbuf[i] & IR_BIT_RX_LEVEL) {
 			us_duration =  1000 * (ir_rtk->ir_manage.wbuf[i] & IR_MASK_RX_CNT) / (ir_rtk->ir_param.ir_freq / 1000);
-			rx_ev.duration = US_TO_NS(us_duration);
+			rx_ev.duration = us_duration;
 			rx_ev.pulse = ir_rtk->ir_param.ir_rx_inverse? 0 : 1;
 			ir_raw_event_store(ir_rtk->rcdev, &rx_ev);
 		} else {
 			us_duration =  1000 * ir_rtk->ir_manage.wbuf[i] / (ir_rtk->ir_param.ir_freq / 1000);
-			rx_ev.duration = US_TO_NS(us_duration);
+			rx_ev.duration = us_duration;
 			rx_ev.pulse = ir_rtk->ir_param.ir_rx_inverse? 1 : 0;
 			ir_raw_event_store(ir_rtk->rcdev, &rx_ev);
 		}
