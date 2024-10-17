@@ -595,7 +595,7 @@ static void rtk_uart_do_tx(struct uart_port *port)
 
 		val = xmit->buf[xmit->tail];
 		rtk_uart_writel(port, val, RBR_OR_UART_THR);
-		xmit->tail = (xmit->tail + 1) & (SERIAL_XMIT_SIZE - 1);
+		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		port->icount.tx++;
 	}
 
@@ -875,7 +875,7 @@ static void rtk_uart_setbaud(struct uart_port *port, unsigned int bandrate)
  */
 static void rtk_uart_set_termios(struct uart_port *port,
 								 struct ktermios *new,
-								 struct ktermios *old)
+								 const struct ktermios *old)
 {
 	unsigned int ctl, baud, val;
 	unsigned long flags;
