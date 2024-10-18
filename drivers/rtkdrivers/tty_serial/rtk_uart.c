@@ -1105,9 +1105,7 @@ static int rtk_uart_probe(struct platform_device *pdev)
 	}
 
 	port->mapbase = res_mem->start;
-	printk("[driver] 333 port->mapbase = %x", port->mapbase);
 	port->membase = devm_ioremap_resource(&pdev->dev, res_mem);
-	printk("[driver] 444 port->mapbase = %x", port->mapbase);
 	if (IS_ERR(port->membase)) {
 		dev_err(&pdev->dev, "Failed to ioremap resource\n");
 		return PTR_ERR(port->membase);

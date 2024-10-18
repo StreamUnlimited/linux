@@ -275,7 +275,6 @@
 			clock-names = "rtk_spi_clk";
 			spi-max-frequency = <100000000>;
 			spi-deactivate-delay = <0>;
-			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <0>;
 			rtk,spi-dma-en = <0>;
 			dmas = <&dma 16>,<&dma 17>;
@@ -298,7 +297,6 @@
 			clock-names = "rtk_spi_clk";
 			spi-max-frequency = <100000000>;
 			spi-deactivate-delay = <0>;
-			rtk,spi-for-kernel = <0>;
 			rtk,spi-slave-mode = <1>;
 			rtk,spi-dma-en = <0>;
 			dmas = <&dma 18>,<&dma 19>;

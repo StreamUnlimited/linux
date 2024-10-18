@@ -13,6 +13,7 @@
 
 #include "spi-realtek-general.h"
 #include <linux/of_gpio.h>
+#include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
 /* Mapping address used by both SPI0 and SPI1. */
 static void __iomem *role_set_base = 0;
@@ -103,9 +104,7 @@ void rtk_spi_struct_init(
 	char s4[] = "rtk,spi-index";
 	char s5[] = "rtk,spi-dma-en";
 	char s6[] = "rtk,spi-master-poll-mode";
-	char s7[] = "rtk,spi-for-kernel";
 	int ret = 0;
-	enum of_gpio_flags flags;
 
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.dma_params.spi_phy_addr, 0, s0);
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.spi_default_cs, 0, s1);
@@ -114,7 +113,6 @@ void rtk_spi_struct_init(
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.spi_index, 0, s4);
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.dma_enabled, 0, s5);
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.spi_poll_mode, 0, s6);
-	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.spi_for_kernel, 0, s7);
 
 	rtk_spi->spi_param.rx_threshold_level = 0;
 	rtk_spi->spi_param.tx_threshold_level = 1;
@@ -137,7 +135,7 @@ void rtk_spi_struct_init(
 	rtk_spi->spi_manage.dma_params.tx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
 
 	if (!rtk_spi->spi_manage.is_slave) {
-		rtk_spi->spi_manage.spi_cs_pin = of_get_named_gpio_flags(np, "rtk,spi-cs-gpios", 0, &flags);
+		rtk_spi->spi_manage.spi_cs_pin = of_get_named_gpio(np, "rtk,spi-cs-gpios", 0);
 		ret = gpio_request(rtk_spi->spi_manage.spi_cs_pin, NULL);
 		if (ret != 0) {
 			dev_err(rtk_spi->dev, "Failed to request SPI CS pin\n");
@@ -659,7 +657,7 @@ static irqreturn_t rtk_spi_interrupt_handler(int irq, void *dev_id)
 		dev_dbg(rtk_spi->dev, "SS_N rising edge detected\n");
 		rtk_spi_interrupt_config(rtk_spi, SPI_BIT_SSRIM, DISABLE);
 		if (rtk_spi->spi_manage.is_slave) {
-			if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
+			if (rtk_spi->controller && rtk_spi->controller->cur_msg_mapped) {
 				complete(&rtk_spi->spi_manage.txrx_completion);
 			}
 
@@ -999,6 +997,8 @@ int rtk_spi_do_dma_transfer(
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 	struct rtk_spi_gdma_parameters	*dma_params;
+	struct dma_peripheral_config dma_peri_rx;
+	struct dma_peripheral_config dma_peri_tx;
 	unsigned long transfer_timeout, timeout;
 	int ret = -EIO;
 
@@ -1077,10 +1077,12 @@ int rtk_spi_do_dma_transfer(
 	dma_params->rx_config->src_maxburst = 4;
 
 	if (rtk_spi->spi_manage.spi_index == 0) {
-		dma_params->rx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_RX;
+		dma_peri_rx.slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_RX;
 	} else {
-		dma_params->rx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_RX;
+		dma_peri_rx.slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_RX;
 	}
+	dma_params->rx_config->peripheral_config = &dma_peri_rx;
+	dma_params->rx_config->peripheral_size = sizeof(struct dma_peripheral_config);
 
 	dma_params->tx_config->src_addr = transfer->tx_dma;
 	dma_params->tx_config->direction = DMA_MEM_TO_DEV;
@@ -1091,10 +1093,12 @@ int rtk_spi_do_dma_transfer(
 	dma_params->tx_config->src_maxburst = 1;
 
 	if (rtk_spi->spi_manage.spi_index == 0) {
-		dma_params->tx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_TX;
+		dma_peri_tx.slave_id = GDMA_HANDSHAKE_INTERFACE_SPI0_TX;
 	} else {
-		dma_params->tx_config->slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_TX;
+		dma_peri_tx.slave_id = GDMA_HANDSHAKE_INTERFACE_SPI1_TX;
 	}
+	dma_params->tx_config->peripheral_config = &dma_peri_tx;
+	dma_params->tx_config->peripheral_size = sizeof(struct dma_peripheral_config);
 
 	ret = dmaengine_slave_config(dma_params->rx_chan, dma_params->rx_config);
 	if (ret < 0) {
@@ -1377,24 +1381,11 @@ int rtk_spi_transfer_one(
 	return ret;
 }
 
-static void spi_init_board_info(
-	struct rtk_spi_controller *rtk_spi,
-	struct spi_board_info *rtk_spi_chip)
-{
-	strcpy(rtk_spi_chip->modalias, "spidev");
-	rtk_spi_chip->chip_select = rtk_spi->spi_manage.spi_default_cs;
-	rtk_spi_chip->bus_num = rtk_spi->spi_manage.spi_index;
-	rtk_spi_chip->controller_data = rtk_spi->controller;
-	rtk_spi_chip->max_speed_hz = 100000000;
-	rtk_spi_chip->mode = 0;
-	rtk_spi_chip->platform_data = rtk_spi;
-}
-
 static int rtk_spi_slave_abort(struct spi_controller *controller)
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 
-	if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
+	if (rtk_spi->controller && rtk_spi->controller->cur_msg_mapped) {
 		/* Slave transfer abort manually. */
 		if (rtk_spi->spi_manage.dma_enabled) {
 			rtk_spi_gdma_deinit(rtk_spi);
@@ -1411,7 +1402,7 @@ static void rtk_spi_handle_err(struct spi_controller *controller,
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(controller);
 	rtk_spi->spi_manage.transfer_status = RTK_SPI_DONE_WITH_ERROR;
-	if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
+	if (rtk_spi->controller && rtk_spi->controller->cur_msg_mapped) {
 		/* Slave transfer abort manually. */
 		if (rtk_spi->spi_manage.dma_enabled) {
 			rtk_spi_gdma_deinit(rtk_spi);
@@ -1456,7 +1447,7 @@ static int rtk_spi_prepare_message(
 	int ret = 0;
 
 	rtk_spi_init_hw(rtk_spi);
-	rtk_spi->controller->cur_msg_prepared = 1;
+	rtk_spi->controller->cur_msg_mapped = 1;
 	return ret;
 }
 
@@ -1470,8 +1461,8 @@ static int rtk_spi_unprepare_message(
 		rtk_spi_gdma_deinit(rtk_spi);
 	}
 
-	if (rtk_spi->controller && rtk_spi->controller->cur_msg_prepared) {
-		rtk_spi->controller->cur_msg_prepared = 0;
+	if (rtk_spi->controller && rtk_spi->controller->cur_msg_mapped) {
+		rtk_spi->controller->cur_msg_mapped = 0;
 	}
 
 	return 0;
@@ -1554,7 +1545,7 @@ static int rtk_spi_probe(struct platform_device *pdev)
 	controller->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LOOP;
 	controller->bus_num = rtk_spi->spi_manage.spi_index;
 	controller->dma_alignment = DMA_ALIGNMENT;
-	controller->flags = SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX;
+	controller->flags = SPI_CONTROLLER_MUST_RX | SPI_CONTROLLER_MUST_TX;
 	controller->setup = rtk_spi_setup;
 	controller->set_cs = rtk_spi_set_cs;
 	controller->transfer_one = rtk_spi_transfer_one;
@@ -1579,13 +1570,6 @@ static int rtk_spi_probe(struct platform_device *pdev)
 	/* Register with the SPI framework */
 	platform_set_drvdata(pdev, rtk_spi);
 	spi_controller_set_devdata(controller, rtk_spi);
-
-	/* Attention!!! If spi controller is registered for kernel device, register board inifo in child-node probe. */
-	if (!rtk_spi->spi_manage.spi_for_kernel) {
-		/* Register board info for userspace spidev. */
-		spi_init_board_info(rtk_spi, &rtk_spi->rtk_spi_chip);
-		spi_register_board_info(&rtk_spi->rtk_spi_chip, 1);
-	}
 
 	status = spi_register_controller(controller);
 	if (status != 0) {

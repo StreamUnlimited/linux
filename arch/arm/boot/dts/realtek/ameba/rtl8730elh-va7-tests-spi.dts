@@ -24,6 +24,13 @@
 	pinctrl-0 = <&spi0_pins>;
 	rtk,spi-slave-mode = <0>; // SPI master
 	status = "okay";
+
+	spidev@0 {
+		compatible = "realtek,ameba-spidev";
+		reg = <0>;
+		spi-max-frequency = <100000000>;
+		status = "okay";
+	};
 };
 
 &spi1 {
@@ -31,4 +38,11 @@
 	pinctrl-0 = <&spi1_pins>;
 	rtk,spi-slave-mode = <1>; // SPI slave
 	status = "okay";
+
+	slave@1 {
+        compatible = "realtek,ameba-spidev";
+        reg = <0>;
+        spi-max-frequency = <100000000>;
+		status = "okay";
+    };
 };

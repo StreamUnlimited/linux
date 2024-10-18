@@ -499,7 +499,6 @@ struct rtk_spi_hw_params {
 
 struct rtk_spi_management {
 	int				spi_index;
-	int				spi_for_kernel;
 	int				max_cs_num;
 	int				spi_default_cs;
 	int				is_slave;
