@@ -355,6 +355,7 @@
 	>;
 	fsl,sai-asynchronous;
 	fsl,sai-multi-lane;
+	fsl,sai-mclk-direction-output;
 	dmas = <&sdma2 0 25 0>, <&sdma2 1 25 0>;
 };
 
@@ -390,6 +391,7 @@
 		4 0xf 0xf
 	>;
 	fsl,sai-asynchronous;
+	fsl,sai-mclk-direction-output;
 };
 
 &spdif1 {

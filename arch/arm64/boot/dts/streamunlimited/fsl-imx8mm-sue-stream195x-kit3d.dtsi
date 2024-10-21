@@ -325,6 +325,7 @@
 		4 0xf 0xf
 	>;
 	fsl,sai-asynchronous;
+	fsl,sai-mclk-direction-output;
 };
 
 &uart1 {
