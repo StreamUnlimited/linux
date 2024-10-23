@@ -8,7 +8,7 @@
 #ifndef _REALTEK_MISC_H_
 #define _REALTEK_MISC_H_
 
-#include <uapi/misc/realtek-misc.h>
+#include <uapi/ameba/realtek-misc.h>
 
 int rtk_misc_get_rlv(void);
 

@@ -28,7 +28,7 @@
 #include <linux/delay.h>
 #include <linux/errno.h>
 
-#include <misc/realtek-console-core.h>
+#include <linux/ameba/realtek-console-core.h>
 
 static int realtek_console_major;
 static spinlock_t lock;

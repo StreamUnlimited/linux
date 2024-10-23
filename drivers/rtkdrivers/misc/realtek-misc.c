@@ -18,7 +18,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
-#include <misc/realtek-misc.h>
+#include <linux/ameba/realtek-misc.h>
 
 #define MISC_CTRL	"misc-ioctl"
 

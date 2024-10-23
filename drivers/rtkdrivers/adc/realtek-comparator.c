@@ -11,7 +11,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
-#include <linux/mfd/rtk-timer.h>
+#include <linux/ameba/rtk-timer.h>
 #include <linux/clk.h>
 #include <linux/pm_wakeirq.h>
 #include <linux/suspend.h>

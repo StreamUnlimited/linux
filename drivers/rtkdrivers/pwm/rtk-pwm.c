@@ -25,7 +25,7 @@
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 
-#include <linux/mfd/rtk-timer.h>
+#include <linux/ameba/rtk-timer.h>
 
 
 #define PWM_DISABLE		0

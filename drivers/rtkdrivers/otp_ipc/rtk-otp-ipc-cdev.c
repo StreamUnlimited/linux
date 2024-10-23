@@ -172,7 +172,7 @@ int realtek_otp_init(void)
 	memset(realtek_otp_devp, 0, sizeof(struct realtek_otp_dev));
 	realtek_otp_setup_cdev(realtek_otp_devp, 0);
 
-	realtek_otp_class = class_create(THIS_MODULE, "otp-ctrl");
+	realtek_otp_class = class_create("otp-ctrl");
 	device_create(realtek_otp_class, NULL, MKDEV(realtek_otp_major, 0), NULL, "otp-ctrl");
 
 	spin_lock_init(&lock);

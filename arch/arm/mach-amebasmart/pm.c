@@ -10,7 +10,7 @@
 #include <linux/slab.h>
 #include <asm/cacheflush.h>
 #include <linux/init.h>
-#include <ameba_ipc/ameba_ipc.h>
+#include <linux/ameba/ameba_ipc.h>
 #include <uapi/linux/psci.h>
 #include <linux/psci.h>
 #include <linux/arm-smccc.h>

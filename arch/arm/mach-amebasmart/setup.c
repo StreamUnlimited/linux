@@ -19,7 +19,7 @@
 #include <linux/reboot.h>
 #include <linux/sysfs.h>
 #include <mach/hardware.h>
-#include <misc/realtek-misc.h>
+#include <linux/ameba/realtek-misc.h>
 
 #define BOOTLOADER_PHYSICAL_ADDR     0x42008D04UL
 #define BOOTLOADER_IMAGE2_PHY_ADDR   0x80220001UL

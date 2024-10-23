@@ -26,7 +26,7 @@
 #include <linux/pm_wakeirq.h>
 
 /* Internal head files */
-#include <ameba_ipc/ameba_ipc.h>
+#include <linux/ameba/ameba_ipc.h>
 #include "ameba_ipc_reg.h"
 
 /* -------------------------------- Defines --------------------------------- */

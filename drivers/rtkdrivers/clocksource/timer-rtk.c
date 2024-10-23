@@ -18,7 +18,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/time.h>
-#include <linux/mfd/rtk-timer.h>
+#include <linux/ameba/rtk-timer.h>
 
 #include "timer-of.h"
 

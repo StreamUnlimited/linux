@@ -20,7 +20,7 @@
 #include <linux/of.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
-#include <linux/mfd/rtk-timer.h>
+#include <linux/ameba/rtk-timer.h>
 #include <linux/nvmem-consumer.h>
 
 #include "realtek-adc.h"

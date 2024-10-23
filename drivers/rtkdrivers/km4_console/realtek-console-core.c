@@ -5,7 +5,7 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
-#include <misc/realtek-console-core.h>
+#include <linux/ameba/realtek-console-core.h>
 
 static struct rtk_console *piihp_priv = NULL;
 //console_ipc_rx_res_t *p_recv_res = NULL;

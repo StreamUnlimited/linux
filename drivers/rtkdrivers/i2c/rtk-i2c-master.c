@@ -6,7 +6,7 @@
 */
 
 #include "i2c-realtek.h"
-#include <linux/mfd/rtk-timer.h>
+#include <linux/ameba/rtk-timer.h>
 
 void rtk_i2c_master_send(
 	struct rtk_i2c_hw_params *i2c_param,

@@ -22,7 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/time.h>
 #include <linux/module.h>
-#include <linux/mfd/rtk-timer.h>
+#include <linux/ameba/rtk-timer.h>
 #include <linux/pm_wakeirq.h>
 
 #define TIMER_DISABLE		0

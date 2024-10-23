@@ -21,7 +21,7 @@
 #include <linux/sysrq.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
-#include <linux/serial_ameba.h>
+#include <linux/ameba/serial_ameba.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/pm_wakeirq.h>

@@ -28,7 +28,7 @@
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
 
-#include <ameba_ipc/ameba_ipc.h>
+#include <linux/ameba/ameba_ipc.h>
 
 #define CONSOLE_MAX_CHAR	128
 

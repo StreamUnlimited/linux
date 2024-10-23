@@ -13,7 +13,7 @@
 
 /* ATTENTION */
 /* Please keep the realtek-misc header for kernel space and user space in sync manually. */
-/* Misc header for kernel space: <sdk>/kernel/linux-5.4/include/uapi/misc/realtek-misc.h */
+/* Misc header for kernel space: <sdk>/kernel/linux-5.4/include/uapi/ameba/realtek-misc.h */
 
 /* IOCTL commands */
 #define MISC_IOC_MAGIC              'm'

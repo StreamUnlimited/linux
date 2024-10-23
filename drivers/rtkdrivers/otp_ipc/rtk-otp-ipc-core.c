@@ -13,7 +13,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
-#include <ameba_ipc/ameba_ipc.h>
+#include <linux/ameba/ameba_ipc.h>
 
 #include "rtk-otp-ipc.h"
 
@@ -198,7 +198,7 @@ int rtk_otp_process(void* data, u8 *result)
 	}
 
 	if (p_recv_res->ret != 1) {
-			pr_warning("OTP failed but has already complete %d", p_recv_res->complete_num);
+			pr_warn("OTP failed but has already complete %d", p_recv_res->complete_num);
 			goto err_ret;
 	}
 

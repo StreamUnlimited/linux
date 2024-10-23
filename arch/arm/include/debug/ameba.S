@@ -4,7 +4,7 @@
  *
  *  Copyright (C) 2020-2023 Realtek
  */
-#include <linux/serial_ameba.h>
+#include <linux/ameba/serial_ameba.h>
 
 		.macro	addruart, rp, rv, tmp
 		ldr	\rp, =CONFIG_DEBUG_UART_PHYS
