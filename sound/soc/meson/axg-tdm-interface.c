@@ -6,6 +6,7 @@
 #include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
+#include <linux/pinctrl/consumer.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/soc-dai.h>
@@ -110,8 +111,20 @@ static int axg_tdm_iface_enable_clk(struct axg_tdm_iface *iface)
 	if (ret)
 		goto err_lrclk;
 
+	// Set pins to default state
+	if (!IS_ERR_OR_NULL(iface->pinctrl) && !IS_ERR_OR_NULL(iface->pins_state)) {
+		ret = pinctrl_select_state(iface->pinctrl, iface->pins_state);
+		if (ret < 0) {
+			pr_err("axg_tdm_iface_enable_clk failed to set default pin state: %d\n", ret);
+			goto err_pin_state;
+		}
+	}
+	atomic_inc(&iface->enable_count);
+
 	return 0;
 
+err_pin_state:
+	clk_disable_unprepare(iface->lrclk);
 err_lrclk:
 	clk_disable_unprepare(iface->sclk);
 err_sclk:
@@ -125,6 +138,16 @@ static int axg_tdm_iface_disable_clk(struct axg_tdm_iface *iface)
 	clk_disable_unprepare(iface->lrclk);
 	clk_disable_unprepare(iface->sclk);
 	clk_disable_unprepare(iface->mclk);
+	if(atomic_dec_and_test(&iface->enable_count)) {
+		// Set pins to suspend state
+		if (!IS_ERR_OR_NULL(iface->pinctrl) && !IS_ERR_OR_NULL(iface->pins_state_suspend)) {
+			int ret = pinctrl_select_state(iface->pinctrl, iface->pins_state_suspend);
+			if (ret < 0) {
+				pr_err("axg_tdm_iface_disable_clk failed to set suspend pin state: %d\n", ret);
+				return ret;
+			}
+		}
+	}
 	return 0;
 }
 
@@ -712,6 +735,20 @@ static int axg_tdm_iface_probe(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(axg_tdm_iface_dai_drv); i++)
 		memcpy(&dai_drv[i], &axg_tdm_iface_dai_drv[i],
 		       sizeof(*dai_drv));
+
+	iface->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (!IS_ERR_OR_NULL(iface->pinctrl)) {
+		iface->pins_state = pinctrl_lookup_state(iface->pinctrl, "default");
+		iface->pins_state_suspend = pinctrl_lookup_state(iface->pinctrl, "suspend");
+
+		if (IS_ERR_OR_NULL(iface->pins_state))
+			dev_warn(&pdev->dev, "could not get normal pins\n");
+
+		if (IS_ERR_OR_NULL(iface->pins_state_suspend))
+			dev_warn(&pdev->dev, "could not get suspend pins\n");
+	} else {
+		dev_warn(&pdev->dev, "failed to get pinctrl\n");
+	}
 
 	/* Bit clock provided on the pad */
 	iface->sclk = devm_clk_get(dev, "sclk");

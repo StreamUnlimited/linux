@@ -47,6 +47,15 @@ struct axg_tdm_iface {
 	s32 drift_comp_value;
 	u32 sysclk_nominal;
 	bool enable_drift_compensator;
+
+	/* Pincrtl */
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pins_state;
+	struct pinctrl_state *pins_state_suspend;
+	/* Need to track enables to switch pin states
+	 * refcount_t would saturate at 0 so using atomic instead
+	 */
+	atomic_t enable_count;
 };
 
 static inline bool axg_tdm_lrclk_invert(unsigned int fmt)
