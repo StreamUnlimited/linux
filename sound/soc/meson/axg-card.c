@@ -62,7 +62,7 @@ static int axg_card_tdm_dai_set_ignore_suspend(struct snd_soc_pcm_runtime *rtd, 
 		struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
 		ret = axg_tdm_iface_set_ignore_suspend(iface, ignore_suspend);
 		if (ret) {
-			dev_err(cpu_dai->dev, "set ignore suspend to %d failed, probably could not enable clk\n", ignore_suspend);
+			dev_err(cpu_dai->dev, "set ignore suspend to %d failed, probably could not enable clk or set pinmux\n", ignore_suspend);
 			return ret;
 		}
 	}
