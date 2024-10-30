@@ -553,7 +553,7 @@ static int realtek_adc_debugfs_reg_access(struct iio_dev *indio_dev,
 }
 
 static int realtek_adc_of_xlate(struct iio_dev *indio_dev,
-								const struct of_phandle_args *iiospec)
+								const struct fwnode_reference_args *iiospec)
 {
 	int i;
 
@@ -569,13 +569,13 @@ static const struct iio_info realtek_adc_iio_info = {
 	.read_raw = realtek_adc_read_raw,
 	.update_scan_mode = realtek_adc_update_scan_mode,
 	.debugfs_reg_access = realtek_adc_debugfs_reg_access,
-	.of_xlate = realtek_adc_of_xlate,
+	.fwnode_xlate = realtek_adc_of_xlate,
 };
 
 static irqreturn_t realtek_adc_isr(int irq, void *data)
 {
 	struct realtek_adc_data *adc = data;
-	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
+	struct iio_dev *indio_dev = adc->indio_dev;
 	u32 status = readl(adc->base + RTK_ADC_INTR_STS);
 	u32 cnt;
 	int ret = 0;
@@ -594,7 +594,7 @@ static irqreturn_t realtek_adc_isr(int irq, void *data)
 				adc->buffer[adc->buf_index] = ADC_GET_DATA_GLOBAL(readl(adc->base + RTK_ADC_DATA_GLOBAL));
 				adc->buf_index++;
 			}
-			ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, NULL);
+			ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, (int64_t)0);
 			adc->buf_index = 0;
 			if (ret < 0) {
 				dev_dbg(&indio_dev->dev, "System buffer is full.");
@@ -623,7 +623,7 @@ static irqreturn_t realtek_adc_isr(int irq, void *data)
 				adc->buf_index++;
 				/* scan_bytes u8 -> buffer[i] u16 */
 				if (adc->buf_index == ((indio_dev->scan_bytes) / 2)) {
-					ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, NULL);
+					ret = iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer, (int64_t)0);
 					if (ret < 0) {
 						dev_dbg(&indio_dev->dev, "System buffer is full.");
 						iio_trigger_notify_done(indio_dev->trig);
@@ -838,11 +838,6 @@ static int realtek_adc_buffer_postenable(struct iio_dev *indio_dev)
 	int ret;
 	unsigned long flags;
 
-	ret = iio_triggered_buffer_postenable(indio_dev);
-	if (ret < 0) {
-		return ret;
-	}
-
 	spin_lock_irqsave(&adc->lock, flags);
 
 	realtek_adc_cmd(adc, false);
@@ -852,8 +847,6 @@ static int realtek_adc_buffer_postenable(struct iio_dev *indio_dev)
 	writel(1, adc->base + RTK_ADC_RST_LIST);
 	writel(0, adc->base + RTK_ADC_RST_LIST);
 	writel(0x3FFFF, adc->base + RTK_ADC_INTR_STS);
-	//realtek_adc_int_config(adc, (ADC_BIT_IT_FIFO_OVER_EN | ADC_BIT_IT_FIFO_FULL_EN), true);
-	//realtek_adc_auto_cmd(adc, true);
 
 	realtek_adc_cmd(adc, true);
 
@@ -868,11 +861,6 @@ static int realtek_adc_buffer_predisable(struct iio_dev *indio_dev)
 	struct realtek_adc_data *adc = iio_priv(indio_dev);
 	u32 i;
 	unsigned long flags;
-
-	ret = iio_triggered_buffer_predisable(indio_dev);
-	if (ret < 0) {
-		dev_err(&indio_dev->dev, "Predisable failed\n");
-	}
 
 	spin_lock_irqsave(&adc->lock, flags);
 	realtek_adc_cmd(adc, false);
@@ -963,6 +951,8 @@ static int realtek_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "ADC mode property not found\n");
 		return -EINVAL;
 	}
+
+	adc->indio_dev = indio_dev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	adc->base = devm_ioremap_resource(&pdev->dev, res);
@@ -1074,7 +1064,7 @@ clk_fail:
 static int realtek_adc_remove(struct platform_device *pdev)
 {
 	struct realtek_adc_data *adc = platform_get_drvdata(pdev);
-	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
+	struct iio_dev *indio_dev = adc->indio_dev;
 
 	clk_disable_unprepare(adc->adc_clk);
 	clk_disable_unprepare(adc->ctc_clk);

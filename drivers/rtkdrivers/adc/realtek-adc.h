@@ -263,6 +263,7 @@ struct realtek_adc_diff_channel {
  *  channels is read out from OTP or not.
  */
 struct realtek_adc_data {
+	struct iio_dev *indio_dev;
 	void __iomem *base;
 	void __iomem *comp_base;
 	void __iomem *path_base;
