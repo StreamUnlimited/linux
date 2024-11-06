@@ -48,31 +48,6 @@ static struct map_desc bsp_io_desc[] __initdata = {
 	},
 };
 
-int rtk_misc_get_rlv(void)
-{
-	int result = -1;
-
-	if (plat_lsys_base_ctrl != NULL) {
-		u32 value;
-		u32 value32;
-
-		value = readl(plat_lsys_base_ctrl);
-		value &= ~(LSYS_MASK_CI_EN);
-		value |= LSYS_CI_EN(0xA);
-		writel(value, plat_lsys_base_ctrl);
-
-		value32 = readl(plat_lsys_base_ctrl);
-		value &= ~(LSYS_MASK_CI_EN);
-		writel(value, plat_lsys_base_ctrl);
-
-		result = (int)(LSYS_GET_RLV(value32));
-	}
-
-	return result;
-}
-
-EXPORT_SYMBOL(rtk_misc_get_rlv);
-
 static void __init plat_map_io(void)
 {
 	extern void plat_smp_map_io(void);
@@ -120,11 +95,6 @@ static void __init plat_init_machine(void)
 	}
 
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-
-	rlv = rtk_misc_get_rlv();
-	if (rlv >= 0) {
-		pr_info("RLV: %d\n", rlv);
-	}
 }
 
 #ifdef CONFIG_SMP

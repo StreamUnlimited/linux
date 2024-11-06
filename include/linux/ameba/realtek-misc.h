@@ -10,6 +10,6 @@
 
 #include <uapi/ameba/realtek-misc.h>
 
-int rtk_misc_get_rlv(void);
+static int rtk_misc_get_rlv(struct device *dev, int *rlv);
 
 #endif

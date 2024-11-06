@@ -8,7 +8,6 @@
 #ifndef _UAPI_REALTEK_MISC_H_
 #define _UAPI_REALTEK_MISC_H_
 
-#include <linux/types.h>
 #include <linux/ioctl.h>
 
 /* ATTENTION */
@@ -18,9 +17,15 @@
 /* IOCTL commands */
 #define MISC_IOC_MAGIC              'm'
 
-#define RTK_MISC_IOC_RLV            _IOR(MISC_IOC_MAGIC, 1, __u32)
-#define RTK_MISC_IOC_UUID           _IOR(MISC_IOC_MAGIC, 2, __u32)
-#define RTK_MISC_IOC_DDRC_AUTO_GATE _IOR(MISC_IOC_MAGIC, 3, __u32)
-#define RTK_MISC_IOC_DDRC_DISGATE   _IOR(MISC_IOC_MAGIC, 4, __u32)
+#define RTK_MISC_IOC_RLV            _IOR(MISC_IOC_MAGIC, 1, int)
+#define RTK_MISC_IOC_UUID           _IOR(MISC_IOC_MAGIC, 2, int)
+#define RTK_MISC_IOC_DDRC_AUTO_GATE _IOR(MISC_IOC_MAGIC, 3, int)
+#define RTK_MISC_IOC_DDRC_DISGATE   _IOR(MISC_IOC_MAGIC, 4, int)
+#define RTK_MISC_IOC_VOLTAGE_SET    _IOR(MISC_IOC_MAGIC, 5, int)
+#define RTK_MISC_IOC_VOLTAGE_GET    _IOR(MISC_IOC_MAGIC, 6, int)
+
+/* Voltage */
+#define VOL_09                      1
+#define VOL_10                      3
 
 #endif
