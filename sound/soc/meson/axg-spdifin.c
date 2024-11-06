@@ -11,12 +11,15 @@
 #include <sound/soc.h>
 #include <sound/soc-dai.h>
 #include <sound/pcm_params.h>
+#include <linux/util_macros.h>
 
 #define SPDIFIN_CTRL0			0x00
 #define  SPDIFIN_CTRL0_EN		BIT(31)
 #define  SPDIFIN_CTRL0_RST_OUT		BIT(29)
 #define  SPDIFIN_CTRL0_RST_IN		BIT(28)
+#define  SPDIFIN_IRQ_CLEAR		BIT(26)
 #define  SPDIFIN_CTRL0_WIDTH_SEL	BIT(24)
+#define  SPDIFIN_IRQ_EN		BIT(12)
 #define  SPDIFIN_CTRL0_STATUS_CH_SHIFT	11
 #define  SPDIFIN_CTRL0_STATUS_SEL	GENMASK(10, 8)
 #define  SPDIFIN_CTRL0_SRC_SEL		GENMASK(5, 4)
@@ -43,6 +46,7 @@
 #define SPDIFIN_MUTE_VAL		0x28
 
 #define SPDIFIN_MODE_NUM		7
+#define SPDIFIN_SAMPLE_RATE_ENUM_NAME		"Sample Rate"
 
 struct axg_spdifin_cfg {
 	const unsigned int *mode_rates;
@@ -54,6 +58,9 @@ struct axg_spdifin {
 	struct regmap *map;
 	struct clk *refclk;
 	struct clk *pclk;
+	unsigned int irq;
+	struct snd_soc_card *card;
+	struct snd_kcontrol *ctrl_sample_rate;
 };
 
 /*
@@ -110,6 +117,38 @@ static int axg_spdifin_prepare(struct snd_pcm_substream *substream,
 			   SPDIFIN_CTRL0_RST_IN,  SPDIFIN_CTRL0_RST_IN);
 
 	return 0;
+}
+
+void axg_spdifin_clr_irq(struct axg_spdifin *priv)
+{
+	unsigned int stat;
+	regmap_read(priv->map, SPDIFIN_STAT0, &stat);
+
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0_EN, SPDIFIN_IRQ_CLEAR,
+			SPDIFIN_IRQ_CLEAR);
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0_EN, SPDIFIN_IRQ_CLEAR,
+			0);
+}
+
+/* detect PCM/RAW and sample changes by the source */
+static irqreturn_t axg_spdifin_status_isr(int irq, void *devid)
+{
+	struct axg_spdifin *priv = (struct axg_spdifin *)devid;
+
+	axg_spdifin_clr_irq(priv);
+
+	return IRQ_WAKE_THREAD;
+}
+
+static irqreturn_t axg_spdifin_status_isr_thread(int irq, void *devid)
+{
+	struct axg_spdifin *priv = (struct axg_spdifin *)devid;
+
+	snd_ctl_notify(priv->card->snd_card,
+					SNDRV_CTL_EVENT_MASK_VALUE,
+					&priv->ctrl_sample_rate->id);
+
+	return IRQ_HANDLED;
 }
 
 static void axg_spdifin_write_mode_param(struct regmap *map, int mode,
@@ -174,6 +213,10 @@ static int axg_spdifin_sample_mode_config(struct snd_soc_dai *dai,
 	 */
 	rate = clk_get_rate(priv->refclk);
 
+	/* Enable IRQ for non-PCM / PCM data change */
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
+			   SPDIFIN_IRQ_EN, SPDIFIN_IRQ_EN);
+
 	/* HW will update mode every 1ms */
 	regmap_update_bits(priv->map, SPDIFIN_CTRL1,
 			   SPDIFIN_CTRL1_BASE_TIMER,
@@ -212,7 +255,19 @@ static int axg_spdifin_sample_mode_config(struct snd_soc_dai *dai,
 static int axg_spdifin_dai_probe(struct snd_soc_dai *dai)
 {
 	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
+	char ctrl_sample_rate_name[128];
 	int ret;
+
+	/* Store card and sample rate control to send notifications on IRQ */
+	priv->card = dai->component->card;
+	snprintf(ctrl_sample_rate_name, ARRAY_SIZE(ctrl_sample_rate_name), "%s %s",
+					dai->component->name_prefix, SPDIFIN_SAMPLE_RATE_ENUM_NAME);
+	priv->ctrl_sample_rate = snd_soc_card_get_kcontrol(dai->component->card,
+					ctrl_sample_rate_name);
+	if (!priv->ctrl_sample_rate) {
+		dev_err(dai->dev, "failed to find %s mixer element\n", ctrl_sample_rate_name);
+		return -EINVAL;
+	}
 
 	ret = clk_prepare_enable(priv->pclk);
 	if (ret) {
@@ -236,6 +291,22 @@ static int axg_spdifin_dai_probe(struct snd_soc_dai *dai)
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN,
 			   SPDIFIN_CTRL0_EN);
 
+	/* Enable IRQ */
+	ret = devm_request_threaded_irq(dai->dev, priv->irq,
+				axg_spdifin_status_isr,
+				axg_spdifin_status_isr_thread,
+				0,
+				"irq_spdifin",
+				priv);
+	if (ret) {
+		dev_err(dai->dev, "failed to claim irq_spdifin %u\n",
+					priv->irq);
+		return ret;
+	}
+
+	regmap_update_bits(priv->map, SPDIFIN_CTRL1,
+			   SPDIFIN_CTRL1_IRQ_MASK, SPDIFIN_CTRL1_IRQ_MASK);
+
 	return 0;
 
 pclk_err:
@@ -246,6 +317,11 @@ pclk_err:
 static int axg_spdifin_dai_remove(struct snd_soc_dai *dai)
 {
 	struct axg_spdifin *priv = snd_soc_dai_get_drvdata(dai);
+
+	/* Disable IRQ */
+	regmap_update_bits(priv->map, SPDIFIN_CTRL1,
+			   SPDIFIN_CTRL1_IRQ_MASK, 0);
+	devm_free_irq(dai->dev, priv->irq, priv);
 
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, 0);
 	clk_disable_unprepare(priv->refclk);
@@ -355,6 +431,36 @@ static int axg_spdifin_rate_lock_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static const unsigned int axg_spdifin_mode_rates[SPDIFIN_MODE_NUM] = {
+	32000, 44100, 48000, 88200, 96000, 176400, 192000,
+};
+
+static const char *const spdifin_samplerate_s[] = {
+	"N/A",
+	"32000",
+	"44100",
+	"48000",
+	"88200",
+	"96000",
+	"176400",
+	"192000"
+};
+
+static int axg_spdif_rx_samplerate_mixer_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *c = snd_kcontrol_chip(kcontrol);
+	struct axg_spdifin *priv = snd_soc_component_get_drvdata(c);
+	unsigned int rate_idx = 0;
+	unsigned int rate = axg_spdifin_get_rate(priv);
+
+	if(rate != 0)
+		rate_idx = find_closest(rate, axg_spdifin_mode_rates, ARRAY_SIZE(axg_spdifin_mode_rates)) + 1;
+
+	ucontrol->value.integer.value[0] = rate_idx;
+	return 0;
+}
+
 #define AXG_SPDIFIN_LOCK_RATE(xname)				\
 	{							\
 		.iface = SNDRV_CTL_ELEM_IFACE_PCM,		\
@@ -365,8 +471,26 @@ static int axg_spdifin_rate_lock_get(struct snd_kcontrol *kcontrol,
 		.name = xname,					\
 	}
 
+
+static const struct soc_enum spdifin_sample_rate_enum[] = {
+	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(spdifin_samplerate_s),
+			spdifin_samplerate_s),
+};
+
+#define AXG_SPDIFIN_LOCK_RATE_MIXER				\
+	{							\
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,		\
+		.access = (SNDRV_CTL_ELEM_ACCESS_READ |		\
+			   SNDRV_CTL_ELEM_ACCESS_VOLATILE),	\
+		.get = axg_spdif_rx_samplerate_mixer_get,		\
+		.info = snd_soc_info_enum_double,		\
+		.name = SPDIFIN_SAMPLE_RATE_ENUM_NAME,					\
+		.private_value = (unsigned long)&spdifin_sample_rate_enum, \
+	}
+
 static const struct snd_kcontrol_new axg_spdifin_controls[] = {
 	AXG_SPDIFIN_LOCK_RATE("Capture Rate Lock"),
+	AXG_SPDIFIN_LOCK_RATE_MIXER,
 	SOC_DOUBLE("Capture Switch", SPDIFIN_CTRL0, 7, 6, 1, 1),
 	SOC_ENUM(SNDRV_CTL_NAME_IEC958("", CAPTURE, NONE) "Src",
 		 axg_spdifin_chsts_src_enum),
@@ -385,10 +509,6 @@ static const struct regmap_config axg_spdifin_regmap_cfg = {
 	.val_bits	= 32,
 	.reg_stride	= 4,
 	.max_register	= SPDIFIN_MUTE_VAL,
-};
-
-static const unsigned int axg_spdifin_mode_rates[SPDIFIN_MODE_NUM] = {
-	32000, 44100, 48000, 88200, 96000, 176400, 192000,
 };
 
 static const struct axg_spdifin_cfg axg_cfg = {
@@ -477,6 +597,10 @@ static int axg_spdifin_probe(struct platform_device *pdev)
 			PTR_ERR(dai_drv));
 		return PTR_ERR(dai_drv);
 	}
+
+	priv->irq = platform_get_irq(pdev, 0);
+	if (priv->irq < 0)
+		return dev_err_probe(dev, priv->irq, "failed to get interrupt\n");
 
 	return devm_snd_soc_register_component(dev, &axg_spdifin_component_drv,
 					       dai_drv, 1);
