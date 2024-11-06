@@ -336,7 +336,8 @@ static int axg_card_parse_tdm(struct snd_soc_card *card,
 
 static int axg_card_cpu_is_capture_fe(struct device_node *np)
 {
-	return of_device_is_compatible(np, DT_PREFIX "axg-toddr");
+	return of_device_is_compatible(np, DT_PREFIX "axg-toddr") ||
+		   of_device_is_compatible(np, DT_PREFIX "axg-toddr-spdif");
 }
 
 static int axg_card_cpu_is_playback_fe(struct device_node *np)

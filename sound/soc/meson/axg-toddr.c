@@ -20,6 +20,7 @@
 #define CTRL0_TODDR_EXT_SIGNED		BIT(29)
 #define CTRL0_TODDR_PP_MODE		BIT(28)
 #define CTRL0_TODDR_SYNC_CH		BIT(27)
+#define CTRL0_TODDR_ENDIAN		GENMASK(26, 24)
 #define CTRL0_TODDR_TYPE		GENMASK(15, 13)
 #define CTRL0_TODDR_MSB_POS		GENMASK(12, 8)
 #define CTRL0_TODDR_LSB_POS		GENMASK(7, 3)
@@ -84,6 +85,51 @@ static int axg_toddr_dai_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int axg_toddr_dai_spdif_hw_params(struct snd_pcm_substream *substream,
+				   struct snd_pcm_hw_params *params,
+				   struct snd_soc_dai *dai)
+{
+	struct axg_fifo *fifo = snd_soc_dai_get_drvdata(dai);
+	unsigned int type, width, phys_width, msb, lsb, endian = 0;
+
+	phys_width = params_physical_width(params);
+
+	switch (phys_width) {
+	case 8:
+		type = 0; /* 8 samples of 8 bits */
+		break;
+	case 16:
+		type = 2; /* 4 samples of 16 bits - right justified */
+		break;
+	case 32:
+		type = 4; /* 2 samples of 32 bits - right justified */
+		endian = 5;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	width = params_width(params);
+
+	msb = 28 - 1;
+	if (phys_width <= 24)
+		lsb = 28 - phys_width;
+	else
+		lsb = 4;
+
+	regmap_update_bits(fifo->map, FIFO_CTRL0,
+			   CTRL0_TODDR_ENDIAN |
+			   CTRL0_TODDR_TYPE |
+			   CTRL0_TODDR_MSB_POS |
+			   CTRL0_TODDR_LSB_POS,
+			   FIELD_PREP(CTRL0_TODDR_ENDIAN, endian) |
+			   FIELD_PREP(CTRL0_TODDR_TYPE, type) |
+			   FIELD_PREP(CTRL0_TODDR_MSB_POS, msb) |
+			   FIELD_PREP(CTRL0_TODDR_LSB_POS, lsb));
+
+	return 0;
+}
+
 static int axg_toddr_dai_startup(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
 {
@@ -108,6 +154,23 @@ static int axg_toddr_dai_startup(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int axg_toddr_dai_spdif_startup(struct snd_pcm_substream *substream,
+				 struct snd_soc_dai *dai)
+{
+	struct axg_fifo *fifo = snd_soc_dai_get_drvdata(dai);
+	int ret;
+
+	/* Enable pclk to access registers and clock the fifo ip */
+	ret = axg_toddr_dai_startup(substream, dai);
+	if (ret)
+		return ret;
+
+	/* Only unsigned format are supported ATM */
+	regmap_update_bits(fifo->map, FIFO_CTRL0, CTRL0_TODDR_EXT_SIGNED, 0);
+
+	return 0;
+}
+
 static void axg_toddr_dai_shutdown(struct snd_pcm_substream *substream,
 				   struct snd_soc_dai *dai)
 {
@@ -123,6 +186,13 @@ static const struct snd_soc_dai_ops axg_toddr_ops = {
 	.pcm_new	= axg_toddr_pcm_new,
 };
 
+static const struct snd_soc_dai_ops axg_toddr_spdif_ops = {
+	.hw_params	= axg_toddr_dai_spdif_hw_params,
+	.startup	= axg_toddr_dai_spdif_startup,
+	.shutdown	= axg_toddr_dai_shutdown,
+	.pcm_new	= axg_toddr_pcm_new,
+};
+
 static struct snd_soc_dai_driver axg_toddr_dai_drv = {
 	.name = "TODDR",
 	.capture = {
@@ -133,6 +203,18 @@ static struct snd_soc_dai_driver axg_toddr_dai_drv = {
 		.formats	= AXG_FIFO_FORMATS,
 	},
 	.ops		= &axg_toddr_ops,
+};
+
+static struct snd_soc_dai_driver axg_toddr_spdif_dai_drv = {
+	.name = "TODDR",
+	.capture = {
+		.stream_name	= "Capture",
+		.channels_min	= 1,
+		.channels_max	= AXG_FIFO_CH_MAX,
+		.rates		= AXG_FIFO_RATES,
+		.formats	= AXG_FIFO_FORMATS,
+	},
+	.ops		= &axg_toddr_spdif_ops,
 };
 
 static const char * const axg_toddr_sel_texts[] = {
@@ -187,6 +269,12 @@ static const struct axg_fifo_match_data axg_toddr_match_data = {
 	.field_threshold	= REG_FIELD(FIFO_CTRL1, 16, 23),
 	.component_drv		= &axg_toddr_component_drv,
 	.dai_drv		= &axg_toddr_dai_drv
+};
+
+static const struct axg_fifo_match_data axg_toddr_spdif_match_data = {
+	.field_threshold	= REG_FIELD(FIFO_CTRL1, 16, 23),
+	.component_drv		= &axg_toddr_component_drv,
+	.dai_drv		= &axg_toddr_spdif_dai_drv
 };
 
 static int g12a_toddr_dai_startup(struct snd_pcm_substream *substream,
@@ -325,6 +413,9 @@ static const struct of_device_id axg_toddr_of_match[] = {
 	{
 		.compatible = "amlogic,axg-toddr",
 		.data = &axg_toddr_match_data,
+	}, {
+		.compatible = "amlogic,axg-toddr-spdif",
+		.data = &axg_toddr_spdif_match_data,
 	}, {
 		.compatible = "amlogic,g12a-toddr",
 		.data = &g12a_toddr_match_data,
