@@ -8,8 +8,6 @@
 #ifndef __SND_SOC_REALTEK_AUDIO_PLL_H_
 #define __SND_SOC_REALTEK_AUDIO_PLL_H_
 
-#include <linux/types.h>
-
 #define PLL_24P576M			0
 #define PLL_45P1584M			1
 #define PLL_98P304M			2
