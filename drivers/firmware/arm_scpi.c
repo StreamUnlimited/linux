@@ -946,6 +946,19 @@ static int scpi_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct scpi_drvinfo *scpi_drvinfo;
+	struct device_node *saradc_node;
+
+	saradc_node = of_parse_phandle(pdev->dev.of_node, "saradc", 0);
+	if (saradc_node) {
+		struct platform_device *saradc_pdev = of_find_device_by_node(saradc_node);
+		of_node_put(saradc_node);
+		if (!saradc_pdev) {
+			dev_err(&pdev->dev, "Failed to find saradc platform device\n");
+			return -ENODEV;
+		}
+		if(platform_get_drvdata(saradc_pdev) == NULL)
+			return -EPROBE_DEFER;
+	}
 
 	scpi_drvinfo = devm_kzalloc(dev, sizeof(*scpi_drvinfo), GFP_KERNEL);
 	if (!scpi_drvinfo)
