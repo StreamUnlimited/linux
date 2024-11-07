@@ -32,7 +32,6 @@ struct rtk_cpufreq {
 	u32 cpu_cur_rate;
 };
 
-
 static int rtk_cpufreq_apll(struct cpufreq_policy *policy, unsigned int index)
 {
 	u32 new_freq;
@@ -66,8 +65,6 @@ static int rtk_cpufreq_apll(struct cpufreq_policy *policy, unsigned int index)
 	return ret;
 }
 
-
-
 static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int index)
 {
 	u32 new_freq;
@@ -87,8 +84,6 @@ static int rtk_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int 
 
 	return ret;
 }
-
-
 
 static int rtk_cpufreq_init(struct cpufreq_policy *policy)
 {
@@ -223,8 +218,6 @@ out1:
 	return ret;
 }
 
-
-
 static int rtk_cpufreq_suspend(struct cpufreq_policy *policy)
 {
 	struct rtk_cpufreq *rtk_data = policy->driver_data;
@@ -232,8 +225,6 @@ static int rtk_cpufreq_suspend(struct cpufreq_policy *policy)
 
 	return 0;
 }
-
-
 
 static int rtk_cpufreq_resume(struct cpufreq_policy *policy)
 {
@@ -254,11 +245,9 @@ static int rtk_cpufreq_resume(struct cpufreq_policy *policy)
 	return rtk_cpufreq_target_index(policy, index);
 }
 
-
-
 static struct cpufreq_driver rtk_cpufreq_driver = {
 	.name         = "realtek-ameba-cpufreq",
-	.flags        = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
+	.flags        = CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 	.init         = rtk_cpufreq_init,
 	.get          = cpufreq_generic_get,
 	.target_index = rtk_cpufreq_target_index,
@@ -266,8 +255,6 @@ static struct cpufreq_driver rtk_cpufreq_driver = {
 	.suspend      = rtk_cpufreq_suspend,
 	.resume       = rtk_cpufreq_resume,
 };
-
-
 
 static int __init rtk_cpufreq_initcall(void)
 {
@@ -281,13 +268,10 @@ static int __init rtk_cpufreq_initcall(void)
 	return ret;
 }
 
-
-
 static void __exit rtk_cpufreq_exitcall(void)
 {
 	cpufreq_unregister_driver(&rtk_cpufreq_driver);
 }
-
 
 module_init(rtk_cpufreq_initcall);
 module_exit(rtk_cpufreq_exitcall);
