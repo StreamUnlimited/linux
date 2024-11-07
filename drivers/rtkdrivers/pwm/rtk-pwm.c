@@ -12,14 +12,12 @@
 #include <linux/module.h>
 #include <linux/sizes.h>
 #include <linux/of.h>
-
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/time.h>
-
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -27,11 +25,8 @@
 
 #include <linux/ameba/rtk-timer.h>
 
-
 #define PWM_DISABLE		0
 #define PWM_ENABLE		1
-
-
 #define AMEBA_PWM_CHAN_NUM		6
 
 struct rtk_pwm {
@@ -43,12 +38,10 @@ struct rtk_pwm {
 	int chan_en[AMEBA_PWM_CHAN_NUM];  /* Channel enable */
 };
 
-
 static struct rtk_pwm *to_rtk_pwm_dev(struct pwm_chip *chip)
 {
 	return container_of(chip, struct rtk_pwm, chip);
 }
-
 
 static int active_channels(struct pwm_chip *chip)
 {
@@ -63,8 +56,6 @@ static int active_channels(struct pwm_chip *chip)
 
 	return 0;
 }
-
-
 
 /* Start or stop timer.(Counter will not reset to 0)*/
 static void rtk_pwm_timer_start_count(struct pwm_chip *chip, u32 NewState)
@@ -103,8 +94,6 @@ static void rtk_pwm_timer_start_count(struct pwm_chip *chip, u32 NewState)
 	}
 }
 
-
-
 static void rtk_pwm_polarity_config(struct pwm_chip *chip, u32 polarity, u32 ch)
 {
 	u32 reg;
@@ -140,8 +129,6 @@ static void rtk_pwm_disable(struct pwm_chip *chip, int ch)
 		rtk_pwm_timer_start_count(chip, PWM_DISABLE);
 	}
 }
-
-
 
 static int rtk_pwm_enable(struct pwm_chip *chip, int ch)
 {
@@ -227,7 +214,6 @@ static int rtk_pwm_config(struct pwm_chip *chip, int ch, u32 duty_ns, u32 period
 	return 0;
 }
 
-
 static int rtk_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 						 const struct pwm_state *state)
 {
@@ -272,7 +258,6 @@ exit:
 	return ret;
 }
 
-
 static const struct pwm_ops rtk_pwm_ops = {
 	.owner = THIS_MODULE,
 	.apply = rtk_pwm_apply,
@@ -280,10 +265,6 @@ static const struct pwm_ops rtk_pwm_ops = {
 	//and capture timer can only capture pulse or width. So
 	//tim8 and tim9 are not fit to linux pwm capture function.
 };
-
-
-
-
 
 static int rtk_pwm_probe(struct platform_device *pdev)
 {
@@ -313,13 +294,11 @@ static int rtk_pwm_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, pwm);
-
 	return 0;
 }
 
-
 static const struct of_device_id rtk_pwm_of_match[] = {
-	{ .compatible = "realtek,ameba-pwm",	},
+	{ .compatible = "realtek,ameba-pwm",},
 	{ /* end node */ },
 };
 
