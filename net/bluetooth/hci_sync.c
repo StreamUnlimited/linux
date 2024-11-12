@@ -4427,6 +4427,10 @@ static int hci_le_read_num_support_adv_sets_sync(struct hci_dev *hdev)
 	if (!ext_adv_capable(hdev))
 		return 0;
 
+	/* Check if this command is supported [STREAMEIGHT-7276] */
+	if (!(hdev->commands[36] & BIT(7)))
+		return 0;
+
 	return __hci_cmd_sync_status(hdev,
 				     HCI_OP_LE_READ_NUM_SUPPORTED_ADV_SETS,
 				     0, NULL, HCI_CMD_TIMEOUT);
