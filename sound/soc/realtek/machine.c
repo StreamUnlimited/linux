@@ -48,7 +48,7 @@ SND_SOC_DAILINK_DEFS(aif4,
 static int snd_soc_ameba_set_pll_ppm(int new_ppm)
 {
 	u32 ppm = abs(new_ppm);
-	u32 action = new_ppm < 0 ? PLL_SLOWER : PLL_FASTER;
+	u32 action = new_ppm < 0 ? PLL_FASTER : PLL_SLOWER;
 
 	pll_i2s_98P304M_clk_tune(ppm, action);
 	// We do not need to tune the 24.576 MHz PLL as it is just
