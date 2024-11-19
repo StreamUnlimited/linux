@@ -5,6 +5,7 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 #include "leds-rtk-ws28xxx.h"
+#include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
 #define to_rtk_ws28xxx_led(ldev) container_of(ldev, struct rtk_ws28xxx_led, ldev)
 
@@ -374,8 +375,8 @@ void rtk_ledc_gdma_tx(
 	u32 length)
 {
 	u32 ledc_fifo_threshold;
-
 	u8 length_long_enough = 0;
+	struct dma_peripheral_config dma_peri;
 
 	dma_params->config = kmalloc(sizeof(*dma_params->config), GFP_KERNEL);
 	dma_params->dma_length = length * 4; // each leds pattern is 32 bits.
@@ -391,10 +392,13 @@ void rtk_ledc_gdma_tx(
 
 	dma_params->config->dst_port_window_size = 0;
 	dma_params->config->dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-	dma_params->config->slave_id = GDMA_HANDSHAKE_INTERFACE_LEDC_TX;
 	dma_params->config->src_addr = dma_params->dma_buf_phy_addr;
 	dma_params->config->src_port_window_size = 0;
 	dma_params->config->src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+
+	dma_peri.slave_id = GDMA_HANDSHAKE_INTERFACE_LEDC_TX;
+	dma_params->config->peripheral_config = &dma_peri;
+	dma_params->config->peripheral_size = sizeof(struct dma_peripheral_config);
 
 	ledc_fifo_threshold = rtk_ledc_get_fifo_level(priv);
 
@@ -1090,6 +1094,7 @@ static int rtk_ws28xxx_led_register(struct device *dev,
 		led->ldev.pattern_set = rtk_ws28xxx_led_pattern_set;
 		led->ldev.pattern_clear = rtk_ws28xxx_led_pattern_clear;
 		led->ldev.default_trigger = "pattern";
+		led->ldev.max_brightness = 0xffffff; // max: GRB
 
 		init_data.fwnode = led->fwnode;
 		init_data.devicename = "rtk_ws28xxx";
