@@ -77,9 +77,9 @@ static void realtek_thermal_cmd(struct realtek_thermal_data *thermal, bool state
 }
 
 /* Callback to get temperature from HW */
-static int realtek_thermal_get_temp(void *data, int *temp)
+static int realtek_thermal_get_temp(struct thermal_zone_device *dev, int *temp)
 {
-	struct realtek_thermal_data *thermal = data;
+	struct realtek_thermal_data *thermal = dev->devdata;
 	u32 temp_result;
 
 	if (thermal->mode != THERMAL_DEVICE_ENABLED) {
@@ -209,7 +209,7 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 }
 #endif
 
-static const struct thermal_zone_of_device_ops realtek_tz_ops = {
+static const struct thermal_zone_device_ops realtek_tz_ops = {
 	.get_temp	= realtek_thermal_get_temp,
 };
 
@@ -217,8 +217,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 {
 	struct realtek_thermal_data *thermal;
 	struct resource *res;
-	const struct thermal_trip *trip;
-	int ret, i;
+	int ret;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "Invalid device node\n");
@@ -255,36 +254,14 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	thermal->th_dev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, thermal, &realtek_tz_ops);
+	/* Use thermal_zone_device_register_with_trips if necessary. */
+	thermal->th_dev = devm_thermal_of_zone_register(&pdev->dev, 0, thermal, &realtek_tz_ops);
 	if (IS_ERR(thermal->th_dev)) {
 		dev_err(&pdev->dev, "Failed to register thermal\n");
 		ret = PTR_ERR(thermal->th_dev);
 		return ret;
 	}
-
-	if (!thermal->th_dev->ops->get_crit_temp) {
-		/* Critical point must be provided */
-		ret = -EINVAL;
-		goto err_tz;
-	}
-
-	ret = thermal->th_dev->ops->get_crit_temp(thermal->th_dev, &thermal->temp_critical);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to read critical_temp: %d\n", ret);
-		goto err_tz;
-	}
-
-	thermal->temp_critical = celsius(thermal->temp_critical);
-
-	trip = of_thermal_get_trip_points(thermal->th_dev);
-	thermal->num_trips = of_thermal_get_ntrips(thermal->th_dev);
-
-	/* Find out passive temperature if it exists */
-	for (i = (thermal->num_trips - 1); i >= 0;  i--) {
-		if (trip[i].type == THERMAL_TRIP_PASSIVE) {
-			thermal->temp_passive = celsius(trip[i].temperature);
-		}
-	}
+	thermal->th_dev->devdata = thermal;
 
 	thermal->atim_clk = devm_clk_get(&pdev->dev, "rtk_aon_tim_clk");
 	if (IS_ERR(thermal->atim_clk)) {
@@ -330,7 +307,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 	return 0;
 
 err_tz:
-	thermal_zone_of_sensor_unregister(&pdev->dev, thermal->th_dev);
+	thermal_zone_device_unregister(thermal->th_dev);
 	clk_disable_unprepare(thermal->thm_clk);
 clk_fail:
 	clk_disable_unprepare(thermal->atim_clk);
@@ -343,7 +320,7 @@ static int realtek_thermal_remove(struct platform_device *pdev)
 
 	realtek_thermal_cmd(thermal, false);
 	thermal_remove_hwmon_sysfs(thermal->th_dev);
-	thermal_zone_of_sensor_unregister(&pdev->dev, thermal->th_dev);
+	thermal_zone_device_unregister(thermal->th_dev);
 	clk_disable_unprepare(thermal->thm_clk);
 	clk_disable_unprepare(thermal->atim_clk);
 
