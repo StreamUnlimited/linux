@@ -203,6 +203,46 @@ static int ameba_drm_private_init(struct drm_device *drm,
 	return 0;
 }
 
+
+// This is based on `drm_atomic_helper_commit_tail()` from `drm_atomic_helper.c` but
+// with the following modification:
+// - Swap order of `_commit_modeset_enables()` and `_commit_planes()` calls
+//
+// This is needed as it seems the controller needs to be enabled first before commiting
+// a plane.
+//
+// The comment about the disabled `_wait_for_vblanks()` was taken over verbatim from the
+// originally modified `drm_atomic_helper_commit_tail()` by Realtek.
+static void ameba_drm_atomic_commit_tail(struct drm_atomic_state *old_state)
+{
+	struct drm_device *dev = old_state->dev;
+
+	drm_atomic_helper_commit_modeset_disables(dev, old_state);
+
+	drm_atomic_helper_commit_modeset_enables(dev, old_state);
+
+	drm_atomic_helper_commit_planes(dev, old_state, 0);
+
+	drm_atomic_helper_fake_vblank(old_state);
+
+	drm_atomic_helper_commit_hw_done(old_state);
+
+	//modify by chunlin.yi@realsil.com.cn at 20211230
+	//drm_atomic_helper_wait_for_vblanks wait for next vblank, before clean up the planes
+	//for amebaSmart , lcdc allows to set all params to HW register anytime
+	//but it will not valid until lcdc reloaded the configuration at next vertical blanking period
+	//	The shadow registers are reloaded during the vertical blanking period
+	//	(at the beginning of the first line after the active display area)
+	//so wait for vblanks is useless for amebaSmart
+	//drm_atomic_helper_wait_for_vblanks(dev, old_state);
+
+	drm_atomic_helper_cleanup_planes(dev, old_state);
+}
+
+static const struct drm_mode_config_helper_funcs ameba_mode_config_helpers = {
+	.atomic_commit_tail = ameba_drm_atomic_commit_tail,
+};
+
 static int ameba_drm_kms_init(struct drm_device *dev,
                               const struct ameba_drm_driver_data *driver_data)
 {
@@ -213,6 +253,7 @@ static int ameba_drm_kms_init(struct drm_device *dev,
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
 	dev->mode_config.funcs = driver_data->mode_config_funcs;
+	dev->mode_config.helper_private	= &ameba_mode_config_helpers;
 
 	/* display controller init */
 	ret = ameba_drm_private_init(dev, driver_data);
