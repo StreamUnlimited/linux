@@ -41,6 +41,7 @@
  * @brief Thermal Meter Threshold Control Register
  * @{
  *****************************************************************************/
+#define TM_BIT_HIGHCMP_PT_EN      ((u32)0x00000001 << 29)          /*!<R/W 0x0  To enable compare tm_out with over temperature protect threshold: When tm_out[18:10] > tm_high_pt_thr, it will set aon reset. * 1: Enable the compare; * 0: Disable the compare. */
 #define TM_MASK_HIGH_PT_THR       ((u32)0x000001FF << 20)          /*!<R/W 0x07D  Set over temperature protection threshold for comparison with TEMP_OUT. Only between 0x046 (70°C) and 0x08C (140°C) are valid. * Bit28: Signed bit * Bit[27:20]: Integer part */
 #define TM_HIGH_PT_THR(x)         ((u32)(((x) & 0x000001FF) << 20))
 #define TM_GET_HIGH_PT_THR(x)     ((u32)(((x >> 20) & 0x000001FF)))

@@ -198,14 +198,28 @@ static void realtek_thermal_init(struct realtek_thermal_data *thermal)
 
 	/* Clear all interrupt */
 	writel((TM_BIT_ISR_TM_LOW_WT | TM_BIT_ISR_TM_HIGH_WT), thermal->base + RTK_TM_INTR_STS);
-	/* Set thermal threshold */
+
+	/* Set thermal critical (protection) and low thresholds */
 	reg_value = (TM_HIGH_PT_THR(thermal->temp_critical) |
-				 TM_BIT_HIGHCMP_WT_EN |
-				 TM_HIGH_WT_THR(thermal->temp_passive) |
-				 TM_BIT_LOWCMP_WT_EN |
-				 TM_LOW_WT_THR(realtek_thermal_cfg.low_tmp_th));
+				 TM_BIT_HIGHCMP_PT_EN |
+				 TM_LOW_WT_THR(realtek_thermal_cfg.low_tmp_th) |
+				 TM_BIT_LOWCMP_WT_EN);
+
+	/* Set the thermal high threshold if it was defined */
+	if (thermal->temp_passive != 0) {
+		reg_value |= TM_HIGH_WT_THR(thermal->temp_passive) | TM_BIT_HIGHCMP_WT_EN;
+	}
 	writel(reg_value, thermal->base + RTK_TM_TH_CTRL);
-	writel((TM_BIT_IMR_TM_HIGH_WT | TM_BIT_IMR_TM_LOW_WT), thermal->base + RTK_TM_INTR_CTRL);
+
+
+	/* Enable low threshold interrupt */
+	reg_value = TM_BIT_IMR_TM_LOW_WT;
+
+	/* Enable thermal high (not critical/protection) threshold interrupt if a threshold was defined */
+	if (thermal->temp_passive != 0) {
+		reg_value = TM_BIT_IMR_TM_HIGH_WT;
+	}
+	writel(reg_value, thermal->base + RTK_TM_INTR_CTRL);
 }
 #endif
 
