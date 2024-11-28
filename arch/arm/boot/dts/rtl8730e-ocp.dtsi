@@ -466,19 +466,11 @@
 			thermal-sensors = <&thermal>;
 
 			trips {
-				cpu_alert1: cpu-alert1 {
-					temperature = <105000>;
-					hysteresis = <0>;
-					type = "passive";
-				};
 				cpu-crit {
-					temperature = <125000>;
+					temperature = <105000>;
 					hysteresis = <0>;
 					type = "critical";
 				};
-			};
-
-			cooling-maps {
 			};
 		};
 	};
