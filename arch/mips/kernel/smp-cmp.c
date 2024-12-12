@@ -8,7 +8,6 @@
 #undef DEBUG
 
 #include <linux/kernel.h>
-#include <linux/sched/task.h>
 #include <linux/sched/task_stack.h>
 #include <linux/smp.h>
 #include <linux/cpumask.h>
@@ -22,25 +21,27 @@
 #include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/smp.h>
-#include <asm/smp-boot.h>
 #include <asm/time.h>
 #include <asm/mipsregs.h>
 #include <asm/mipsmtregs.h>
 #include <asm/mips_mt.h>
-#include <asm/smp-boot.h>
-#include <asm/taroko-mmcr.h>
+#include <asm/amon.h>
 
 static void cmp_init_secondary(void)
 {
 	struct cpuinfo_mips *c __maybe_unused = &current_cpu_data;
-	extern char handle_vec __maybe_unused;
+
+	/* Assume GIC is present */
+	change_c0_status(ST0_IM, STATUSF_IP2 | STATUSF_IP3 | STATUSF_IP4 |
+				 STATUSF_IP5 | STATUSF_IP6 | STATUSF_IP7);
 
 	/* Enable per-cpu interrupts: platform specific */
-	if (IS_ENABLED(CONFIG_CPU_RLX))
-		write_lxc0_intvec(&handle_vec);
 
-	/* Call platform init_secondary hook */
-	plat_smp_init_secondary();
+#ifdef CONFIG_MIPS_MT_SMP
+	if (cpu_has_mipsmt)
+		cpu_set_vpe_id(c, (read_c0_tcbind() >> TCBIND_CURVPE_SHIFT) &
+				  TCBIND_CURVPE);
+#endif
 }
 
 static void cmp_smp_finish(void)
@@ -75,30 +76,14 @@ static int cmp_boot_secondary(int cpu, struct task_struct *idle)
 	pr_debug("SMPCMP: CPU%d: %s cpu %d\n", smp_processor_id(),
 		__func__, cpu);
 
-#if defined(CONFIG_MIPS_MT_SMP)
+#if 0
 	/* Needed? */
 	flush_icache_range((unsigned long)gp,
 			   (unsigned long)(gp + sizeof(struct thread_info)));
 #endif
-	if (IS_ENABLED(CONFIG_CPU_RLX))
-		mmcr_init_core(cpu);
 
 	amon_cpu_start(cpu, pc, sp, (unsigned long)gp, a0);
 	return 0;
-}
-
-static unsigned core_vpe_count(unsigned core)
-{
-	unsigned int nvpe;
-	unsigned int mvpconf0;
-
-	if (!IS_ENABLED(CONFIG_MIPS_MT_SMP) || !cpu_has_mipsmt)
-		return 1;
-
-	mvpconf0 = read_c0_mvpconf0();
-	nvpe = ((mvpconf0 & MVPCONF0_PVPE) >> MVPCONF0_PVPE_SHIFT) + 1;
-
-	return nvpe;
 }
 
 /*
@@ -108,7 +93,6 @@ void __init cmp_smp_setup(void)
 {
 	int i;
 	int ncpu = 0;
-	int nvpe = 0;
 
 	pr_debug("SMPCMP: CPU%d: %s\n", smp_processor_id(), __func__);
 
@@ -118,20 +102,22 @@ void __init cmp_smp_setup(void)
 		cpumask_set_cpu(0, &mt_fpu_cpumask);
 #endif /* CONFIG_MIPS_MT_FPAFF */
 
-	nvpe = core_vpe_count(0);
-	smp_num_siblings = nvpe;
-
 	for (i = 1; i < NR_CPUS; i++) {
 		if (amon_cpu_avail(i)) {
 			set_cpu_possible(i, true);
 			__cpu_number_map[i]	= ++ncpu;
 			__cpu_logical_map[ncpu] = i;
-
-			cpu_data[ncpu].globalnumber = ncpu / nvpe;
-#ifdef CONFIG_MIPS_MT_SMP
-			cpu_data[ncpu].vpe_id = ncpu % nvpe;
-#endif
 		}
+	}
+
+	if (cpu_has_mipsmt) {
+		unsigned int nvpe = 1;
+#ifdef CONFIG_MIPS_MT_SMP
+		unsigned int mvpconf0 = read_c0_mvpconf0();
+
+		nvpe = ((mvpconf0 & MVPCONF0_PVPE) >> MVPCONF0_PVPE_SHIFT) + 1;
+#endif
+		smp_num_siblings = nvpe;
 	}
 	pr_info("Detected %i available secondary CPU(s)\n", ncpu);
 }
@@ -148,6 +134,7 @@ void __init cmp_prepare_cpus(unsigned int max_cpus)
 	 */
 	mips_mt_set_cpuoptions();
 #endif
+
 }
 
 const struct plat_smp_ops cmp_smp_ops = {

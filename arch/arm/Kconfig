@@ -1,12 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0
-# Realtek Semiconductor Corp.
-#
-# RLX Linux Kernel Configuration
-#
-# Tony Wu (tonywu@realtek.com)
-# Dec. 07, 2008
-#
-
 config ARM
 	bool
 	default y

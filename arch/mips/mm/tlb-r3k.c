@@ -24,7 +24,6 @@
 #include <asm/io.h>
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
-#include <asm/tlb.h>
 
 #undef DEBUG_TLB
 
@@ -49,7 +48,7 @@ static void local_flush_tlb_from(int entry)
 	write_c0_entrylo0(0);
 	while (entry < current_cpu_data.tlbsize) {
 		write_c0_index(entry << 8);
-		write_c0_entryhi(UNIQUE_ENTRYHI(entry));
+		write_c0_entryhi((entry | 0x80000) << 12);
 		entry++;				/* BARRIER */
 		tlb_write_indexed();
 	}
@@ -117,7 +116,7 @@ void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 	unsigned long size, flags;
 
 #ifdef DEBUG_TLB
-	printk("[tlbrange<kernel,0x%08lx,0x%08lx>]", start, end);
+	printk("[tlbrange<%lu,0x%08lx,0x%08lx>]", start, end);
 #endif
 	local_irq_save(flags);
 	size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;

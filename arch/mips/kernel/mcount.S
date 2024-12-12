@@ -119,9 +119,6 @@ NESTED(_mcount, PT_SIZE, ra)
 EXPORT_SYMBOL(_mcount)
 	PTR_LA	t1, ftrace_stub
 	PTR_L	t2, ftrace_trace_function /* Prepare t2 for (1) */
-#if defined(CONFIG_CPU_RLX4181) || defined(CONFIG_CPU_RLX5181)
-	 nop
-#endif
 	beq	t1, t2, fgraph_trace
 	 nop
 
@@ -137,16 +134,10 @@ fgraph_trace:
 #ifdef	CONFIG_FUNCTION_GRAPH_TRACER
 	PTR_LA	t1, ftrace_stub
 	PTR_L	t3, ftrace_graph_return
-#if defined(CONFIG_CPU_RLX4181) || defined(CONFIG_CPU_RLX5181)
-	 nop
-#endif
 	bne	t1, t3, ftrace_graph_caller
 	 nop
 	PTR_LA	t1, ftrace_graph_entry_stub
 	PTR_L	t3, ftrace_graph_entry
-#if defined(CONFIG_CPU_RLX4181) || defined(CONFIG_CPU_RLX5181)
-	 nop
-#endif
 	bne	t1, t3, ftrace_graph_caller
 	 nop
 #endif
@@ -173,9 +164,6 @@ NESTED(ftrace_graph_caller, PT_SIZE, ra)
 #ifdef KBUILD_MCOUNT_RA_ADDRESS
 #ifdef CONFIG_DYNAMIC_FTRACE
 	PTR_L	a0, PT_R12(sp)
-#if defined(CONFIG_CPU_RLX4181) || defined(CONFIG_CPU_RLX5181)
-	 nop
-#endif
 #else
 	move	a0, MCOUNT_RA_ADDRESS_REG
 #endif

@@ -60,5 +60,6 @@ static inline u64 kcov_common_handle(void)
 	return 0;
 }
 static inline void kcov_remote_start_common(u64 id) {}
+
 #endif /* CONFIG_KCOV */
 #endif /* _LINUX_KCOV_H */

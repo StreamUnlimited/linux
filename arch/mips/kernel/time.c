@@ -100,7 +100,6 @@ core_initcall(register_cpufreq_notifier);
 DEFINE_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
 
-#ifndef CONFIG_CPU_RLX
 static int null_perf_irq(void)
 {
 	return 0;
@@ -109,12 +108,11 @@ static int null_perf_irq(void)
 int (*perf_irq)(void) = null_perf_irq;
 
 EXPORT_SYMBOL(perf_irq);
-#endif
 
 /*
  * time_init() - it does the following things.
  *
- * 1) bsp_time_init() -
+ * 1) plat_time_init() -
  *	a) (optional) set up RTC routines,
  *	b) (optional) calibrate and set the mips_hpt_frequency
  *	    (only needed if you intended to use cpu counter as timer interrupt
@@ -143,15 +141,10 @@ static __init int cpu_has_mfc0_count_bug(void)
 	case CPU_R4400MC:
 		/*
 		 * The published errata for the R4400 up to 3.0 say the CPU
-		 * has the mfc0 from count bug.
+		 * has the mfc0 from count bug.  This seems the last version
+		 * produced.
 		 */
-		if ((current_cpu_data.processor_id & 0xff) <= 0x30)
-			return 1;
-
-		/*
-		 * we assume newer revisions are ok
-		 */
-		return 0;
+		return 1;
 	}
 
 	return 0;

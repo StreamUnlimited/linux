@@ -37,8 +37,6 @@
 #include <asm/setup.h>
 #include <asm/maar.h>
 
-extern int plat_qemu;
-
 int __cpu_number_map[CONFIG_MIPS_NR_CPU_NR_MAP];   /* Map physical to logical */
 EXPORT_SYMBOL(__cpu_number_map);
 
@@ -363,20 +361,19 @@ asmlinkage void start_secondary(void)
 	cpu = smp_processor_id();
 	cpu_data[cpu].udelay_val = loops_per_jiffy;
 
+	set_cpu_sibling_map(cpu);
+	set_cpu_core_map(cpu);
+
 	cpumask_set_cpu(cpu, &cpu_coherent_mask);
 	notify_cpu_starting(cpu);
 
 	/* Notify boot CPU that we're starting & ready to sync counters */
 	complete(&cpu_starting);
 
-	if (!plat_qemu)
-		synchronise_count_slave(cpu);
+	synchronise_count_slave(cpu);
 
 	/* The CPU is running and counters synchronised, now mark it online */
 	set_cpu_online(cpu, true);
-
-	set_cpu_sibling_map(cpu);
-	set_cpu_core_map(cpu);
 
 	calculate_cpu_foreign_map();
 
@@ -456,8 +453,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *tidle)
 		return -EIO;
 	}
 
-	if (!plat_qemu)
-		synchronise_count_master(cpu);
+	synchronise_count_master(cpu);
 
 	/* Wait for CPU to finish startup & mark itself online before return */
 	wait_for_completion(&cpu_running);

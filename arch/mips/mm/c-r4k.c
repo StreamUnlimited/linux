@@ -1560,7 +1560,7 @@ static int probe_scache(void)
 	return 1;
 }
 
-static void __init loongson2_sc_init(void)
+static void loongson2_sc_init(void)
 {
 	struct cpuinfo_mips *c = &current_cpu_data;
 
@@ -1576,7 +1576,7 @@ static void __init loongson2_sc_init(void)
 	c->options |= MIPS_CPU_INCLUSIVE_CACHES;
 }
 
-static void __init loongson3_sc_init(void)
+static void loongson3_sc_init(void)
 {
 	struct cpuinfo_mips *c = &current_cpu_data;
 	unsigned int config2, lsize;
@@ -1676,7 +1676,11 @@ static void setup_scache(void)
 				printk("MIPS secondary cache %ldkB, %s, linesize %d bytes.\n",
 				       scache_size >> 10,
 				       way_string[c->scache.ways], c->scache.linesz);
+
+				if (current_cpu_type() == CPU_BMIPS5000)
+					c->options |= MIPS_CPU_INCLUSIVE_CACHES;
 			}
+
 #else
 			if (!(c->scache.flags & MIPS_CACHE_NOT_PRESENT))
 				panic("Dunno how to handle MIPS32 / MIPS64 second level cache");
@@ -1760,11 +1764,6 @@ early_param("cca", cca_setup);
 
 static void coherency_setup(void)
 {
-#if defined(CONFIG_MIPS_CMP) || defined(CONFIG_MIPS_CPS)
-	cca = CONF_CM_CACHABLE_COW;
-#elif defined CONFIG_CPU_HAS_WBC
-	cca = CONF_CM_CACHABLE_NONCOHERENT;
-#endif
 	if (cca < 0 || cca > 7)
 		cca = read_c0_config() & CONF_CM_CMASK;
 	_page_cachable_default = cca << _CACHE_SHIFT;

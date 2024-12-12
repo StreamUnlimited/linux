@@ -7,9 +7,6 @@
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  * Copyright (C) 2002, 2007  Maciej W. Rozycki
  * Copyright (C) 2001, 2012 MIPS Technologies, Inc.  All rights reserved.
- *
- * Modified for RLX processors
- * Copyright (C) 2008-2013 Tony Wu (tonywu@realtek.com)
  */
 #include <linux/init.h>
 
@@ -45,6 +42,66 @@ NESTED(except_vec3_generic, 0, sp)
 	.set	pop
 	END(except_vec3_generic)
 
+/*
+ * General exception handler for CPUs with virtual coherency exception.
+ *
+ * Be careful when changing this, it has to be at most 256 (as a special
+ * exception) bytes to fit into space reserved for the exception handler.
+ */
+NESTED(except_vec3_r4000, 0, sp)
+	.set	push
+	.set	arch=r4000
+	.set	noat
+	mfc0	k1, CP0_CAUSE
+	li	k0, 31<<2
+	andi	k1, k1, 0x7c
+	.set	push
+	.set	noreorder
+	.set	nomacro
+	beq	k1, k0, handle_vced
+	 li	k0, 14<<2
+	beq	k1, k0, handle_vcei
+#ifdef CONFIG_64BIT
+	 dsll	k1, k1, 1
+#endif
+	.set	pop
+	PTR_L	k0, exception_handlers(k1)
+	jr	k0
+
+	/*
+	 * Big shit, we now may have two dirty primary cache lines for the same
+	 * physical address.  We can safely invalidate the line pointed to by
+	 * c0_badvaddr because after return from this exception handler the
+	 * load / store will be re-executed.
+	 */
+handle_vced:
+	MFC0	k0, CP0_BADVADDR
+	li	k1, -4					# Is this ...
+	and	k0, k1					# ... really needed?
+	mtc0	zero, CP0_TAGLO
+	cache	Index_Store_Tag_D, (k0)
+	cache	Hit_Writeback_Inv_SD, (k0)
+#ifdef CONFIG_PROC_FS
+	PTR_LA	k0, vced_count
+	lw	k1, (k0)
+	addiu	k1, 1
+	sw	k1, (k0)
+#endif
+	eret
+
+handle_vcei:
+	MFC0	k0, CP0_BADVADDR
+	cache	Hit_Writeback_Inv_SD, (k0)		# also cleans pi
+#ifdef CONFIG_PROC_FS
+	PTR_LA	k0, vcei_count
+	lw	k1, (k0)
+	addiu	k1, 1
+	sw	k1, (k0)
+#endif
+	eret
+	.set	pop
+	END(except_vec3_r4000)
+
 	__FINIT
 
 	.align	5	/* 32 byte rollback region */
@@ -74,7 +131,6 @@ LEAF(__r4k_wait)
 	.set	pop
 	END(__r4k_wait)
 
-#ifndef CONFIG_CPU_RLX
 	.macro	BUILD_ROLLBACK_PROLOGUE handler
 	FEXPORT(rollback_\handler)
 	.set	push
@@ -87,10 +143,6 @@ LEAF(__r4k_wait)
 	MTC0	k0, CP0_EPC
 	.set pop
 	.endm
-#else
-	.macro	BUILD_ROLLBACK_PROLOGUE handler
-	.endm
-#endif
 
 	.align	5
 BUILD_ROLLBACK_PROLOGUE handle_int
@@ -110,7 +162,7 @@ NESTED(handle_int, PT_SIZE, sp)
 	.set	push
 	.set	noat
 	mfc0	k0, CP0_STATUS
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_RLX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 	and	k0, ST0_IEP
 	bnez	k0, 1f
 
@@ -178,43 +230,6 @@ NESTED(handle_int, PT_SIZE, sp)
 #endif
 	END(handle_int)
 
-#ifdef CONFIG_CPU_RLX
-	.align	6
-NESTED(handle_vec, PT_SIZE, sp)
-	.set push
-	.set noreorder
-	b	9f
-	 li	k0, 0
-	b	9f
-	 li	k0, 1
-	b	9f
-	 li	k0, 2
-	b	9f
-	 li	k0, 3
-	b	9f
-	 li	k0, 4
-	b	9f
-	 li	k0, 5
-	b	9f
-	 li	k0, 6
-	b	9f
-	 li	k0, 7
-	.set pop
-
-9:	mtlxc0	k0, LXCP0_TR1
-	SAVE_ALL
-	CLI
-	TRACE_IRQS_OFF
-
-	LONG_L	s0, TI_REGS($28)
-	LONG_S	sp, TI_REGS($28)
-	PTR_LA	ra, ret_from_irq
-	mflxc0	a0, LXCP0_TR1
-	j	mips_do_lopi_IRQ
-	END(handle_vec)
-#endif
-
-#ifndef CONFIG_CPU_RLX
 	__INIT
 
 /*
@@ -250,7 +265,6 @@ NESTED(except_vec_ejtag_debug, 0, sp)
  * This prototype is copied to ebase + n*IntCtl.VS and patched
  * to invoke the handler
  */
-#ifdef CONFIG_CPU_MIPSR2_IRQ_VI
 BUILD_ROLLBACK_PROLOGUE except_vec_vi
 NESTED(except_vec_vi, 0, sp)
 	SAVE_SOME docfi=1
@@ -324,7 +338,6 @@ NESTED(except_vec_vi_handler, 0, sp)
 
 	j	ret_from_irq
 	END(except_vec_vi_handler)
-#endif
 
 /*
  * EJTAG debug exception handler.
@@ -446,7 +459,6 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	/* nmi_exception_handler never returns */
 	.set	pop
 	END(nmi_handler)
-#endif
 
 	.macro	__build_clear_none
 	.endm
@@ -461,7 +473,6 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	TRACE_IRQS_OFF
 	.endm
 
-#ifdef CONFIG_MIPS_FP_SUPPORT
 	.macro	__build_clear_fpe
 	CLI
 	TRACE_IRQS_OFF
@@ -478,7 +489,6 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	TRACE_IRQS_OFF
 	_cfcmsa	a1, MSA_CSR
 	.endm
-#endif
 
 	.macro	__build_clear_ade
 	MFC0	t0, CP0_BADVADDR
@@ -538,39 +548,28 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	BUILD_HANDLER ri ri sti silent			/* #10 */
 	BUILD_HANDLER cpu cpu sti silent		/* #11 */
 	BUILD_HANDLER ov ov sti silent			/* #12 */
-#ifndef CONFIG_CPU_RLX
 	BUILD_HANDLER tr tr sti silent			/* #13 */
-#endif
-#ifdef CONFIG_CPU_HAS_MSA
 	BUILD_HANDLER msa_fpe msa_fpe msa_fpe silent	/* #14 */
-	BUILD_HANDLER msa msa sti silent		/* #21 */
-#endif
 #ifdef CONFIG_MIPS_FP_SUPPORT
 	BUILD_HANDLER fpe fpe fpe silent		/* #15 */
 #endif
-#ifndef CONFIG_CPU_RLX
 	BUILD_HANDLER ftlb ftlb none silent		/* #16 */
+	BUILD_HANDLER msa msa sti silent		/* #21 */
 	BUILD_HANDLER mdmx mdmx sti silent		/* #22 */
-#endif
-#ifdef CONFIG_HARDWARE_WATCHPOINTS
+#ifdef	CONFIG_HARDWARE_WATCHPOINTS
 	/*
 	 * For watch, interrupts will be enabled after the watch
 	 * registers are read.
 	 */
 	BUILD_HANDLER watch watch cli silent		/* #23 */
+#else
+	BUILD_HANDLER watch watch sti verbose		/* #23 */
 #endif
-#ifndef CONFIG_CPU_RLX
 	BUILD_HANDLER mcheck mcheck cli verbose		/* #24 */
-#endif
-#ifdef CONFIG_MIPS_MT
 	BUILD_HANDLER mt mt sti silent			/* #25 */
-#endif
-#ifdef CONFIG_CPU_HAS_DSP
 	BUILD_HANDLER dsp dsp sti silent		/* #26 */
-#endif
 	BUILD_HANDLER reserved reserved sti verbose	/* others */
 
-#if !defined(CONFIG_CPU_RLX) && !defined(CONFIG_CPU_HAS_TLS)
 	.align	5
 	LEAF(handle_ri_rdhwr_tlbp)
 	.set	push
@@ -657,7 +656,6 @@ isrdhwr:
 #endif
 	.set	pop
 	END(handle_ri_rdhwr)
-#endif
 
 #ifdef CONFIG_64BIT
 /* A temporary overflow handler used by check_daddi(). */

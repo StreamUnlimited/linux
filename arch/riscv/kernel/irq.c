@@ -45,11 +45,6 @@ asmlinkage __visible void __irq_entry do_IRQ(struct pt_regs *regs)
 	case INTERRUPT_CAUSE_EXTERNAL:
 		handle_arch_irq(regs);
 		break;
-#ifdef CONFIG_RISCV_CLIC
-	case 16 ... 31:
-		riscv_clic_handle_irq();
-		break;
-#endif
 	default:
 		pr_alert("unexpected interrupt cause 0x%lx", regs->scause);
 		BUG();

@@ -103,7 +103,7 @@ LEAF(_save_fp_context)
 	.set	pop
 
 #if defined(CONFIG_64BIT) || defined(CONFIG_CPU_MIPSR2) || \
-    defined(CONFIG_CPU_MIPSR6) || defined(CONFIG_CPU_RLX)
+		defined(CONFIG_CPU_MIPSR6)
 	.set	push
 	SET_HARDFLOAT
 #ifdef CONFIG_CPU_MIPSR2
@@ -113,9 +113,6 @@ LEAF(_save_fp_context)
 	sll	t0, t0, 5
 	bgez	t0, 1f			# skip storing odd if FR=0
 	 nop
-#endif
-#ifdef CONFIG_CPU_RLX
-	.set	fp=64
 #endif
 	/* Store the 16 odd double precision registers */
 	EX	sdc1 $f1, 8(a0)
@@ -174,7 +171,7 @@ LEAF(_restore_fp_context)
 	EX	lw t1, 0(a1)
 
 #if defined(CONFIG_64BIT) || defined(CONFIG_CPU_MIPSR2)  || \
-    defined(CONFIG_CPU_MIPSR6) || defined(CONFIG_CPU_RLX)
+		defined(CONFIG_CPU_MIPSR6)
 	.set	push
 	SET_HARDFLOAT
 #ifdef CONFIG_CPU_MIPSR2
@@ -184,9 +181,6 @@ LEAF(_restore_fp_context)
 	sll	t0, t0, 5
 	bgez	t0, 1f			# skip loading odd if FR=0
 	 nop
-#endif
-#ifdef CONFIG_CPU_RLX
-	.set	fp=64
 #endif
 	EX	ldc1 $f1, 8(a0)
 	EX	ldc1 $f3, 24(a0)

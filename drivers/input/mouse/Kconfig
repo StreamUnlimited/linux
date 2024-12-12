@@ -13,10 +13,6 @@ menuconfig INPUT_MOUSE
 
 if INPUT_MOUSE
 
-config MOUSE_RLXVM
-	tristate "RLXVM visual mouse"
-	default n
-
 config MOUSE_PS2
 	tristate "PS/2 mouse"
 	default y

@@ -143,7 +143,7 @@ int arch_check_elf(void *_ehdr, bool has_interpreter, void *_interp_ehdr,
 		struct elf64_hdr e64;
 	} *iehdr = _interp_ehdr;
 	struct mode_req prog_req, interp_req;
-	int fp_abi, interp_fp_abi __maybe_unused, abi0, abi1, max_abi;
+	int fp_abi, interp_fp_abi, abi0, abi1, max_abi;
 	bool elf32;
 	u32 flags;
 
@@ -181,9 +181,6 @@ int arch_check_elf(void *_ehdr, bool has_interpreter, void *_interp_ehdr,
 
 	fp_abi = state->fp_abi;
 
-#if defined(CONFIG_CPU_RLX)
-	abi0 = abi1 = fp_abi;
-#else
 	if (has_interpreter) {
 		interp_fp_abi = state->interp_fp_abi;
 
@@ -192,7 +189,6 @@ int arch_check_elf(void *_ehdr, bool has_interpreter, void *_interp_ehdr,
 	} else {
 		abi0 = abi1 = fp_abi;
 	}
-#endif
 
 	if (elf32 && !(flags & EF_MIPS_ABI2)) {
 		/* Default to a mode capable of running code expecting FR=0 */

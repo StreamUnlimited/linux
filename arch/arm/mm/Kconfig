@@ -5,6 +5,38 @@ comment "Processor Type"
 # which CPUs we support in the kernel image, and the compiler instruction
 # optimiser behaviour.
 
+config CPU_ARMA7
+	bool "Support cortex-a7 processor"
+	select CPU_V7
+	select ARM_GIC
+	select HAVE_ARM_ARCH_TIMER
+
+config CPU_ARMA32
+	bool "Support cortex-a32 processor"
+	select CPU_V7
+	select ARM_GIC
+	select HAVE_ARM_ARCH_TIMER
+
+config CPU_ARMA53
+	bool "Support cortex-a53 processor"
+	select CPU_V8
+	select ARM_GIC
+	select HAVE_ARM_ARCH_TIMER
+
+config CPU_ARMA55
+	bool "Support cortex-a55 processor"
+	select CPU_V8
+	select ARM_GIC
+	select ARM_GIC_V3
+	select HAVE_ARM_ARCH_TIMER
+
+config CPU_ARMA73
+	bool "Support cortex-a73 processor"
+	select CPU_V8
+	select ARM_GIC
+	select ARM_GIC_V3
+	select HAVE_ARM_ARCH_TIMER
+
 # ARM7TDMI
 config CPU_ARM7TDMI
 	bool
@@ -752,6 +784,7 @@ config SWP_EMULATE
 config CPU_BIG_ENDIAN
 	bool "Build big-endian kernel"
 	depends on ARCH_SUPPORTS_BIG_ENDIAN
+	depends on !LD_IS_LLD
 	help
 	  Say Y if you plan on running a kernel in big-endian mode.
 	  Note that your board must be properly built and your board
@@ -761,7 +794,7 @@ config CPU_BIG_ENDIAN
 config CPU_ENDIAN_BE8
 	bool
 	depends on CPU_BIG_ENDIAN
-	default CPU_V6 || CPU_V6K || CPU_V7
+	default CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
 	help
 	  Support for the BE-8 (big-endian) mode on ARMv6 and ARMv7 processors.
 
@@ -841,6 +874,7 @@ config CPU_BPREDICT_DISABLE
 
 config CPU_SPECTRE
 	bool
+	select GENERIC_CPU_VULNERABILITIES
 
 config HARDEN_BRANCH_PREDICTOR
 	bool "Harden the branch predictor against aliasing attacks" if EXPERT
@@ -860,6 +894,16 @@ config HARDEN_BRANCH_PREDICTOR
 	   the system firmware.
 
 	   If unsure, say Y.
+
+config HARDEN_BRANCH_HISTORY
+	bool "Harden Spectre style attacks against branch history" if EXPERT
+	depends on CPU_SPECTRE
+	default y
+	help
+	  Speculation attacks against some high-performance processors can
+	  make use of branch history to influence future speculation. When
+	  taking an exception, a sequence of branches overwrites the branch
+	  history, or branch history is invalidated.
 
 config TLS_REG_EMUL
 	bool
@@ -1136,3 +1180,6 @@ config DEBUG_ALIGN_RODATA
 	  additional section-aligned split of rodata from kernel text so it
 	  can be made explicitly non-executable. This padding may waste memory
 	  space to gain the additional protection.
+
+config CPU_HAS_L2C
+	bool

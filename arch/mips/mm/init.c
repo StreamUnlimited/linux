@@ -84,7 +84,7 @@ void setup_zero_pages(void)
 static void *__kmap_pgprot(struct page *page, unsigned long addr, pgprot_t prot)
 {
 	enum fixed_addresses idx;
-	unsigned int uninitialized_var(old_mmid);
+	unsigned int old_mmid;
 	unsigned long vaddr, flags, entrylo;
 	unsigned long old_ctx;
 	pte_t pte;
@@ -108,7 +108,7 @@ static void *__kmap_pgprot(struct page *page, unsigned long addr, pgprot_t prot)
 
 	local_irq_save(flags);
 	old_ctx = read_c0_entryhi();
-	write_c0_entryhi(vaddr & ENTRYHI_VPN_MASK);
+	write_c0_entryhi(vaddr & (PAGE_MASK << 1));
 	write_c0_entrylo0(entrylo);
 	write_c0_entrylo1(entrylo);
 	if (cpu_has_mmid) {

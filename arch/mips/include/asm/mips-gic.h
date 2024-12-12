@@ -287,7 +287,6 @@ GIC_VX_ACCESSOR_RW_INTR_REG(32, 0x100, 0x4, eic_shadow_set)
  * Enumerates interrupts provided by the GIC that are local to a VP.
  */
 enum mips_gic_local_interrupt {
-#ifndef CONFIG_TAROKO_GIC
 	GIC_LOCAL_INT_WD,
 	GIC_LOCAL_INT_COMPARE,
 	GIC_LOCAL_INT_TIMER,
@@ -295,7 +294,6 @@ enum mips_gic_local_interrupt {
 	GIC_LOCAL_INT_SWINT0,
 	GIC_LOCAL_INT_SWINT1,
 	GIC_LOCAL_INT_FDC,
-#endif
 	GIC_NUM_LOCAL_INTRS
 };
 
@@ -312,7 +310,6 @@ static inline bool mips_gic_present(void)
 	return IS_ENABLED(CONFIG_MIPS_GIC) && mips_gic_base;
 }
 
-#ifndef CONFIG_TAROKO_GIC
 /**
  * mips_gic_vx_map_reg() - Return GIC_Vx_<intr>_MAP register offset
  * @intr: A GIC local interrupt
@@ -342,7 +339,6 @@ mips_gic_vx_map_reg(enum mips_gic_local_interrupt intr)
 	/* As a result everything else is offset by 1 */
 	return intr + 1;
 }
-#endif
 
 /**
  * gic_get_c0_compare_int() - Return cp0 count/compare interrupt virq

@@ -17,13 +17,12 @@
 #include <linux/atomic.h>
 #include <asm/barrier.h>
 #include <asm/mipsregs.h>
-#include <asm/time.h>
 
 static unsigned int initcount = 0;
 static atomic_t count_count_start = ATOMIC_INIT(0);
 static atomic_t count_count_stop = ATOMIC_INIT(0);
 
-#define COUNTON (8 * mips_hpt_frequency / HZ)
+#define COUNTON 100
 #define NR_LOOPS 3
 
 void synchronise_count_master(int cpu)

@@ -7,9 +7,6 @@
  * Copyright (C) 1994, 1995, 1996 Paul M. Antoine.
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) 2007  Maciej W. Rozycki
- *
- * Modified for RLX processors
- * Copyright (C) 2008-2013 Tony Wu (tonywu@realtek.com)
  */
 #ifndef _ASM_STACKFRAME_H
 #define _ASM_STACKFRAME_H
@@ -352,7 +349,7 @@
 		cfi_ld	sp, PT_R29, \docfi
 		.endm
 
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_RLX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 
 		.macro	RESTORE_SOME docfi=0
 		.set	push
@@ -481,7 +478,7 @@
 		.macro	KMODE
 		mfc0	t0, CP0_STATUS
 		li	t1, ST0_CU0 | (STATMASK & ~1)
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_RLX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
 		andi	t2, t0, ST0_IEP
 		srl	t2, 2
 		or	t0, t2

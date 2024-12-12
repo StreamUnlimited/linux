@@ -7,9 +7,6 @@
 # DECStation modifications by Paul M. Antoine, 1996
 # Copyright (C) 2002, 2003, 2004  Maciej W. Rozycki
 #
-# Modified for RLX Linux for MIPS
-# Copyright (C) 2008-2011 Tony Wu (tonywu@realtek.com)
-#
 # This file is included by the global makefile so that you can add your own
 # architecture-specific flags and dependencies. Remember to do have actions
 # for "archclean" cleaning up for this architecture.
@@ -19,15 +16,15 @@ archscripts: scripts_basic
 	$(Q)$(MAKE) $(build)=arch/mips/tools elf-entry
 	$(Q)$(MAKE) $(build)=arch/mips/boot/tools relocs
 
-KBUILD_DEFCONFIG := mips_defconfig
+KBUILD_DEFCONFIG := 32r2el_defconfig
 KBUILD_DTBS      := dtbs
 
 #
 # Select the object file format to substitute into the linker script.
 #
 ifdef CONFIG_CPU_LITTLE_ENDIAN
-32bit-tool-archpref	= mips
-64bit-tool-archpref	= mips64
+32bit-tool-archpref	= mipsel
+64bit-tool-archpref	= mips64el
 32bit-bfd		= elf32-tradlittlemips
 64bit-bfd		= elf64-tradlittlemips
 32bit-emul		= elf32ltsmip
@@ -140,8 +137,8 @@ undef-all += -UMIPSEB -U_MIPSEB -U__MIPSEB -U__MIPSEB__
 undef-all += -UMIPSEL -U_MIPSEL -U__MIPSEL -U__MIPSEL__
 predef-be += -DMIPSEB -D_MIPSEB -D__MIPSEB -D__MIPSEB__
 predef-le += -DMIPSEL -D_MIPSEL -D__MIPSEL -D__MIPSEL__
-cflags-$(CONFIG_CPU_BIG_ENDIAN)		+= -EB $(undef-all) $(predef-be)
-cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	+= -EL $(undef-all) $(predef-le)
+cflags-$(CONFIG_CPU_BIG_ENDIAN)		+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' && echo -EB $(undef-all) $(predef-be))
+cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' || echo -EL $(undef-all) $(predef-le))
 endif
 
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= $(call cc-option,-mno-sched-prolog) \
@@ -256,11 +253,7 @@ endif
 #
 # Board-dependent options and extra files
 #
-#include arch/mips/Kbuild.platforms
-
-ifeq ($(CONFIG_SHEIPA),y)
-include $(srctree)/arch/$(VAR_ARCH)/bsp/Makefile
-endif
+include arch/mips/Kbuild.platforms
 
 ifdef CONFIG_PHYSICAL_START
 load-y					= $(CONFIG_PHYSICAL_START)
@@ -327,7 +320,7 @@ KBUILD_LDFLAGS		+= -m $(ld-emul)
 
 ifdef CONFIG_MIPS
 CHECKFLAGS += $(shell $(CC) $(KBUILD_CFLAGS) -dM -E -x c /dev/null | \
-	egrep -vw '__GNUC_(|MINOR_|PATCHLEVEL_)_' | \
+	egrep -vw '__GNUC_(MINOR_|PATCHLEVEL_)?_' | \
 	sed -e "s/^\#define /-D'/" -e "s/ /'='/" -e "s/$$/'/" -e 's/\$$/&&/g')
 endif
 
@@ -336,7 +329,7 @@ OBJCOPYFLAGS		+= --remove-section=.reginfo
 head-y := arch/mips/kernel/head.o
 
 libs-y			+= arch/mips/lib/
-libs-$(CONFIG_CPU_HAS_EMU)	+= arch/mips/math-emu/
+libs-$(CONFIG_MIPS_FP_SUPPORT) += arch/mips/math-emu/
 
 # See arch/mips/Kbuild for content of core part of the kernel
 core-y += arch/mips/
@@ -351,12 +344,14 @@ drivers-$(CONFIG_PM)	+= arch/mips/power/
 boot-y			:= vmlinux.bin
 boot-y			+= vmlinux.ecoff
 boot-y			+= vmlinux.srec
+ifeq ($(shell expr $(load-y) \< 0xffffffff80000000 2> /dev/null), 0)
 boot-y			+= uImage
 boot-y			+= uImage.bin
 boot-y			+= uImage.bz2
 boot-y			+= uImage.gz
 boot-y			+= uImage.lzma
 boot-y			+= uImage.lzo
+endif
 boot-y			+= vmlinux.itb
 boot-y			+= vmlinux.gz.itb
 boot-y			+= vmlinux.bz2.itb

@@ -32,6 +32,7 @@ source "drivers/rtkdrivers/gpio/Kconfig"
 source "drivers/rtkdrivers/ipc/Kconfig"
 
 if NETDEVICES
+source "drivers/rtkdrivers/net/wireless/inic/Kconfig"
 endif
 
 source "drivers/rtkdrivers/ir/Kconfig"
@@ -74,6 +75,7 @@ source "drivers/rtkdrivers/usb_phy/Kconfig"
 
 source "drivers/rtkdrivers/watchdog/Kconfig"
 
+source "drivers/rtkdrivers/net/ieee802154/Kconfig"
 
 source "drivers/rtkdrivers/bluetooth/Kconfig"
 

@@ -98,8 +98,6 @@
 #ifndef FIXADDR_TOP
 #ifdef CONFIG_KVM_GUEST
 #define FIXADDR_TOP		((unsigned long)(long)(int)0x7ffe0000)
-#elif defined(CONFIG_CPU_RLX)
-#define FIXADDR_TOP		((unsigned long)(long)(int)0xff000000 - PAGE_SIZE)
 #else
 #define FIXADDR_TOP		((unsigned long)(long)(int)0xfffe0000)
 #endif

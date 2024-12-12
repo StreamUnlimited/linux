@@ -33,7 +33,7 @@
 #include <asm/cacheflush.h>
 #include <asm/fpu.h>
 #include <asm/sim.h>
-#include <uapi/asm/ucontext.h>
+#include <asm/ucontext.h>
 #include <asm/cpu-features.h>
 #include <asm/war.h>
 #include <asm/dsp.h>

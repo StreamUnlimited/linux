@@ -518,8 +518,6 @@ static void __init serial8250_isa_init_ports(void)
 		timer_setup(&up->timer, serial8250_timeout, 0);
 
 		up->ops = &univ8250_driver_ops;
-		if (!(up->port.flags & UPF_SKIP_TEST))
-			up->cur_iotype = 0xFF;
 
 		/*
 		 * ALPHA_KLUDGE_MCR needs to be killed.
@@ -1140,6 +1138,7 @@ void serial8250_unregister_port(int line)
 		uart->port.type = PORT_UNKNOWN;
 		uart->port.dev = &serial8250_isa_devs->dev;
 		uart->capabilities = 0;
+		serial8250_init_port(uart);
 		serial8250_apply_quirks(uart);
 		uart_add_one_port(&serial8250_reg, &uart->port);
 	} else {

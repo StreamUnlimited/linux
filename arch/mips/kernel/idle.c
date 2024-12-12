@@ -67,19 +67,6 @@ void __cpuidle r4k_wait_irqoff(void)
 	local_irq_enable();
 }
 
-#ifdef CONFIG_CPU_HAS_SLEEP
-static void rlx_wait(void)
-{
-	if (!need_resched())
-		__asm__(
-		"	.set push		\n"
-		"	.set noreorder		\n"
-		"	sleep			\n"
-		"	.set pop		\n");
-	local_irq_enable();
-}
-#endif
-
 /*
  * The RM7000 variant has to handle erratum 38.	 The workaround is to not
  * have any pending stores when the WAIT instruction is executed.
@@ -257,14 +244,6 @@ void __init check_wait(void)
 		 * disable the use of WAIT for 20Kc entirely.
 		   cpu_wait = r4k_wait;
 		 */
-		break;
-	case CPU_RLX4181:
-	case CPU_RLX5181:
-	case CPU_RLX4281:
-	case CPU_RLX5281:
-#ifdef CONFIG_CPU_HAS_SLEEP
-		cpu_wait = rlx_wait;
-#endif
 		break;
 	default:
 		break;

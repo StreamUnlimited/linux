@@ -5,7 +5,6 @@
 
 # Each configuration option enables a list of files.
 
-obj-$(CONFIG_MOUSE_RLXVM)		+= vm_virtual_mouse.o
 obj-$(CONFIG_MOUSE_AMIGA)		+= amimouse.o
 obj-$(CONFIG_MOUSE_APPLETOUCH)		+= appletouch.o
 obj-$(CONFIG_MOUSE_ATARI)		+= atarimouse.o

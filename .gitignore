@@ -11,9 +11,11 @@
 #
 .*
 *.a
+*.asn1.[ch]
 *.bin
 *.bz2
 *.c.[012]*.*
+*.dt.yaml
 *.dtb
 *.dtb.S
 *.dwo
@@ -30,21 +32,21 @@
 *.lzo
 *.mod
 *.mod.c
+*.ns_deps
 *.o
 *.o.*
-*.order
 *.patch
 *.s
 *.so
 *.so.dbg
 *.su
 *.symtypes
-*.tab.c
-*.tab.h
+*.tab.[ch]
 *.tar
 *.xz
 Module.symvers
 modules.builtin
+modules.order
 
 #
 # Top-level generic files
@@ -58,37 +60,7 @@ modules.builtin
 /vmlinuz
 /System.map
 /Module.markers
-arch/arm/boot/Image
-arch/arm/boot/compressed/ashldi3.S
-arch/arm/boot/compressed/bswapsdi2.S
-arch/arm/boot/compressed/hyp-stub.S
-arch/arm/boot/compressed/lib1funcs.S
-arch/arm/boot/compressed/piggy_data
-arch/arm/boot/compressed/vmlinux
-arch/arm/boot/compressed/vmlinux.lds
-arch/arm/boot/uImage
-arch/arm/boot/zImage
-arch/arm/kernel/vmlinux.lds
-arch/arm/vdso/vdso.lds
-arch/arm/vdso/vdso.so.raw
-arch/arm/vdso/vdsomunge
-lib/crc32table.h
-lib/gen_crc32table
-modules.builtin.modinfo
-scripts/basic/fixdep
-scripts/dtc/dtc
-scripts/kallsyms
-scripts/kconfig/conf
-scripts/kconfig/mconf
-scripts/kconfig/mconf-cfg
-scripts/mod/devicetable-offsets.h
-scripts/mod/elfconfig.h
-scripts/mod/mk_elfconfig
-scripts/mod/modpost
-scripts/sortextable
-scripts/unifdef
-usr/gen_init_cpio
-usr/initramfs_data.cpio
+/modules.builtin.modinfo
 
 #
 # RPM spec file (make rpm-pkg)
@@ -101,37 +73,32 @@ usr/initramfs_data.cpio
 /debian/
 
 #
+# Snap directory (make snap-pkg)
+#
+/snap/
+
+#
 # tar directory (make tar*-pkg)
 #
 /tar-install/
 
 #
-# git files that we don't want to ignore even if they are dot-files
+# We don't want to ignore the following even if they are dot-files
 #
+!.clang-format
+!.cocciconfig
+!.get_maintainer.ignore
+!.gitattributes
 !.gitignore
 !.mailmap
-!.cocciconfig
-!.clang-format
 
 #
 # Generated include files
 #
-include/config
-include/generated
-arch/*/include/generated
-user_headers/*
-usr/include/asm-generic/*
-usr/include/asm/*
-usr/include/drm/*
-usr/include/inic/*
-usr/include/linux/*
-usr/include/misc/*
-usr/include/mtd/*
-usr/include/rdma/*
-usr/include/scsi/*
-usr/include/sound/*
-usr/include/video/*
-usr/include/xen/*
+/include/config/
+/include/generated/
+/include/ksym/
+/arch/*/include/generated/
 
 # stgit generated dirs
 patches-*
@@ -167,7 +134,15 @@ signing_key.x509
 x509.genkey
 
 # Kconfig presets
-all.config
+/all.config
+/alldef.config
+/allmod.config
+/allno.config
+/allrandom.config
+/allyes.config
 
 # Kdevelop4
 *.kdev4
+
+# Clang's compilation database file
+/compile_commands.json

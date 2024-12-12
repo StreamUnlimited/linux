@@ -134,7 +134,7 @@ static struct {
 
 static int siw_init_cpulist(void)
 {
-	int i, num_nodes = num_possible_nodes();
+	int i, num_nodes = nr_node_ids;
 
 	memset(siw_tx_thread, 0, sizeof(siw_tx_thread));
 
@@ -471,9 +471,6 @@ static int siw_netdev_event(struct notifier_block *nb, unsigned long event,
 	struct siw_device *sdev;
 
 	dev_dbg(&netdev->dev, "siw: event %lu\n", event);
-
-	if (dev_net(netdev) != &init_net)
-		return NOTIFY_OK;
 
 	base_dev = ib_device_get_by_netdev(netdev, RDMA_DRIVER_SIW);
 	if (!base_dev)

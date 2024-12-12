@@ -1159,19 +1159,12 @@
  * microMIPS instructions can be 16-bit or 32-bit in length. This
  * returns a 1 if the instruction is 16-bit and a 0 if 32-bit.
  */
-#ifdef CONFIG_CPU_HAS_MICROMIPS
 static inline int mm_insn_16bit(u16 insn)
 {
 	u16 opcode = (insn >> 10) & 0x7;
 
 	return (opcode >= 1 && opcode <= 3) ? 1 : 0;
 }
-#else
-static inline int mm_insn_16bit(u16 insn)
-{
-	return 0;
-}
-#endif
 
 /*
  * Helper macros for generating raw instruction encodings in inline asm.
@@ -1598,13 +1591,8 @@ do {									\
 #define readx_c0_entrylo0()	__readx_32bit_c0_register($2, 0)
 #define writex_c0_entrylo0(val)	__writex_32bit_c0_register($2, 0, val)
 
-#ifdef CONFIG_CPU_RLX
-#define read_c0_entrylo1()	do { } while (0)
-#define write_c0_entrylo1(val)	do { } while (0)
-#else
 #define read_c0_entrylo1()	__read_ulong_c0_register($3, 0)
 #define write_c0_entrylo1(val)	__write_ulong_c0_register($3, 0, val)
-#endif
 
 #define readx_c0_entrylo1()	__readx_32bit_c0_register($3, 0)
 #define writex_c0_entrylo1(val)	__writex_32bit_c0_register($3, 0, val)
@@ -1620,13 +1608,8 @@ do {									\
 #define read_c0_contextconfig()		__read_32bit_c0_register($4, 1)
 #define write_c0_contextconfig(val)	__write_32bit_c0_register($4, 1, val)
 
-#ifdef CONFIG_CPU_RLX
-#define read_c0_userlocal()	read_lxc0_userlocal()
-#define write_c0_userlocal(val)	write_lxc0_userlocal(val)
-#else
 #define read_c0_userlocal()	__read_ulong_c0_register($4, 2)
 #define write_c0_userlocal(val) __write_ulong_c0_register($4, 2, val)
-#endif
 
 #define read_c0_xcontextconfig()	__read_ulong_c0_register($4, 3)
 #define write_c0_xcontextconfig(val)	__write_ulong_c0_register($4, 3, val)
@@ -1723,14 +1706,6 @@ do {									\
 #define write_c0_config5(val)	__write_32bit_c0_register($16, 5, val)
 #define write_c0_config6(val)	__write_32bit_c0_register($16, 6, val)
 #define write_c0_config7(val)	__write_32bit_c0_register($16, 7, val)
-#define read_c0_cctl0()		__read_32bit_c0_register($20, 0)
-#define read_c0_cctl1()		__read_32bit_c0_register($20, 1)
-#define read_c0_cctl2()		__read_32bit_c0_register($20, 2)
-#define read_c0_cctl3()		__read_32bit_c0_register($20, 3)
-#define write_c0_cctl0(val)	__write_32bit_c0_register($20, 0, val)
-#define write_c0_cctl1(val)	__write_32bit_c0_register($20, 1, val)
-#define write_c0_cctl2(val)	__write_32bit_c0_register($20, 2, val)
-#define write_c0_cctl3(val)	__write_32bit_c0_register($20, 3, val)
 
 #define read_c0_lladdr()	__read_ulong_c0_register($17, 0)
 #define write_c0_lladdr(val)	__write_ulong_c0_register($17, 0, val)
@@ -2032,7 +2007,7 @@ _ASM_MACRO_0(tlbginvf, _ASM_INSN_IF_MIPS(0x4200000c)
 ({ int __res;								\
 	__asm__ __volatile__(						\
 		".set\tpush\n\t"					\
-		".set\tmips32r2\n\t"					\
+		".set\tmips32r5\n\t"					\
 		_ASM_SET_VIRT						\
 		"mfgc0\t%0, " #source ", %1\n\t"			\
 		".set\tpop"						\
@@ -2045,7 +2020,7 @@ _ASM_MACRO_0(tlbginvf, _ASM_INSN_IF_MIPS(0x4200000c)
 ({ unsigned long long __res;						\
 	__asm__ __volatile__(						\
 		".set\tpush\n\t"					\
-		".set\tmips64r2\n\t"					\
+		".set\tmips64r5\n\t"					\
 		_ASM_SET_VIRT						\
 		"dmfgc0\t%0, " #source ", %1\n\t"			\
 		".set\tpop"						\
@@ -2058,7 +2033,7 @@ _ASM_MACRO_0(tlbginvf, _ASM_INSN_IF_MIPS(0x4200000c)
 do {									\
 	__asm__ __volatile__(						\
 		".set\tpush\n\t"					\
-		".set\tmips32r2\n\t"					\
+		".set\tmips32r5\n\t"					\
 		_ASM_SET_VIRT						\
 		"mtgc0\t%z0, " #register ", %1\n\t"			\
 		".set\tpop"						\
@@ -2070,7 +2045,7 @@ do {									\
 do {									\
 	__asm__ __volatile__(						\
 		".set\tpush\n\t"					\
-		".set\tmips64r2\n\t"					\
+		".set\tmips64r5\n\t"					\
 		_ASM_SET_VIRT						\
 		"dmtgc0\t%z0, " #register ", %1\n\t"			\
 		".set\tpop"						\
@@ -2858,8 +2833,6 @@ __BUILD_SET_C0(brcm_cmt_intr)
 __BUILD_SET_C0(brcm_cmt_ctrl)
 __BUILD_SET_C0(brcm_config)
 __BUILD_SET_C0(brcm_mode)
-__BUILD_SET_C0(cctl0)
-__BUILD_SET_C0(cctl1)
 
 /*
  * Manipulate bits in a guest c0 register.
@@ -2880,215 +2853,6 @@ static inline unsigned int get_ebase_cpunum(void)
 {
 	return read_c0_ebase() & MIPS_EBASE_CPUNUM;
 }
-
-#endif /* !__ASSEMBLY__ */
-
-/*
- * RLX CP0 register names
- */
-#define LXCP0_ESTATUS		$0
-#define LXCP0_ECAUSE		$1
-#define LXCP0_INTVEC		$2
-#define LXCP0_CVSTAG		$3
-#define LXCP0_BPCTL		$4
-#define LXCP0_WMPCTL		$5
-#define LXCP0_WMPSTATUS		$6
-#define LXCP0_WMPVADDR		$7
-#define LXCP0_TLPTR		$8
-#define LXCP0_WMPEXTRAMASK	$19
-#define LXCP0_CCTL		$20
-#define LXCP0_TR1		$24
-#define LXCP0_TR2		$25
-
-#define CCTL_DInval		0x00000001
-#define CCTL_IInval		0x00000002
-#define CCTL_IMEM0FILL		0x00000010
-#define CCTL_IMEM0OFF		0x00000020
-#define CCTL_IMEM0ON		0x00000040
-#define CCTL_DWB		0x00000100
-#define CCTL_DWBInval		0x00000200
-#define CCTL_DMEM0ON		0x00000400
-#define CCTL_DMEM0OFF		0x00000800
-
-#define CCTL_L2COFF		0x02000000
-#define CCTL_L2CON		0x01000000
-
-/*
- * RLX status register bits
- */
-#define EST0_IM			0x00ff0000
-#define ESTATUSF_IP0		(_ULCAST_(1) << 16)
-#define ESTATUSF_IP1		(_ULCAST_(1) << 17)
-#define ESTATUSF_IP2		(_ULCAST_(1) << 18)
-#define ESTATUSF_IP3		(_ULCAST_(1) << 19)
-#define ESTATUSF_IP4		(_ULCAST_(1) << 20)
-#define ESTATUSF_IP5		(_ULCAST_(1) << 21)
-#define ESTATUSF_IP6		(_ULCAST_(1) << 22)
-#define ESTATUSF_IP7		(_ULCAST_(1) << 23)
-
-#define ECAUSEF_IP		(_ULCAST_(255) << 16)
-#define ECAUSEF_IP0		(_ULCAST_(1)   << 16)
-#define ECAUSEF_IP1		(_ULCAST_(1)   << 17)
-#define ECAUSEF_IP2		(_ULCAST_(1)   << 18)
-#define ECAUSEF_IP3		(_ULCAST_(1)   << 19)
-#define ECAUSEF_IP4		(_ULCAST_(1)   << 20)
-#define ECAUSEF_IP5		(_ULCAST_(1)   << 21)
-#define ECAUSEF_IP6		(_ULCAST_(1)   << 22)
-#define ECAUSEF_IP7		(_ULCAST_(1)   << 23)
-
-/*
- * WMPU CTRL register
- */
-#define WMPCTLF_MS		(_ULCAST_(1) << 0)
-#define WMPCTLF_KE		(_ULCAST_(1) << 1)
-
-#define WMPCTLF_EE0		(_ULCAST_(1) << 16)
-#define WMPCTLF_EE1		(_ULCAST_(1) << 17)
-#define WMPCTLF_EE2		(_ULCAST_(1) << 18)
-#define WMPCTLF_EE3		(_ULCAST_(1) << 19)
-#define WMPCTLF_EE4		(_ULCAST_(1) << 20)
-#define WMPCTLF_EE5		(_ULCAST_(1) << 21)
-#define WMPCTLF_EE6		(_ULCAST_(1) << 22)
-#define WMPCTLF_EE7		(_ULCAST_(1) << 23)
-
-/*
- * WMPU status register
- */
-#define WMPSTATUSF_II		(_ULCAST_(1) << 0)
-#define WMPSTATUSF_DR		(_ULCAST_(1) << 1)
-#define WMPSTATUSF_DW		(_ULCAST_(1) << 2)
-
-#define WMPSTATUSF_EM0		(_ULCAST_(1) << 16)
-#define WMPSTATUSF_EM1		(_ULCAST_(1) << 17)
-#define WMPSTATUSF_EM2		(_ULCAST_(1) << 18)
-#define WMPSTATUSF_EM3		(_ULCAST_(1) << 19)
-#define WMPSTATUSF_EM4		(_ULCAST_(1) << 20)
-#define WMPSTATUSF_EM5		(_ULCAST_(1) << 21)
-#define WMPSTATUSF_EM6		(_ULCAST_(1) << 22)
-#define WMPSTATUSF_EM7		(_ULCAST_(1) << 23)
-
-#ifndef __ASSEMBLY__
-
-/*
- * Realtek Taroko Processor
- *
- * Macros to access the system control coprocessor
- */
-
-#define __read_32bit_lxc0_register(source, sel)			\
-({ int __res;							\
-	if (sel == 0)						\
-		__asm__ __volatile__(				\
-			"mflxc0\t%0, " #source "\n\t"		\
-			: "=r" (__res));			\
-	else							\
-		__asm__ __volatile__(				\
-			"mflxc0\t%0, " #source ", " #sel "\n\t"	\
-			: "=r" (__res));			\
-	__res;							\
-})
-
-#define __write_32bit_lxc0_register(target, sel, value)		\
-do {								\
-	if (sel == 0)						\
-		__asm__ __volatile__(				\
-			"mtlxc0\t%z0, " #target "\n\t"		\
-			: : "Jr" ((unsigned int)(value)));	\
-	else							\
-		__asm__ __volatile__(				\
-			"mtlxc0\t%z0, " #target ", " #sel "\n"	\
-			: : "Jr" ((unsigned int)(value)));	\
-} while (0)
-
-
-/*
- * TLS register
- */
-#define read_lxc0_userlocal()		__read_32bit_lxc0_register($8, 0)
-#define write_lxc0_userlocal(val)	__write_32bit_lxc0_register($8, 0, val)
-
-#define read_lxc0_estatus()	__read_32bit_lxc0_register($0, 0)
-#define read_lxc0_ecause()	__read_32bit_lxc0_register($1, 0)
-#define read_lxc0_intvec()	__read_32bit_lxc0_register($2, 0)
-#define write_lxc0_estatus(val)	__write_32bit_lxc0_register($0, 0, val)
-#define write_lxc0_ecause(val)	__write_32bit_lxc0_register($1, 0, val)
-#define write_lxc0_intvec(val)	__write_32bit_lxc0_register($2, 0, val)
-
-/*
- * The WMPCTL, WMPSTATUS and WMPVADDR register
- */
-#define read_lxc0_wmpctl()	__read_32bit_lxc0_register($5, 0)
-#define write_lxc0_wmpctl(val)	__write_32bit_lxc0_register($5, 0, val)
-
-#define read_lxc0_wmpstatus()	__read_32bit_lxc0_register($6, 0)
-#define read_lxc0_wmpvaddr()	__read_32bit_lxc0_register($7, 0)
-
-/*
- * The WMPEXTRAMASK register.
- */
-#define read_lxc0_wmpxmask0()	__read_32bit_lxc0_register($19, 0)
-#define read_lxc0_wmpxmask1()	__read_32bit_lxc0_register($19, 1)
-#define read_lxc0_wmpxmask2()	__read_32bit_lxc0_register($19, 2)
-#define read_lxc0_wmpxmask3()	__read_32bit_lxc0_register($19, 3)
-#define read_lxc0_wmpxmask4()	__read_32bit_lxc0_register($19, 4)
-#define read_lxc0_wmpxmask5()	__read_32bit_lxc0_register($19, 5)
-#define read_lxc0_wmpxmask6()	__read_32bit_lxc0_register($19, 6)
-#define read_lxc0_wmpxmask7()	__read_32bit_lxc0_register($19, 7)
-
-#define write_lxc0_wmpxmask0(val) __write_32bit_lxc0_register($19, 0, val)
-#define write_lxc0_wmpxmask1(val) __write_32bit_lxc0_register($19, 1, val)
-#define write_lxc0_wmpxmask2(val) __write_32bit_lxc0_register($19, 2, val)
-#define write_lxc0_wmpxmask3(val) __write_32bit_lxc0_register($19, 3, val)
-#define write_lxc0_wmpxmask4(val) __write_32bit_lxc0_register($19, 4, val)
-#define write_lxc0_wmpxmask5(val) __write_32bit_lxc0_register($19, 5, val)
-#define write_lxc0_wmpxmask6(val) __write_32bit_lxc0_register($19, 6, val)
-#define write_lxc0_wmpxmask7(val) __write_32bit_lxc0_register($19, 7, val)
-
-/*
- * Manipulate bits in a lxc0 register.
- */
-#define __BUILD_SET_LXC0(name)					\
-static inline unsigned int					\
-set_lxc0_##name(unsigned int set)				\
-{								\
-	unsigned int res;					\
-								\
-	res = read_lxc0_##name();				\
-	res |= set;						\
-	write_lxc0_##name(res);					\
-								\
-	return res;						\
-}								\
-								\
-static inline unsigned int					\
-clear_lxc0_##name(unsigned int clear)				\
-{								\
-	unsigned int res;					\
-								\
-	res = read_lxc0_##name();				\
-	res &= ~clear;						\
-	write_lxc0_##name(res);					\
-								\
-	return res;						\
-}								\
-								\
-static inline unsigned int					\
-change_lxc0_##name(unsigned int change, unsigned int new)	\
-{								\
-	unsigned int res;					\
-								\
-	res = read_lxc0_##name();				\
-	res &= ~change;						\
-	res |= (new & change);					\
-	write_lxc0_##name(res);					\
-								\
-	return res;						\
-}
-
-__BUILD_SET_LXC0(intvec)
-__BUILD_SET_LXC0(estatus)
-__BUILD_SET_LXC0(ecause)
-__BUILD_SET_LXC0(wmpctl)
 
 #endif /* !__ASSEMBLY__ */
 

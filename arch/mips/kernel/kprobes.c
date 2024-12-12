@@ -174,11 +174,7 @@ static void set_current_kprobe(struct kprobe *p, struct pt_regs *regs,
 			       struct kprobe_ctlblk *kcb)
 {
 	__this_cpu_write(current_kprobe, p);
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX3900) || defined(CONFIG_CPU_RLX)
-	kcb->kprobe_saved_SR = kcb->kprobe_old_SR = (regs->cp0_status & ST0_IEC);
-#else
 	kcb->kprobe_saved_SR = kcb->kprobe_old_SR = (regs->cp0_status & ST0_IE);
-#endif
 	kcb->kprobe_saved_epc = regs->cp0_epc;
 }
 
@@ -234,11 +230,7 @@ static void prepare_singlestep(struct kprobe *p, struct pt_regs *regs,
 {
 	int ret = 0;
 
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX3900) || defined(CONFIG_CPU_RLX)
-	regs->cp0_status &= ~ST0_IEC;
-#else
 	regs->cp0_status &= ~ST0_IE;
-#endif
 
 	/* single step inline if the instruction is a break */
 	if (p->opcode.word == breakpoint_insn.word ||
@@ -300,11 +292,7 @@ static int __kprobes kprobe_handler(struct pt_regs *regs)
 		if (p) {
 			if (kcb->kprobe_status == KPROBE_HIT_SS &&
 			    p->ainsn.insn->word == breakpoint_insn.word) {
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX3900) || defined(CONFIG_CPU_RLX)
-				regs->cp0_status &= ~ST0_IEC;
-#else
 				regs->cp0_status &= ~ST0_IE;
-#endif
 				regs->cp0_status |= kcb->kprobe_saved_SR;
 				goto no_kprobe;
 			}

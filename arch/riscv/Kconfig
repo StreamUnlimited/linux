@@ -51,14 +51,13 @@ config RISCV
 	select PCI_MSI if PCI
 	select RISCV_TIMER
 	select GENERIC_IRQ_MULTI_HANDLER
-	select GENERIC_ARCH_TOPOLOGY if SMP
+	select GENERIC_ARCH_TOPOLOGY
 	select ARCH_HAS_PTE_SPECIAL
 	select ARCH_HAS_MMIOWB
 	select HAVE_EBPF_JIT if 64BIT
 	select EDAC_SUPPORT
 	select ARCH_HAS_GIGANTIC_PAGE
 	select ARCH_WANT_HUGE_PMD_SHARE if 64BIT
-	select SPARSEMEM_STATIC if 32BIT
 	select ARCH_WANT_DEFAULT_TOPDOWN_MMAP_LAYOUT if MMU
 	select HAVE_ARCH_MMAP_RND_BITS
 	select HAVE_COPY_THREAD_TLS
@@ -102,7 +101,8 @@ config ARCH_FLATMEM_ENABLE
 config ARCH_SPARSEMEM_ENABLE
 	def_bool y
 	depends on MMU
-	select SPARSEMEM_VMEMMAP_ENABLE
+	select SPARSEMEM_STATIC if 32BIT && SPARSEMEM
+	select SPARSEMEM_VMEMMAP_ENABLE if 64BIT
 
 config ARCH_SELECT_MEMORY_MODEL
 	def_bool ARCH_SPARSEMEM_ENABLE
@@ -145,7 +145,6 @@ config PGTABLE_LEVELS
 	default 2
 
 source "arch/riscv/Kconfig.socs"
-source "arch/riscv/Kconfig.formosa"
 
 menu "Platform type"
 
@@ -211,7 +210,6 @@ endchoice
 
 config SMP
 	bool "Symmetric Multi-Processing"
-	depends on SYS_SUPPORTS_SMP
 	help
 	  This enables support for systems with more than one CPU.  If
 	  you say N here, the kernel will run on single and
@@ -222,9 +220,6 @@ config SMP
 	  here.
 
 	  If you don't know what to do here, say N.
-
-config SYS_SUPPORTS_SMP
-	bool
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"

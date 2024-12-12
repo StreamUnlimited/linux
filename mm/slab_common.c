@@ -85,8 +85,7 @@ EXPORT_SYMBOL(kmem_cache_size);
 #ifdef CONFIG_DEBUG_VM
 static int kmem_cache_sanity_check(const char *name, unsigned int size)
 {
-	if (!name || in_interrupt() || size < sizeof(void *) ||
-		size > KMALLOC_MAX_SIZE) {
+	if (!name || in_interrupt() || size > KMALLOC_MAX_SIZE) {
 		pr_err("kmem_cache_create(%s) integrity check failed\n", name);
 		return -EINVAL;
 	}
@@ -325,14 +324,6 @@ int slab_unmergeable(struct kmem_cache *s)
 	 */
 	if (s->refcount < 0)
 		return 1;
-
-#ifdef CONFIG_MEMCG_KMEM
-	/*
-	 * Skip the dying kmem_cache.
-	 */
-	if (s->memcg_params.dying)
-		return 1;
-#endif
 
 	return 0;
 }
@@ -974,6 +965,16 @@ void kmem_cache_destroy(struct kmem_cache *s)
 	get_online_mems();
 
 	mutex_lock(&slab_mutex);
+
+	/*
+	 * Another thread referenced it again
+	 */
+	if (READ_ONCE(s->refcount)) {
+		spin_lock_irq(&memcg_kmem_wq_lock);
+		s->memcg_params.dying = false;
+		spin_unlock_irq(&memcg_kmem_wq_lock);
+		goto out_unlock;
+	}
 #endif
 
 	err = shutdown_memcg_caches(s);
@@ -1765,23 +1766,6 @@ void kzfree(const void *p)
 	kfree(mem);
 }
 EXPORT_SYMBOL(kzfree);
-
-/**
- * kfree_sensitive - Clear sensitive information in memory before freeing
- * @p: object to free memory of
- *
- * The memory of the object @p points to is zeroed before freed.
- * If @p is %NULL, kfree_sensitive() does nothing.
- *
- * Note: this function zeroes the whole allocated buffer which can be a good
- * deal bigger than the requested buffer size passed to kmalloc(). So be
- * careful when using this function in performance sensitive code.
- */
-void kfree_sensitive(const void *p)
-{
-	kzfree(p);
-}
-EXPORT_SYMBOL(kfree_sensitive);
 
 /**
  * ksize - get the actual amount of memory allocated for a given object

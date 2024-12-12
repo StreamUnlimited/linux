@@ -13,11 +13,6 @@ static inline u16 __get_unaligned_cpu16(const void *p)
 	return ptr->x;
 }
 
-static inline u32 __get_unaligned_le24(const u8 *p)
-{
-	return p[0] | p[1] << 8 | p[2] << 16;
-}
-
 static inline u32 __get_unaligned_cpu32(const void *p)
 {
 	const struct __una_u32 *ptr = (const struct __una_u32 *)p;
@@ -34,13 +29,6 @@ static inline void __put_unaligned_cpu16(u16 val, void *p)
 {
 	struct __una_u16 *ptr = (struct __una_u16 *)p;
 	ptr->x = val;
-}
-
-static inline void __put_unaligned_le24(const u32 val, u8 *p)
-{
-	*p++ = val;
-	*p++ = val >> 8;
-	*p++ = val >> 16;
 }
 
 static inline void __put_unaligned_cpu32(u32 val, void *p)

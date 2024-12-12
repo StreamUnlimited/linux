@@ -59,6 +59,7 @@ config DMA_OF
 #devices
 config ALTERA_MSGDMA
 	tristate "Altera / Intel mSGDMA Engine"
+	depends on HAS_IOMEM
 	select DMA_ENGINE
 	help
 	  Enable support for Altera / Intel mSGDMA controller.
@@ -275,7 +276,7 @@ config INTEL_IDMA64
 
 config INTEL_IOATDMA
 	tristate "Intel I/OAT DMA support"
-	depends on PCI && X86_64
+	depends on PCI && X86_64 && !UML
 	select DMA_ENGINE
 	select DMA_ENGINE_RAID
 	select DCA
@@ -650,6 +651,7 @@ config ZX_DMA
 	select DMA_VIRTUAL_CHANNELS
 	help
 	  Support the DMA engine for ZTE ZX family platform devices.
+
 
 # driver files
 source "drivers/dma/bestcomm/Kconfig"

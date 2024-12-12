@@ -110,12 +110,15 @@ static void dw8250_check_lcr(struct uart_port *p, int value)
 /* Returns once the transmitter is empty or we run out of retries */
 static void dw8250_tx_wait_empty(struct uart_port *p)
 {
+	struct uart_8250_port *up = up_to_u8250p(p);
 	unsigned int tries = 20000;
 	unsigned int delay_threshold = tries - 1000;
 	unsigned int lsr;
 
 	while (tries--) {
 		lsr = readb (p->membase + (UART_LSR << p->regshift));
+		up->lsr_saved_flags |= lsr & LSR_SAVE_FLAGS;
+
 		if (lsr & UART_LSR_TEMT)
 			break;
 
@@ -382,28 +385,10 @@ static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
 	}
 }
 
-static void dw8250_probe_plat(struct uart_port *p,
-			      struct plat_serial8250_port *pdata)
-{
-	if (!pdata)
-		return;
-
-	p->type = pdata->type;
-	p->flags = pdata->flags;
-	p->uartclk = pdata->uartclk;
-	p->iotype = pdata->iotype;
-	if (p->iotype == UPIO_MEM32) {
-		p->serial_in = dw8250_serial_in32;
-		p->serial_out = dw8250_serial_out32;
-	}
-	p->regshift = pdata->regshift;
-}
-
 static int dw8250_probe(struct platform_device *pdev)
 {
 	struct uart_8250_port uart = {}, *up = &uart;
 	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	struct plat_serial8250_port *pdata = dev_get_platdata(&pdev->dev);
 	struct uart_port *p = &up->port;
 	struct device *dev = &pdev->dev;
 	struct dw8250_data *data;
@@ -503,7 +488,7 @@ static int dw8250_probe(struct platform_device *pdev)
 	}
 
 	/* If no clock rate is defined, fail. */
-	if (!p->uartclk && !pdata) {
+	if (!p->uartclk) {
 		dev_err(dev, "clock rate not defined\n");
 		err = -EINVAL;
 		goto err_clk;
@@ -530,7 +515,6 @@ static int dw8250_probe(struct platform_device *pdev)
 	reset_control_deassert(data->rst);
 
 	dw8250_quirks(p, data);
-	dw8250_probe_plat(p, pdata);
 
 	/* If the Busy Functionality is not implemented, don't handle it */
 	if (data->uart_16550_compatible)
@@ -679,7 +663,7 @@ static struct platform_driver dw8250_platform_driver = {
 		.name		= "dw-apb-uart",
 		.pm		= &dw8250_pm_ops,
 		.of_match_table	= dw8250_of_match,
-		.acpi_match_table = ACPI_PTR(dw8250_acpi_match),
+		.acpi_match_table = dw8250_acpi_match,
 	},
 	.probe			= dw8250_probe,
 	.remove			= dw8250_remove,

@@ -12,11 +12,7 @@ extern void r4k_wait_irqoff(void);
 
 static inline int using_rollback_handler(void)
 {
-#ifdef CONFIG_CPU_RLX
-	return 0;
-#else
 	return cpu_wait == r4k_wait;
-#endif
 }
 
 extern int mips_cpuidle_wait_enter(struct cpuidle_device *dev,

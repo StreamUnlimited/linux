@@ -123,9 +123,6 @@ void output_thread_defines(void)
 	OFFSET(THREAD_REG31, task_struct, thread.reg31);
 	OFFSET(THREAD_STATUS, task_struct,
 	       thread.cp0_status);
-#ifdef CONFIG_CPU_HAS_RADIAX
-	OFFSET(THREAD_RADIAX, task_struct, thread.radiax);
-#endif
 
 	OFFSET(THREAD_BVADDR, task_struct, \
 	       thread.cp0_badvaddr);
@@ -178,38 +175,6 @@ void output_thread_fpu_defines(void)
 	OFFSET(THREAD_FCR31, task_struct, thread.fpu.fcr31);
 	OFFSET(THREAD_MSA_CSR, task_struct, thread.fpu.msacsr);
 	BLANK();
-}
-#endif
-
-#ifdef CONFIG_CPU_HAS_RADIAX
-void output_thread_radiax_defines(void)
-{
-	OFFSET(THREAD_CBS0, task_struct, thread.radiax.radiaxr[0]);
-	OFFSET(THREAD_CBS1, task_struct, thread.radiax.radiaxr[1]);
-	OFFSET(THREAD_CBS2, task_struct, thread.radiax.radiaxr[2]);
-	OFFSET(THREAD_CBE0, task_struct, thread.radiax.radiaxr[3]);
-	OFFSET(THREAD_CBE1, task_struct, thread.radiax.radiaxr[4]);
-	OFFSET(THREAD_CBE2, task_struct, thread.radiax.radiaxr[5]);
-	OFFSET(THREAD_LPS0, task_struct, thread.radiax.radiaxr[6]);
-	OFFSET(THREAD_LPE0, task_struct, thread.radiax.radiaxr[7]);
-	OFFSET(THREAD_LPC0, task_struct, thread.radiax.radiaxr[8]);
-	OFFSET(THREAD_MMD , task_struct, thread.radiax.radiaxr[9]);
-	OFFSET(THREAD_M0LL, task_struct, thread.radiax.radiaxr[10]);
-	OFFSET(THREAD_M0LH, task_struct, thread.radiax.radiaxr[11]);
-	OFFSET(THREAD_M0HL, task_struct, thread.radiax.radiaxr[12]);
-	OFFSET(THREAD_M0HH, task_struct, thread.radiax.radiaxr[13]);
-	OFFSET(THREAD_M1LL, task_struct, thread.radiax.radiaxr[14]);
-	OFFSET(THREAD_M1LH, task_struct, thread.radiax.radiaxr[15]);
-	OFFSET(THREAD_M1HL, task_struct, thread.radiax.radiaxr[16]);
-	OFFSET(THREAD_M1HH, task_struct, thread.radiax.radiaxr[17]);
-	OFFSET(THREAD_M2LL, task_struct, thread.radiax.radiaxr[18]);
-	OFFSET(THREAD_M2LH, task_struct, thread.radiax.radiaxr[19]);
-	OFFSET(THREAD_M2HL, task_struct, thread.radiax.radiaxr[20]);
-	OFFSET(THREAD_M2HH, task_struct, thread.radiax.radiaxr[21]);
-	OFFSET(THREAD_M3LL, task_struct, thread.radiax.radiaxr[22]);
-	OFFSET(THREAD_M3LH, task_struct, thread.radiax.radiaxr[23]);
-	OFFSET(THREAD_M3HL, task_struct, thread.radiax.radiaxr[24]);
-	OFFSET(THREAD_M3HH, task_struct, thread.radiax.radiaxr[25]);
 }
 #endif
 
@@ -379,7 +344,6 @@ void output_pm_defines(void)
 }
 #endif
 
-#ifdef CONFIG_KVM
 #ifdef CONFIG_MIPS_FP_SUPPORT
 void output_kvm_defines(void)
 {
@@ -422,7 +386,6 @@ void output_kvm_defines(void)
 	OFFSET(VCPU_MSA_CSR, kvm_vcpu_arch, fpu.msacsr);
 	BLANK();
 }
-#endif
 #endif
 
 #ifdef CONFIG_MIPS_CPS

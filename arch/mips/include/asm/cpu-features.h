@@ -99,23 +99,6 @@
 #ifndef cpu_has_rw_llb
 #define cpu_has_rw_llb		__isa_ge_or_opt(6, MIPS_CPU_RW_LLB)
 #endif
-#ifndef cpu_has_ftlb
-#define cpu_has_ftlb		(cpu_data[0].cputype == CPU_PROAPTIV)
-#endif
-
-#ifndef cpu_has_sync
-#define cpu_has_sync		1
-#endif
-
-#ifndef cpu_has_sleep
-#define cpu_has_sleep		0
-#endif
-#ifndef cpu_has_radiax
-#define cpu_has_radiax		0
-#endif
-#ifndef cpu_has_cls
-#define cpu_has_cls		0
-#endif
 
 /*
  * For the moment we don't consider R6000 and R8000 so we can assume that
@@ -147,13 +130,13 @@
 #ifndef cpu_has_fpu
 # ifdef CONFIG_MIPS_FP_SUPPORT
 #  define cpu_has_fpu		(current_cpu_data.options & MIPS_CPU_FPU)
-#  ifndef raw_cpu_has_fpu
-#    define raw_cpu_has_fpu	(raw_current_cpu_data.options & MIPS_CPU_FPU)
-#  endif
+#  define raw_cpu_has_fpu	(raw_current_cpu_data.options & MIPS_CPU_FPU)
 # else
 #  define cpu_has_fpu		0
 #  define raw_cpu_has_fpu	0
 # endif
+#else
+# define raw_cpu_has_fpu	cpu_has_fpu
 #endif
 #ifndef cpu_has_32fpr
 #define cpu_has_32fpr		__isa_ge_or_opt(1, MIPS_CPU_32FPR)

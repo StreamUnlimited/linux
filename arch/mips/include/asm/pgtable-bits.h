@@ -6,9 +6,6 @@
  * Copyright (C) 1994 - 2002 by Ralf Baechle
  * Copyright (C) 1999, 2000, 2001 Silicon Graphics, Inc.
  * Copyright (C) 2002  Maciej W. Rozycki
- *
- * Modified for RLX Linux for RLX
- * Copyright (C) 2012  Tony Wu (tonywu@realtek.com)
  */
 #ifndef _ASM_PGTABLE_BITS_H
 #define _ASM_PGTABLE_BITS_H
@@ -89,7 +86,7 @@ enum pgtable_bits {
 #endif
 };
 
-#elif defined(CONFIG_CPU_R3K_TLB) || defined(CONFIG_CPU_RLX)
+#elif defined(CONFIG_CPU_R3K_TLB)
 
 /* Page table bits used for r3k systems */
 enum pgtable_bits {
@@ -166,7 +163,7 @@ enum pgtable_bits {
 #define _PAGE_GLOBAL		(1 << _PAGE_GLOBAL_SHIFT)
 #define _PAGE_VALID		(1 << _PAGE_VALID_SHIFT)
 #define _PAGE_DIRTY		(1 << _PAGE_DIRTY_SHIFT)
-#if defined(CONFIG_CPU_R3K_TLB) || defined(CONFIG_CPU_RLX)
+#if defined(CONFIG_CPU_R3K_TLB)
 # define _CACHE_UNCACHED	(1 << _CACHE_UNCACHED_SHIFT)
 # define _CACHE_MASK		_CACHE_UNCACHED
 # define _PFN_SHIFT		PAGE_SHIFT
@@ -229,46 +226,6 @@ static inline uint64_t pte_to_entrylo(unsigned long pte_val)
 #define _CACHE_CACHABLE_NONCOHERENT 0
 #define _CACHE_UNCACHED_ACCELERATED _CACHE_UNCACHED
 
-#elif defined(CONFIG_CPU_RLX)
-
-/*
- * entrylo cache attribute bits
- *
- * bit 11: Cachable
- * bit 7: (C) Coherent
- * bit 6: (M) Mergeable / (T) Write-through
- * bit 5: (W) Write-allocate
- *
- * Let C => coherent
- * Let M => mergable
- * Let T => write-through
- * Let W => write-allocate
- * Let X => disabled
- */
-
-#define _CCA_SHIFT			5
-#define _CCA_MASK			(7 << _CCA_SHIFT)
-
-/* cached mode, bit 11 = 0 */
-#define _CACHE_ENTRYLO_XXX		(0 << _CCA_SHIFT)
-#define _CACHE_ENTRYLO_XXW		(1 << _CCA_SHIFT)
-#define _CACHE_ENTRYLO_XMX		(2 << _CCA_SHIFT)
-#define _CACHE_ENTRYLO_XMW		(3 << _CCA_SHIFT)
-#define _CACHE_ENTRYLO_CXX		(4 << _CCA_SHIFT)
-#define _CACHE_ENTRYLO_CXW		(5 << _CCA_SHIFT)
-
-/* uncached mode, bit 11 = 1 */
-#define _CACHE_ENTRYLO_XTX              (2 << _CCA_SHIFT)
-
-/*
- * So far, only the following three combinations are used
- */
-#define _CACHE_UNCACHED_WRITETHROUGH	_CACHE_ENTRYLO_XXX
-#define _CACHE_UNCACHED_MERGEABLE	_CACHE_ENTRYLO_XMX
-#define _CACHE_UNCACHED_ACCELERATED	_CACHE_ENTRYLO_XMX
-#define _CACHE_CACHABLE_NONCOHERENT	_CACHE_ENTRYLO_XXW
-#define _CACHE_CACHABLE_COHERENT	_CACHE_ENTRYLO_CXW
-
 #elif defined(CONFIG_CPU_SB1)
 
 /* No penalty for being coherent on the SB1, so just
@@ -311,12 +268,7 @@ static inline uint64_t pte_to_entrylo(unsigned long pte_val)
 #define __READABLE	(_PAGE_SILENT_READ | _PAGE_ACCESSED)
 #define __WRITEABLE	(_PAGE_SILENT_WRITE | _PAGE_WRITE | _PAGE_MODIFIED)
 
-#ifdef CONFIG_CPU_RLX
-#define _PAGE_CHG_MASK	(_PAGE_ACCESSED | _PAGE_MODIFIED |	\
-			 _PFN_MASK | _CACHE_MASK | _CCA_MASK)
-#else
 #define _PAGE_CHG_MASK	(_PAGE_ACCESSED | _PAGE_MODIFIED |	\
 			 _PFN_MASK | _CACHE_MASK)
-#endif
 
 #endif /* _ASM_PGTABLE_BITS_H */

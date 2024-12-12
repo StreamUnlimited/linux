@@ -370,3 +370,35 @@ void rtk_btcoex_close(void);
 void rtk_btcoex_probe(struct hci_dev *hdev);
 void rtk_btcoex_init(void);
 void rtk_btcoex_exit(void);
+
+#define DIR_IN     0
+#define DIR_OUT    1
+
+/* OpCode Group Fields */
+#define BT_OGF_LINK_CTRL                        0x01
+#define BT_OGF_BASEBAND                         0x03
+#define BT_OGF_INFO                             0x04
+#define BT_OGF_STATUS                           0x05
+#define BT_OGF_LE                               0x08
+#define BT_OGF_VS                               0x3f
+
+//BT_OGF_BASEBAND
+#define HCI_CMD_BR_WR_SCAN_ENABLE               0x1A
+#define HCI_CMD_BR_WR_PAGE_SCAN_ACTIVITY        0x1C
+#define HCI_CMD_BR_WR_INQ_SCAN_ACTIVITY         0x1E
+
+
+//BT_OGF_LE
+#define HCI_CMD_LE_SET_SCAN_PARAM               0x0B
+#define HCI_CMD_LE_CREATE_CONNECTION            0x0D
+#define HCI_CMD_LE_SET_EX_SCAN_PARAM            0x41
+
+#define BT_OP(ogf, ocf)                         ((ocf) | ((ogf) << 10))
+
+#define BT_HCI_OP_LE_SET_SCAN_PARAM             BT_OP(BT_OGF_LE, HCI_CMD_LE_SET_SCAN_PARAM)                 /* 0x200B */
+#define BT_HCI_OP_LE_SET_EX_SCAN_PARAM          BT_OP(BT_OGF_LE, HCI_CMD_LE_SET_EX_SCAN_PARAM)              /* 0x2041 */
+#define BT_HCI_OP_LE_CREATE_CONNECTION          BT_OP(BT_OGF_LE, HCI_CMD_LE_CREATE_CONNECTION)              /* 0x200D */
+
+#define BT_HCI_OP_BR_WR_SCAN_ENABLE             BT_OP(BT_OGF_BASEBAND, HCI_CMD_BR_WR_SCAN_ENABLE)           /* 0x0C1A */
+#define BT_HCI_OP_BR_WR_PAGE_SCAN_ACTIVITY      BT_OP(BT_OGF_BASEBAND, HCI_CMD_BR_WR_PAGE_SCAN_ACTIVITY)    /* 0x0C1C */
+#define BT_HCI_OP_BR_WR_INQ_SCAN_ACTIVITY       BT_OP(BT_OGF_BASEBAND, HCI_CMD_BR_WR_INQ_SCAN_ACTIVITY)     /* 0x0C1E */

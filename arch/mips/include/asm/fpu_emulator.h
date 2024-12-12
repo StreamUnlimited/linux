@@ -19,7 +19,6 @@
 #include <asm/local.h>
 #include <asm/processor.h>
 
-#ifdef CONFIG_CPU_HAS_EMU
 #ifdef CONFIG_DEBUG_FS
 
 struct mips_fpu_emulator_stats {
@@ -169,20 +168,14 @@ do {									\
 extern int fpu_emulator_cop1Handler(struct pt_regs *xcp,
 				    struct mips_fpu_struct *ctx, int has_fpu,
 				    void __user **fault_addr);
-#else  /* no CONFIG_CPU_HAS_EMU */
-static inline int fpu_emulator_cop1Handler(struct pt_regs *xcp,
-					   struct mips_fpu_struct *ctx, int has_fpu,
-					   void __user **fault_addr)
-{
-	*fault_addr = NULL;
-	return SIGILL;	/* we don't speak MIPS FPU */
-}
-#endif /* CONFIG_CPU_HAS_EMU */
-
 void force_fcr31_sig(unsigned long fcr31, void __user *fault_addr,
 		     struct task_struct *tsk);
 int process_fpemu_return(int sig, void __user *fault_addr,
 			 unsigned long fcr31);
+int isBranchInstr(struct pt_regs *regs, struct mm_decoded_insn dec_insn,
+		  unsigned long *contpc);
+int mm_isBranchInstr(struct pt_regs *regs, struct mm_decoded_insn dec_insn,
+		     unsigned long *contpc);
 
 /*
  * Mask the FCSR Cause bits according to the Enable bits, observing
