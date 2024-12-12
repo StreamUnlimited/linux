@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 menuconfig SND_SOC_REALTEK
 	tristate "Realtek ALSA ASoC Driver"
-	---help---
+	help
 	  Say Y or M if you want to add support for codecs attached to
 	  the Realtek SoCs' Audio interfaces. You will also need to
 	  select the audio interfaces to support below.

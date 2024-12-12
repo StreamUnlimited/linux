@@ -745,7 +745,6 @@ void audio_sp_disable_tx_count(void __iomem * sportx)
 
 u32 audio_sp_get_tx_count(void __iomem * sportx)
 {
-	u32 tmp;
 	u32 dsp_counter;
 	u32 tx_counter;
 
@@ -807,7 +806,6 @@ void audio_sp_disable_rx_count(void __iomem * sportx)
 
 u32 audio_sp_get_rx_count(void __iomem * sportx)
 {
-	u32 tmp;
 	u32 rx_counter2;
 	u32 rx_counter;
 

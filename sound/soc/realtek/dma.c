@@ -17,6 +17,8 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 
+#include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
+
 //why need sport.h in dma? Because we need to check the I2S counter for get_time_info
 #include "ameba_sport.h"
 #include "dma.h"
@@ -117,8 +119,8 @@ struct ameba_pcm_dma_private {
 static u64 ameba_adjust_codec_delay(struct snd_pcm_substream *substream,
 				u64 nsec)
 {
-	struct snd_soc_pcm_runtime *rtd = snd_pcm_substream_chip(substream);
-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
 	u64 codec_frames, codec_nsecs;
 
 	if (!codec_dai->driver->ops->delay)
@@ -173,7 +175,7 @@ static u64 ameba_get_dai_counter_ntime(struct snd_pcm_substream *substream)
 }
 
 static int ameba_get_time_info(struct snd_pcm_substream *substream,
-			struct timespec *system_ts, struct timespec *audio_ts,
+			struct timespec64 *system_ts, struct timespec64 *audio_ts,
 			struct snd_pcm_audio_tstamp_config *audio_tstamp_config,
 			struct snd_pcm_audio_tstamp_report *audio_tstamp_report)
 {
@@ -187,7 +189,7 @@ static int ameba_get_time_info(struct snd_pcm_substream *substream,
 		if (audio_tstamp_config->report_delay)
 			nsec = ameba_adjust_codec_delay(substream, nsec);
 
-		*audio_ts = ns_to_timespec(nsec);
+		*audio_ts = ns_to_timespec64(nsec);
 		//pr_info("%s nsec:%lld", __func__, nsec);
 		audio_tstamp_report->actual_type = SNDRV_PCM_AUDIO_TSTAMP_TYPE_LINK;
 		audio_tstamp_report->accuracy_report = 1; /* rest of struct is valid */
@@ -200,12 +202,9 @@ static int ameba_get_time_info(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int gdma_open(struct snd_pcm_substream *substream)
+static int gdma_open(struct snd_soc_component *component, struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component =
-		snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 
 	struct device *dev = component->dev;
 	struct ameba_pcm_dma_private *dma_private;
@@ -235,12 +234,10 @@ static int gdma_open(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int gdma_close(struct snd_pcm_substream *substream)
+static int gdma_close(struct snd_soc_component *component, struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	struct device *dev = component->dev;
 
 	dma_info(1,component->dev,"%s",__func__);
@@ -250,7 +247,7 @@ static int gdma_close(struct snd_pcm_substream *substream)
 }
 
 
-static int gdma_mmap(struct snd_pcm_substream *substream,
+static int gdma_mmap(struct snd_soc_component *component, struct snd_pcm_substream *substream,
 	struct vm_area_struct *vma)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -375,6 +372,7 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 	struct dma_chan *chan;
 	struct dma_async_tx_descriptor *desc;
 	struct dma_slave_config config;
+	struct dma_peripheral_config dma_peri;
 	enum dma_transfer_direction dir;
 	int ret;
 	unsigned int dma_id = 0;
@@ -410,9 +408,12 @@ static int load_dma_period(struct snd_pcm_substream *substream, struct ameba_pcm
 	config.dst_addr_width = dma_params->datawidth;
 
 	if (dma_id == 0)
-		config.slave_id = dma_params->handshaking_0;
+		dma_peri.slave_id = dma_params->handshaking_0;
 	else
-		config.slave_id = dma_params->handshaking_1;
+		dma_peri.slave_id = dma_params->handshaking_1;
+
+	config.peripheral_config = &dma_peri;
+	config.peripheral_size = sizeof(struct dma_peripheral_config);
 
 	config.src_port_window_size = 0;
 	config.dst_port_window_size = 0;
@@ -532,12 +533,11 @@ void ameba_alsa_callback_handle(struct dma_callback_params *params){
 #endif
 }
 
-static int gdma_hw_params(struct snd_pcm_substream *substream,
+static int gdma_hw_params(struct snd_soc_component *component, struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_data *data_0 = NULL;
 	struct ameba_pcm_dma_data *data_1 = NULL;
@@ -571,7 +571,8 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 
 	dma_info(1, component->dev,"%s, dma 0 get from user: period_bytes:%d,period_num:%d,buffer_size:%d,channels:%d,format bit:%d,format=%d,rate:%d; \n",__func__,data_0->period_bytes,data_0->period_num,data_0->buffer_size,data_0->channels,params_width(params),params_format(params),params_rate(params));
 
-	dma_params = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);     //dma data is set in sport.c
+	//dma data is set in sport.c, every rtd only have one cpu-dai now, so dais[0] is ok here.
+	dma_params = snd_soc_dai_get_dma_data(asoc_rtd_to_cpu(rtd, 0), substream);
 	if (!dma_params) {
 		dev_warn(component->dev, "no dma parameters setting\n");
 		dma_private->pcm_params = NULL;
@@ -594,14 +595,14 @@ static int gdma_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int gdma_hw_free(struct snd_pcm_substream *substream)
+static int gdma_hw_free(struct snd_soc_component *component, struct snd_pcm_substream *substream)
 {
 	snd_pcm_set_runtime_buffer(substream, NULL);
 	ameba_pcm_release_dma_channel(substream);
 	return 0;
 }
 
-static int gdma_prepare(struct snd_pcm_substream *substream)
+static int gdma_prepare(struct snd_soc_component *component, struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
@@ -663,12 +664,10 @@ static int gdma_trigger_start(struct snd_pcm_substream *substream, struct ameba_
 	return 0;
 }
 
-static int gdma_trigger(struct snd_pcm_substream *substream, int cmd)
+static int gdma_trigger(struct snd_soc_component *component, struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	int ret = 0;
 	struct ameba_pcm_dma_data *data_0 = NULL;
 	struct ameba_pcm_dma_data *data_1 = NULL;
@@ -746,7 +745,7 @@ static int gdma_trigger(struct snd_pcm_substream *substream, int cmd)
 }
 
 static snd_pcm_uframes_t
-	gdma_pointer(struct snd_pcm_substream *substream)
+	gdma_pointer(struct snd_soc_component *component, struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
@@ -784,7 +783,7 @@ static void *get_dma_ptr(struct snd_pcm_runtime *runtime,
 /*this function is only used in channel 6/8 playback case*/
 static ssize_t gdma_write(struct snd_pcm_substream *substream,
 			      int channel, unsigned long hwoff,
-			      void *buf, unsigned long bytes)
+			      struct iov_iter *iter, unsigned long bytes)
 {
 	unsigned int frame_num = 0;
 	unsigned int format_bytes = 0;
@@ -804,7 +803,7 @@ static ssize_t gdma_write(struct snd_pcm_substream *substream,
 
 	/*write first 4 channel data to DMA buf*/
 	for (; frame_num < frames_to_write; ++frame_num) {
-		if (copy_from_user(get_dma_ptr(substream->runtime, channel, offset_bytes), (void __user *)buf + buf_offset, first_channels * format_bytes))
+		if (copy_from_user(get_dma_ptr(substream->runtime, channel, offset_bytes), (void __user *)(iter->ubuf + iter->iov_offset) + buf_offset, first_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += first_channels * format_bytes;
 		buf_offset += substream->runtime->channels * format_bytes;
@@ -816,7 +815,7 @@ static ssize_t gdma_write(struct snd_pcm_substream *substream,
 
 	/*write last 2/4 channel data to DMA buf*/
 	for (; frame_num < frames_to_write; ++frame_num) {
-		if (copy_from_user(get_dma_ptr(substream->runtime, channel, offset_bytes), (void __user *)buf + buf_offset, last_channels * format_bytes))
+		if (copy_from_user(get_dma_ptr(substream->runtime, channel, offset_bytes), (void __user *)(iter->ubuf + iter->iov_offset) + buf_offset, last_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += last_channels * format_bytes;
 		buf_offset += substream->runtime->channels * format_bytes;
@@ -828,7 +827,7 @@ static ssize_t gdma_write(struct snd_pcm_substream *substream,
 /*this function is only used in channel 6/8 capture case*/
 static ssize_t gdma_read(struct snd_pcm_substream *substream,
 			      int channel, unsigned long hwoff,
-			      void *buf, unsigned long bytes)
+			      struct iov_iter *iter, unsigned long bytes)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -854,7 +853,7 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 
 	/*read first 4 channel data to user buf*/
 	for (; frame_num < frames_to_read; ++frame_num) {
-		if (copy_to_user((void __user *)buf + buf_offset, get_dma_ptr(runtime, channel, offset_bytes), first_channels * format_bytes))
+		if (copy_to_user((void __user *)(iter->ubuf + iter->iov_offset) + buf_offset, get_dma_ptr(runtime, channel, offset_bytes), first_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += first_channels * format_bytes;
 		buf_offset += runtime->channels * format_bytes;
@@ -866,7 +865,7 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
 
 	/*read last 2/4 channel data to user buf*/
 	for (; frame_num < frames_to_read; ++frame_num) {
-		if (copy_to_user((void __user *)buf + buf_offset, get_dma_ptr(runtime, channel, offset_bytes), last_channels * format_bytes))
+		if (copy_to_user((void __user *)(iter->ubuf + iter->iov_offset) + buf_offset, get_dma_ptr(runtime, channel, offset_bytes), last_channels * format_bytes))
 			return -EFAULT;
 		offset_bytes += last_channels * format_bytes;
 		buf_offset += runtime->channels * format_bytes;
@@ -884,28 +883,27 @@ static ssize_t gdma_read(struct snd_pcm_substream *substream,
  *
  * param hwoff means offset of bytes, not frames.
  */
-static int gdma_copy(struct snd_pcm_substream *substream,
+static int gdma_copy(struct snd_soc_component *component, struct snd_pcm_substream *substream,
 			      int channel, unsigned long hwoff,
-			      void *buf, unsigned long bytes)
+			      struct iov_iter *iter, unsigned long bytes)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 
 	if (runtime->channels == 1 || runtime->channels == 2 || runtime->channels == 4) {
 		if (is_playback) {
-			if (copy_from_user(get_dma_ptr(runtime, channel, hwoff), (void __user *)buf, bytes))
-				return -EFAULT;
+			if (copy_from_iter(get_dma_ptr(runtime, channel, hwoff), bytes, iter) != bytes)
+			   return -EFAULT;
 		} else {
-			if (copy_to_user((void __user *)buf, get_dma_ptr(runtime, channel, hwoff), bytes))
+			if (copy_to_iter(get_dma_ptr(runtime, channel, hwoff), bytes, iter) != bytes)
 				return -EFAULT;
 		}
 	} else if (runtime->channels == 6 || runtime->channels == 8) {
 		if (is_playback)
-			gdma_write(substream, channel, hwoff, buf, bytes);
+			gdma_write(substream, channel, hwoff, iter, bytes);
 		else
-			gdma_read(substream, channel, hwoff, buf, bytes);
+			gdma_read(substream, channel, hwoff, iter, bytes);
 	} else {
 		dev_err(component->dev, " channel:%d not supported, please try 2/4/6/8 \n", channel);
 		return -EFAULT;
@@ -914,27 +912,11 @@ static int gdma_copy(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static const struct snd_pcm_ops gdma_ops = {
-	.open		= gdma_open,
-	.close		= gdma_close,
-	.ioctl		= snd_pcm_lib_ioctl,
-	.trigger	= gdma_trigger,
-	.pointer	= gdma_pointer,
-	.mmap		= gdma_mmap,
-	.hw_params	= gdma_hw_params,
-	.hw_free	= gdma_hw_free,
-	.prepare	= gdma_prepare,
-	.copy_user  = gdma_copy,
-	#if USING_COUNTER
-	.get_time_info = ameba_get_time_info,
-	#endif
-};
-
 /*
  *mainly assign members'values for substream->dma_buffer,including
  *buffer addr , buffer size and so on
  */
-static int gdma_new(struct snd_soc_pcm_runtime *rtd)
+static int gdma_new(struct snd_soc_component *component, struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_card *card = rtd->card->snd_card;
 	struct snd_pcm *pcm = rtd->pcm;
@@ -974,7 +956,7 @@ static int gdma_new(struct snd_soc_pcm_runtime *rtd)
 /*
  *release dma_buffer.
  */
-static void gdma_free(struct snd_pcm *pcm)
+static void gdma_free(struct snd_soc_component *component, struct snd_pcm *pcm)
 {
 	struct snd_pcm_substream *substream;
 	struct snd_dma_buffer *buf;
@@ -995,11 +977,20 @@ static void gdma_free(struct snd_pcm *pcm)
 	}
 
 }
+
 static const struct snd_soc_component_driver asoc_gdma_platform = {
-	.name = "ameba-gdma",
-	.ops = &gdma_ops,
-	.pcm_new = gdma_new,
-	.pcm_free = gdma_free,
+	.name          = "ameba-gdma",
+	.pcm_construct = gdma_new,
+	.pcm_destruct  = gdma_free,
+	.open		   = gdma_open,
+	.close		   = gdma_close,
+	.trigger	   = gdma_trigger,
+	.pointer	   = gdma_pointer,
+	.mmap		   = gdma_mmap,
+	.hw_params	   = gdma_hw_params,
+	.hw_free	   = gdma_hw_free,
+	.prepare	   = gdma_prepare,
+	.copy          = gdma_copy,
 };
 
 static int asoc_gdma_platform_probe(struct platform_device *pdev)

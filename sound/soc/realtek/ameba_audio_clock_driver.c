@@ -19,7 +19,6 @@
 #include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
-#include <stddef.h>
 #include <uapi/sound/rtk_audio_pll.h>
 
 #include "ameba_audio_clock.h"
@@ -864,7 +863,7 @@ static int ameba_audio_clock_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	realtek_audio_pll_class = class_create(THIS_MODULE, "audio_pll_clk");
+	realtek_audio_pll_class = class_create("audio_pll_clk");
 	device_create(realtek_audio_pll_class, NULL, devno, NULL, "audio_pll_clk");
 
 	return 0;
