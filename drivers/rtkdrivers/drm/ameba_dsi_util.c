@@ -153,7 +153,8 @@ void ameba_dsi_lcdc_reenable(void __iomem* address)
 	ameba_dsi_set_lcdc_status(address, 1);
 }
 
-void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd)
+void ameba_dsi_init_config(
+	MIPI_InitTypeDef *MIPI_InitStruct, u32 width, u32 height, u32 framerate, u32 *mipi_ckd)
 {
 	u32 vtotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits, total_bits;
 	u32 MIPI_HACT_g = width;
@@ -209,7 +210,7 @@ void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 heigh
 	}
 
 	if (MIPI_InitStruct->MIPI_LineTime * MIPI_InitStruct->MIPI_LaneNum < total_bits / 8) {
-		DRM_ERROR("!!ERROR!!, LINE TIME TOO SHORT!\n");
+		DRM_ERROR("!!ERROR!!, LINE TIME TOO SHORT! MIPI_InitStruct->MIPI_LineTime = %d, MIPI_InitStruct->MIPI_LaneNum = %d, total_bits / 8 = %d\n", MIPI_InitStruct->MIPI_LineTime, MIPI_InitStruct->MIPI_LaneNum, total_bits / 8);
 	}
 
 	//vo frequency , //output format is RGB888
@@ -219,13 +220,13 @@ void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 heigh
 	//assert_param(vo_freq < 67);
 
 	//vo_freq = 80;
-	mipi_div = 1000 / vo_freq - 1;//shall get NPPLL frequency 
+	mipi_div = 1000 / vo_freq - 1;//shall get NPPLL frequency
 	if(mipi_ckd)
 	{
 		*mipi_ckd = mipi_div;
 	}
 
-	DRM_DEBUG_DRIVER("DataLaneFreq(%d)LineTime(%d)vo_freq(%d[Mhz])mipi_ckd(%d)\n", 
+	DRM_DEBUG_DRIVER("DataLaneFreq(%d)LineTime(%d)vo_freq(%d[Mhz])mipi_ckd(%d)\n",
 		MIPI_InitStruct->MIPI_VideDataLaneFreq, MIPI_InitStruct->MIPI_LineTime, vo_freq, mipi_div);
 }
 

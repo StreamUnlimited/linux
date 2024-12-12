@@ -12,11 +12,10 @@ config DRM_RTK_AMEBA
 	tristate "Drm Driver"
 	select DRM
 	select DRM_KMS_HELPER
-	select DRM_GEM_CMA_HELPER
-	select DRM_KMS_CMA_HELPER
+	select DRM_GEM_DMA_HELPER
 	default n
 	help
-	  Ameba DRM Kernel Mode-Setting , used for LCDC MIPI DRM Support 
+	  Ameba DRM Kernel Mode-Setting , used for LCDC MIPI DRM Support
 	  If M is selected the module will be called drm.
 
 config DRM_DSI_RTK_AMEBA
@@ -25,7 +24,7 @@ config DRM_DSI_RTK_AMEBA
 	select DRM_MIPI_DSI
 	default n
 	help
-	  Ameba DRM Kernel Mode-Setting , used for LCDC MIPI DRM DSI Support 
+	  Ameba DRM Kernel Mode-Setting , used for LCDC MIPI DRM DSI Support
 	  If M is selected the module will be called drm.
 
 

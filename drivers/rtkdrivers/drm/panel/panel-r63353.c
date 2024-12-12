@@ -45,7 +45,6 @@ static struct drm_display_mode r63353_mode = {
 	.vsync_start = 1280 + 2,
 	.vsync_end = 1280 + 2 + 4,
 	.vtotal = 1280 + 2 + 4 + 0,
-	.vrefresh = 30,
 };
 
 static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
@@ -95,9 +94,9 @@ static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
 	{ MIPI_DSI_GENERIC_LONG_WRITE, 45, {0xC2, 0xf0, 0xf5, 0x00, 0x04, 0x02, 0x00, 0x00, 0x08, 0xe5, 0x14, 0x94, 0x53, 0x50, 0x4e, 0x41, 0x39, 0x05, 0xe5, 0x14, 0x94, 0x53, 0x50, 0x4e, 0x41, 0x39, 0x05, 0xe5, 0x14, 0x94, 0x53, 0x50, 0x4e, 0x41, 0x39, 0x05, 0xe5, 0x14, 0x94, 0x53, 0x50, 0x4e, 0x41, 0x39, 0x05}}, 			
 
 	//#  TPC Sync Control 06 03 c3 00 00 00
-	{ MIPI_DSI_GENERIC_LONG_WRITE, 4, {0xc3, 0x00, 0x00, 0x00}}, 
+	{ MIPI_DSI_GENERIC_LONG_WRITE, 4, {0xc3, 0x00, 0x00, 0x00}},
 	//#  Source Timing Setting 12 03 C4 30 00 00 00 00 00 00 00 00 00 00 00 00 01 02
-	{ MIPI_DSI_GENERIC_LONG_WRITE, 16, {0xC4, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02}},	
+	{ MIPI_DSI_GENERIC_LONG_WRITE, 16, {0xC4, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02}},
 	//# Realtime Scaling & Cross Hair 0b 03 c5 00 08 00 00 00 00 70 00
 	{ MIPI_DSI_GENERIC_LONG_WRITE, 9, {0xc5, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x70, 0x00}},
 	//# LTPS Timing Setting 1b 03 C6 01 90 0c 9b 0c 9b 00 00 00 00 00 00 00 00 00 00 00 00 0d 12 04 01 90 05
@@ -117,7 +116,7 @@ static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
 	{ MIPI_DSI_GENERIC_LONG_WRITE, 22, {0xCB, 0x7f, 0xfd, 0xff, 0xff, 0xeb, 0x0f, 0x00, 0xfc, 0x00, 0xf0, 0x03, 0x00, 0x40, 0x00, 0x00, 0x00, 0x20, 0x00, 0xe8, 0x00, 0x00}},
 
 	//# Panel Interface Control 04 03 cc 05
-	{ MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM, 2, {0xcc, 0x05}}, 	
+	{ MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM, 2, {0xcc, 0x05}},
 	//# Backlight Control 4 1c 03 ce 55 40 49 53 59 5e 63 68 6e 74 7e 8a 98 a8 bb d0 ff 04 00 04 04 42 00 69 5a
 	{ MIPI_DSI_GENERIC_LONG_WRITE, 26, {0xce, 0x55, 0x40, 0x49, 0x53, 0x59, 0x5e, 0x63, 0x68, 0x6e, 0x74, 0x7e, 0x8a, 0x98, 0xa8, 0xbb, 0xd0, 0xff, 0x04, 0x00, 0x04, 0x04, 0x42, 0x00, 0x69, 0x5a}},
 
@@ -192,10 +191,10 @@ static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
 };
 
 static int dsi_gpio_reset(int iod,int value,int flag)
-{	
+{
 	int req_status;
 	int set_direct_status;
-	int gpio_index = iod ;	
+	int gpio_index = iod;
 
 	if(flag == 0) {
 		req_status = gpio_request(gpio_index, NULL);
@@ -222,7 +221,6 @@ static int r63353_enable(struct drm_panel *panel)
 {
 	struct ameba_panel_desc *desc = panel_to_desc(panel);
 	struct r63353           *handle = desc->priv;
-	struct device           *dev = desc->dev;
 	int                     ret;
 
 	//dsi_gpio_reset(dsi->gpio_reset,1,0));
@@ -255,12 +253,11 @@ static int r63353_disable(struct drm_panel *panel)
 	return 0;
 }
 
-static int r63353_get_modes(struct drm_panel *panel)
+static int r63353_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
-	struct drm_connector        *connector = panel->connector;
-	struct drm_display_mode     *mode;
+	struct drm_display_mode	*mode;
 
-	mode = drm_mode_duplicate(panel->drm, &r63353_mode);
+	mode = drm_mode_duplicate(connector->dev, &r63353_mode);
 	if (!mode) {
 		DRM_ERROR("Bad mode or fail to add mode\n");
 		return -EINVAL;
@@ -279,7 +276,6 @@ static int r63353_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct device_node              *np = dev->of_node;
 	struct r63353                   *r63353_data;
-	enum of_gpio_flags              flags;
 
 	r63353_data = devm_kzalloc(dev, sizeof(struct r63353), GFP_KERNEL);
 	if (!r63353_data)
@@ -288,24 +284,24 @@ static int r63353_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	priv_data->priv = r63353_data ;
 
 	//gpio
-	r63353_data->gpio_reset = of_get_named_gpio_flags(np, "mipi-reset", 0, &flags);
+	r63353_data->gpio_reset = of_get_named_gpio(np, "mipi-reset", 0);
 	if (!gpio_is_valid(r63353_data->gpio_reset)) {
 		DRM_ERROR("Drm mipi dsi node fail to get mipi-reset\n");
 		return -ENODEV;
 	}
 
-	r63353_data->gpio_v01 = of_get_named_gpio_flags(np, "mipi-v01", 0, &flags);
+	r63353_data->gpio_v01 = of_get_named_gpio(np, "mipi-v01", 0);
 	if (!gpio_is_valid(r63353_data->gpio_v01)) {
 		DRM_ERROR("Drm mipi dsi node fail to get mipi-v01\n");
 		return -ENODEV;
 	}
-	r63353_data->gpio_v02 = of_get_named_gpio_flags(np, "mipi-v02", 0, &flags);
+	r63353_data->gpio_v02 = of_get_named_gpio(np, "mipi-v02", 0);
 	if (!gpio_is_valid(r63353_data->gpio_v02)) {
 		DRM_ERROR("Drm mipi dsi node fail to get mipi-v02\n");
 		return -ENODEV;
 	}
 
-	r63353_data->gpio_pwm = of_get_named_gpio_flags(np, "mipi-pwm", 0, &flags);
+	r63353_data->gpio_pwm = of_get_named_gpio(np, "mipi-pwm", 0);
 	if (!gpio_is_valid(r63353_data->gpio_pwm)) {
 		DRM_ERROR("Drm mipi dsi node fail to get mipi-pwm\n");
 		return -ENODEV;
@@ -319,7 +315,7 @@ static int r63353_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 	struct r63353      *handle = priv_data->priv;
 	AMEBA_DRM_DEBUG();
 
-	//disable gpio 
+	//disable gpio
 	gpio_free(handle->gpio_reset);
 	gpio_free(handle->gpio_v01);
 	gpio_free(handle->gpio_v02);

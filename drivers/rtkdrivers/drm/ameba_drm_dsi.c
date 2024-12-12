@@ -31,10 +31,10 @@
 #include "ameba_drm_comm.h"
 
 
-#define LSYS_MASK_CKD_MIPI                         ((u32)0x0000003F << 24)          /*!<R/WPD 6'd14  mipi vo clock divider, it is based on nppll clock Max timing signoff clock is 66.7M . Default is 800/12 = 66.7 divider by this value + 1 */
-#define LSYS_CKD_MIPI(x)                           ((u32)(((x) & 0x0000003F) << 24))
-#define LSYS_GET_CKD_MIPI(x)                       ((u32)(((x >> 24) & 0x0000003F)))
-#define REG_LSYS_CKD_GRP0                           0x28
+#define LSYS_MASK_CKD_MIPI             ((u32)0x0000003F << 24)          /*!<R/WPD 6'd14  mipi vo clock divider, it is based on nppll clock Max timing signoff clock is 66.7M . Default is 800/12 = 66.7 divider by this value + 1 */
+#define LSYS_CKD_MIPI(x)               ((u32)(((x) & 0x0000003F) << 24))
+#define LSYS_GET_CKD_MIPI(x)           ((u32)(((x >> 24) & 0x0000003F)))
+#define REG_LSYS_CKD_GRP0              0x28
 
 /*
 *	below is mipi dsi struct
@@ -46,7 +46,7 @@
 struct ameba_hw_dsi {
 	void __iomem                    *mipi_reg;        // put in first place
 
-	//mipi dsi register  & data struction
+	/* mipi dsi register & data struction */
 	u32                             mipi_ckd;
 	MIPI_InitTypeDef                dsi_ctx;
 	void __iomem                    *bg_ctrl;          // mipi bandgap ctrl
@@ -60,9 +60,8 @@ struct ameba_hw_dsi {
 	struct drm_connector            connector;
 	struct device                   *paneldev;
 
-	//panel driver issue
 	struct drm_panel                *panel;
-	struct mipi_dsi_host            dsi_host; 
+	struct mipi_dsi_host            dsi_host;
 
 	int             irq;             // cmd replay and underflow reset issue
 	u32             dsi_tx_done;     // command tx done
@@ -71,52 +70,6 @@ struct ameba_hw_dsi {
 	bool            dsi_init;        // dsi hw init flag
 	u8              pm_status;       // pm status
 	u32             dsi_debug;
-};
-
-// sys debug
-// path:sys/devices/platform/ocp/400ea000.dsi
-static ssize_t ameba_dsi_debug_show(struct device *dev, struct device_attribute*attr, char *buf)
-{
-	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
-	return sprintf(buf, "dsi_debug=%d\n", dsi->dsi_debug);
-}
-
-static ssize_t ameba_dsi_debug_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
-	u32 tmp = 0 ;
-	char c;
-	size_t tmp_count = count;
-	char* pbuf = (char*)buf;
-
-	while(*pbuf != 0 && tmp_count > 1)
-	{
-		c = *pbuf;
-		if((c<'0')||(c>'9'))
-			break;
-		tmp = tmp * 10 + (c - '0');
-		pbuf++;
-		tmp_count--;
-	}
-
-	if(TRIGGER_DUMP_DSI_REG == tmp) {
-		ameba_dsi_reg_dump(dsi->mipi_reg);
-	} else {
-		dsi->dsi_debug = tmp;
-	}
-
-    return count;
-}
-
-static DEVICE_ATTR(dsi_debug, S_IWUSR |S_IRUGO, ameba_dsi_debug_show, ameba_dsi_debug_store);
-
-static struct attribute *ameba_dsi_debug_attrs[] = {
-        &dev_attr_dsi_debug.attr,
-        NULL
-};
-
-static const struct attribute_group ameba_dsi_debug_attr_grp = {
-        .attrs = ameba_dsi_debug_attrs,
 };
 
 /* underflow issue */
@@ -133,13 +86,11 @@ static irqreturn_t ameba_dsi_underflow_irq(int irq, void *data)
 
 	if (reg_val) {
 		DRM_DEBUG("Underflow count(%d)reg(0x%x)\n",ameba_struct->under_flow_count,readl((void*)(dsi->sysctrl_reg + REG_LSYS_CKD_GRP0)));
-
 		MIPI_DSI_INT_Config(pmipi_reg, 0, 0, 0);
 
 		// reset the LCDC
 		ameba_dsi_lcdc_reenable(plcdc_reg);
 		ameba_struct->under_flow_flag = 0;
-
 		MIPI_DSI_Mode_Switch(pmipi_reg, 1);
 
 		if(dsi->dsi_debug){
@@ -147,7 +98,7 @@ static irqreturn_t ameba_dsi_underflow_irq(int irq, void *data)
 		}
 	}
 
-	return IRQ_HANDLED; 
+	return IRQ_HANDLED;
 }
 
 static void ameba_dsi_readcmd_decode(struct device *dev, MIPI_TypeDef *MIPIx, u8 rcmd_idx)
@@ -182,7 +133,7 @@ static void ameba_dsi_readcmd_decode(struct device *dev, MIPI_TypeDef *MIPIx, u8
 	}
 }
 
-// command mode
+/* command mode */
 static irqreturn_t ameba_dsi_irq_handler(int irq, void *data)
 {
 	u32                     reg_val, reg_val2, reg_dphy_err,Value32;
@@ -260,34 +211,32 @@ static void ameba_dsi_mipi_init_pre(struct ameba_hw_dsi *dsi)
 	int ret;
 	u32 reg_value, reg_tmp;
 	struct ameba_drm_struct          *ameba_struct = dsi->ameba_struct;
-
 	MIPI_InitTypeDef                 *pdsi_ctx = &(dsi->dsi_ctx);
 	void __iomem                     *pmipi_reg = dsi->mipi_reg ;
 	void __iomem                     *bg_ctrl = dsi->bg_ctrl;
 
-	// reset mipi core
+	/* reset mipi core */
 	MIPI_StructInit(pdsi_ctx);
-	ameba_dsi_init_config(pdsi_ctx,ameba_struct->display_width,ameba_struct->display_height,ameba_struct->display_framerate,&(dsi->mipi_ckd));
+	ameba_dsi_init_config(pdsi_ctx, ameba_struct->display_width, ameba_struct->display_height, ameba_struct->display_framerate, &(dsi->mipi_ckd));
 	MIPI_BG_CMD(bg_ctrl, 1);//bandgap issue
 	MIPI_DPHY_init(pmipi_reg, pdsi_ctx);
 
-	//set the vo div[29:24] mipi clk issue
+	/* set the vo div[29:24] mipi clk issue */
 	reg_value = ameba_dsi_reg_read(dsi->sysctrl_reg + REG_LSYS_CKD_GRP0);
 	reg_tmp = reg_value;
 	reg_value &= ~LSYS_MASK_CKD_MIPI;
 	reg_value |= LSYS_CKD_MIPI(dsi->mipi_ckd);
 	ameba_dsi_reg_write(dsi->sysctrl_reg + REG_LSYS_CKD_GRP0, reg_value);
 
-	// enable RTK_CKE_HPERI clock
+	/* enable RTK_CKE_HPERI clock */
 	ret = clk_prepare_enable(dsi->hepri_clk);
 	if (ret < 0) {
 		DRM_ERROR("Fail to enable hepri clock(%d)\n", ret);
 	}
-	
+
 	DRM_DEBUG("Reg(0x%x-0x%x)\n", reg_tmp, ameba_dsi_reg_read(dsi->sysctrl_reg + REG_LSYS_CKD_GRP0));
 }
 
-// do mipi init
 static int ameba_dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
 {
 	struct device                   *paneldev;
@@ -297,35 +246,30 @@ static int ameba_dsi_mipi_init(struct device *dev, struct ameba_hw_dsi *dsi)
 	void __iomem                    *pmipi_reg = dsi->mipi_reg ;
 	int                             ret;
 
-	//register MIPI ISR
+	/* register MIPI ISR */
 	ret = devm_request_irq(dev,dsi->irq, ameba_dsi_irq_handler,0,dev_name(dev), dsi);
-	if (ret)
-	{
+	if (ret) {
 		DRM_ERROR("Fail to set irq for dsi command \n");
 		return -ENODEV;
 	}
 
-	//set command to dsi
+	/* set command to dsi */
 	paneldev = dsi->paneldev;
 	handle = dev_get_drvdata(paneldev);
 	table = handle->init_table;
 	ameba_dsi_do_init(pmipi_reg,pdsi_ctx,&(dsi->dsi_tx_done),&(dsi->dsi_rx_cmd),table);
-
 	devm_free_irq(dev, dsi->irq, dsi);//unregister dsi ISR
-
 	MIPI_DSI_INT_Config(pmipi_reg,0,0, 0);
 
 	return 0;
 }
 
-// enable mipi underflow irq
 static int ameba_dsi_mipi_init_irq(struct device *dev, struct ameba_hw_dsi *dsi)
 {
 	int                 ret;
 
 	ret = devm_request_irq(dev,dsi->irq, ameba_dsi_underflow_irq, 0, dev_name(dev), dsi);
-	if (ret)
-	{
+	if (ret) {
 		DRM_ERROR("Fail to set irq for underflow \n");
 		return -ENODEV;
 	}
@@ -349,9 +293,7 @@ static void ameba_dsi_encoder_disable(struct drm_encoder *encoder)
 	}
 
 	DRM_DEBUG_DRIVER("Dsi disable\n");
-
 	MIPI_DSI_Mode_Switch(dsi->mipi_reg, 0);
-
 	dsi->enable = false;
 }
 
@@ -391,7 +333,7 @@ static void ameba_dsi_encoder_enable(struct drm_encoder *encoder)
 
 	DRM_DEBUG_DRIVER("Dsi enable\n");
 
-	//switch mipi module
+	/* switch mipi module */
 	MIPI_DSI_Mode_Switch(dsi->mipi_reg, 1);
 
 	if(dsi->dsi_debug) {
@@ -414,12 +356,14 @@ static void ameba_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	struct ameba_hw_dsi     *dsi = encoder_to_dsi(encoder);
 	AMEBA_DRM_DEBUG();
 
-	///valid mode
+	/* valid mode */
 	if(dsi->ameba_struct)
 	{
 		dsi->ameba_struct->display_height = adj_mode->vdisplay;
 		dsi->ameba_struct->display_width = adj_mode->hdisplay;
-		dsi->ameba_struct->display_framerate = adj_mode->vrefresh;
+		dsi->ameba_struct->display_framerate
+			  = (adj_mode->clock * 1000)
+			  / (adj_mode->htotal * adj_mode->vtotal);
 	}
 }
 
@@ -434,7 +378,7 @@ static int ameba_dsi_encoder_atomic_check(struct drm_encoder *encoder,
 static const struct drm_encoder_helper_funcs ameba_dsi_encoder_helper_funcs = {
 	.atomic_check   = ameba_dsi_encoder_atomic_check,
 	.mode_valid     = ameba_dsi_encoder_mode_valid,
-	.mode_set       = ameba_dsi_encoder_mode_set,	
+	.mode_set       = ameba_dsi_encoder_mode_set,
 	.enable         = ameba_dsi_encoder_enable,
 	.disable        = ameba_dsi_encoder_disable
 };
@@ -472,9 +416,9 @@ static int ameba_dsi_conn_get_modes(struct drm_connector *connector)
 {
    struct ameba_hw_dsi      *dsi = connector_to_dsi(connector);
 
-   /* Just pass the question to the panel */
+  /* Just pass the question to the panel */
    if (dsi->panel)
-	   return drm_panel_get_modes(dsi->panel);
+	   return drm_panel_get_modes(dsi->panel, connector);
 
    return 0;
 }
@@ -549,30 +493,17 @@ static int ameba_dsi_of_find_panel(const struct device_node *np,
 static int ameba_dsi_init_panel(struct device *dev, struct ameba_hw_dsi *dsi)
 {
 	struct drm_panel        *panel = NULL;
-//	struct device_node      *child;
 
 	if (!of_get_available_child_count(dev->of_node)) {
 		DRM_ERROR("DSI interface not init\n");
 		return -EPERM;
 	}
-#if 0
-	/* Look for a panel as a child to this node */
-	for_each_available_child_of_node(dev->of_node, child) {
-		panel = of_drm_find_panel(child);
-		if (IS_ERR(panel)) {
-			DRM_ERROR("Fail to find panel (%ld)\n",PTR_ERR(panel));
-			panel = NULL;
-		}
-		else {
-			break;
-		}
-	}
-#else
-	if (ameba_dsi_of_find_panel(dev->of_node,&panel) < 0) {
+
+	if (ameba_dsi_of_find_panel(dev->of_node, &panel) < 0) {
 		DRM_ERROR("Fail to find panel !\n");
 		return -ENODEV;
 	}
-#endif
+
 	if (panel) {
 		dsi->panel = panel;
 	} else {
@@ -581,9 +512,6 @@ static int ameba_dsi_init_panel(struct device *dev, struct ameba_hw_dsi *dsi)
 	}
 
 	dsi->paneldev = panel->dev;
-
-	drm_panel_attach(dsi->panel,&dsi->connector);
-
 	return 0;
 }
 
@@ -593,19 +521,18 @@ static int ameba_dsi_bind(struct device *dev, struct device *master, void *data)
 	struct drm_device           *drm = data;
 	struct ameba_drm_struct     *ameba_struct = drm->dev_private;
 	int                         ret;
+
 	AMEBA_DRM_DEBUG();
 
 	ameba_struct->dsi_dev = dev;
 	dsi->ameba_struct = ameba_struct;
 
-	//init encoder
 	ret = ameba_dsi_encoder_init(dev, drm, &dsi->encoder);
 	if (ret) {
 		DRM_ERROR("Fail to init encoder\n");
 		goto err_encoder;
 	}
 
-	//init encoder
 	ret = ameba_dsi_connect_init(dev, drm, &dsi->connector);
 	if (ret) {
 		DRM_ERROR("Fail to init connector\n");
@@ -618,15 +545,13 @@ static int ameba_dsi_bind(struct device *dev, struct device *master, void *data)
 		goto err_attach;
 	}
 
-	//enable dsi
 	ret = ameba_dsi_init_panel(dev, dsi);
 	if (ret) {
-		DRM_ERROR( "Fail to init panel \n");
+		DRM_ERROR( "Fail to init panel.\n");
 		goto err_mipi_init;
 	}
 
 	DRM_INFO("MIPI DSI Bind Success!\n");
-
 	return 0;
 
 err_mipi_init:
@@ -643,13 +568,10 @@ err_encoder:
 
 static void ameba_dsi_unbind(struct device *dev, struct device *master, void *data)
 {
-	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
+	(void) dev;
+	(void) master;
+	(void) data;
 	DRM_INFO("Run MIPI DSI Unbind \n");
-
-	if (dsi->panel) {
-		drm_panel_detach(dsi->panel);
-		dsi->panel = NULL;
-	}
 }
 
 static const struct component_ops ameba_dsi_ops = {
@@ -677,14 +599,13 @@ static int ameba_dsi_parse_dt(struct platform_device *pdev, struct ameba_hw_dsi 
 		DRM_ERROR("Fail to remap sys reg io region\n");
 		return -ENODEV;
 	}
-	//irq info
+
 	dsi->irq = platform_get_irq(pdev, 0);
 	if (dsi->irq < 0) {
 		DRM_ERROR("Fail to get irq\n");
 		return -ENODEV;
 	}
 
-	// get hepric clk
 	dsi->hepri_clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(dsi->hepri_clk)) {
 		DRM_ERROR("Fail to get hepri clock(%d)\n", __LINE__);
@@ -764,10 +685,6 @@ static int ameba_dsi_probe(struct platform_device *pdev)
 
 	dsi->dsi_debug = 0;
 	dsi->dsi_init = 0;
-	if ( sysfs_create_group(&pdev->dev.kobj,&ameba_dsi_debug_attr_grp) ) {
-		DRM_ERROR("Error creating dsi sysfs entry.\n");
-	}
-
 	dev_set_drvdata(dev, dsi);
 
 	ret = ameba_dsi_host_init(dev, &dsi->dsi_host);
@@ -793,21 +710,17 @@ static int ameba_dsi_remove(struct platform_device *pdev)
 
 	bg_ctrl = dsi->bg_ctrl;
 
-	//close irq
 	if(dsi->enable) {
 		devm_free_irq(dev, dsi->irq, dsi);
 		dsi->enable = false ;
 	}
 	iounmap(dsi->sysctrl_reg);
 
-	sysfs_remove_group(&pdev->dev.kobj, &ameba_dsi_debug_attr_grp);
-
-	//host deinit
 	mipi_dsi_host_unregister(&(dsi->dsi_host));
 	dsi->dsi_host.dev = NULL;
 	dsi->dsi_host.ops = NULL;
 
-	MIPI_BG_CMD(bg_ctrl, 0);//bandgap issue	
+	MIPI_BG_CMD(bg_ctrl, 0); //bandgap issue
 	component_del(&pdev->dev, &ameba_dsi_ops);
 
 	return 0;

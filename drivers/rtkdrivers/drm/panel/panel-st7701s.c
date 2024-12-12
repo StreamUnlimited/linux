@@ -42,8 +42,6 @@ static struct drm_display_mode st7701s_mode = {
 	.vsync_start = 824,
 	.vsync_end = 896,
 	.vtotal = 1024,
-
-	.vrefresh = 60,
 };
 
 static LCM_setting_table_t st7701s_initialization[] = {/* DCS Write Long */
@@ -146,7 +144,6 @@ static int st7701s_enable(struct drm_panel *panel)
 {
 	struct ameba_panel_desc  *desc = panel_to_desc(panel);
 	struct st7701s           *handle = desc->priv;
-	struct device            *dev = desc->dev;
 	int                      ret;
 
 	ret = dsi_gpio_reset(handle->gpio);
@@ -164,12 +161,11 @@ static int st7701s_disable(struct drm_panel *panel)
 	return 0;
 }
 
-static int st7701s_get_modes(struct drm_panel *panel)
+static int st7701s_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
-	struct drm_connector        *connector = panel->connector;
 	struct drm_display_mode     *mode;
 
-	mode = drm_mode_duplicate(panel->drm, &st7701s_mode);
+	mode = drm_mode_duplicate(connector->dev, &st7701s_mode);
 	if (!mode) {
 		DRM_ERROR("Bad mode or fail to add mode\n");
 		return -EINVAL;
@@ -188,7 +184,6 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct device_node              *np = dev->of_node;
 	struct st7701s                  *st7701s_data;
-	enum of_gpio_flags              flags;
 
 	st7701s_data = devm_kzalloc(dev, sizeof(struct st7701s), GFP_KERNEL);
 	if (!st7701s_data)
@@ -197,7 +192,7 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	priv_data->priv = st7701s_data ;
 
 	//gpio
-	st7701s_data->gpio = of_get_named_gpio_flags(np, "mipi-gpios", 0, &flags);
+	st7701s_data->gpio = of_get_named_gpio(np, "mipi-gpios", 0);
 	if (!gpio_is_valid(st7701s_data->gpio)) {
 		DRM_ERROR("Panel fail to get mipi-gpios\n");
 		return -ENODEV;
@@ -211,7 +206,7 @@ static int st7701s_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 	struct st7701s      *handle = priv_data->priv;
 	AMEBA_DRM_DEBUG();
 
-	//disable gpio 
+	//disable gpio
 	gpio_free(handle->gpio);
 	//devm_kfree
 	return 0;

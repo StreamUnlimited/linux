@@ -27,14 +27,19 @@
 //panel description
 extern struct ameba_panel_desc panel_st7701s_desc;
 extern struct ameba_panel_desc panel_r63353_desc;
+extern struct ameba_panel_desc panel_jd9165a_desc;
+
 static const struct of_device_id ameba_panel_match[] = {
-	{ 
+	{
 		.compatible = "realtek,st7701s",
 		.data = &panel_st7701s_desc,
 	}, {
 		.compatible = "realtek,r63353",
 		.data = &panel_r63353_desc,
-	}, {	
+	}, {
+		.compatible = "realtek,jd9165a",
+		.data = &panel_jd9165a_desc,
+	}, {
 		/* NULL */
 	}
 };
@@ -63,7 +68,6 @@ static int ameba_panel_probe(struct platform_device *pdev)
 	const struct of_device_id  *id;
 	struct ameba_panel_desc    *priv_data;
 	struct ameba_drm_panel_struct   *ameba_panel;
-	int                             ret = 0;
 
 	DRM_DEBUG_DRIVER("Run panel probe!\n");
 
@@ -85,15 +89,14 @@ static int ameba_panel_probe(struct platform_device *pdev)
 	dev_set_drvdata(dev, ameba_panel);
 	priv_data->dev = dev;
 
-	drm_panel_init(&priv_data->panel);
+	drm_panel_init(&priv_data->panel, dev, priv_data->rtk_panel_funcs, DRM_MODE_CONNECTOR_DSI);
 
 	if (priv_data->init)
 		priv_data->init(dev,priv_data);
 
 	priv_data->panel.dev = dev;
 	priv_data->panel.funcs = priv_data->rtk_panel_funcs;
-
-	ret = drm_panel_add(&priv_data->panel);
+	drm_panel_add(&priv_data->panel);
 
 	return component_add(dev, &ameba_panel_ops);
 }

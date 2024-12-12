@@ -130,7 +130,7 @@ void ameba_lcdc_reg_dump(void __iomem *address, const char *filename)
 
 	/*global register*/
 	DRM_INFO("[%s]Dump lcdc register value baseaddr : 0x%08x\n", filename, (u32)pLCDCx);
-	
+
 	DRM_INFO("pLCDCx CTRL[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_CTRL_OFFSET));
 	DRM_INFO("pLCDCx PLANE_SIZE[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_PLANE_SIZE_OFFSET));
 	DRM_INFO("pLCDCx UNDFLW_CFG[0x%x] = 0x%08x\n", DUMP_REG(pLCDCx , LCDC_UNDFLW_CFG_OFFSET));
@@ -235,6 +235,7 @@ void ameba_lcdc_config_setvalid(void __iomem *address, LCDC_InitTypeDef *LCDC_In
 
 void ameba_lcdc_enable_SHW(void __iomem *address)
 {
+	
 	LCDC_TrigerSHWReload(address);
 }
 

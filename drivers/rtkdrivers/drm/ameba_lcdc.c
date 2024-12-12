@@ -83,7 +83,7 @@ void LCDC_DMADebugConfig(void __iomem *LCDCx, u32 DmaWriteBack, u32 ImgDestAddr)
 	u32 Value32 = readl(LCDCx+LCDC_DMA_MODE_CFG_OFFSET);
 	Value32 &= ~LCDC_BIT_LCD_DMA_OUT;
 	writel(Value32,LCDCx+LCDC_DMA_MODE_CFG_OFFSET);
-	
+
 	if (DmaWriteBack) {
 		/*fill the LCD_DMA_OUT field in register LCDC_DMA_MODE_CFG*/
 		Value32 = readl(LCDCx+LCDC_DMA_MODE_CFG_OFFSET);
@@ -354,7 +354,7 @@ void LCDC_LayerConfig(void __iomem *LCDCx, u8 LayerId, LCDC_LayerConfigTypeDef *
 	u32 ColorKey;
 	u32 Alpha;
 	void __iomem *LCDC_Layerx ;
-		
+
 	/*check the parameters*/
 	assert_param(IS_LCDC_A_VALID_LAYER(LayerId));
 
@@ -371,7 +371,7 @@ void LCDC_LayerConfig(void __iomem *LCDCx, u8 LayerId, LCDC_LayerConfigTypeDef *
 			LCDC_Layerx = LCDCx + LCDC_LAYER3_BASEADDRESS_OFFSET ;
 			break;
 	}
-	
+
 	/*Note: the setting of this layer is not clear by LCDC_BIT_LAYERx_IMG_LAYER_EN bit*/
 	if (0 == EachLayer->LCDC_LayerEn) {
 		writel(0,LCDC_Layerx+LCDC_LAYERx_CTRL_OFFSET);

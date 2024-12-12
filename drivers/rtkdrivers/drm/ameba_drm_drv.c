@@ -13,12 +13,11 @@
 #include <linux/suspend.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_drv.h>
-#include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_fb_helper.h>
-#include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_of.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_vblank.h>
+#include <drm/drm_fbdev_generic.h>
 
 #include "ameba_drm_base.h"
 #include "ameba_lcdc.h"
@@ -29,8 +28,7 @@
 
 #define LCDC_LAYER_IMG_FORMAT_NOT_SUPPORT   (LCDC_LAYER_IMG_FORMAT_ARGB8666+1)
 
-
-// ameba-format translate table
+/* ameba-format translate table */
 struct ameba_format {
 	u32 pixel_bpp;
 	u32 pixel_format;
@@ -39,14 +37,12 @@ struct ameba_format {
 
 struct ameba_crtc {
 	struct drm_crtc     base;
-
 	void                *lcdc_hw_ctx;        // struct lcdc_hw_ctx_type handle
 	bool                enable;
 };
 
 struct ameba_plane {
 	struct drm_plane    base;
-
 	void                *lcdc_hw_ctx;        // struct lcdc_hw_ctx_type handle
 	u32                 ch;                  // layer index
 };
@@ -54,7 +50,6 @@ struct ameba_plane {
 struct ameba_drm_private {
 	struct ameba_crtc   crtc;
 	struct ameba_plane  planes[LCDC_LAYER_MAX_NUM];
-
 	void                *lcdc_hw_ctx;        // struct lcdc_hw_ctx_type handle
 };
 
@@ -236,8 +231,6 @@ static int ameba_drm_kms_init(struct drm_device *dev,
 		DRM_ERROR("Fail to initialize vblank.\n");
 		goto err_unbind_all;
 	}
-	/* with irq_enabled = true, we can use the vblank feature. */
-	dev->irq_enabled = true;
 
 	/* reset all the states of crtc/plane/encoder/connector */
 	drm_mode_config_reset(dev);
@@ -298,13 +291,11 @@ static int ameba_drm_bind(struct device *dev)
 		goto err_drm_dev_put;
 	}
 
-	//register the device
+	/* register the device */
 	ret = drm_dev_register(drm, 0);
 	if (ret) {
 		goto err_kms_cleanup;
 	}
-
-	//drm_fbdev_generic_setup(drm, 24);
 
 	DRM_INFO("DRM Bind Success!\n");
 
@@ -331,8 +322,6 @@ static void ameba_drm_destroy_crtc(struct drm_device *drm_dev)
 	struct drm_plane                    *plane, *tmp;
 
 	drm_crtc_vblank_off(crtc);
-
-	//drm_self_refresh_helper_cleanup(crtc);
 	of_node_put(crtc->port);
 
 	/*
@@ -343,7 +332,7 @@ static void ameba_drm_destroy_crtc(struct drm_device *drm_dev)
 	 * was devm allocated and associated with this component.  We need to
 	 * free it ourselves before vop_unbind() finishes.
 	 */
-	list_for_each_entry_safe(plane, tmp, &drm_dev->mode_config.plane_list, head) 
+	list_for_each_entry_safe(plane, tmp, &drm_dev->mode_config.plane_list, head)
 	{
 		drm_plane_cleanup(plane);
 	}
@@ -357,17 +346,12 @@ static void ameba_drm_destroy_crtc(struct drm_device *drm_dev)
 
 static void ameba_drm_unbind(struct device *dev)
 {
-	struct drm_device           *drm = dev_get_drvdata(dev);
+	struct drm_device *drm = dev_get_drvdata(dev);
 
 	DRM_INFO("Run DRM Unbind\n");
 
 	drm_dev_unregister(drm);
 	ameba_drm_destroy_crtc(drm);
-
-	//if(ameba_struct->state) {
-		//drm_atomic_helper_commit_modeset_disables(drm,ameba_struct->state);
-	//	ameba_struct->state = NULL ;
-	//}
 
 	drm_kms_helper_poll_fini(drm);
 	drm_atomic_helper_shutdown(drm);
@@ -394,7 +378,6 @@ static int ameba_drm_probe(struct platform_device *pdev)
 	struct device_node      *np = dev->of_node;
 	int i;
 
-	drm_debug = DRM_UT_DRIVER;
 	DRM_DEBUG_DRIVER("Run Drm Probe!\n");
 
 	for (i = 0; i<LCDC_MAX_REMOTE_DEV; i++) {
@@ -428,11 +411,7 @@ static int ameba_drm_probe(struct platform_device *pdev)
 static int ameba_drm_remove(struct platform_device *pdev)
 {
 	DRM_DEBUG_DRIVER("Run Drm Remove!\n");
-
 	component_master_del(&pdev->dev, &ameba_drm_ops);
-
-	drm_debug = 0;
-
 	return 0;
 }
 
