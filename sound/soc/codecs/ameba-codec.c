@@ -545,7 +545,7 @@ static int alsa_dac_eq_coef_put(struct snd_kcontrol *kcontrol,
 	void __iomem *addr = NULL;
 	void *data;
 	u32 *val, value;
-	int i, reg;
+	int i;
 	int cnt = params->max - 2;
 
 	codec_priv->dac_channel = ucontrol->value.bytes.data[0];
@@ -800,11 +800,6 @@ static int ameba_codec_dai_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int ameba_codec_dai_aif_mute(struct snd_soc_dai *codec_dai, int mute)
-{
-	return 0;
-}
-
 static int ameba_codec_dai_set_fll(struct snd_soc_dai *dai, int id, int src,
 			  unsigned int freq_in, unsigned int freq_out)
 {
@@ -851,26 +846,21 @@ static int ameba_codec_dai_hw_free(struct snd_pcm_substream *substream,struct sn
 	return 0;
 }
 
-
 static const struct snd_soc_dai_ops ameba_aif_dai_ops = {
 	.set_sysclk		= ameba_codec_dai_set_dai_sysclk,
 	.set_fmt		= ameba_codec_dai_set_dai_fmt,
 	.hw_params		= ameba_codec_dai_hw_params,
 	.startup		= ameba_codec_dai_startup,
 	.delay			= ameba_codec_delay,
-	.digital_mute	= ameba_codec_dai_aif_mute,
 	.set_pll		= ameba_codec_dai_set_fll,
 	.set_tristate	= ameba_codec_dai_set_tristate,
 	.hw_free		= ameba_codec_dai_hw_free,
 };
 
-
-
-static int ameba_codec_hw_params(struct snd_pcm_substream *substream,
-				struct snd_pcm_hw_params *params)
+static int ameba_codec_hw_params(struct snd_soc_component *component,
+			 struct snd_pcm_substream *substream,
+			 struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component =snd_soc_rtdcom_lookup(rtd, "ameba-codec");
 	int is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct ameba_priv * codec_priv = snd_soc_component_get_drvdata(component);
 	codec_init_params codec_init =
@@ -1077,20 +1067,13 @@ static int ameba_codec_hw_params(struct snd_pcm_substream *substream,
 
 }
 
-static int ameba_codec_hw_free(struct snd_pcm_substream *substream)
+static int ameba_codec_hw_free(struct snd_soc_component *component,
+								struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component =snd_soc_rtdcom_lookup(rtd, "ameba-codec");
-
 	codec_info(1,component->dev,"%s",__func__);
 
 	return 0;
 }
-
-static const struct snd_pcm_ops codec_ops = {
-	.hw_params	= ameba_codec_hw_params,
-	.hw_free = ameba_codec_hw_free,
-};
 
 static struct snd_soc_dai_driver ameba_dai[] = {
 	{
@@ -1243,7 +1226,8 @@ static const struct snd_soc_component_driver soc_component_drv_codec = {
 	.resume			= ameba_codec_component_resume,
 	.write          = ameba_write_reg,
 	.read           = ameba_read_reg,
-	.ops 		    = &codec_ops,
+	.hw_params	    = ameba_codec_hw_params,
+	.hw_free        = ameba_codec_hw_free,
 };
 
 /* for clk set, get clk first, then set parent relationship ,then enable from parent to child*/
@@ -1280,7 +1264,6 @@ static int ameba_codec_probe(struct platform_device *pdev)
 	struct resource *resource_reg_swr_on_ctrl0;
 	void __iomem *sys_fen_grp1_addr;
 	void __iomem *swr_on_ctrl0_addr;
-	enum of_gpio_flags flags;
 	int index;
 	u32 tmp;
 
@@ -1334,7 +1317,7 @@ static int ameba_codec_probe(struct platform_device *pdev)
 	writel(tmp, swr_on_ctrl0_addr);
 
 	codec_priv->gpio_index = 0;
-	index = of_get_named_gpio_flags(pdev->dev.of_node, "ext_amp_gpio", 0, &flags);
+	index = of_get_named_gpio(pdev->dev.of_node, "ext_amp_gpio", 0);
 
 	codec_priv->gpio_index = index;
 	codec_priv->enable_dac_asrc = of_property_read_bool(pdev->dev.of_node, "enable-dac-asrc");

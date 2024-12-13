@@ -8,7 +8,6 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
-#include <stddef.h>
 
 #include "ameba_audio_clock.h"
 

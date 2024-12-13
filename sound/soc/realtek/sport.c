@@ -275,7 +275,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 		}
 		mutex_unlock(&sport->state_mutex);
 
-		if (sport->play_record_in_use & 0x03 == 0)
+		if ((sport->play_record_in_use & 0x03) == 0)
 			audio_sp_dma_cmd(sport->addr, false);
 
 		if (is_playback) {
@@ -775,7 +775,7 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
-	if (sport->play_record_in_use & 0x03 == 0) {
+	if ((sport->play_record_in_use & 0x03) == 0) {
 		clk_disable_unprepare(sport->clock);
 		sport->clock_enabled = 0;
 		//below to be done
@@ -792,7 +792,7 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 }
 
 #ifdef CONFIG_PM
-static int ameba_sport_suspend(struct snd_soc_dai *dai)
+static int ameba_sport_suspend(struct snd_soc_component *component)
 {
 	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 
@@ -812,7 +812,7 @@ static int ameba_sport_suspend(struct snd_soc_dai *dai)
 	return 0;
 }
 
-static int ameba_sport_resume(struct snd_soc_dai *dai)
+static int ameba_sport_resume(struct snd_soc_component *component)
 {
 	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 	int ret;
@@ -833,19 +833,6 @@ static int ameba_sport_resume(struct snd_soc_dai *dai)
 #define ameba_sport_suspend NULL
 #define ameba_sport_resume NULL
 #endif
-
-static const struct snd_soc_dai_ops ameba_sport_dai_ops = {
-	.trigger   = sport_trigger,
-	#if USING_COUNTER
-	.delay     = sport_delay,
-	#endif
-	.hw_params = sport_hw_params,
-	.hw_free   = sport_hw_free,
-	.set_fmt   = sport_set_fmt,
-	.startup   = sport_startup,
-	.shutdown  = sport_shutdown,
-};
-
 
 static const struct snd_kcontrol_new sport_controls[] = {
 
@@ -937,6 +924,20 @@ static int ameba_sport_dai_remove(struct snd_soc_dai *dai)
 	return 0;
 }
 
+static const struct snd_soc_dai_ops ameba_sport_dai_ops = {
+	.trigger   = sport_trigger,
+	#if USING_COUNTER
+	.delay     = sport_delay,
+	#endif
+	.hw_params = sport_hw_params,
+	.hw_free   = sport_hw_free,
+	.set_fmt   = sport_set_fmt,
+	.startup   = sport_startup,
+	.shutdown  = sport_shutdown,
+	.probe     = ameba_sport_dai_probe,
+	.remove    = ameba_sport_dai_remove,
+};
+
 static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 	{
 		.name = "4100d000.sport",
@@ -956,11 +957,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = ameba_sport_dai_probe,
-		.remove = ameba_sport_dai_remove,
 		.ops = &ameba_sport_dai_ops,
-		.suspend = ameba_sport_suspend,
-		.resume = ameba_sport_resume,
 	},
 	{
 		.name = "4100e000.sport",
@@ -980,11 +977,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = ameba_sport_dai_probe,
-		.remove = ameba_sport_dai_remove,
 		.ops = &ameba_sport_dai_ops,
-		.suspend = ameba_sport_suspend,
-		.resume = ameba_sport_resume,
 	},
 	{
 		.name = "4100f000.sport",
@@ -1019,11 +1012,7 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = ameba_sport_dai_probe,
-		.remove = ameba_sport_dai_remove,
 		.ops = &ameba_sport_dai_ops,
-		.suspend = ameba_sport_suspend,
-		.resume = ameba_sport_resume,
 	},
 	{
 		.name = "41010000.sport",
@@ -1058,18 +1047,15 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
 							SNDRV_PCM_FMTBIT_S32_LE |
 							SNDRV_PCM_FMTBIT_U32_LE,
         },
-		.probe = ameba_sport_dai_probe,
-		.remove = ameba_sport_dai_remove,
 		.ops = &ameba_sport_dai_ops,
-		.suspend = ameba_sport_suspend,
-		.resume = ameba_sport_resume,
 	},
 };
 
 static const struct snd_soc_component_driver ameba_sport_component = {
 	.name = "ameba,sport",
+	.suspend   = ameba_sport_suspend,
+	.resume    = ameba_sport_resume,
 };
-
 
 struct sport_dai *sport_alloc_dai(struct platform_device *pdev)
 {
