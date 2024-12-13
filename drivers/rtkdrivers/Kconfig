@@ -15,8 +15,6 @@ source "drivers/rtkdrivers/cpufreq/Kconfig"
 
 source "drivers/rtkdrivers/crypto/Kconfig"
 
-source "drivers/rtkdrivers/touchscreen/Kconfig"
-
 source "drivers/rtkdrivers/dma/Kconfig"
 
 source "drivers/rtkdrivers/drm/Kconfig"
@@ -56,6 +54,8 @@ source "drivers/rtkdrivers/mmc/Kconfig"
 source "drivers/rtkdrivers/spi/Kconfig"
 
 source "drivers/rtkdrivers/thermal/Kconfig"
+
+source "drivers/rtkdrivers/touchscreen/Kconfig"
 
 source "drivers/rtkdrivers/mfd_timer/Kconfig"
 

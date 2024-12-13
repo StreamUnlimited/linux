@@ -23,7 +23,7 @@
 
 #include "cst328.h"
 
-#define RTK_DRIVER_NAME                     "rtk_ts"
+#define RTK_DRIVER_NAME                     "cst328"
 
 #define RTK_IRQ_TRIGGER_RISING_CONFIG               0x01
 #define RTK_MAIN_IIC_ADDR_CONFIG                    0x1A
@@ -40,7 +40,7 @@
 static DECLARE_WAIT_QUEUE_HEAD(waiter);
 static struct task_struct *thread = NULL;
 static int thread_ts_flag = 0;
-struct rtk_ts_data *rtk_ts_data = NULL;
+struct cst328_ts_data *cst328_ts_data = NULL;
 
 static const struct i2c_device_id rtk_ts_id[] = {
 	{RTK_DRIVER_NAME, 0},
@@ -48,27 +48,25 @@ static const struct i2c_device_id rtk_ts_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, rtk_ts_id);
 
-static const struct of_device_id rtk_dt_match[] = {
-	{.compatible = "realtek,ameba-ts", },
+static const struct of_device_id cst328_dt_match[] = {
+	{.compatible = "cst328", },
 	{}
 };
-MODULE_DEVICE_TABLE(of, rtk_dt_match);
-
+MODULE_DEVICE_TABLE(of, cst328_dt_match);
 
 static void rtk_ts_irq_disable(void)
 {
-	if (!rtk_ts_data->irq_is_disable) {
-		disable_irq(rtk_ts_data->use_irq);
-		rtk_ts_data->irq_is_disable = 1;
+	if (!cst328_ts_data->irq_is_disable) {
+		disable_irq(cst328_ts_data->use_irq);
+		cst328_ts_data->irq_is_disable = 1;
 	}
 }
 
-
 static void rtk_ts_irq_enable(void)
 {
-	if (rtk_ts_data->irq_is_disable) {
-		enable_irq(rtk_ts_data->use_irq);
-		rtk_ts_data->irq_is_disable = 0;
+	if (cst328_ts_data->irq_is_disable) {
+		enable_irq(cst328_ts_data->use_irq);
+		cst328_ts_data->irq_is_disable = 0;
 	}
 }
 
@@ -182,19 +180,19 @@ static void rtk_ts_touch_report(void)
 
 	buf[0] = 0xD0;
 	buf[1] = 0x00;
-	ret = rtk_ts_i2c_read_register(rtk_ts_data->client, buf, 7);
+	ret = rtk_ts_i2c_read_register(cst328_ts_data->client, buf, 7);
 	if (ret < 0) {
-		dev_err(rtk_ts_data->dev, "Failed to read touch point data\n");
+		dev_err(cst328_ts_data->dev, "Failed to read touch point data\n");
 		goto OUT_PROCESS;
 	}
 
 	if (buf[6] != 0xAB) {
-		dev_err(rtk_ts_data->dev, "Invalid data: buf[6] != 0xAB\n");
+		dev_err(cst328_ts_data->dev, "Invalid data: buf[6] != 0xAB\n");
 		goto OUT_PROCESS;
 	}
 
 	if (buf[0] == 0xAB) {
-		dev_err(rtk_ts_data->dev, "Invalid data: buf[0] == 0xAB\n");
+		dev_err(cst328_ts_data->dev, "Invalid data: buf[0] == 0xAB\n");
 		goto OUT_PROCESS;
 	}
 
@@ -208,7 +206,7 @@ static void rtk_ts_touch_report(void)
 	if (cnt == 0x01) {
 		goto FINGER_PROCESS;
 	} else {
-		dev_err(rtk_ts_data->dev, "Report touch cnt = %d\n", cnt);
+		dev_err(cst328_ts_data->dev, "Report touch cnt = %d\n", cnt);
 		i2c_len = (cnt - 1) * 5 + 1;
 		len_1 = i2c_len;
 
@@ -224,7 +222,7 @@ static void rtk_ts_touch_report(void)
 				len_1 = 0;
 			}
 
-			ret = rtk_ts_i2c_read_register(rtk_ts_data->client, i2c_buf, len_2);
+			ret = rtk_ts_i2c_read_register(cst328_ts_data->client, i2c_buf, len_2);
 			if (ret < 0) {
 				goto OUT_PROCESS;
 			}
@@ -245,9 +243,9 @@ FINGER_PROCESS:
 	i2c_buf[0] = 0xD0;
 	i2c_buf[1] = 0x00;
 	i2c_buf[2] = 0xAB;
-	ret = rtk_ts_i2c_write(rtk_ts_data->client, i2c_buf, 3);
+	ret = rtk_ts_i2c_write(cst328_ts_data->client, i2c_buf, 3);
 	if (ret < 0) {
-		dev_err(rtk_ts_data->dev, "Failed to send read touch info ending\n");
+		dev_err(cst328_ts_data->dev, "Failed to send read touch info ending\n");
 		goto OUT_PROCESS;
 	}
 
@@ -259,62 +257,62 @@ FINGER_PROCESS:
 		input_y = (unsigned int)((buf[idx + 2] << 4) | (buf[idx + 3] & 0x0F));
 
 		/* Adapter for new touch firmware */
-		if (!rtk_ts_data || !rtk_ts_data->pdata) {
+		if (!cst328_ts_data || !cst328_ts_data->pdata) {
 			input_x = RTK_X_DISPLAY_DEFAULT - input_x;
 			input_y = RTK_Y_DISPLAY_DEFAULT - input_y;
 		} else {
-			input_x = rtk_ts_data->pdata->x_resolution - input_x;
-			input_y = rtk_ts_data->pdata->y_resolution - input_y;
+			input_x = cst328_ts_data->pdata->x_resolution - input_x;
+			input_y = cst328_ts_data->pdata->y_resolution - input_y;
 		}
 
 		input_w = (unsigned int)(buf[idx + 4]);
 		sw = (buf[idx] & 0x0F) >> 1;
 		finger_id = (buf[idx] >> 4) & 0x0F;
 
-		dev_dbg(rtk_ts_data->dev, "Point x:%d, y:%d, id:%d, sw:%d\n", input_x, input_y, finger_id, sw);
+		dev_dbg(cst328_ts_data->dev, "Point x:%d, y:%d, id:%d, sw:%d\n", input_x, input_y, finger_id, sw);
 
 		if (sw == 0x03) {
-			rtk_ts_touch_down(rtk_ts_data->input_dev, finger_id, input_x, input_y, input_w);
+			rtk_ts_touch_down(cst328_ts_data->input_dev, finger_id, input_x, input_y, input_w);
 			cnt_down++;
 		} else {
 			cnt_up++;
-			rtk_ts_touch_up(rtk_ts_data->input_dev, finger_id);
+			rtk_ts_touch_up(cst328_ts_data->input_dev, finger_id);
 		}
 		idx += 5;
 
 	}
 
 	if ((cnt_up > 0) && (cnt_down == 0)) {
-		input_report_key(rtk_ts_data->input_dev, BTN_TOUCH, 0);
+		input_report_key(cst328_ts_data->input_dev, BTN_TOUCH, 0);
 	} else {
-		input_report_key(rtk_ts_data->input_dev, BTN_TOUCH, 1);
+		input_report_key(cst328_ts_data->input_dev, BTN_TOUCH, 1);
 	}
 
 	if (cnt_down == 0) {
-		rtk_ts_data->report_flag = 0;
+		cst328_ts_data->report_flag = 0;
 	} else {
-		rtk_ts_data->report_flag = 0xCA;
+		cst328_ts_data->report_flag = 0xCA;
 	}
 
-	input_sync(rtk_ts_data->input_dev);
+	input_sync(cst328_ts_data->input_dev);
 	goto END;
 
 CLR_POINT:
 	for (i = 0; i <= 10; i++) {
-		input_mt_slot(rtk_ts_data->input_dev, i);
-		input_report_abs(rtk_ts_data->input_dev, ABS_MT_TRACKING_ID, -1);
-		input_mt_report_slot_state(rtk_ts_data->input_dev, MT_TOOL_FINGER, false);
+		input_mt_slot(cst328_ts_data->input_dev, i);
+		input_report_abs(cst328_ts_data->input_dev, ABS_MT_TRACKING_ID, -1);
+		input_mt_report_slot_state(cst328_ts_data->input_dev, MT_TOOL_FINGER, false);
 	}
-	input_report_key(rtk_ts_data->input_dev, BTN_TOUCH, 0);
-	input_sync(rtk_ts_data->input_dev);
+	input_report_key(cst328_ts_data->input_dev, BTN_TOUCH, 0);
+	input_sync(cst328_ts_data->input_dev);
 
 OUT_PROCESS:
 	buf[0] = 0xD0;
 	buf[1] = 0x00;
 	buf[2] = 0xAB;
-	ret = rtk_ts_i2c_write(rtk_ts_data->client, buf, 3);
+	ret = rtk_ts_i2c_write(cst328_ts_data->client, buf, 3);
 	if (ret < 0) {
-		dev_err(rtk_ts_data->dev, " Failed to send read touch info ending\n");
+		dev_err(cst328_ts_data->dev, " Failed to send read touch info ending\n");
 	}
 
 END:
@@ -344,7 +342,7 @@ static int rtk_touch_handler(void *unused)
 	return 0;
 }
 
-static int rtk_input_dev_init(struct rtk_ts_data *ts_data)
+static int rtk_input_dev_init(struct cst328_ts_data *ts_data)
 {
 	int ret = 0;
 	struct input_dev *input_dev;
@@ -393,11 +391,11 @@ static int rtk_input_dev_init(struct rtk_ts_data *ts_data)
 
 static void rtk_ts_data_init(struct i2c_client *client)
 {
-	rtk_ts_data->client = client;
-	rtk_ts_data->pdata->max_touch_num  = RTK_MAX_POINTS;
+	cst328_ts_data->client = client;
+	cst328_ts_data->pdata->max_touch_num  = RTK_MAX_POINTS;
 }
 
-static int rtk_gpio_configure(struct rtk_ts_data *data)
+static int rtk_gpio_configure(struct cst328_ts_data *data)
 {
 	int ret = -1;
 
@@ -430,9 +428,9 @@ static int rtk_gpio_configure(struct rtk_ts_data *data)
 			goto err_reset_gpio_dir;
 		}
 	}
-	gpio_direction_output(rtk_ts_data->pdata->reset_gpio, 0);
+	gpio_direction_output(cst328_ts_data->pdata->reset_gpio, 0);
 	mdelay(20);
-	gpio_direction_output(rtk_ts_data->pdata->reset_gpio, 1);
+	gpio_direction_output(cst328_ts_data->pdata->reset_gpio, 1);
 
 	return 0;
 
@@ -491,7 +489,7 @@ static int rtk_parse_dt(struct device *dev, struct rtk_ts_platform_data *pdata)
 	u32 temp_val = 0;
 	const  struct of_device_id *match;
 
-	match = of_match_device(of_match_ptr(rtk_dt_match), dev);
+	match = of_match_device(of_match_ptr(cst328_dt_match), dev);
 	if (!match) {
 		dev_err(dev, "Unable to find matchv device in DTS\n");
 		return ENODEV;
@@ -504,13 +502,13 @@ static int rtk_parse_dt(struct device *dev, struct rtk_ts_platform_data *pdata)
 
 	//printk("rtk_parse_dt np: %s, name: %s", np->full_name,  np->name);
 	/* reset, irq gpio info */
-	pdata->reset_gpio = of_get_named_gpio_flags(np, "ts-reset-gpios", 0, &pdata->reset_gpio_flags);
+	pdata->reset_gpio = of_get_named_gpio(np, "ts-reset-gpios", 0);
 	if (pdata->reset_gpio < 0) {
 		dev_err(dev, "Invalid reset_gpio property in DTS\n");
 		return -1;
 	}
 
-	pdata->irq_gpio = of_get_named_gpio_flags(np, "ts-irq-gpios", 0, &pdata->irq_gpio_flags);
+	pdata->irq_gpio = of_get_named_gpio(np, "ts-irq-gpios", 0);
 	if (pdata->irq_gpio < 0) {
 		dev_err(dev, "Invalid irq_gpio property in DTS\n");
 		return -1;
@@ -536,7 +534,7 @@ static int rtk_parse_dt(struct device *dev, struct rtk_ts_platform_data *pdata)
 	return ret;
 }
 
-static int rtk_platform_data_init(struct rtk_ts_data *ts_data)
+static int rtk_platform_data_init(struct cst328_ts_data *ts_data)
 {
 	int ret = -1;
 	int pdata_size = sizeof(struct rtk_ts_platform_data);
@@ -644,25 +642,25 @@ static int rtk_irq_init(struct i2c_client *client)
 {
 	int ret = -1;
 
-	rtk_ts_data->int_trigger_type = RTK_IRQ_TRIGGER_RISING_CONFIG;
-	rtk_ts_data->pdata->irq_gpio_flags = ((RTK_IRQ_TRIGGER_RISING_CONFIG) ? IRQF_TRIGGER_RISING : IRQF_TRIGGER_FALLING);
-	rtk_ts_data->pdata->irq_gpio_flags |= IRQF_ONESHOT;
+	cst328_ts_data->int_trigger_type = RTK_IRQ_TRIGGER_RISING_CONFIG;
+	cst328_ts_data->pdata->irq_gpio_flags = ((RTK_IRQ_TRIGGER_RISING_CONFIG) ? IRQF_TRIGGER_RISING : IRQF_TRIGGER_FALLING);
+	cst328_ts_data->pdata->irq_gpio_flags |= IRQF_ONESHOT;
 
-	rtk_ts_data->use_irq = gpio_to_irq(rtk_ts_data->pdata->irq_gpio);
+	cst328_ts_data->use_irq = gpio_to_irq(cst328_ts_data->pdata->irq_gpio);
 
 	/* Configure GPIO to IRQ and request IRQ */
-	ret = request_irq(rtk_ts_data->use_irq, (irq_handler_t)rtk_eint_interrupt_handler, rtk_ts_data->pdata->irq_gpio_flags, "Realtek Touch Int", NULL);
+	ret = request_irq(cst328_ts_data->use_irq, (irq_handler_t)rtk_eint_interrupt_handler, cst328_ts_data->pdata->irq_gpio_flags, "Realtek Touch Int", NULL);
 	if (ret == 0) {
-		client->irq = rtk_ts_data->use_irq;
+		client->irq = cst328_ts_data->use_irq;
 	}
 
 	return ret;
 }
 
-static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int rtk_ts_probe(struct i2c_client *client)
 {
 	int ret = -1;
-	struct rtk_ts_data *ts_data = NULL;
+	struct cst328_ts_data *ts_data = NULL;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "I2C not supported\n");
@@ -675,7 +673,7 @@ static int rtk_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 		return -ENOMEM;
 	}
 
-	rtk_ts_data = ts_data;
+	cst328_ts_data = ts_data;
 	ts_data->client = client;
 	ts_data->dev = &client->dev;
 
@@ -734,8 +732,8 @@ err_end:
 		gpio_free(ts_data->pdata->irq_gpio);
 	}
 
-	if (rtk_ts_data->use_irq != 0) {
-		free_irq(rtk_ts_data->use_irq, NULL);
+	if (cst328_ts_data->use_irq != 0) {
+		free_irq(cst328_ts_data->use_irq, NULL);
 	}
 
 	if (ts_data->input_dev != NULL) {
@@ -772,12 +770,12 @@ static void rtk_ts_enter_sleep(struct i2c_client *client)
 	return;
 }
 
-static int rtk_ts_remove(struct i2c_client *client)
+static void rtk_ts_remove(struct i2c_client *client)
 {
-	struct rtk_ts_data *ts = i2c_get_clientdata(client);
+	struct cst328_ts_data *ts = i2c_get_clientdata(client);
 
 	if (!ts) {
-		return -EINVAL;
+		return;
 	}
 
 	if (ts->pdata && gpio_is_valid(ts->pdata->reset_gpio)) {
@@ -800,15 +798,13 @@ static int rtk_ts_remove(struct i2c_client *client)
 	if (ts != NULL) {
 		kfree(ts);
 	}
-
-	return 0;
 }
 
 static int __maybe_unused rtk_ts_suspend(struct device *dev)
 {
 	int idx;
 	struct i2c_client *client = to_i2c_client(dev);
-	struct rtk_ts_data *ts = i2c_get_clientdata(client);
+	struct cst328_ts_data *ts = i2c_get_clientdata(client);
 
 	rtk_ts_irq_disable();
 
@@ -829,7 +825,7 @@ static int __maybe_unused rtk_ts_resume(struct device *dev)
 	int idx;
 
 	struct i2c_client *client = to_i2c_client(dev);
-	struct rtk_ts_data *ts = i2c_get_clientdata(client);
+	struct cst328_ts_data *ts = i2c_get_clientdata(client);
 
 	for (idx = 0; idx <= 10; idx++) {
 		input_mt_slot(ts->input_dev, idx);
@@ -849,7 +845,7 @@ static struct i2c_driver rtk_ts_driver = {
 	.driver = {
 		.name = RTK_DRIVER_NAME,
 		.owner  = THIS_MODULE,
-		.of_match_table = of_match_ptr(rtk_dt_match),
+		.of_match_table = of_match_ptr(cst328_dt_match),
 		.pm = &rtk_pm_ops,
 	},
 	.probe = rtk_ts_probe,

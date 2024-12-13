@@ -1,4 +1,29 @@
-config TOUCHSCREEN_RTK_AMEBA
-	tristate "CST328 I2C touchscreen"
+menuconfig TOUCHSCREEN_RTK_AMEBA
+	tristate "I2C touchscreen"
 	depends on I2C
 	depends on GPIOLIB || COMPILE_TEST
+
+if TOUCHSCREEN_RTK_AMEBA
+
+config TOUCHSCREEN_GT9XX
+	tristate "Goodix touchpanel GT9xx series"
+	select CONFIG_PINCTRL
+	select CONFIG_PINMUX
+	select CONFIG_GENERIC_PINCONF
+	help
+	  Say Y here if you have a Goodix GT9xx touchscreen
+	  controller.
+
+		If build module, say M.
+		If unsure, say N.
+
+config TOUCHSCREEN_CST328
+	tristate "CST328"
+	help
+	  Say Y here if you have a CST328 touchscreen
+	  controller.
+
+		If build module, say M.
+		If unsure, say N.
+
+endif

@@ -15,13 +15,12 @@ struct rtk_ts_platform_data {
 	int irq_gpio;
 	u32 irq_gpio_flags;
 	int reset_gpio;
-	u32 reset_gpio_flags;
 	u32 x_resolution;
 	u32 y_resolution;
 	u32 max_touch_num;
 };
 
-struct rtk_ts_data {
+struct cst328_ts_data {
 	struct rtk_ts_platform_data *pdata;
 	struct i2c_client *client;
 	struct device *dev;
@@ -32,7 +31,6 @@ struct rtk_ts_data {
 	u8  irq_is_disable;
 	u8  report_flag;
 };
-extern struct rtk_ts_data *rtk_ts_data;
-
+extern struct cst328_ts_data *cst328_ts_data;
 
 #endif
