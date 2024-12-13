@@ -1021,8 +1021,6 @@ static const struct mmc_host_ops rtk_mmc_ops = {
 	.get_ro = rtk_mmc_get_ro,
 };
 
-
-
 static irqreturn_t rtk_mmc_irq(int irq, void *dev_id)
 {
 	struct rtk_mmc_host *host = dev_id;
@@ -1128,7 +1126,7 @@ static int rtk_mmc_add_host(struct rtk_mmc_host *host)
 
 	/* Host controller capabilities */
 	mmc->caps |= MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
-				 MMC_CAP_ERASE | MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25;
+				 MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25;
 	//MMC_CAP_4_BIT_DATA;// | MMC_CAP_NEEDS_POLL | MMC_CAP_CMD23;
 
 	mmc->caps2 |= MMC_CAP2_NO_WRITE_PROTECT | MMC_CAP2_NO_SDIO | MMC_CAP2_NO_MMC;
@@ -1160,7 +1158,6 @@ static int rtk_mmc_add_host(struct rtk_mmc_host *host)
 
 	return 0;
 }
-
 
 static int rtk_mmc_probe(struct platform_device *pdev)
 {
@@ -1242,7 +1239,6 @@ err:
 
 	return ret;
 }
-
 
 static const struct of_device_id rtk_mmc_match[] = {
 	{ .compatible = "realtek,ameba-sdiohost" },
