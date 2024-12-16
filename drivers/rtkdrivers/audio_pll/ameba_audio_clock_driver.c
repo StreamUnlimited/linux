@@ -19,9 +19,10 @@
 #include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
-#include <uapi/sound/rtk_audio_pll.h>
 
-#include "ameba_audio_clock.h"
+#include "ameba/ameba_audio_clock.h"
+#include "uapi/ameba/audio_pll.h"
+
 #include "ameba_audio_clock_driver.h"
 
 #define SPORT_INDEX_MAX 4

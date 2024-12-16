@@ -9,7 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 
-#include "ameba_audio_clock.h"
+#include "ameba/ameba_audio_clock.h"
 
 #define MAX_PLL_DIV 8
 

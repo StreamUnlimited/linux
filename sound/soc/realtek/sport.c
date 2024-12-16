@@ -23,7 +23,7 @@
 #include "dma.h"
 #include "ameba_sport.h"
 #include "ameba_gdma.h"
-#include "ameba_audio_clock.h"
+#include "ameba/ameba_audio_clock.h"
 
 #define NO_MICRO_ADJUST 1
 #define IRQ_COMPENSATE_BASING_ON_DELTA_DELAY 1

@@ -67,4 +67,6 @@ source "drivers/rtkdrivers/watchdog/Kconfig"
 
 source "drivers/rtkdrivers/bluetooth/Kconfig"
 
+source "drivers/rtkdrivers/audio_pll/Kconfig"
+
 endif
