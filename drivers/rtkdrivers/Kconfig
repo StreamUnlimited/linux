@@ -5,6 +5,12 @@ menuconfig RTK_DRIVERS
 
 if RTK_DRIVERS
 
+if NETDEVICES
+if CFG80211
+source "drivers/rtkdrivers/net/wireless/cfg80211_fullmac/Kconfig"
+endif
+endif
+
 source "drivers/rtkdrivers/adc/Kconfig"
 
 source "drivers/rtkdrivers/captouch/Kconfig"

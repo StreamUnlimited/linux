@@ -48,7 +48,7 @@
 };
 
 &rtkpanel {
-	compatible = "realtek,st7701s";
+	compatible = "realtek,jd9165a";
 	pinctrl-names="default";
 	pinctrl-0 = <&drm_disable_swd_pins>;
 	mipi-gpios = <&gpioa 14 0>;
@@ -79,6 +79,45 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c2_pins>;
 	status = "okay";
+
+	gt9xx@5d {
+		compatible = "goodix,gt9xx";
+		reg = <0x5d>;
+		status = "disabled";
+		interrupt-parent = <&gpioa>;
+		interrupts = <9 0x2800>;
+		pinctrl-names = "default", "int-output-low","int-output-high", "int-input";
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-1 = <&ts_int_output_low>;
+		pinctrl-2 = <&ts_int_output_high>;
+		pinctrl-3 = <&ts_int_input>;
+
+		reset-gpios = <&gpioa 10 0x0>;
+		irq-gpios = <&gpioa 9 0x2800>;
+		irq-flags = <2>;
+
+		touchscreen-max-id = <11>;
+		touchscreen-size-x = <1080>;
+		touchscreen-size-y = <1920>;
+		touchscreen-max-w = <512>;
+		touchscreen-max-p = <512>;
+		touchscreen-key-map = <172>, <158>; /* KEY_HOMEPAGE=172, KEY_BACK=158，KEY_MENU=139 */
+
+		goodix,slide-wakeup = <0>;
+		goodix,type-a-report = <0>;
+		goodix,driver-send-cfg = <0>;
+		goodix,resume-in-workqueue = <0>;
+		goodix,int-sync = <1>;
+		goodix,swap-x2y = <0>;
+		goodix,esd-protect = <1>;
+		goodix,auto-update-cfg = <0>;
+		oodix,auto-update = <0>;
+		goodix,power-off-sleep = <0>;
+		goodix,pen-suppress-finger = <0>;
+		goodix,cfg-group0 = [
+			53 D0 02 00 05 05 F5 D5 21 48 2D 0F 5A 41 0E 05 00 00 32 32 20 00 05 14 14 1A 14 8B 2B 00
+		];
+	};
 
 	rtk_ts@1a {
 		compatible = "realtek,ameba-ts";
