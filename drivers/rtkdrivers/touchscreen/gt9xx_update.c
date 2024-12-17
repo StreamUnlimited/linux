@@ -489,7 +489,7 @@ static int gup_update_config(struct i2c_client *client)
 			break;
 	}
 		dev_err(&ts->client->dev, "Send config i2c error.");
-	}	
+	}
 
 update_cfg_file_failed:
 	kfree(file_config);

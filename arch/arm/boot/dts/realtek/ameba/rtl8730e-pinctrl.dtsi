@@ -77,6 +77,38 @@
 				};
 			};
 
+			ts_int_default: tsintdefault {
+				pins_cmd_dat {
+					pinmux = <REALTEK_PINMUX('A', 9, GPIO)>;
+					slew-rate = <0>;
+					bias-disable;
+				};
+			};
+
+			ts_int_output_low: tsintoutlow {
+				pins_cmd_dat {
+					pinmux = <REALTEK_PINMUX('A', 9, GPIO)>;
+					slew-rate = <1>;
+					output-low;
+				};
+			};
+
+			ts_int_output_high: tsintouthigh {
+				pins_cmd_dat {
+					pinmux = <REALTEK_PINMUX('A', 9, GPIO)>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+
+			ts_int_input: tsintinput {
+				pins_cmd_dat {
+					pinmux = <REALTEK_PINMUX('A', 9, GPIO)>;
+					slew-rate = <0>;
+					bias-disable;
+				};
+			};
+
 			ir_pins: ir@0 {
 				pins {
 					pinmux = <REALTEK_PINMUX('B', 11, IR)>, // IR_TX
