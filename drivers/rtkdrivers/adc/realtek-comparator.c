@@ -14,7 +14,6 @@
 #include <linux/ameba/rtk-timer.h>
 #include <linux/clk.h>
 #include <linux/pm_wakeirq.h>
-#include <linux/suspend.h>
 
 #include "realtek-comparator.h"
 
@@ -302,9 +301,7 @@ static int realtek_comp_suspend(struct device *dev)
 {
 	struct realtek_adc_data *comp_adc = dev_get_drvdata(dev->parent);
 
-	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
-		clk_set_parent(comp_adc->clk_sl, comp_adc->adc_parent_osc_2m);
-	}
+	clk_set_parent(comp_adc->clk_sl, comp_adc->adc_parent_osc_2m); // for cg, pg only
 	return 0;
 }
 
@@ -312,9 +309,7 @@ static int realtek_comp_resume(struct device *dev)
 {
 	struct realtek_adc_data *comp_adc = dev_get_drvdata(dev->parent);
 
-	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
-		clk_set_parent(comp_adc->clk_sl, comp_adc->adc_parent_ls_apb);
-	}
+	clk_set_parent(comp_adc->clk_sl, comp_adc->adc_parent_ls_apb); // for cg, pg only
 	return 0;
 }
 

@@ -322,7 +322,18 @@ static int realtek_gpio_irq_set_type(struct irq_data *data, unsigned int type)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int	realtek_gpio_irq_set_wake(struct irq_data *data, unsigned int on)
+{
+	struct realtek_gpio_bank *bank = irq_data_get_irq_chip_data(data);
+
+	irq_set_irq_wake(bank->irq, on);
+
+	return 0;
+}
+#else
 #define realtek_gpio_irq_set_wake NULL
+#endif
 
 static void realtek_gpio_irq_handler(struct irq_desc *desc)
 {
@@ -478,6 +489,33 @@ int realtek_gpio_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int realtek_gpio_suspend(struct device *dev)
+{
+	struct realtek_gpio_bank *bank = (struct realtek_gpio_bank *) dev->driver_data;
+
+	/* For sleep type CG/PG, GPIO clock need to switch from LS APB to SDM32K when suspend. */
+	clk_set_parent(bank->clk_sl, bank->parent_sdm32k);
+
+	return 0;
+}
+
+static int realtek_gpio_resume(struct device *dev)
+{
+	struct realtek_gpio_bank *bank = (struct realtek_gpio_bank *) dev->driver_data;
+
+	/* For sleep type CG/PG, GPIO clock need to switch from SDM32K to LS APB when resume. */
+	clk_set_parent(bank->clk_sl, bank->parent_ls_apb);
+
+	return 0;
+}
+
+
+static const struct dev_pm_ops realtek_ameba_gpio_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(realtek_gpio_suspend, realtek_gpio_resume)
+};
+#endif
+
 static const struct of_device_id realtek_ameba_gpio_of_match[] = {
 	{ .compatible = "realtek,ameba-gpio", },
 	{ },
@@ -488,6 +526,9 @@ static struct platform_driver realtek_ameba_gpio_driver = {
 	.driver = {
 		.name = "realtek-ameba-gpio",
 		.of_match_table = realtek_ameba_gpio_of_match,
+#ifdef CONFIG_PM
+		.pm = &realtek_ameba_gpio_pm_ops,
+#endif
 	},
 };
 
