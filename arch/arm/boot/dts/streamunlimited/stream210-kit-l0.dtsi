@@ -113,6 +113,15 @@
 	status = "okay";
 };
 
+&ir {
+	pinctrl-names = "default";
+	pinctrl-0 = <&ir_pin>;
+	rtk,ir-receiver = <1>;
+	rtk,ir-idle-level = <1>;
+	rtk,ir_rx_inverse = <1>;
+	status = "okay";
+};
+
 &drm {
 	status = "okay";
 };
@@ -207,6 +216,15 @@
 				 <REALTEK_PINMUX('A', 11, SPI)>,	// SPI1_CLK
 				 <REALTEK_PINMUX('A', 10, SPI)>,	// SPI1_MISO
 				 <REALTEK_PINMUX('A', 9, SPI)>;		// SPI1_MOSI
+		};
+	};
+
+	ir_pin: ir_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 26, IR)>; // IR_RX
+			bias-pull-up;
+			slew-rate = <0>;
+			drive-strength = <0>;
 		};
 	};
 };

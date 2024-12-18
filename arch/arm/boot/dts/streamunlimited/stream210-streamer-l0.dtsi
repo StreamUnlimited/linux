@@ -153,6 +153,15 @@
 
 };
 
+&ir {
+	pinctrl-names = "default";
+	pinctrl-0 = <&ir_pin>;
+	rtk,ir-receiver = <1>;
+	rtk,ir-idle-level = <1>;
+	rtk,ir_rx_inverse = <1>;
+	status = "okay";
+};
+
 // ADC can't be configured by linux, because it is used by the M0, all ADC requests go through HSMP to the M0
 &adc {
 	status = "disabled";
@@ -256,6 +265,15 @@
 		pins {
 			pinmux = <REALTEK_PINMUX('A', 10, GPIO)>,	// RESET_N_9211
 				 <REALTEK_PINMUX('B', 29, GPIO)>;	// SPDIFRX_ERROR (INT0)
+		};
+	};
+
+	ir_pin: ir_pin {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 26, IR)>; // IR_RX
+			bias-pull-up;
+			slew-rate = <0>;
+			drive-strength = <0>;
 		};
 	};
 };
