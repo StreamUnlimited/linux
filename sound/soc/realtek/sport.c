@@ -794,19 +794,23 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 #ifdef CONFIG_PM
 static int ameba_sport_suspend(struct snd_soc_component *component)
 {
-	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
+	struct snd_soc_dai *dai;
 
-	sport_info(1, &sport->pdev->dev, "%s, clock enabled: %d", __func__, sport->clock_enabled);
+	for_each_component_dais(component, dai) {
+		struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 
-	if (sport->clock_enabled) {
-		clk_disable_unprepare(sport->clock);
-		sport->clock_enabled = 0;
-	}
+		sport_info(1, &sport->pdev->dev, "%s, clock enabled: %d", __func__, sport->clock_enabled);
 
-	//below to be done
-	if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
-		/* disable sport clock */
-		update_fen_cke_sport_status(sport->id, false);
+		if (sport->clock_enabled) {
+			clk_disable_unprepare(sport->clock);
+			sport->clock_enabled = 0;
+		}
+
+		//below to be done
+		if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
+			/* disable sport clock */
+			update_fen_cke_sport_status(sport->id, false);
+		}
 	}
 
 	return 0;
@@ -814,18 +818,23 @@ static int ameba_sport_suspend(struct snd_soc_component *component)
 
 static int ameba_sport_resume(struct snd_soc_component *component)
 {
-	struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 	int ret;
+	struct snd_soc_dai *dai;
 
-	sport_info(1, &sport->pdev->dev, "%s", __func__);
+	for_each_component_dais(component, dai) {
+		struct sport_dai *sport = snd_soc_dai_get_drvdata(dai);
 
-	/* enable sport clock */
-	ret = clk_prepare_enable(sport->clock);
-	if (ret < 0) {
-		dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
+		sport_info(1, &sport->pdev->dev, "%s", __func__);
+
+		/* enable sport clock */
+		ret = clk_prepare_enable(sport->clock);
+		if (ret < 0) {
+			dev_err(&sport->pdev->dev, "Fail to enable clock %d\n", ret);
+			return ret;
+		}
+
+		sport->clock_enabled = 1;
 	}
-
-	sport->clock_enabled = 1;
 
 	return ret;
 }
