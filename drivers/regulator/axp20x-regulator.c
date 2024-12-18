@@ -1405,6 +1405,14 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
 		mask = AXP22X_WORKMODE_DCDCX_MASK(id - AXP22X_DCDC1);
 		workmode <<= id - AXP22X_DCDC1;
 		break;
+	case AXP313A_ID:
+		reg = AXP313A_DCDC_DVM_PWM;
+		if (id < AXP313A_DCDC1 || id > AXP313A_DCDC3)
+			return -EINVAL;
+
+		mask = AXP22X_WORKMODE_DCDCX_MASK(id);
+		workmode <<= id - AXP313A_DCDC1;
+		break;
 
 	case AXP803_ID:
 		if (id < AXP803_DCDC1 || id > AXP803_DCDC6)
