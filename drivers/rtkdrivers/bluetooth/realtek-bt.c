@@ -17,7 +17,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
-#include <linux/realtek-bt.h>
+#include <ameba/realtek-bt.h>
 
 #define BT_CDEV_CTRL			"bt-cdev"
 
@@ -185,7 +185,7 @@ int rtk_bt_cdev_init(void)
 		goto of_iomap_error;
 	}
 
-	btdev->bt_cdev_class = class_create(THIS_MODULE, BT_CDEV_CTRL);
+	btdev->bt_cdev_class = class_create(BT_CDEV_CTRL);
 
 	ret = alloc_chrdev_region(&devno, 0, 1, BT_CDEV_CTRL);
 	if (ret < 0) {
