@@ -246,6 +246,7 @@ struct aipc_ch_node *ameba_ipc_find_int_ch(struct aipc_port *pport, \
 		u32 reg_isr)
 {
 	struct aipc_ch_node *chn = NULL;
+	struct aipc_ch_node *found_chn = NULL;
 	u32 reg_isr_empt = (reg_isr & ISR_EMPT_MASK) >> EMPT_OFFSET;
 	u32 reg_isr_full = (reg_isr & ISR_FULL_MASK) >> FULL_OFFSET;
 
@@ -264,15 +265,17 @@ struct aipc_ch_node *ameba_ipc_find_int_ch(struct aipc_port *pport, \
 	list_for_each_entry(chn, &pport->ch_list, list) {
 		if (reg_isr_empt && (chn->ch) \
 			&& (reg_isr_empt & (0x01 << chn->ch->ch_id))) {
+			found_chn = chn;
 			break;
 		} else if (reg_isr_full && (chn->ch) \
 				   && (reg_isr_full & (0x01 << chn->ch->ch_id))) {
+			found_chn = chn;
 			break;
 		}
 	}
 
 func_exit:
-	return chn;
+	return found_chn;
 }
 
 /**
