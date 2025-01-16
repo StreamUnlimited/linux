@@ -13,7 +13,6 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/kconfig.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
@@ -1192,6 +1191,18 @@ static void dwc2_hsotg_start_req(struct dwc2_hsotg *hsotg,
 		}
 	}
 
+#if defined(CONFIG_USB_RTK_AMEBA_USB20PHY) || defined(CONFIG_USB_RTK_AMEBA_USB20PHY_MODULE)
+	if (!hsotg->hw_params.en_multiple_tx_fifo && using_dma(hsotg)) {
+		u32 ep_type;
+		/* Update nextep_seq array */
+		ep_type = ctrl & DXEPCTL_EPTYPE_MASK;
+		if ((ep_type == DXEPCTL_EPTYPE_CONTROL || ep_type == DXEPCTL_EPTYPE_BULK) && dir_in) {
+			ctrl &= ~DXEPCTL_NEXTEP_MASK;
+			ctrl |= DXEPCTL_NEXTEP(hsotg->nextep_seq[index]);
+		}
+	}
+#endif
+
 	if (hs_ep->isochronous) {
 		if (!dwc2_gadget_target_frame_elapsed(hs_ep)) {
 			if (hs_ep->interval == 1) {
@@ -2104,6 +2115,19 @@ static void dwc2_hsotg_program_zlp(struct dwc2_hsotg *hsotg,
 	ctrl |= DXEPCTL_CNAK;  /* clear NAK set by core */
 	ctrl |= DXEPCTL_EPENA; /* ensure ep enabled */
 	ctrl |= DXEPCTL_USBACTEP;
+
+#if defined(CONFIG_USB_RTK_AMEBA_USB20PHY) || defined(CONFIG_USB_RTK_AMEBA_USB20PHY_MODULE)
+	if (!hsotg->hw_params.en_multiple_tx_fifo && using_dma(hsotg)) {
+		u32 ep_type;
+		/* Update nextep_seq array */
+		ep_type = ctrl & DXEPCTL_EPTYPE_MASK;
+		if ((ep_type == DXEPCTL_EPTYPE_CONTROL || ep_type == DXEPCTL_EPTYPE_BULK) && hs_ep->dir_in) {
+			ctrl &= ~DXEPCTL_NEXTEP_MASK;
+			ctrl |= DXEPCTL_NEXTEP(hsotg->nextep_seq[index]);
+		}
+	}
+#endif
+
 	dwc2_writel(hsotg, ctrl, epctl_reg);
 }
 
@@ -3432,7 +3456,30 @@ void dwc2_hsotg_core_init_disconnected(struct dwc2_hsotg *hsotg,
 	if (!is_usb_reset)
 		dwc2_set_bit(hsotg, DCTL, DCTL_SFTDISCON);
 
-	dcfg |= DCFG_EPMISCNT(1);
+#if defined(CONFIG_USB_RTK_AMEBA_USB20PHY) || defined(CONFIG_USB_RTK_AMEBA_USB20PHY_MODULE)
+	if (!hsotg->hw_params.en_multiple_tx_fifo && using_dma(hsotg)) {
+		u32 rstctl;
+		u32 diepctl;
+
+		/* Flush the Learning Queue. */
+		rstctl = dwc2_readl(hsotg, GRSTCTL);
+		rstctl |= GRSTCTL_IN_TKNQ_FLSH;
+		dwc2_writel(hsotg, rstctl, GRSTCTL);
+
+		hsotg->start_predict = 0;
+		for (ep = 0; ep <= hsotg->hw_params.num_dev_in_eps; ++ep) {
+			hsotg->nextep_seq[ep] = 0xff;  // 0xff - EP not active
+		}
+
+		hsotg->nextep_seq[0] = 0;
+		hsotg->first_in_nextep_seq = 0;
+		diepctl = dwc2_readl(hsotg, DIEPCTL0);
+		diepctl &= ~DXEPCTL_NEXTEP_MASK;
+		dwc2_writel(hsotg, diepctl, DIEPCTL0);
+	}
+#endif
+
+	dcfg |= DCFG_EPMISCNT(8);
 
 	switch (hsotg->params.speed) {
 	case DWC2_SPEED_PARAM_LOW:
@@ -4218,6 +4265,31 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 			epctrl |= DXEPCTL_CNAK;
 	}
 
+#if defined(CONFIG_USB_RTK_AMEBA_USB20PHY) || defined(CONFIG_USB_RTK_AMEBA_USB20PHY_MODULE)
+	/* Update nextep_seq array and EPMSCNT in DCFG */
+	if (!(ep_type & 1) && dir_in && using_dma(hsotg)) {   // NP IN EP
+		u32 dcfg;
+		u32 epmscnt;
+		/* control & bulk EP*/
+		for (i = 0; i <= hsotg->hw_params.num_dev_in_eps; i++) {
+			if (hsotg->nextep_seq[i] == hsotg->first_in_nextep_seq) {
+				break;
+			}
+		}
+
+		hsotg->nextep_seq[i] = index;
+		hsotg->nextep_seq[index] = hsotg->first_in_nextep_seq;
+		epctrl &= ~DXEPCTL_NEXTEP_MASK;
+		epctrl |= DXEPCTL_NEXTEP(hsotg->nextep_seq[index]);
+
+		dcfg = dwc2_readl(hsotg, DCFG);
+		epmscnt = ((dcfg & DCFG_EPMISCNT_MASK) >> DCFG_EPMISCNT_SHIFT) + 1;
+		dcfg &= ~DCFG_EPMISCNT_MASK;
+		dcfg |= DCFG_EPMISCNT(epmscnt);
+		dwc2_writel(hsotg, dcfg, DCFG);
+	}
+#endif
+
 	dev_dbg(hsotg->dev, "%s: write DxEPCTL=0x%08x\n",
 		__func__, epctrl);
 
@@ -4988,6 +5060,7 @@ static void dwc2_hsotg_initep(struct dwc2_hsotg *hsotg,
 	 * to be something valid.
 	 */
 
+#if !defined(CONFIG_USB_RTK_AMEBA_USB20PHY) && !defined(CONFIG_USB_RTK_AMEBA_USB20PHY_MODULE)
 	if (using_dma(hsotg)) {
 		u32 next = DXEPCTL_NEXTEP((epnum + 1) % 15);
 
@@ -4996,6 +5069,7 @@ static void dwc2_hsotg_initep(struct dwc2_hsotg *hsotg,
 		else
 			dwc2_writel(hsotg, next, DOEPCTL(epnum));
 	}
+#endif
 }
 
 /**
