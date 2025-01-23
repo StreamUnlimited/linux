@@ -783,7 +783,11 @@ void audio_codec_init(void __iomem * audio_base_addr,void __iomem * aud_analog)
 
 	/*DAC part*/
 	tmp = readl(audio_base_addr + CODEC_CLOCK_CONTROL_1);
-	tmp |= AUD_BIT_DA_L_EN | AUD_BIT_DA_R_EN | AUD_BIT_MOD_L_EN | AUD_BIT_MOD_R_EN | AUD_BIT_DA_ANA_CLK_EN | AUD_BIT_DA_FIFO_EN;
+	tmp |= AUD_BIT_DA_L_EN | AUD_BIT_DA_R_EN | AUD_BIT_MOD_L_EN | AUD_BIT_MOD_R_EN | AUD_BIT_DA_ANA_CLK_EN;
+	// Make sure the FIFO clock is disabled so that the analog output is back to 0 when no
+	// playback is active, the FIFO clock will be explicitly enabled/disabled in the `.trigger()`
+	// callback.
+	tmp &= ~(AUD_BIT_DA_FIFO_EN);
 	writel(tmp,audio_base_addr + CODEC_CLOCK_CONTROL_1);
 
 }
