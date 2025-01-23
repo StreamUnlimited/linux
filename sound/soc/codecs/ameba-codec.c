@@ -853,12 +853,46 @@ static int ameba_codec_dai_hw_free(struct snd_pcm_substream *substream,struct sn
 	return 0;
 }
 
+static int ameba_codec_trigger(struct snd_pcm_substream *substream, int cmd, struct snd_soc_dai *dai)
+{
+	u32 reg;
+	struct snd_soc_component *component = dai->component;
+	struct ameba_priv *codec_priv = snd_soc_component_get_drvdata(component);
+	bool is_playback = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		if (is_playback) {
+			reg = readl(codec_priv->digital_addr + CODEC_CLOCK_CONTROL_1);
+			reg |= AUD_BIT_DA_FIFO_EN;
+			writel(reg, codec_priv->digital_addr + CODEC_CLOCK_CONTROL_1);
+		}
+
+		break;
+
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		if (is_playback) {
+			reg = readl(codec_priv->digital_addr + CODEC_CLOCK_CONTROL_1);
+			reg &= ~(AUD_BIT_DA_FIFO_EN);
+			writel(reg, codec_priv->digital_addr + CODEC_CLOCK_CONTROL_1);
+		}
+
+		break;
+	}
+
+	return 0;
+}
 
 static const struct snd_soc_dai_ops ameba_aif_dai_ops = {
 	.set_sysclk		= ameba_codec_dai_set_dai_sysclk,
 	.set_fmt		= ameba_codec_dai_set_dai_fmt,
 	.hw_params		= ameba_codec_dai_hw_params,
 	.startup		= ameba_codec_dai_startup,
+	.trigger		= ameba_codec_trigger,
 	.delay			= ameba_codec_delay,
 	.digital_mute	= ameba_codec_dai_aif_mute,
 	.set_pll		= ameba_codec_dai_set_fll,
