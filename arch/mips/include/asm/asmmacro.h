@@ -131,7 +131,7 @@
 
 	.macro	fpu_save_double thread status tmp
 #if defined(CONFIG_64BIT) || defined(CONFIG_CPU_MIPSR2) || \
-		defined(CONFIG_CPU_MIPSR6) || defined(CONFIG_CPU_RLX)
+		defined(CONFIG_CPU_MIPSR6)
 	sll	\tmp, \status, 5
 	bgez	\tmp, 10f
 	fpu_save_16odd \thread
@@ -190,7 +190,7 @@
 
 	.macro	fpu_restore_double thread status tmp
 #if defined(CONFIG_64BIT) || defined(CONFIG_CPU_MIPSR2) || \
-    defined(CONFIG_CPU_MIPSR6) || defined(CONFIG_CPU_RLX)
+		defined(CONFIG_CPU_MIPSR6)
 	sll	\tmp, \status, 5
 	bgez	\tmp, 10f				# 16 register mode?
 

@@ -108,7 +108,7 @@ config SERIAL_8250_CONSOLE
 
 config SERIAL_8250_GSC
 	tristate
-	depends on SERIAL_8250 && GSC
+	depends on SERIAL_8250 && PARISC
 	default SERIAL_8250
 
 config SERIAL_8250_DMA
@@ -122,7 +122,7 @@ config SERIAL_8250_DMA
 config SERIAL_8250_PCI
 	tristate "8250/16550 PCI device support"
 	depends on SERIAL_8250 && PCI
-	default n
+	default SERIAL_8250
 	help
 	  This builds standard PCI serial support. You may be able to
 	  disable this feature if you only need legacy serial support.
@@ -173,7 +173,7 @@ config SERIAL_8250_MEN_MCB
 config SERIAL_8250_NR_UARTS
 	int "Maximum number of 8250/16550 serial ports"
 	depends on SERIAL_8250
-	default "2"
+	default "4"
 	help
 	  Set this to the number of serial ports you want the driver
 	  to support.  This includes any ports discovered via ACPI or
@@ -184,7 +184,7 @@ config SERIAL_8250_RUNTIME_UARTS
 	int "Number of 8250/16550 serial ports to register at runtime"
 	depends on SERIAL_8250
 	range 0 SERIAL_8250_NR_UARTS
-	default "2"
+	default "4"
 	help
 	  Set this to the maximum number of serial ports you want
 	  the kernel to register at boot time.  This can be overridden

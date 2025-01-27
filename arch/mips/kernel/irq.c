@@ -60,7 +60,7 @@ void __init init_IRQ(void)
 	if (cpu_has_veic)
 		clear_c0_status(ST0_IM);
 
-	plat_irq_init();
+	arch_init_irq();
 
 	for_each_possible_cpu(i) {
 		void *s = (void *)__get_free_pages(GFP_KERNEL, order);

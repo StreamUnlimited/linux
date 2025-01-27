@@ -18,11 +18,13 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
-#include <misc/realtek-misc.h>
+#include <uapi/misc/realtek-misc.h>
 
 #define MISC_CTRL	"misc-ioctl"
 
-#define DDRC_BIT_DYN_SRE ((u32)0x00000001 << 7)
+#define DDRC_BIT_DYN_SRE        ((u32)0x00000001 << 7)
+#define MISC_GET_RLV(x)         ((u32)(((x >> 0) & 0x0000001F)))
+#define REGU_GET_SYS_SWR_REQ(x) ((u32)(((x >> 20) & 0x00000003)))
 
 struct rtk_misc_dev {
 	struct device device;
@@ -32,6 +34,8 @@ struct rtk_misc_dev {
 	int rlv;
 	u32 ddr_auto_gating_ctrl;
 	void __iomem *ddrc_iocr;
+	void __iomem *wake_vol;
+	void __iomem *current_vol;
 };
 
 struct rtk_misc_dev *mdev;
@@ -41,7 +45,20 @@ static struct class *misc_class;
 static struct proc_dir_entry *misc_proc_dir;
 static struct proc_dir_entry *uuid_proc_ent;
 
-extern int rtk_misc_get_rlv(void);
+int rtk_misc_wake_voltage_set(u8 voltage)
+{
+	if ((voltage != VOL_09) && (voltage != VOL_10)) {
+		return -EINVAL;
+	}
+
+	writeb(voltage, mdev->wake_vol);
+	return 0;
+}
+
+int rtk_misc_wake_voltage_get(void)
+{
+	return REGU_GET_SYS_SWR_REQ(readl(mdev->current_vol));
+}
 
 int rtk_misc_hw_ddrc_autogating(u8 enable)
 {
@@ -86,7 +103,7 @@ static const struct file_operations rtk_uuid_proc_fops = {
 
 static long rtk_misc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int ret = 0;
+	int ret = -1;
 	u32 val = 0;
 
 	if (!mutex_trylock(&mdev->misc_mutex)) {
@@ -107,6 +124,14 @@ static long rtk_misc_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		break;
 	case RTK_MISC_IOC_DDRC_DISGATE:
 		ret = rtk_misc_hw_ddrc_autogating(0);
+		break;
+	case RTK_MISC_IOC_VOLTAGE_SET:
+		ret = rtk_misc_wake_voltage_set(arg);
+		break;
+	case RTK_MISC_IOC_VOLTAGE_GET:
+		val = rtk_misc_wake_voltage_get();
+		val = ((val > VOL_09) ? VOL_10 : VOL_09);
+		ret = put_user(val, (__u32 __user *)arg);
 		break;
 	default:
 		dev_warn(&mdev->device, "Unsupported misc ioctl cmd: 0x%08X\n", cmd);
@@ -158,6 +183,29 @@ static int rtk_misc_get_uuid(struct device *dev, u32 *uuid)
 	return 0;
 }
 
+static int rtk_misc_get_rlv(struct device *dev, int *rlv)
+{
+	struct nvmem_cell *cell;
+	unsigned char *efuse_buf;
+	size_t len;
+
+	cell = nvmem_cell_get(dev, "rlv");
+	if (IS_ERR(cell)) {
+		return PTR_ERR(cell);
+	}
+
+	efuse_buf = nvmem_cell_read(cell, &len);
+	nvmem_cell_put(cell);
+
+	if (IS_ERR(efuse_buf)) {
+		return PTR_ERR(efuse_buf);
+	}
+
+	*rlv = MISC_GET_RLV(efuse_buf[0]);
+
+	return 0;
+}
+
 /*
 * misc device file ops
 */
@@ -196,6 +244,18 @@ int rtk_misc_init(void)
 	}
 	of_property_read_u32(np, "rtk,ddr-auto-gating-ctrl", &mdev->ddr_auto_gating_ctrl);
 
+	mdev->wake_vol = of_iomap(np, 1);
+	if (!mdev->wake_vol) {
+		pr_err("MISC: Failed to iomap the reg.\n");
+		goto of_iomap_error;
+	}
+
+	mdev->current_vol = of_iomap(np, 2);
+	if (!mdev->current_vol) {
+		pr_err("MISC: Failed to iomap the reg.\n");
+		goto of_iomap_error;
+	}
+
 	misc_class = class_create(THIS_MODULE, MISC_CTRL);
 
 	ret = alloc_chrdev_region(&devno, 0, 1, MISC_CTRL);
@@ -227,7 +287,10 @@ int rtk_misc_init(void)
 	rtk_misc_create_proc(dev);
 
 	rtk_misc_get_uuid(dev, &mdev->uuid);
-	mdev->rlv = rtk_misc_get_rlv();
+	rtk_misc_get_rlv(dev, &mdev->rlv);
+	if (mdev->rlv >= 0) {
+		pr_info("RLV: %d\n", mdev->rlv);
+	}
 
 	return 0;
 
@@ -238,6 +301,8 @@ cdev_error:
 chrdev_error:
 	class_destroy(misc_class);
 	iounmap(mdev->ddrc_iocr);
+	iounmap(mdev->wake_vol);
+	iounmap(mdev->current_vol);
 of_iomap_error:
 	of_node_put(np);
 of_error:
@@ -255,6 +320,8 @@ void rtk_misc_exit(void)
 		cdev_del(&mdev->cdev);
 		unregister_chrdev_region(mdev->cdev.dev, 1);
 		iounmap(mdev->ddrc_iocr);
+		iounmap(mdev->wake_vol);
+		iounmap(mdev->current_vol);
 		of_node_put(mdev->device.of_node);
 		kfree(mdev);
 		mdev = NULL;

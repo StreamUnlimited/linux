@@ -601,7 +601,6 @@ struct spi_nor {
 	ssize_t (*write)(struct spi_nor *nor, loff_t to,
 			size_t len, const u_char *write_buf);
 	int (*erase)(struct spi_nor *nor, loff_t offs);
-	int (*wait_till_ready)(struct spi_nor *nor);
 
 	int (*clear_sr_bp)(struct spi_nor *nor);
 	struct spi_nor_flash_parameter params;

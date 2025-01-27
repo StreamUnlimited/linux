@@ -5,9 +5,6 @@
  *
  * Copyright (C) 1999, 2000, 06 Ralf Baechle (ralf@linux-mips.org)
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
- *
- * Modified for RLX processors
- * Copyright (C) 2008-2013 Tony Wu (tonywu@realtek.com)
  */
 #ifndef _ASM_SPINLOCK_H
 #define _ASM_SPINLOCK_H

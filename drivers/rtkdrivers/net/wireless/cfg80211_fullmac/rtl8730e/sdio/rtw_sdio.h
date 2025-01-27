@@ -8,6 +8,7 @@ struct inic_sdio;
 #include "rtw_sdio_drvio.h"
 #include "rtw_sdio_ops.h"
 
+#define CALCULATE_FREE_TXBD
 #define CONFIG_SDIO_TX_ENABLE_AVAL_INT
 #define CONFIG_SDIO_TX_OVF_CTRL
 //#define CONFIG_SDIO_RX_AGGREGATION //for Rx Aggregation
@@ -16,8 +17,9 @@ struct inic_sdio;
 //#define CONFIG_POWER_SAVING
 //#define CONFIG_PS_DYNAMIC_CHK
 
-//#define CONFIG_LOOPBACK_TEST //to enable loopback test, must disable CONFIG_SDIO_RX_AGGREGATION
+#define BUF_ALIGN_SZ	4
 
+#define SDIO_BLOCK_SIZE		256
 #define ETH_ALEN	6 //ethernet address length
 
 #define SD_IO_TRY_CNT (8)
@@ -25,7 +27,7 @@ struct inic_sdio;
 
 #define MAX_RX_AGG_NUM 6
 
-#define SDIO_HOST_FAKE_SLEEP
+//#define SDIO_HOST_FAKE_SLEEP
 
 #define PWR_STATE_ACTIVE	0
 #define PWR_STATE_SLEEP		1
@@ -63,11 +65,11 @@ struct inic_sdio {
 
 	u8 dev_state;
 
+	int (*rx_process_func)(struct sk_buff *pskb);
+
 };
 
 extern struct inic_sdio inic_sdio_priv;
-
-void rtw_sdio_send_msg(u8 *buf, u32 len);
-void rtw_sdio_free_rxbuf(u8 *rx_payload);
+extern struct hci_ops_t sdio_intf_ops;
 
 #endif  //_RTW_SDIO_H_

@@ -53,7 +53,7 @@ do {									\
 
 static inline int __enable_fpu(enum fpu_mode mode)
 {
-	int fr __maybe_unused;
+	int fr;
 
 	switch (mode) {
 	case FPU_AS_IS:
@@ -72,22 +72,12 @@ static inline int __enable_fpu(enum fpu_mode mode)
 
 	case FPU_64BIT:
 #if !(defined(CONFIG_CPU_MIPSR2) || defined(CONFIG_CPU_MIPSR6) \
-      || defined(CONFIG_64BIT) || defined(CONFIG_CPU_RLX))
+      || defined(CONFIG_64BIT))
 		/* we only have a 32-bit FPU */
 		return SIGFPE;
 #endif
 		/* fall through */
 	case FPU_32BIT:
-#if defined(CONFIG_CPU_RLX)
-		/* set CU1 */
-		change_c0_status(ST0_CU1, ST0_CU1);
-
-		/*
-		 * Taroko FPU always uses the double-sized floating-point register, but
-		 * the Status register does not have the ST0_FR field.
-		 */
-		return 0;
-#endif
 		if (cpu_has_fre) {
 			/* clear FRE */
 			clear_c0_config5(MIPS_CONF5_FRE);

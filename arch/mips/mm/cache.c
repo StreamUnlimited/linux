@@ -200,15 +200,9 @@ static inline void setup_protection_map(void)
 void cpu_cache_init(void)
 {
 	if (cpu_has_3k_cache) {
-#ifdef CONFIG_CPU_RLX
-		extern void __weak rlx_cache_init(void);
-
-		rlx_cache_init();
-#else
 		extern void __weak r3k_cache_init(void);
 
 		r3k_cache_init();
-#endif
 	}
 	if (cpu_has_6k_cache) {
 		extern void __weak r6k_cache_init(void);

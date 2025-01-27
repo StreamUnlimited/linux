@@ -76,6 +76,7 @@
 #include <net/ieee80211_radiotap.h>
 #include <linux/ieee80211.h>
 #include <net/cfg80211.h>
+#include <linux/of_gpio.h>
 
 /* fullmac headers. */
 #include "rom_rtw_defs.h"
@@ -88,10 +89,23 @@
 /* ipc driver. */
 #include <ameba_ipc/ameba_ipc.h>
 #include "inic_ipc.h"
-#else
+#include "rtw_llhw_msg.h"
+#include "rtw_llhw_ops.h"
+#elif defined(CONFIG_FULLMAC_HCI_SDIO)
 #include <linux/mmc/sdio_func.h>
-#include "inic_sdio.h"
+#include "inic_dev.h"
 #include "rtw_sdio.h"
+#include "rtw_ioctl.h"
+#elif defined(CONFIG_FULLMAC_HCI_SPI)
+#include <linux/spi/spi.h>
+#include "inic_dev.h"
+#include "rtw_spi.h"
+#include "rtw_ioctl.h"
+#elif defined(CONFIG_FULLMAC_HCI_USB)
+#include <linux/usb.h>
+#include "inic_dev.h"
+#include "rtw_usb.h"
+#include "rtw_ioctl.h"
 #endif
 
 #include "rtw_llhw_event.h"
@@ -100,19 +114,26 @@
 #include "rtw_netdev_ops.h"
 #include "rtw_ethtool_ops.h"
 #include "rtw_llhw_hci.h"
-#include "rtw_llhw_ops.h"
-#include "rtw_llhw_msg.h"
 #include "rtw_functions.h"
 #include "rtw_cfgvendor.h"
 #include "rtw_proc.h"
+#include "rtw_acs.h"
 
 /******************************************************************/
 /********** Definitions between Linux and FULLMAC. **************/
 /******************************************************************/
+#ifdef CONFIG_SDIO_BRIDGE
+#define TOTAL_IFACE_NUM			1
+#else
 #define TOTAL_IFACE_NUM			2
+#endif
 #define ETH_ALEN			6
 #define FUNC_NDEV_FMT			"%s(%s)"
 #define FUNC_NDEV_ARG(ndev)		__func__, ndev->name
+
+#ifdef CONFIG_FULLMAC_HCI_SDIO
+#define CONFIG_WOWLAN
+#endif
 
 /******************************************************************/
 /***************** Definitions for cfg80211_ops. ******************/
@@ -311,7 +332,7 @@ static inline u8 rtw_80211_cipher_suite_to_driver(const u32 _80211_suite)
 
 static inline __iomem void *km4_phys_to_virt(phys_addr_t p)
 {
-	return (p - 0x60000000) + global_idev.km4_map_start;
+	return (p - 0x60000020) + global_idev.km4_map_start;
 }
 
 #endif // _RTW_TOP_HEADER_

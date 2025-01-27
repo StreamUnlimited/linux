@@ -36,11 +36,7 @@ obj-$(CONFIG_MODULES)		+= module.o
 obj-$(CONFIG_FTRACE_SYSCALLS)	+= ftrace.o
 obj-$(CONFIG_FUNCTION_TRACER)	+= mcount.o ftrace.o
 
-ifeq ($(CONFIG_CPU_RLX),)
 sw-y				:= r4k_switch.o
-else
-sw-y				:= r4k_switch.o
-endif
 sw-$(CONFIG_CPU_R3000)		:= r2300_switch.o
 sw-$(CONFIG_CPU_TX39XX)		:= r2300_switch.o
 sw-$(CONFIG_CPU_CAVIUM_OCTEON)	:= octeon_switch.o
@@ -48,16 +44,14 @@ obj-y				+= $(sw-y)
 
 obj-$(CONFIG_CPU_R2300_FPU)	+= r2300_fpu.o
 obj-$(CONFIG_CPU_R4K_FPU)	+= r4k_fpu.o
-obj-$(CONFIG_CPU_RLX_FPU)	+= r4k_fpu.o
 
-obj-$(CONFIG_SMP)		+= smp.o smp-amon.o
+obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_SMP_UP)		+= smp-up.o
 obj-$(CONFIG_CPU_BMIPS)		+= smp-bmips.o bmips_vec.o bmips_5xxx_init.o
 
 obj-$(CONFIG_MIPS_MT)		+= mips-mt.o
 obj-$(CONFIG_MIPS_MT_FPAFF)	+= mips-mt-fpaff.o
 obj-$(CONFIG_MIPS_MT_SMP)	+= smp-mt.o
-obj-$(CONFIG_TAROKO_CMP)	+= smp-cmp.o taroko-mmcr.o
 obj-$(CONFIG_MIPS_CMP)		+= smp-cmp.o
 obj-$(CONFIG_MIPS_CPS)		+= smp-cps.o cps-vec.o
 obj-$(CONFIG_MIPS_CPS_NS16550)	+= cps-vec-ns16550.o

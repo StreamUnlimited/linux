@@ -49,20 +49,17 @@ struct  dev_sk_buff_head {
 };
 
 struct skb_raw_para {
-	unsigned char enable;
-	unsigned char rate;
-	unsigned char retry_limit;
-	unsigned char ac_queue;		/*0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO*/
-	unsigned char sgi;		/* 1 for enable data short */
-	unsigned char agg_en;
+	unsigned char rate;         /* tx rate of tx_raw data */
+	unsigned char retry_limit;  /* the number of tx retry when tx fail for tx_raw frame */
+	unsigned char ac_queue;     /* 0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO */
+	unsigned char device_id;    /* index of peer device which as a rx role for receiving this pkt, and will be update when linked peer */
+	unsigned char enable : 1;   /* indicate whether this packet is a tx_raw packet. set to 1 when tx_raw */
+	unsigned char sgi : 1;      /* 1 for enable data short */
+	unsigned char agg_en : 1;   /* aggregation of tx_raw frames. 1:enable; 0-disable */
 };
 
 struct dev_sk_buff {
-	/* These two members must be first. */
-	struct dev_sk_buff	*next;		/* Next buffer in list */
-	struct dev_sk_buff	*prev;		/* Previous buffer in list */
-
-	struct dev_sk_buff_head	*list;		/* List we are on */
+	struct list_head	list;
 	unsigned char		*head;		/* Head of buffer */
 	unsigned char		*data;		/* Data head pointer */
 	unsigned char		*tail;		/* Tail pointer	*/
@@ -74,18 +71,10 @@ struct dev_sk_buff {
 	unsigned char		busy;
 	unsigned char		no_free;
 	struct skb_raw_para		tx_raw;
-};
 
-struct skb_data {
-	struct list_head        list;
 	unsigned char           buf[MAX_SKB_BUF_SIZE] SKB_ALIGNMENT;
 	atomic_t ref;
 };
-
-struct skb_info {
-	struct list_head	list;
-	struct dev_sk_buff	skb;
-} SKB_ALIGNMENT;
 
 static inline unsigned char *dev_skb_put(struct dev_sk_buff *skb, unsigned int len)
 {

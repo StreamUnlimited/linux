@@ -125,6 +125,11 @@ static int ionic_get_link_ksettings(struct net_device *netdev,
 
 	ethtool_link_ksettings_zero_link_mode(ks, supported);
 
+	if (!idev->port_info) {
+		netdev_err(netdev, "port_info not initialized\n");
+		return -EOPNOTSUPP;
+	}
+
 	/* The port_info data is found in a DMA space that the NIC keeps
 	 * up-to-date, so there's no need to request the data from the
 	 * NIC, we already have it in our memory space.
@@ -568,7 +573,7 @@ static int ionic_get_rxnfc(struct net_device *netdev,
 		info->data = lif->nxqs;
 		break;
 	default:
-		netdev_err(netdev, "Command parameter %d is not supported\n",
+		netdev_dbg(netdev, "Command parameter %d is not supported\n",
 			   info->cmd);
 		err = -EOPNOTSUPP;
 	}

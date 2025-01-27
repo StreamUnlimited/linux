@@ -262,6 +262,12 @@ static int rtw_ndev_close(struct net_device *pnetdev)
 		info.aborted = 1;
 		cfg80211_scan_done(global_idev.mlme_priv.pscan_req_global, &info);
 	}
+#ifdef CONFIG_SDIO_BRIDGE
+	llhw_wifi_disconnect();
+	/* sdio device will report WIFI_EVENT_DISCONNECT event to linux, after disconnect done */
+	global_idev.mlme_priv.b_in_disconnect = true;
+	wait_for_completion_interruptible(&global_idev.mlme_priv.disconnect_done_sema);
+#endif
 	netif_tx_stop_all_queues(pnetdev);
 	netif_carrier_off(pnetdev);
 	rtw_netdev_priv_is_on(pnetdev) = false;
@@ -392,7 +398,11 @@ int rtw_nan_iface_alloc(struct wiphy *wiphy,
 	netif_carrier_off(global_idev.pndev[2]);
 	/* set nan port mac address */
 	memcpy(global_idev.pndev[2]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-	global_idev.pndev[2]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 2;
+	if(softap_addr_offset_idx == 0){
+		global_idev.pndev[2]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + (2 << 1);
+	}else{
+		global_idev.pndev[2]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 2;
+	}
 
 	ret = (register_netdevice(global_idev.pndev[2]) == 0) ? true : false;
 	if (ret != true) {
@@ -475,7 +485,9 @@ int rtw_ndev_alloc(void)
 {
 	int i, ret = false;
 	struct net_device *ndev = NULL;
+#ifndef CONFIG_SDIO_BRIDGE
 	struct wireless_dev *wdev;
+#endif
 
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
 		/* alloc and init netdev */
@@ -488,8 +500,19 @@ int rtw_ndev_alloc(void)
 		rtw_netdev_label(ndev) = WIFI_FULLMAC_LABEL;
 		ndev->netdev_ops = (i ? &rtw_ndev_ops_ap : &rtw_ndev_ops);
 		ndev->watchdog_timeo = HZ * 3; /* 3 second timeout */
+#ifndef CONFIG_FULLMAC_HCI_IPC
+		ndev->needed_headroom = max(SIZE_RX_DESC, SIZE_TX_DESC) + sizeof(struct inic_msg_info) + 4;
+#ifndef CONFIG_SDIO_BRIDGE
+#ifdef CONFIG_WIRELESS_EXT
+		if (i == 0) {
+			ndev->wireless_handlers = (struct iw_handler_def *)&rtw_handlers_def;
+		}
+#endif
+#endif
+#endif
 		SET_NETDEV_DEV(ndev, global_idev.fullmac_dev);
 
+#ifndef CONFIG_SDIO_BRIDGE
 		/* alloc and init wireless_dev */
 		wdev = (struct wireless_dev *)kzalloc(sizeof(struct wireless_dev), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 		if (!wdev) {
@@ -500,18 +523,23 @@ int rtw_ndev_alloc(void)
 		wdev->iftype = (i ? NL80211_IFTYPE_AP : NL80211_IFTYPE_STATION);
 		ndev->ieee80211_ptr = wdev;
 		global_idev.pwdev_global[i] = wdev;
+#endif
 	}
 	global_idev.mlme_priv.b_in_scan = false;
+	global_idev.mlme_priv.b_in_disconnect = false;
+
+	init_completion(&global_idev.mlme_priv.disconnect_done_sema);
 
 	return ret;
 
 fail:
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
+#ifndef CONFIG_SDIO_BRIDGE
 		if (global_idev.pwdev_global[i]) { //wdev
 			kfree((u8 *)global_idev.pwdev_global[i]);
 			global_idev.pwdev_global[i] = NULL;
 		}
-
+#endif
 		if (global_idev.pndev[i]) {
 			free_netdev(global_idev.pndev[i]);
 			global_idev.pndev[i] = NULL;
@@ -524,7 +552,7 @@ fail:
 int rtw_ndev_register(void)
 {
 	int i, ret = false;
-	char *wlan_name[TOTAL_IFACE_NUM] = {"wlan%d", "uap%d"};
+	char *wlan_name[TOTAL_IFACE_NUM] = {"wlan0", "uap0"};
 
 	for (i = 0; i < TOTAL_IFACE_NUM; i++) {
 		rtw_ethtool_ops_init();

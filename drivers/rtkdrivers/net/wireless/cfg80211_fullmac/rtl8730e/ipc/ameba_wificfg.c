@@ -20,8 +20,9 @@ _WEAK void wifi_set_user_config(void)
 	/* below items for user config, for details, see wifi_user_conf in wifi_intf_drv_to_app_basic.h */
 	wifi_user_config.concurrent_enabled = 1;
 	wifi_user_config.softap_addr_offset_idx = 1;
-	wifi_user_config.auto_reconnect_count = 8;
+	wifi_user_config.auto_reconnect_count = 10;
 	wifi_user_config.auto_reconnect_interval = 5;
+	wifi_user_config.no_beacon_disconnect_time = 9; /* unit 2s, default 18s */
 #ifdef CONFIG_HIGH_TP_TEST /*enable high tp in make menuconfig*/
 	wifi_user_config.skb_num_np = 22;
 	wifi_user_config.skb_num_ap = 8;
@@ -38,6 +39,7 @@ _WEAK void wifi_set_user_config(void)
 #ifdef CONFIG_SINGLE_CORE_WIFI
 	wifi_user_config.skb_num_ap = 0;
 #endif
+	wifi_user_config.skb_buf_size = 0;
 	wifi_user_config.wifi_wpa_mode_force = WPA_AUTO_MODE;
 
 	/*Regulatory related*/
@@ -66,7 +68,7 @@ _WEAK void wifi_set_user_config(void)
 	wifi_user_config.uapsd_ac_enable = 0;
 
 	/* Softap related */
-	wifi_user_config.g_user_ap_sta_num = 14;
+	wifi_user_config.ap_sta_num = 12;	/*should not exceed AP_STA_NUM */
 	wifi_user_config.ap_polling_sta = 0;
 
 	/* MISC */
@@ -93,5 +95,8 @@ _WEAK void wifi_set_user_config(void)
 
 	/* wifi speaker */
 	wifi_user_config.wifi_speaker_feature = 0;
+
+	/*Automatic channel selection*/
+	wifi_user_config.acs_en = 0;
 }
 

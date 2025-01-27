@@ -27,7 +27,7 @@ GZFLAGS		:=-9
 KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
 
 # This should work on most of the modern platforms
-KBUILD_DEFCONFIG := arm_defconfig
+KBUILD_DEFCONFIG := rtl8730elh_defconfig
 
 # defines filename extension depending memory management type.
 ifeq ($(CONFIG_MMU),)

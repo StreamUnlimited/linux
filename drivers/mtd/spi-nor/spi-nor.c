@@ -22,6 +22,9 @@
 #include <linux/sched/task_stack.h>
 #include <linux/spi/flash.h>
 #include <linux/mtd/spi-nor.h>
+#ifdef CONFIG_SPI_SHEIPA
+#include "../../spi/spi-sheipa.h"
+#endif
 
 /* Define max times to check status register before we give up. */
 
@@ -1010,14 +1013,17 @@ spi_nor_find_best_erase_type(const struct spi_nor_erase_map *map,
 			continue;
 
 		erase = &map->erase_type[i];
+		if (!erase->size)
+			continue;
+
+		/* Alignment is not mandatory for overlaid regions */
+		if (region->offset & SNOR_OVERLAID_REGION &&
+		    region->size <= len)
+			return erase;
 
 		/* Don't erase more than what the user has asked for. */
 		if (erase->size > len)
 			continue;
-
-		/* Alignment is not mandatory for overlaid regions */
-		if (region->offset & SNOR_OVERLAID_REGION)
-			return erase;
 
 		spi_nor_div_by_erase_size(erase, addr, &rem);
 		if (rem)
@@ -1152,6 +1158,7 @@ static int spi_nor_init_erase_cmd_list(struct spi_nor *nor,
 			goto destroy_erase_cmd_list;
 
 		if (prev_erase != erase ||
+		    erase->size != cmd->size ||
 		    region->offset & SNOR_OVERLAID_REGION) {
 			cmd = spi_nor_init_erase_cmd(region, erase);
 			if (IS_ERR(cmd)) {
@@ -2730,9 +2737,6 @@ static int spi_nor_check(struct spi_nor *nor)
 		return -EINVAL;
 	}
 
-	if (!nor->wait_till_ready)
-		nor->wait_till_ready = spi_nor_wait_till_ready;
-
 	return 0;
 }
 
@@ -3703,7 +3707,7 @@ spi_nor_region_check_overlay(struct spi_nor_erase_region *region,
 	int i;
 
 	for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++) {
-		if (!(erase_type & BIT(i)))
+		if (!(erase[i].size && erase_type & BIT(erase[i].idx)))
 			continue;
 		if (region->size & erase[i].size_mask) {
 			spi_nor_region_mark_overlay(region);
@@ -3773,6 +3777,7 @@ spi_nor_init_non_uniform_erase_map(struct spi_nor *nor,
 		offset = (region[i].offset & ~SNOR_ERASE_FLAGS_MASK) +
 			 region[i].size;
 	}
+	spi_nor_region_mark_end(&region[i - 1]);
 
 	save_uniform_erase_type = map->uniform_erase_type;
 	map->uniform_erase_type = spi_nor_sort_erase_mask(map,
@@ -3795,8 +3800,6 @@ spi_nor_init_non_uniform_erase_map(struct spi_nor *nor,
 	for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++)
 		if (!(regions_erase_type & BIT(erase[i].idx)))
 			spi_nor_set_erase_type(&erase[i], 0, 0xFF);
-
-	spi_nor_region_mark_end(&region[i - 1]);
 
 	return 0;
 }
@@ -5040,6 +5043,14 @@ static int spi_nor_probe(struct spi_mem *spimem)
 		if (!nor->bouncebuf)
 			return -ENOMEM;
 	}
+
+#if defined(CONFIG_SPI_SHEIPA) && !defined(CONFIG_SPI_REALTEK_RXI312)
+	/* realtek,spi-rxi312 does not need this config */
+	ret = sheipa_spi_config(spi, nor);
+
+	if (ret)
+		return ret;
+#endif
 
 	return mtd_device_register(&nor->mtd, data ? data->parts : NULL,
 				   data ? data->nr_parts : 0);

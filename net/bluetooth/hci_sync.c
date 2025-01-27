@@ -1064,10 +1064,6 @@ int hci_setup_ext_adv_instance_sync(struct hci_dev *hdev, u8 instance)
 	if (err < 0)
 		return err;
 
-	/* ping_yan add for bis broadcaster, receiver need adv address to establish PA sync. */
-	if(own_addr_type != ADDR_LE_DEV_PUBLIC)
-		BT_INFO("hci_setup_ext_adv_instance_sync use random address %pMR",
-				&random_addr);
 	own_addr_type = ADDR_LE_DEV_PUBLIC;
 	memset(&cp, 0, sizeof(cp));
 

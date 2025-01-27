@@ -54,10 +54,8 @@ struct ipc_msg_q_priv {
 };
 
 struct xmit_priv_t {
-	struct skb_info			*host_skb_info;
-	dma_addr_t			host_skb_info_phy;
-	struct skb_data			*host_skb_data;
-	dma_addr_t			host_skb_data_phy;
+	struct dev_sk_buff		*host_skb_buff;
+	dma_addr_t			host_skb_buff_phy;
 	atomic_t				skb_free_num;
 	u32				skb_idx;
 	spinlock_t			skb_lock;
@@ -77,6 +75,10 @@ struct mlme_priv_t {
 	size_t				assoc_req_ie_len;
 	size_t				assoc_rsp_ie_len;
 	struct cfg80211_external_auth_params auth_ext_para;
+
+	/* disconnect parameters */
+	bool b_in_disconnect;
+	struct completion	disconnect_done_sema;
 };
 
 #ifdef CONFIG_P2P

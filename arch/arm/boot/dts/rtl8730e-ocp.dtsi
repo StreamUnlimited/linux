@@ -69,7 +69,7 @@
 			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
 				<GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x40000000 0x80000>, // wifi register base address and length
-				<0x60000000 0x180000>; // map KM4 image2 ram to access it from the driver
+				<0x60000020 0x15B000>; // km4 ram base address and length in amebasmart_layout.ld
 			pinctrl-names = "default";
 			pinctrl-0 = <&wifi_ant_sel>;
 		};
@@ -200,9 +200,9 @@
 
 		misc: misc@41100000 {
 			compatible = "realtek,ameba-misc";
-			reg = <0x41100008 0x4>;
-			nvmem-cells = <&efuse_uuid>;
-			nvmem-cell-names = "uuid";
+			reg = <0x41100008 0x4>, <0x2302010C 0x1>, <0x42008100 0x4>;
+			nvmem-cells = <&efuse_uuid>, <&efuse_rlv>;
+			nvmem-cell-names = "uuid", "rlv";
 			rtk,ddr-auto-gating-ctrl = <0>;
 			status = "okay";
 		};
@@ -212,7 +212,6 @@
 			reg = <0x42008000 0x1000>;
 		};
 
-
 		otp_phy: otp_phy@42000000 {
 			compatible = "realtek,ameba-otp-phy";
 			#address-cells = <1>;
@@ -220,6 +219,10 @@
 
 			reg = <0x42000000 0x800>,
 				<0x42008000 0x1000>;
+
+			efuse_rlv: rlv@7F0 {
+				reg = <0x07F0 0x1>;
+			};
 
 			efuse_uuid: uuid@7F4 {
 				reg = <0x07F4 0x4>;
@@ -424,6 +427,42 @@
 			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
+		usb: usb@40080000 {
+			compatible = "realtek,dwc-otg";
+			reg = <0x40080000 0x20000>;
+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+			g-rx-fifo-size = <512>;
+			g-np-tx-fifo-size = <256>;
+			g-tx-fifo-size = <128 120>;
+			status = "okay";
+			endpoints {
+				ep1in {
+					ep_name = "ep1in";
+					ep_type = <0x0E>; // USB_EP_CAPS_TYPE_ALL
+				};
+				ep2out {
+					ep_name = "ep2out";
+					ep_type = <0x0E>; // USB_EP_CAPS_TYPE_ALL
+				};
+				ep3in {
+					ep_name = "ep3in";
+					ep_type = <0x0E>; // USB_EP_CAPS_TYPE_ALL
+				};
+				ep4out {
+					ep_name = "ep4out";
+					ep_type = <0x0E>; // USB_EP_CAPS_TYPE_ALL
+				};
+				ep5in {
+					ep_name = "ep5in";
+					ep_type = <0x0E>; // USB_EP_CAPS_TYPE_ALL
+				};
+				ep5out {
+					ep_name = "ep5out";
+					ep_type = <0x0E>; // USB_EP_CAPS_TYPE_ALL
+				};
+			};
+		};
+
 		usb_phy: usb-phy@41000000 {
 			compatible = "realtek,otg-phy";
 			reg = <0x400B0000 0x20>,
@@ -432,16 +471,18 @@
 				<0x4200825C 4>;
 			#phy-cells = <0>;
 			clocks = <&rcc RTK_CKE_USB>;
-			status = "okay";
-		};
-
-		usb: usb@40080000 {
-			compatible = "realtek,dwc-otg";
-			reg = <0x40080000 0x20000>;
-			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-			g-rx-fifo-size = <512>;
-			g-np-tx-fifo-size = <256>;
-			g-tx-fifo-size = <128 120>;
+			rtk,cal-data = <0x00 0xE0 0x9D>,
+				<0x00 0xE1 0x19>,
+				<0x00 0xE2 0xDB>,
+				<0x00 0xE4 0x68>,
+				<0x01 0xE5 0x0A>,
+				<0x01 0xE6 0xD8>,
+				<0x02 0xE7 0x52>,
+				<0x01 0xE0 0x04>,
+				<0x01 0xE0 0x00>,
+				<0x01 0xE0 0x04>;
+			rtk,usb-phandle = <&usb>;
+			rtk,usb-force-role-en = <0>;
 			status = "okay";
 		};
 

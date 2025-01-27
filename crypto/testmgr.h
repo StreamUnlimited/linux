@@ -16821,17 +16821,13 @@ static const struct cipher_testvec aes_ofb_tv_template[] = {
 };
 
 static const struct aead_testvec aes_gcm_tv_template[] = {
-
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto HW doesn't support zero length plain text encryption */
 	{ /* From McGrew & Viega - http://citeseer.ist.psu.edu/656989.html */
 		.key    = zeroed_string,
 		.klen	= 16,
 		.ctext	= "\x58\xe2\xfc\xce\xfa\x7e\x30\x61"
 			  "\x36\x7f\x1d\x57\xa4\xe7\x45\x5a",
 		.clen	= 16,
-	},
-#endif
-	{
+	}, {
 		.key    = zeroed_string,
 		.klen	= 16,
 		.ptext	= zeroed_string,
@@ -16897,18 +16893,13 @@ static const struct aead_testvec aes_gcm_tv_template[] = {
 			  "\x5b\xc9\x4f\xbc\x32\x21\xa5\xdb"
 			  "\x94\xfa\xe9\x5a\xe7\x12\x1a\x47",
 		.clen	= 76,
-	},
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto HW doesn't support zero length plain text encryption */
-
-	{
+	}, {
 		.key    = zeroed_string,
 		.klen	= 24,
 		.ctext	= "\xcd\x33\xb2\x8a\xc7\x73\xf7\x4b"
 			  "\xa0\x0e\xd1\xf3\x12\x57\x24\x35",
 		.clen	= 16,
-	},
-#endif
-	{
+	}, {
 		.key    = zeroed_string,
 		.klen	= 24,
 		.ptext	= zeroed_string,
@@ -16945,17 +16936,13 @@ static const struct aead_testvec aes_gcm_tv_template[] = {
 			  "\x99\x24\xa7\xc8\x58\x73\x36\xbf"
 			  "\xb1\x18\x02\x4d\xb8\x67\x4a\x14",
 		.clen	= 80,
-	},
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto HW doesn't support zero length plain text encryption */
-	{
+	}, {
 		.key    = zeroed_string,
 		.klen	= 32,
 		.ctext	= "\x53\x0f\x8a\xfb\xc7\x45\x36\xb9"
 			  "\xa9\x63\xb4\xf1\xc4\xcb\x73\x8b",
 		.clen	= 16,
-	},
-#endif
-	{
+	}, {
 		.key    = zeroed_string,
 		.klen	= 32,
 		.ptext	= zeroed_string,

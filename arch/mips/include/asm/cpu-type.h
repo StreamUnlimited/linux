@@ -193,12 +193,6 @@ static inline int __pure __get_cpu_type(const int cpu_type)
 #ifdef CONFIG_SYS_HAS_CPU_XLR
 	case CPU_XLR:
 #endif
-#ifdef CONFIG_SYS_HAS_CPU_RLX
-	case CPU_RLX5281:
-	case CPU_RLX4281:
-	case CPU_RLX5181:
-	case CPU_RLX4181:
-#endif
 		break;
 	default:
 		unreachable();

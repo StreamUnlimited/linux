@@ -57,8 +57,9 @@ void *kmap_atomic(struct page *page)
 	type = kmap_atomic_idx_push();
 	idx = type + KM_TYPE_NR*smp_processor_id();
 	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-	if (IS_ENABLED(CONFIG_DEBUG_HIGHMEM))
-		BUG_ON(!pte_none(*(kmap_pte - idx)));
+#ifdef CONFIG_DEBUG_HIGHMEM
+	BUG_ON(!pte_none(*(kmap_pte - idx)));
+#endif
 	set_pte(kmap_pte-idx, mk_pte(page, PAGE_KERNEL));
 	local_flush_tlb_one((unsigned long)vaddr);
 
@@ -69,6 +70,7 @@ EXPORT_SYMBOL(kmap_atomic);
 void __kunmap_atomic(void *kvaddr)
 {
 	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
+	int type __maybe_unused;
 
 	if (vaddr < FIXADDR_START) { // FIXME
 		pagefault_enable();
@@ -76,8 +78,9 @@ void __kunmap_atomic(void *kvaddr)
 		return;
 	}
 
-	if (IS_ENABLED(CONFIG_DEBUG_HIGHMEM)) {
-		int type = kmap_atomic_idx();
+	type = kmap_atomic_idx();
+#ifdef CONFIG_DEBUG_HIGHMEM
+	{
 		int idx = type + KM_TYPE_NR * smp_processor_id();
 
 		BUG_ON(vaddr != __fix_to_virt(FIX_KMAP_BEGIN + idx));
@@ -89,7 +92,7 @@ void __kunmap_atomic(void *kvaddr)
 		pte_clear(&init_mm, vaddr, kmap_pte-idx);
 		local_flush_tlb_one(vaddr);
 	}
-
+#endif
 	kmap_atomic_idx_pop();
 	pagefault_enable();
 	preempt_enable();

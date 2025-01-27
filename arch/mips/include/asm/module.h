@@ -131,8 +131,6 @@ search_module_dbetables(unsigned long addr)
 #define MODULE_PROC_FAMILY "XLR "
 #elif defined CONFIG_CPU_XLP
 #define MODULE_PROC_FAMILY "XLP "
-#elif defined CONFIG_CPU_RLX
-#define MODULE_PROC_FAMILY "RLX "
 #else
 #error MODULE_PROC_FAMILY undefined for your processor configuration
 #endif

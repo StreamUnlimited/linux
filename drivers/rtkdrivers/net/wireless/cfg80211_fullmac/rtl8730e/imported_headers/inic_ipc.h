@@ -39,7 +39,7 @@
 
 #define HOST_MSG_PARAM_NUM		(9)
 #define HOST_MSG_DUMY_NUM		(64 - (HOST_MSG_PARAM_NUM + 2) * 4)
-#define DEV_MSG_PARAM_NUM		(7)
+#define DEV_MSG_PARAM_NUM		(8)
 #define DEV_MSG_DUMY_NUM		(64 - (DEV_MSG_PARAM_NUM + 2) * 4)
 
 #define INIC_MP_MSG_BUF_SIZE 4096
@@ -103,11 +103,10 @@ int inic_api_host_message_send(u32 id, u32 *param_buf, u32 buf_len);
 void inic_api_init_dev(void);
 void inic_api_dev_int_hdl(void *Data, u32 IrqStatus, u32 ChanNum);
 void inic_wifi_event_indicate(int event_cmd, char *buf, int buf_len, int flags);
-void inic_autoreconnect_indicate(enum rtw_security security_type, u8 *ssid, int ssid_len, u8 *password, int password_len, int key_id, char is_wps_trigger);
-void inic_eap_autoreconnect_indicate(u8 saved_eap_method);
 void inic_scan_user_callback_indicate(unsigned int ap_num, void *user_data);
+void inic_acs_info_indicate(struct acs_mntr_rpt *acs_mntr_rpt);
 void inic_scan_each_report_user_callback_indicate(rtw_scan_result_t *scanned_ap_info, void *user_data);
-enum _promisc_result_t inic_promisc_callback_indicate(void *pkt_info);
+enum _promisc_result_t inic_promisc_callback_indicate(struct rx_pkt_info *pkt_info);
 void inic_ap_ch_switch_callback_indicate(unsigned char channel, enum rtw_channel_switch_res ret);
 int inic_dev_set_netif_info(int idx_wlan, unsigned char *dev_addr);
 int inic_get_lwip_info(u32 type, unsigned char *input, int index);

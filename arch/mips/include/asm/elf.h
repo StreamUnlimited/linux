@@ -492,20 +492,12 @@ struct arch_elf_state {
 
 #define MIPS_ABI_FP_UNKNOWN	(-1)	/* Unknown FP ABI (kernel internal) */
 
-#if defined(CONFIG_CPU_RLX)
-#define INIT_ARCH_ELF_STATE {			\
-	.fp_abi = MIPS_ABI_FP_64,		\
-	.interp_fp_abi = MIPS_ABI_FP_UNKNOWN,	\
-	.overall_fp_mode = -1,			\
-}
-#else
 #define INIT_ARCH_ELF_STATE {			\
 	.nan_2008 = -1,				\
 	.fp_abi = MIPS_ABI_FP_UNKNOWN,		\
 	.interp_fp_abi = MIPS_ABI_FP_UNKNOWN,	\
 	.overall_fp_mode = -1,			\
 }
-#endif
 
 extern int arch_elf_pt_proc(void *ehdr, void *phdr, struct file *elf,
 			    bool is_interp, struct arch_elf_state *state);

@@ -4,7 +4,6 @@
  *
  * Copyright (C) 2007, 2008 MIPS Technologies, Inc.
  */
-#ifdef CONFIG_CPU_HAS_SPRAM
 #include <linux/kernel.h>
 #include <linux/ptrace.h>
 #include <linux/stddef.h>
@@ -13,8 +12,6 @@
 #include <asm/mipsregs.h>
 #include <asm/r4kcache.h>
 #include <asm/hazards.h>
-
-#include <bspchip.h>
 
 /*
  * These definitions are correct for the 24K/34K/74K SPRAM sample
@@ -61,6 +58,7 @@ static void ispram_store_tag(unsigned int offset, unsigned int data)
 	ehb();
 }
 
+
 static unsigned int ispram_load_tag(unsigned int offset)
 {
 	unsigned int data;
@@ -93,6 +91,7 @@ static void dspram_store_tag(unsigned int offset, unsigned int data)
 	write_c0_errctl(errctl);
 	ehb();
 }
+
 
 static unsigned int dspram_load_tag(unsigned int offset)
 {
@@ -192,7 +191,6 @@ static void probe_spram(char *type,
 		offset += 2 * SPRAM_TAG_STRIDE;
 	}
 }
-
 void spram_config(void)
 {
 	unsigned int config0;
@@ -211,12 +209,12 @@ void spram_config(void)
 	case CPU_P6600:
 		config0 = read_c0_config();
 		/* FIXME: addresses are Malta specific */
-		if (config0 & (1<<24) && BSP_ISRAM_BASE >= 0)
-			probe_spram("ISPRAM", BSP_ISRAM_BASE,
+		if (config0 & (1<<24)) {
+			probe_spram("ISPRAM", 0x1c000000,
 				    &ispram_load_tag, &ispram_store_tag);
-		if (config0 & (1<<23) && BSP_DSRAM_BASE >= 0)
-			probe_spram("DSPRAM", BSP_DSRAM_BASE,
+		}
+		if (config0 & (1<<23))
+			probe_spram("DSPRAM", 0x1c100000,
 				    &dspram_load_tag, &dspram_store_tag);
 	}
 }
-#endif

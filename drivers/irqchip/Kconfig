@@ -183,11 +183,6 @@ config IRQ_MIPS_CPU
 	select IRQ_DOMAIN_HIERARCHY if GENERIC_IRQ_IPI
 	select GENERIC_IRQ_EFFECTIVE_AFF_MASK
 
-config TAROKO_VEC
-	bool
-	select GENERIC_IRQ_CHIP
-	select IRQ_DOMAIN
-
 config CLPS711X_IRQCHIP
 	bool
 	depends on ARCH_CLPS711X
@@ -315,11 +310,6 @@ config MIPS_GIC
 	select IRQ_DOMAIN_HIERARCHY
 	select MIPS_CM
 
-config TAROKO_GIC
-	bool
-	select GENERIC_IRQ_IPI
-	select IRQ_DOMAIN_HIERARCHY
-
 config INGENIC_IRQ
 	bool
 	depends on MACH_INGENIC
@@ -425,6 +415,7 @@ config MESON_IRQ_GPIO
 config GOLDFISH_PIC
        bool "Goldfish programmable interrupt controller"
        depends on MIPS && (GOLDFISH || COMPILE_TEST)
+       select GENERIC_IRQ_CHIP
        select IRQ_DOMAIN
        help
          Say yes here to enable Goldfish interrupt controller driver used
@@ -492,11 +483,6 @@ config TI_SCI_INTA_IRQCHIP
 	  over TI System Control Interface available on some new TI's SoCs.
 	  If you wish to use interrupt aggregator irq resources managed by the
 	  TI System Controller, say Y here. Otherwise, say N.
-
-config DW_ICTL
-	def_bool y if IRQ_ICTL
-	select GENERIC_IRQ_CHIP
-	select IRQ_DOMAIN
 
 config SIFIVE_PLIC
 	bool "SiFive Platform-Level Interrupt Controller"

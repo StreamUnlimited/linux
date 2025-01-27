@@ -40,6 +40,45 @@ func_exit:
 	return;
 }
 
+static void cfg80211_rtw_set_acs_info(struct inic_ipc_dev_req_msg *p_ipc_msg)
+{
+	extern u8 chanel_idx_max;
+	extern u8 rtw_chnl_tbl[MAX_CHANNEL_NUM];
+	extern struct acs_mntr_rpt acs_mntr_rpt_tbl[MAX_CHANNEL_NUM];
+
+	u8 idx = 0;
+	struct device *pdev = NULL;
+	struct acs_mntr_rpt *acs_rpt = km4_phys_to_virt(p_ipc_msg->param_buf[0]);
+
+
+	if (!global_idev.event_ch) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: event_priv_t is NULL in!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	pdev = global_idev.ipc_dev;
+	if (!pdev) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	if (acs_rpt->channel == 0) {
+		memset(acs_mntr_rpt_tbl, 0, sizeof(struct acs_mntr_rpt)*MAX_CHANNEL_NUM);
+		return;
+	}
+
+	for (idx = 0; idx < MAX_CHANNEL_NUM; idx++) {
+		if (acs_rpt->channel == rtw_chnl_tbl[idx]) {
+			memcpy(&acs_mntr_rpt_tbl[idx], acs_rpt, sizeof(struct acs_mntr_rpt));
+			chanel_idx_max = idx;
+			break;
+		}
+	}
+
+func_exit:
+	return;
+}
+
 static void llhw_event_join_status_indicate(struct event_priv_t *event_priv, struct inic_ipc_dev_req_msg *p_ipc_msg)
 {
 	enum rtw_event_indicate event = (enum rtw_event_indicate)p_ipc_msg->param_buf[0];
@@ -69,11 +108,15 @@ static void llhw_event_join_status_indicate(struct event_priv_t *event_priv, str
 		cfg80211_rtw_connect_indicate(flags, buf, buf_len);
 	}
 
-	if (event == WIFI_EVENT_DISCONNECT) {
-		memcpy(&disassoc_reason, buf + ETH_ALEN, 2);
-		dev_dbg(global_idev.fullmac_dev, "%s: disassoc_reason=%d \n", __func__, disassoc_reason);
-		if (global_idev.mlme_priv.rtw_join_status == RTW_JOINSTATUS_DISCONNECT) {
+	if ((event == WIFI_EVENT_JOIN_STATUS) && ((flags == RTW_JOINSTATUS_FAIL) || (flags == RTW_JOINSTATUS_DISCONNECT))) {
+		if (flags == RTW_JOINSTATUS_DISCONNECT) {
+			disassoc_reason = (u16)(((struct rtw_event_disconn_info_t *)buf)->disconn_reason && 0xffff);
+			dev_dbg(global_idev.fullmac_dev, "%s: disassoc_reason=%d \n", __func__, disassoc_reason);
 			cfg80211_rtw_disconnect_indicate(disassoc_reason, 1);
+		}
+		if (global_idev.mlme_priv.b_in_disconnect) {
+			complete(&global_idev.mlme_priv.disconnect_done_sema);
+			global_idev.mlme_priv.b_in_disconnect = false;
 		}
 	}
 	if (event == WIFI_EVENT_STA_ASSOC) {
@@ -138,6 +181,11 @@ static void llhw_event_join_status_indicate(struct event_priv_t *event_priv, str
 		cfg80211_rx_mgmt(wdev, rtw_ch2freq(channel), 0, buf, buf_len, 0);
 	}
 
+	if (event == WIFI_EVENT_OWE_PEER_KEY_RECV) {
+		dev_dbg(global_idev.fullmac_dev, "%s: owe update \n", __func__);
+		cfg80211_rtw_update_owe_info_event(buf, buf_len);
+	}
+
 func_exit:
 	return;
 }
@@ -191,7 +239,11 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, struct in
 	if (!global_idev.pndev[0]) {
 		/*set ap port mac address*/
 		memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-		global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
+		if(softap_addr_offset_idx == 0){
+			global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + (1 << 1);
+		}else{
+			global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
+		}
 	}
 
 func_exit:
@@ -266,24 +318,16 @@ func_exit:
 #ifdef CONFIG_NAN
 static void llhw_event_nan_match_indicate(struct event_priv_t *event_priv, struct inic_ipc_dev_req_msg *p_ipc_msg)
 {
-	struct device *pdev = NULL;
-	u8 type = p_ipc_msg->param_buf[0];
-	u8 inst_id = p_ipc_msg->param_buf[1];
-	u8 peer_inst_id = p_ipc_msg->param_buf[2];
-	unsigned char *mac_addr = km4_phys_to_virt(p_ipc_msg->param_buf[3]);
-	unsigned char *IEs = km4_phys_to_virt(p_ipc_msg->param_buf[4]);
-	u32 info_len = p_ipc_msg->param_buf[5];
-	u64 cookie = p_ipc_msg->param_buf[7] << 32 | p_ipc_msg->param_buf[6];
+	u8 type = param_buf[0];
+	u8 inst_id = param_buf[1];
+	u8 peer_inst_id = param_buf[2];
+	u32 info_len = param_buf[3];
+	u64 cookie = ((u64)param_buf[5] << 32) | param_buf[4];
+	unsigned char *mac_addr = (u8 *)&param_buf[6];
+	unsigned char *IEs = mac_addr + ETH_ALEN;
 
-	pdev = global_idev.ipc_dev;
-	if (!pdev) {
-		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
-		goto func_exit;
-	}
+	cfg80211_rtw_nan_handle_sdf(type, inst_id, peer_inst_id, mac_addr, info_len, IEs, cookie);
 
-	cfg80211_rtw_nan_handle_sdf(type, inst_id, peer_inst_id, mac_addr, info_len, dma_ie, cookie);
-
-func_exit:
 	return;
 }
 
@@ -308,19 +352,11 @@ func_exit:
 
 static void llhw_event_nan_cfgvendor_cmd_reply(struct event_priv_t *event_priv, struct inic_ipc_dev_req_msg *p_ipc_msg)
 {
-	struct device *pdev = NULL;
-	unsigned char *data_addr = km4_phys_to_virt(p_ipc_msg->param_buf[0]);
-	u32 size = p_ipc_msg->param_buf[1];
-
-	pdev = global_idev.ipc_dev;
-	if (!pdev) {
-		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL in scan!\n", "event", __func__);
-		goto func_exit;
-	}
+	u32 size = param_buf[0];
+	unsigned char *data_addr = (u8 *)&param_buf[1];
 
 	rtw_cfgvendor_send_cmd_reply(data_addr, size);
 
-func_exit:
 	return;
 }
 
@@ -374,11 +410,11 @@ void llhw_event_task(unsigned long data)
 		/* https://jira.realtek.com/browse/AMEBAD2-1543 */
 		cfg80211_rtw_scan_done_indicate(p_recv_msg->param_buf[0], NULL);
 		break;
+	case INIC_API_IP_ACS:
+		cfg80211_rtw_set_acs_info(p_recv_msg);
+		break;
 	case INIC_API_SCAN_EACH_REPORT_USER_CALLBACK:
 		//iiha_scan_each_report_cb_hdl(event_priv, p_recv_msg);
-		break;
-	case INIC_API_AUTO_RECONNECT:
-		//iiha_autoreconnect_hdl(event_priv, p_recv_msg);
 		break;
 	case INIC_API_AP_CH_SWITCH:
 		//iiha_ap_ch_switch_hdl(event_priv, p_recv_msg);

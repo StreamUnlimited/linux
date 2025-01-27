@@ -1511,12 +1511,6 @@ static void generate_random_hash_testvec(struct shash_desc *desc,
 {
 	/* Data */
 	vec->psize = generate_random_length(maxdatasize);
-
-#ifdef CONFIG_CRYPTO_RTK_AMEBA
-	if (!vec->psize)
-		++vec->psize; /* RTK crypto HW does not support 0 length test vector */
-#endif
-
 	generate_random_bytes((u8 *)vec->plaintext, vec->psize);
 
 	/*
@@ -1880,20 +1874,6 @@ static int test_aead_vec_cfg(const char *driver, int enc,
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_CRYPTO_RTK_AMEBA
-	if (authsize != 16) {
-		pr_info("alg: aead: %s test vector %s; req authsize %d but RTK HW crypto driver only supports authsize 16, skipping test..\n",
-				 driver, vec_name, authsize);
-		return 0;
-	}
-
-	if (!vec->plen) {
-		pr_info("alg: aead: %s test vector %s; RTK crypto HW does not support zero length plain text for encryption, skipping test..\n",
-				 driver, vec_name);
-		return 0;
-	}
-#endif
-
 	/* Set the authentication tag size */
 	err = crypto_aead_setauthsize(tfm, authsize);
 	if (err && err != vec->setauthsize_error) {
@@ -2066,9 +2046,6 @@ static int test_aead_vec(const char *driver, int enc,
 	return 0;
 }
 
-
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto AES HW is not generic implementation compatible */
-
 #ifdef CONFIG_CRYPTO_MANAGER_EXTRA_TESTS
 /*
  * Generate an AEAD test vector from the given implementation.
@@ -2115,7 +2092,6 @@ static void generate_random_aead_testvec(struct aead_request *req,
 		vec->alen = 0;
 	else
 		vec->alen = generate_random_length(total_len);
-
 	vec->plen = total_len - vec->alen;
 	generate_random_bytes((u8 *)vec->assoc, vec->alen);
 	generate_random_bytes((u8 *)vec->ptext, vec->plen);
@@ -2300,8 +2276,6 @@ static int test_aead_vs_generic_impl(const char *driver,
 }
 #endif /* !CONFIG_CRYPTO_MANAGER_EXTRA_TESTS */
 
-#endif /* CONFIG_CRYPTO_RTK_AMEBA */
-
 static int test_aead(const char *driver, int enc,
 		     const struct aead_test_suite *suite,
 		     struct aead_request *req,
@@ -2365,10 +2339,7 @@ static int alg_test_aead(const struct alg_test_desc *desc, const char *driver,
 	if (err)
 		goto out;
 
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto AES HW is not generic implementation compatible */
 	err = test_aead_vs_generic_impl(driver, desc, req, tsgls);
-#endif
-
 out:
 	free_cipher_test_sglists(tsgls);
 	aead_request_free(req);
@@ -2615,8 +2586,6 @@ static int test_skcipher_vec_cfg(const char *driver, int enc,
 		return err;
 	}
 
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK aes hardware does not support IV output - so below is not applicable */
-	
 	/* If applicable, check that the algorithm generated the correct IV */
 	if (vec->iv_out && memcmp(iv, vec->iv_out, ivsize) != 0) {
 		pr_err("alg: skcipher: %s %s test failed (wrong output IV) on test vector %s, cfg=\"%s\"\n",
@@ -2624,9 +2593,6 @@ static int test_skcipher_vec_cfg(const char *driver, int enc,
 		hexdump(iv, ivsize);
 		return -EINVAL;
 	}
-
-#endif
-
 
 	return 0;
 }
@@ -2673,11 +2639,7 @@ static int test_skcipher_vec(const char *driver, int enc,
 	return 0;
 }
 
-
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto AES HW is not generic implementation compatible */
-
 #ifdef CONFIG_CRYPTO_MANAGER_EXTRA_TESTS
-
 /*
  * Generate a symmetric cipher test vector from the given implementation.
  * Assumes the buffers in 'vec' were already allocated.
@@ -2706,7 +2668,6 @@ static void generate_random_cipher_testvec(struct skcipher_request *req,
 
 	/* Plaintext */
 	vec->len = generate_random_length(maxdatasize);
-
 	generate_random_bytes((u8 *)vec->ptext, vec->len);
 
 	/* If the key couldn't be set, no need to continue to encrypt. */
@@ -2874,8 +2835,6 @@ static int test_skcipher_vs_generic_impl(const char *driver,
 }
 #endif /* !CONFIG_CRYPTO_MANAGER_EXTRA_TESTS */
 
-#endif /* CONFIG_CRYPTO_RTK_AMEBA */
-
 static int test_skcipher(const char *driver, int enc,
 			 const struct cipher_test_suite *suite,
 			 struct skcipher_request *req,
@@ -2939,11 +2898,8 @@ static int alg_test_skcipher(const struct alg_test_desc *desc,
 	if (err)
 		goto out;
 
-#ifndef CONFIG_CRYPTO_RTK_AMEBA /* RTK crypto AES HW is not generic implementation compatible */
 	err = test_skcipher_vs_generic_impl(driver, desc->generic_driver, req,
 					    tsgls);
-#endif
-
 out:
 	free_cipher_test_sglists(tsgls);
 	skcipher_request_free(req);

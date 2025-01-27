@@ -93,7 +93,7 @@ int cfg80211_rtw_scan_done_indicate(unsigned int scanned_AP_num, void *user_data
 		return -1;
 	}
 
-	if (!global_idev.mlme_priv.pscan_req_global) {
+	if (!global_idev.mlme_priv.pscan_req_global || !global_idev.mlme_priv.b_in_scan) {
 		dev_dbg(global_idev.fullmac_dev, "Last scan req has been finished. Wait for next. ");
 		return -1;
 	}
@@ -106,6 +106,13 @@ int cfg80211_rtw_scan_done_indicate(unsigned int scanned_AP_num, void *user_data
 	/* cfg80211_scan_done will clear last request. Clean global scan request as well. */
 	global_idev.mlme_priv.pscan_req_global = NULL;
 	global_idev.mlme_priv.b_in_scan = false;
+
+#ifndef CONFIG_FULLMAC_HCI_IPC
+	/* wakeup xmit thread if there are pending packets */
+	if (llhw_xmit_pending_q_num() > 0) {
+		llhw_xmit_wakeup_thread();
+	}
+#endif
 
 	return 0;
 }
@@ -199,6 +206,7 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 	u32 wlan_idx = 0;
 	struct net_device *pnetdev = NULL;
 	struct _rtw_scan_param_t scan_param = {0};
+	struct cfg80211_scan_info info;
 
 	/* coherent alloc: revise vir addr will be mapped to phy addr. Send phy addr to rtos by ipc. */
 	u8 *channel_list_vir = NULL;
@@ -306,21 +314,33 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy, struct cfg80211_scan_request *
 		llhw_wifi_set_gen_ie(wlan_idx, wps_info.wps_probe_ie, wps_info.wps_probe_ielen, P2PWPS_PROBE_REQ_IE);
 	}
 
-	ret = llhw_wifi_scan(&scan_param, ssid_len, 0);
-	if (ret < 0) {
-		//_rtw_cfg80211_surveydone_event_callback(padapter, request);
-		struct cfg80211_scan_info info;
+	if (global_idev.mlme_priv.b_in_scan) {
 		memset(&info, 0, sizeof(info));
 		info.aborted = 0;
 		cfg80211_scan_done(request, &info);
-		dev_dbg(global_idev.fullmac_dev, "%s: scan request(%p) fail.", __FUNCTION__, request);
-		if (!global_idev.mlme_priv.b_in_scan) {
-			global_idev.mlme_priv.pscan_req_global = NULL;
-		}
+		dev_dbg(global_idev.fullmac_dev, "%s: scan is in progress..", __FUNCTION__);
 	} else {
 		global_idev.mlme_priv.b_in_scan = true;
-		global_idev.mlme_priv.pscan_req_global = request;
-		dev_dbg(global_idev.fullmac_dev, "%s: scan request(%p) start.", __FUNCTION__, request);
+
+		ret = llhw_wifi_scan(&scan_param, ssid_len, 0);
+		if (ret < 0) {
+			memset(&info, 0, sizeof(info));
+			info.aborted = 0;
+			cfg80211_scan_done(request, &info);
+			dev_dbg(global_idev.fullmac_dev, "%s: scan request(%p) fail.", __FUNCTION__, request);
+
+			global_idev.mlme_priv.b_in_scan = false;
+
+#ifndef CONFIG_FULLMAC_HCI_IPC
+			/* wakeup xmit thread if there are pending packets */
+			if (llhw_xmit_pending_q_num() > 0) {
+				llhw_xmit_wakeup_thread();
+			}
+#endif
+		} else {
+			global_idev.mlme_priv.pscan_req_global = request;
+			dev_dbg(global_idev.fullmac_dev, "%s: scan request(%p) start.", __FUNCTION__, request);
+		}
 	}
 
 	if (ssid_vir) {
@@ -441,10 +461,13 @@ void cfg80211_rtw_disconnect_indicate(u16 reason, u8 locally_generated)
 		wlan_idx = 1;// GC intf is up, then use GC's netdev
 	}
 #endif
-	/* Do it first for tx broadcast pkt after disconnection issue! */
-	netif_carrier_off(global_idev.pndev[wlan_idx]);
-	dev_dbg(global_idev.fullmac_dev, "%s reason:%d\n", __func__, reason);
-	cfg80211_disconnected(global_idev.pndev[wlan_idx], reason, NULL, 0, locally_generated, GFP_ATOMIC);
+
+	if (global_idev.pndev[wlan_idx] != NULL) {
+		/* Do it first for tx broadcast pkt after disconnection issue! */
+		netif_carrier_off(global_idev.pndev[wlan_idx]);
+		dev_dbg(global_idev.fullmac_dev, "%s reason:%d\n", __func__, reason);
+		cfg80211_disconnected(global_idev.pndev[wlan_idx], reason, NULL, 0, locally_generated, GFP_ATOMIC);
+	}
 }
 
 void cfg80211_rtw_external_auth_request(char *buf, int buf_len)
@@ -461,6 +484,23 @@ void cfg80211_rtw_external_auth_request(char *buf, int buf_len)
 	dev_dbg(global_idev.fullmac_dev, "%s, ssid=%s, len=%d\n", __func__, auth_ext_para->ssid.ssid, auth_ext_para->ssid.ssid_len);
 }
 
+void cfg80211_rtw_update_owe_info_event(char *buf, int buf_len)
+{
+	struct cfg80211_update_owe_info owe_info;
+	struct rtw_owe_param_t *owe_param = (struct rtw_owe_param_t *)buf;
+	char owe_ie[RTW_OWE_KEY_LEN + 5];
+
+	owe_ie[0] = WLAN_EID_EXTENSION;
+	owe_ie[1] = RTW_OWE_KEY_LEN + 3; /*WLAN_EID_EXT_OWE_DH_PARAM + group*/
+	owe_ie[2] = WLAN_EID_EXT_OWE_DH_PARAM;
+	memcpy(&owe_ie[3], &owe_param->group, owe_param->pub_key_len + 2);
+	owe_info.ie = (u8 *)&owe_ie;
+	memcpy(owe_info.peer,  owe_param->peer_mac, ETH_ALEN);
+	owe_info.status = WLAN_STATUS_SUCCESS;
+	owe_info.ie_len = RTW_OWE_KEY_LEN + 5;
+	cfg80211_update_owe_info_event(global_idev.pndev[0], &owe_info, GFP_ATOMIC);
+}
+
 static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_connect_params *sme)
 {
 	int ret = 0;
@@ -474,6 +514,7 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	u8 pmf_mode = 0, spp_opt = 0;
 	u8 *prsnx, *prsn;
 	struct element *target_ptr;
+	struct rtw_owe_param_t owe_info;
 	struct cfg80211_external_auth_params *auth_ext_para = &global_idev.mlme_priv.auth_ext_para;
 
 	if (global_idev.mp_fw) {
@@ -503,8 +544,8 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 			sme->ssid, sme->ssid_len, sme->channel->center_freq,
 			sme->bssid[0], sme->bssid[1], sme->bssid[2], sme->bssid[3], sme->bssid[4], sme->bssid[5],
 			sme->privacy, sme->key, sme->key_len, sme->key_idx, sme->auth_type);
-	dev_dbg(global_idev.fullmac_dev, " ciphers_pairwise=0x%x, cipher_group=0x%x,, akm_suites=0x%x\n",
-			sme->crypto.ciphers_pairwise[0], sme->crypto.cipher_group, sme->crypto.akm_suites[0]);
+	dev_dbg(global_idev.fullmac_dev, "wpa_versions=0x%x, ciphers_pairwise=0x%x, cipher_group=0x%x,, akm_suites=0x%x\n",
+			sme->crypto.wpa_versions, sme->crypto.ciphers_pairwise[0], sme->crypto.cipher_group, sme->crypto.akm_suites[0]);
 
 	memset(&connect_param, 0, sizeof(struct _rtw_network_info_t));
 	connect_param.security_type = 0;
@@ -558,6 +599,22 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 		memcpy(connect_param.prev_bssid.octet, sme->prev_bssid, ETH_ALEN);
 		/* Stop upper-layer-data-queue because of re-association. */
 		netif_carrier_off(global_idev.pndev[0]);
+	}
+
+	if (sme->crypto.akm_suites[0] ==  WIFI_AKM_SUITE_OWE) {
+		connect_param.security_type = 0;
+		target_ptr = (struct element *)cfg80211_find_ext_elem(WLAN_EID_EXT_OWE_DH_PARAM, sme->ie, sme->ie_len);
+		if (target_ptr) {
+			memcpy(&owe_info, target_ptr->data + 1, target_ptr->datalen - 1);
+			owe_info.pub_key_len = target_ptr->datalen - 3;
+			if (owe_info.pub_key_len == RTW_OWE_KEY_LEN) {
+				llhw_wifi_set_owe_param(&owe_info);
+			} else {
+				/* disconent when ask for group 20, 21 */
+				cfg80211_connect_result(ndev, NULL, NULL, 0, NULL, 0, WLAN_STATUS_UNSPECIFIED_FAILURE, GFP_ATOMIC);
+				return -EINVAL;
+			}
+		}
 	}
 
 	if (sme->key_len) {
@@ -649,8 +706,6 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev, st
 	}
 #endif
 
-	connect_param.joinstatus_user_callback = NULL;
-
 	ret = llhw_wifi_connect(&connect_param, 0);
 	if (ret < 0) {
 		/* KM4 connect failed */
@@ -687,6 +742,8 @@ static int cfg80211_rtw_disconnect(struct wiphy *wiphy, struct net_device *ndev,
 	ret = llhw_wifi_disconnect();
 
 	/* KM4 will report WIFI_EVENT_DISCONNECT event to linux, after disconnect done */
+	global_idev.mlme_priv.b_in_disconnect = true;
+	wait_for_completion_interruptible(&global_idev.mlme_priv.disconnect_done_sema);
 
 	return ret;
 }
@@ -724,6 +781,60 @@ static int cfg80211_rtw_set_monitor_channel(struct wiphy *wiphy, struct cfg80211
 {
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
 	return 0;
+}
+
+static int cfg80211_rtw_get_channel(struct wiphy *wiphy,
+				    struct wireless_dev *wdev,
+#if (KERNEL_VERSION(6, 6, 0) <= LINUX_VERSION_CODE)
+				    unsigned int link_id,
+#endif
+				    struct cfg80211_chan_def *chandef)
+{
+	u32 wlan_idx = 0;
+	struct net_device *pnetdev = NULL;
+	u8 ch = 0;
+	struct ieee80211_channel *chan = NULL;
+	int freq = 0;
+	int ret = 0;
+
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
+
+	if (global_idev.mp_fw) {
+		return -EPERM;
+	}
+
+	pnetdev = wdev_to_ndev(wdev);
+#ifdef CONFIG_P2P
+	if (wdev == global_idev.p2p_global.pd_pwdev) {/*P2P Device intf not have ndev, wlanidx need fetch from other way*/
+		wlan_idx = global_idev.p2p_global.pd_wlan_idx;
+	} else
+#endif
+	if (pnetdev) {
+		wlan_idx = rtw_netdev_idx(pnetdev);
+	} else {
+		dev_err(global_idev.fullmac_dev, "[fullmac]: %s, cannot find wlan idx.", __func__);
+		return -EINVAL;
+	}
+
+	ret = llhw_wifi_get_channel(wlan_idx, &ch);
+	if (ret < 0) {
+		dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s, get channel failed(%d).", __func__, ret);
+		return ret;
+	}
+
+	freq = rtw_ch2freq(ch);
+	chan = ieee80211_get_channel(wiphy, freq);
+	if (!chan) {
+		dev_err(global_idev.fullmac_dev, "[fullmac]: %s, ieee80211_get_channel failed.", __func__);
+		return -EINVAL;
+	}
+
+	memset(chandef, 0, sizeof(struct cfg80211_chan_def));
+	chandef->width = NL80211_CHAN_WIDTH_20;
+	chandef->center_freq1 = freq;
+	chandef->chan = chan;
+
+	return ret;
 }
 
 static int cfg80211_rtw_external_auth_status(struct wiphy *wiphy, struct net_device *dev, struct cfg80211_external_auth_params *params)
@@ -999,6 +1110,7 @@ void cfg80211_rtw_ops_sta_init(void)
 	ops->get_tx_power = cfg80211_rtw_get_txpower;
 	ops->set_power_mgmt = cfg80211_rtw_set_power_mgmt;
 	ops->set_monitor_channel = cfg80211_rtw_set_monitor_channel;
+	ops->get_channel = cfg80211_rtw_get_channel;
 	ops->remain_on_channel = cfg80211_rtw_remain_on_channel;
 	ops->cancel_remain_on_channel = cfg80211_rtw_cancel_remain_on_channel;
 	ops->mgmt_tx = cfg80211_rtw_mgmt_tx;

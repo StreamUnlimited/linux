@@ -57,7 +57,7 @@ asmlinkage void plat_irq_dispatch(void);
 
 extern void do_IRQ(unsigned int irq);
 
-extern void plat_irq_init(void);
+extern void arch_init_irq(void);
 extern void spurious_interrupt(void);
 
 extern int allocate_irqno(void);

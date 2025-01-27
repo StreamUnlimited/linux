@@ -48,7 +48,7 @@ extern int mips_dsemul(struct pt_regs *regs, mips_instruction ir,
  *
  * Return: True if an emulation frame was returned from, else false.
  */
-#ifdef CONFIG_CPU_HAS_EMU
+#ifdef CONFIG_MIPS_FP_SUPPORT
 extern bool do_dsemulret(struct pt_regs *xcp);
 #else
 static inline bool do_dsemulret(struct pt_regs *xcp)
@@ -66,7 +66,7 @@ static inline bool do_dsemulret(struct pt_regs *xcp)
  *
  * Return: True if a frame was freed, else false.
  */
-#ifdef CONFIG_CPU_HAS_EMU
+#ifdef CONFIG_MIPS_FP_SUPPORT
 extern bool dsemul_thread_cleanup(struct task_struct *tsk);
 #else
 static inline bool dsemul_thread_cleanup(struct task_struct *tsk)
@@ -86,7 +86,7 @@ static inline bool dsemul_thread_cleanup(struct task_struct *tsk)
  *
  * Return: True if a frame was exited, else false.
  */
-#ifdef CONFIG_CPU_HAS_EMU
+#ifdef CONFIG_MIPS_FP_SUPPORT
 extern bool dsemul_thread_rollback(struct pt_regs *regs);
 #else
 static inline bool dsemul_thread_rollback(struct pt_regs *regs)
@@ -103,7 +103,7 @@ static inline bool dsemul_thread_rollback(struct pt_regs *regs)
  * for delay slot 'emulation' book-keeping is freed. This is to be called
  * before @mm is freed in order to avoid memory leaks.
  */
-#ifdef CONFIG_CPU_HAS_EMU
+#ifdef CONFIG_MIPS_FP_SUPPORT
 extern void dsemul_mm_cleanup(struct mm_struct *mm);
 #else
 static inline void dsemul_mm_cleanup(struct mm_struct *mm)

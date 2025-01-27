@@ -257,7 +257,6 @@ int __mm_isBranchInstr(struct pt_regs *regs, struct mm_decoded_insn dec_insn,
  * be used in interrupt context. (Compact branches/jumps do not cause
  * exceptions.)
  */
-#ifdef CONFIG_CPU_MICROMIPS
 int __microMIPS_compute_return_epc(struct pt_regs *regs)
 {
 	u16 __user *pc16;
@@ -309,7 +308,6 @@ sigsegv:
 	force_sig(SIGSEGV);
 	return -EFAULT;
 }
-#endif
 
 /*
  * Compute return address and emulate branch in MIPS16e mode after an

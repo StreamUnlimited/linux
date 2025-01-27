@@ -6,10 +6,6 @@
  * Copyright (C) 2008 David Daney
  */
 
-#ifdef CONFIG_HARDWARE_WATCHPOINTS
-#ifdef CONFIG_CPU_RLX
-#include "taroko-watch.c"
-#else
 #include <linux/sched.h>
 
 #include <asm/processor.h>
@@ -213,5 +209,3 @@ void mips_probe_watch_registers(struct cpuinfo_mips *c)
 
 	c->watch_reg_count = 8;
 }
-#endif
-#endif

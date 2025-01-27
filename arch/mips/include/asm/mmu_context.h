@@ -64,15 +64,6 @@ do {									\
  */
 extern unsigned long pgd_current[];
 
-/*
- * to speed up, we use PTEBASE in CP0_CONTEXT for smp processor id
- * it is left-shifted 2 bits so that it can be directly added to
- * smp variables such as pgd_current and kernelsp
- *
- * i.e. kernelsp + (context_ptebase) = kernelsp + cpu * 4;
- *
- * PTEBASE_SHIFT = 21, so we store (smp_processor_id() << 23) in context;
- */
 #define TLBMISS_HANDLER_RESTORE()					\
 	write_c0_context((unsigned long) smp_processor_id() <<		\
 			 SMP_CPUID_REGSHIFT)

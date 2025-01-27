@@ -21,6 +21,7 @@
 #include <net/bluetooth/l2cap.h>
 
 #include "rtk_coex.h"
+extern void wifi_btcoex_bt_hci_notify(uint8_t *pdata, uint16_t len, uint8_t dir);
 
 #define HCI_CONN_HANDLE_UNSET_START	(0x0eff + 1)
 #define HCI_CONN_TYPE_CIS		0x04
@@ -1498,6 +1499,53 @@ static void rtk_notify_regester_to_wifi(uint8_t * reg_value)
 
 #endif
 
+void bt_coex_evt_notify(uint8_t *pdata, uint16_t len)
+{
+	uint8_t evt = pdata[0];
+	bool need_notify = FALSE;
+	switch (evt) {
+	case HCI_EV_LE_META: {
+		uint8_t sub_evt = pdata[2];
+		switch (sub_evt) {
+		case HCI_EV_LE_CONN_COMPLETE:
+		case HCI_EV_LE_ENHANCED_CONN_COMPLETE:
+		case HCI_EV_LE_CONN_UPDATE_COMPLETE:
+			need_notify = TRUE;
+			break;
+		default:
+			break;
+		}
+	}
+	break;
+	case HCI_EV_DISCONN_COMPLETE:
+		need_notify = TRUE;
+		break;
+	default:
+		break;
+	}
+	if (need_notify == TRUE) {
+		wifi_btcoex_bt_hci_notify(pdata, len, DIR_IN);
+	}
+}
+
+void bt_coex_cmd_notify(uint8_t *pdata, uint16_t len)
+{
+	uint16_t opcode;
+	opcode = (uint16_t)((pdata[1] << 8) | pdata[0]);
+	switch (opcode) {
+	case BT_HCI_OP_LE_SET_SCAN_PARAM:
+	case BT_HCI_OP_LE_SET_EX_SCAN_PARAM:
+	case BT_HCI_OP_BR_WR_SCAN_ENABLE:
+	case BT_HCI_OP_BR_WR_PAGE_SCAN_ACTIVITY:
+	case BT_HCI_OP_BR_WR_INQ_SCAN_ACTIVITY:
+	case BT_HCI_OP_LE_CREATE_CONNECTION:		
+		wifi_btcoex_bt_hci_notify(pdata, len, DIR_OUT);
+		break;
+	default:
+		break;
+	}
+}
+
 void rtk_btcoex_parse_cmd(uint8_t *buffer, int count)
 {
 	u16 opcode = (buffer[0]) + (buffer[1] << 8);
@@ -1555,6 +1603,8 @@ void rtk_btcoex_parse_cmd(uint8_t *buffer, int count)
 	default:
 		break;
 	}
+
+	bt_coex_cmd_notify(buffer, (uint16_t)count);
 }
 
 static void rtk_handle_inquiry_complete(void)
@@ -2330,6 +2380,7 @@ static void rtk_parse_event_data(struct rtl_coex_struct *coex,
 	default:
 		break;
 	}
+	bt_coex_evt_notify(data, len);
 }
 
 static const char l2_dir_str[][4] = {

@@ -36,7 +36,7 @@ int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len, u8 need_wait_a
 int llhw_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr);
 int llhw_wifi_pmksa_ops(dma_addr_t pmksa_ops_addr);
 int llhw_wifi_channel_switch(dma_addr_t csa_param_addr);
-u32 llhw_wifi_update_ip_addr_in_wowlan(void);
+u32 llhw_wifi_update_ip_addr(void);
 int llhw_wifi_get_statistics(dma_addr_t statistic_addr);
 int llhw_wifi_set_lps_enable(u8 enable);
 int llhw_wifi_mp_cmd(dma_addr_t cmd_addr, unsigned int cmd_len, dma_addr_t user_addr);
@@ -53,11 +53,11 @@ void cfg80211_rtw_inform_bss(u32 channel, u32 frame_is_bcn, s32 rssi, u8 *mac_ad
 void cfg80211_rtw_disconnect_indicate(u16 reason, u8 locally_generated);
 void cfg80211_rtw_sta_assoc_indicate(char *buf, int buf_len);
 void cfg80211_rtw_external_auth_request(char *buf, int buf_len);
+void cfg80211_rtw_update_owe_info_event(char *buf, int buf_len);
 void cfg80211_rtw_connect_indicate(unsigned int join_status, void *user_data, size_t user_data_len);
 int cfg80211_rtw_scan_done_indicate(unsigned int scanned_AP_num, void *user_data);
 u64 llhw_wifi_get_tsft(u8 iface_type);
 void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request);
-void rtw_regd_deinit(void);
 int rtw_regd_init(void);
 void rtw_ethtool_ops_init(void);
 
@@ -90,6 +90,7 @@ int rtw_p2p_get_wdex_idx(struct wireless_dev *wdev);
 int llhw_wifi_set_pmf_mode(u8 pmf_mode);
 int llhw_wifi_set_wps_phase(u8 enable);
 int llhw_wifi_set_wpa_mode(rtw_wpa_mode wpa_mode);
+int llhw_wifi_set_owe_param(struct rtw_owe_param_t *owe_param);
 int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16 flags);
 int llhw_wifi_add_custom_ie(const struct element **elem, u8 num, u16 type);
 int llhw_wifi_del_custom_ie(unsigned char wlan_idx);
@@ -100,6 +101,7 @@ int llhw_wifi_get_ant_info(u8 *antdiv_mode, u8 *curr_ant);
 int llhw_wifi_set_country_code(char *cc);
 int llhw_wifi_get_country_code(struct country_code_table_t *table);
 int llhw_wifi_driver_is_mp(void);
+int wifi_btcoex_bt_hci_notify(uint8_t *pdata, uint16_t len, uint8_t dir);
 
 void *rtw_malloc(size_t size, dma_addr_t *paddr);
 void rtw_mfree(size_t size, void *vaddr, dma_addr_t paddr);
@@ -122,29 +124,46 @@ void llhw_event_deinit(void);
 int llhw_ipc_send_msg(u32 id, u32 *param_buf, u32 buf_len);
 
 #else
-int inic_msg_q_init(struct msg_priv_t *priv, void (*task_hdl)(void *));
-int inic_msg_enqueue(struct msg_priv_t *priv, void *msg);
-void inic_msg_q_deinit(struct msg_priv_t *priv);
-unsigned int llhw_recv_handler(u8 *rxbuf);
+void llhw_send_data(u8 *buf, u32 len, struct sk_buff *pskb);
+void llhw_recv_data_process(void *intf_priv);
 void llhw_event_task(struct work_struct *data);
-void llhw_recv_pkts(void *msg);
 int llhw_xmit_entry(int idx, struct sk_buff *pskb);
 int llhw_xmit_init(void);
 int llhw_xmit_deinit(void);
+int llhw_xmit_pending_q_num(void);
+void llhw_xmit_wakeup_thread(void);
+void llhw_recv_notify(void);
+int llhw_recv_process(struct sk_buff *pskb);
+void llhw_recv_init(void);
+void llhw_recv_deinit(void);
 int llhw_event_init(struct inic_device *idev);
 void llhw_event_deinit(void);
-void llhw_send_msg(u32 id, u8 *param, u32 param_len, u8 *ret, u32 ret_len);
-int llhw_war_offload_ctrl(struct H2C_WAROFFLOAD_PARM *offload_parm);
+int llhw_war_offload_ctrl(u8 offload_en, u32 offload_ctrl);
+int llhw_war_set_mdns_param(u8 *pframe, u32 len);
 void rtw_set_wowlan_offload_ctrl(u32 value);
 void rtw_proxy_init(void);
 void rtw_proxy_mdns_parms_init(u8 is_set_default);
-ssize_t proc_set_mdns_offload(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
-ssize_t proc_set_wow_mode(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 void rtw_wow_prepare_mdns_para(u8 *pframe, u32 *plen);
+
+#ifdef CONFIG_FULLMAC_HCI_SDIO
+u32 rtw_sdio_init(struct inic_sdio *priv);
+void rtw_sdio_deinit(struct inic_sdio *priv);
 int rtw_sdio_suspend(struct device *dev);
 int rtw_sdio_resume(struct device *dev);
 int rtw_resume_common(struct inic_sdio *priv);
+void rtw_sdio_init_txavailbd_threshold(struct inic_sdio *priv);
+u8 rtw_sdio_query_txbd_status(struct inic_sdio *priv);
+int rtw_sdio_alloc_irq(struct inic_sdio *priv);
+#elif defined (CONFIG_FULLMAC_HCI_SPI)
+
 
 #endif
 
+#ifdef CONFIG_SDIO_BRIDGE
+void llhw_sdio_bridge_get_scan_result(u32 ap_num);
+void llhw_sdio_bridge_event_join_status_indicate(void *event_priv, u32 *param_buf);
+void rtw_sdio_bridge_register_genl_family(void);
+void rtw_sdio_bridge_unregister_genl_family(void);
+#endif
+#endif
 #endif // __RTW_FUNCTIONS_H__

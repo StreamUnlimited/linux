@@ -439,7 +439,7 @@ int llhw_wifi_sae_status_indicate(u8 wlan_idx, u16 status, u8 *mac_addr)
 	return ret;
 }
 
-u32 llhw_wifi_update_ip_addr_in_wowlan(void)
+u32 llhw_wifi_update_ip_addr(void)
 {
 	int ret = 0;
 	struct event_priv_t *event_priv = &global_idev.event_priv;
@@ -781,6 +781,25 @@ int llhw_wifi_set_wpa_mode(rtw_wpa_mode wpa_mode)
 	return ret;
 }
 
+int llhw_wifi_set_owe_param(struct rtw_owe_param_t *owe_param)
+{
+	int ret = 0;
+	u32 param_buf[1];
+	dma_addr_t dma_data = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	dma_data = dma_map_single(pdev, owe_param, sizeof(struct rtw_owe_param_t), DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_data)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		return -1;
+	}
+	param_buf[0] = (u32)dma_data;
+
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_OWE_PARAM, param_buf, 1);
+	dma_unmap_single(pdev, dma_data, sizeof(struct rtw_owe_param_t), DMA_TO_DEVICE);
+	return ret;
+}
+
 int llhw_wifi_set_gen_ie(unsigned char wlan_idx, char *buf, __u16 buf_len, __u16 flags)
 {
 	int ret = 0;
@@ -1065,4 +1084,25 @@ int llhw_wifi_get_country_code(struct country_code_table_t *table)
 int llhw_wifi_driver_is_mp(void)
 {
 	return llhw_ipc_send_msg(INIC_API_WIFI_DRIVE_IS_MP, NULL, 0);
+}
+
+int wifi_btcoex_bt_hci_notify(uint8_t *pdata, uint16_t len, uint8_t dir)
+{
+	int ret = 0;
+	u32 param_buf[3] = {0};
+	dma_addr_t dma_data = 0;
+	struct device *pdev = global_idev.ipc_dev;
+
+	dma_data = dma_map_single(pdev, pdata, len, DMA_TO_DEVICE);
+	if (dma_mapping_error(pdev, dma_data)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+		return -1;
+	}
+
+	param_buf[0] = (u32)dma_data;
+	param_buf[1] = (u32)len;
+	param_buf[2] = (u32)dir;
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_COEX_BT_HCI, param_buf, 3);
+	dma_unmap_single(pdev, dma_data, len, DMA_TO_DEVICE);
+	return ret;
 }

@@ -1214,10 +1214,9 @@ static void emulate_load_store_insn(struct pt_regs *regs,
 	case swc1_op:
 	case sdc1_op:
 	case cop1x_op: {
-		void __user __maybe_unused *fault_addr = NULL;
+		void __user *fault_addr = NULL;
 
 		die_if_kernel("Unaligned FP access in kernel code", regs);
-#ifdef CONFIG_CPU_HAS_EMU
 		BUG_ON(!used_math());
 
 		res = fpu_emulator_cop1Handler(regs, &current->thread.fpu, 1,
@@ -1230,9 +1229,6 @@ static void emulate_load_store_insn(struct pt_regs *regs,
 		if (res == 0)
 			break;
 		return;
-#else
-		goto sigill;
-#endif
 	}
 #endif /* CONFIG_MIPS_FP_SUPPORT */
 
@@ -1732,7 +1728,7 @@ static void emulate_load_store_microMIPS(struct pt_regs *regs,
 	case mm_sdc132_op:
 	case mm_lwc132_op:
 	case mm_swc132_op: {
-		void __user __maybe_unused *fault_addr = NULL;
+		void __user *fault_addr = NULL;
 
 fpu_emul:
 		/* roll back jump/branch */
@@ -1740,7 +1736,6 @@ fpu_emul:
 		regs->regs[31] = orig31;
 
 		die_if_kernel("Unaligned FP access in kernel code", regs);
-#ifdef CONFIG_CPU_HAS_EMU
 		BUG_ON(!used_math());
 		BUG_ON(!is_fpu_owner());
 
@@ -1754,9 +1749,6 @@ fpu_emul:
 		if (res == 0)
 			goto success;
 		return;
-#else
-		goto sigill;
-#endif
 	}
 #endif /* CONFIG_MIPS_FP_SUPPORT */
 

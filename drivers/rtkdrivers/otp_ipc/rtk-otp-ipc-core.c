@@ -209,7 +209,7 @@ int rtk_otp_process(void* data, u8 *result)
 		goto err_ret;
 	}
 
-	if (v_recv_res->ret != 1) {
+	if (v_recv_res->ret < 0) {
 		pr_warning("OTP failed but has already complete %d", v_recv_res->complete_num);
 		goto err_ret;
 	}
