@@ -475,6 +475,27 @@ static unsigned int get_sp_df_for_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 	return sp_df;
 }
 
+static int sport_calculate_and_enable_mclk(struct sport_dai *sport, u32 channel_count, u32 channel_length, u32 rate)
+{
+	if (sport->sport_multi_io == 1) {
+		if (choose_pll_clock(2, channel_length, rate, sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
+			return -EINVAL;
+	} else {
+		if (choose_pll_clock(channel_count, channel_length, rate, sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
+			return -EINVAL;
+	}
+	enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
+	update_fen_cke_sport_status(sport->id, true);
+#if NO_MICRO_ADJUST
+	set_rate_divider(sport->id, sport->audio_clock_params->pll_div);
+	audio_sp_set_mclk_clk_div(sport->addr, sport->audio_clock_params->sport_mclk_div);
+#else
+	audio_sp_set_mclk_clk_div(sport->addr, 1);
+#endif
+
+	return 0;
+}
+
 static int sport_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
 {
@@ -506,24 +527,8 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 
 		/* this means the external codec MCLK needs to be imported by sport_mclk_multiplier*sport_MCLK */
 		if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
-			if (sport->sport_multi_io == 1) {
-				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params)!= 0)
-					return -EINVAL;
-			} else {
-				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
-					return -EINVAL;
-			}
-			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
-			update_fen_cke_sport_status(sport->id, true);
-#if NO_MICRO_ADJUST
-			set_rate_divider(sport->id, sport->audio_clock_params->pll_div);
-#endif
+			sport_calculate_and_enable_mclk(sport, channel_count, channel_length, params_rate(params));
 			sp_tx_init.sp_in_clock = sport->audio_clock_params->clock / sport->audio_clock_params->pll_div;
-#if NO_MICRO_ADJUST
-			audio_sp_set_mclk_clk_div(sport->addr, sport->audio_clock_params->sport_mclk_div);
-#else
-			audio_sp_set_mclk_clk_div(sport->addr, 1);
-#endif
 		}
 
 		switch (channel_count) {     //params_channels - Get the number of channels from the hw params
@@ -614,24 +619,8 @@ static int sport_hw_params(struct snd_pcm_substream *substream,
 			sp_rx_init.sp_set_multi_io = SP_RX_MULTIIO_DIS;
 
 		if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
-			if (sport->sport_multi_io == 1) {
-				if (choose_pll_clock(2, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
-					return -EINVAL;
-			} else {
-				if (choose_pll_clock(channel_count, channel_length, params_rate(params), sport->sport_mclk_multiplier, sport->sport_fixed_mclk_max, sport->audio_clock_params) != 0)
-					return -EINVAL;
-			}
-			enable_audio_source_clock(sport->audio_clock_params, sport->id, true);
-			update_fen_cke_sport_status(sport->id, true);
-#if NO_MICRO_ADJUST
-			set_rate_divider(sport->id, sport->audio_clock_params->pll_div);
-#endif
+			sport_calculate_and_enable_mclk(sport, channel_count, channel_length, params_rate(params));
 			sp_rx_init.sp_in_clock = sport->audio_clock_params->clock / sport->audio_clock_params->pll_div;
-#if NO_MICRO_ADJUST
-			audio_sp_set_mclk_clk_div(sport->addr, sport->audio_clock_params->sport_mclk_div);
-#else
-			audio_sp_set_mclk_clk_div(sport->addr, 1);
-#endif
 		}
 
 		switch (channel_count) {     //params_channels - Get the number of channels from the hw params
