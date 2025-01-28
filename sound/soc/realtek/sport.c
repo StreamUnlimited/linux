@@ -89,6 +89,8 @@ struct sport_dai {
 	u8 play_record_in_use;
 	/* guard play_record_in_use */
 	struct mutex state_mutex;
+
+	bool sue_continuous_clock;
 };
 
 #define sport_info(mask,dev, ...)						\
@@ -279,9 +281,11 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 			audio_sp_dma_cmd(sport->addr, false);
 
 		if (is_playback) {
-			audio_sp_tx_start(sport->addr, false);
-			audio_sp_disable_tx_count(sport->addr);
-			audio_sp_tx_set_fifo(sport->addr, sport->fifo_num, false);
+			if (!sport->sue_continuous_clock) {
+				audio_sp_tx_start(sport->addr, false);
+				audio_sp_disable_tx_count(sport->addr);
+				audio_sp_tx_set_fifo(sport->addr, sport->fifo_num, false);
+			}
 		} else {
 			audio_sp_rx_start(sport->addr, false);
 			audio_sp_disable_rx_count(sport->addr);
@@ -764,7 +768,7 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
-	if ((sport->play_record_in_use & (PLAY_IN_USE | RECORD_IN_USE)) == 0) {
+	if ((sport->play_record_in_use & (PLAY_IN_USE | RECORD_IN_USE)) == 0 && !sport->sue_continuous_clock) {
 		clk_disable_unprepare(sport->clock);
 		sport->clock_enabled = 0;
 		//below to be done
@@ -848,12 +852,6 @@ static int ameba_sport_dai_probe(struct snd_soc_dai *dai)
 	int fifo_byte = 128;
 
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
-
-	sport->addr = ioremap(sport->base, sport->reg_size);
-	if (sport->addr == NULL) {
-		dev_err(&sport->pdev->dev, "cannot ioremap registers\n");
-		return -ENXIO;
-	}
 
 	if (sport->sport_debug == 2){
 		for (i = 0;i < fifo_byte; i++)
@@ -1148,6 +1146,12 @@ static int ameba_sport_probe(struct platform_device *pdev)
 	sport->base = sportx_regs_base;
 	sport->reg_size = sportx_reg_size;
 
+	sport->addr = ioremap(sport->base, sport->reg_size);
+	if (sport->addr == NULL) {
+		dev_err(&pdev->dev, "cannot ioremap registers\n");
+		return -ENXIO;
+	}
+
 	sport->sport_debug = 0;
 	if (sysfs_create_group(&pdev->dev.kobj,&sport_debug_attr_grp))
 		dev_warn(&pdev->dev, "Error creating sysfs entry\n");
@@ -1187,6 +1191,8 @@ static int ameba_sport_probe(struct platform_device *pdev)
 	/* Reads the sport_mode value from the device tree and stores in data->sport_mode */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-mode", 0, &sport->sport_mode);
 
+	sport->sue_continuous_clock = of_property_read_bool(dev->of_node, "sue,continuous-clock");
+
 	/* Read irq of sport */
 	sport->irq = platform_get_irq(pdev, 0);
 
@@ -1222,8 +1228,37 @@ static int ameba_sport_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "alloc audio_clock_params fail");
 			ret = -ENOMEM;
 			goto err;
-    	}
+		}
+	}
 
+	// If requested, enable early MCLK, BCLK and LRCLK during probe here for 48 kHz, 32 bit and 2 channels
+	if (sport->sue_continuous_clock) {
+		sport_init_params sp_tx_init;
+		u32 rate = 48000;
+
+		dev_info(dev, "enabling early Tx clocks for %u rate\n", rate);
+
+		sp_tx_init.sp_sel_data_format = SP_DF_I2S;
+		sp_tx_init.sp_sel_ch = SP_TX_CH_LR;
+		sp_tx_init.sp_sr = rate;
+		sp_tx_init.sp_in_clock = sport->clock_in_from_dts;
+		sp_tx_init.sp_sel_tdm = SP_TX_NOTDM;
+		sp_tx_init.sp_sel_fifo = SP_TX_FIFO2;
+		sp_tx_init.sp_sel_i2s0_mono_stereo = SP_CH_STEREO;
+		sp_tx_init.sp_sel_i2s1_mono_stereo = SP_CH_STEREO;
+		sp_tx_init.sp_set_multi_io = SP_TX_MULTIIO_EN;
+		sp_tx_init.sp_sel_word_len = SP_TXWL_32;
+		sp_tx_init.sp_sel_ch_len = SP_TXCL_32;
+
+		if (sport->sport_mclk_multiplier != 0 || sport->sport_fixed_mclk_max != 0) {
+			sport_calculate_and_enable_mclk(sport, 2, 32, rate);
+			sp_tx_init.sp_in_clock = sport->audio_clock_params->clock / sport->audio_clock_params->pll_div;
+		}
+
+		audio_sp_tx_init(sport->addr, &sp_tx_init);
+		audio_sp_set_i2s_mode(sport->addr, sport->sport_mode);
+
+		audio_sp_tx_start(sport->addr, true);
 	}
 
 	/* Pre-assign snd_soc_dai_set_drvdata */
