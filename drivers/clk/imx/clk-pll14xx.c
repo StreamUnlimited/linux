@@ -77,8 +77,8 @@ static const struct imx_pll14xx_rate_table imx_pll1443x_tbl[] = {
 };
 
 static const struct imx_pll14xx_rate_table imx_pll1443x_audiopll_tbl[] = {
-	PLL_1443X_RATE(786432000U, 328, 5, 1, 0xae14),	/* 32 * MCLK for 48 kHz */
-	PLL_1443X_RATE(722534400U, 301, 5, 1, 0xe56),	/* 32 * MCLK for 44.1 kHz */
+	PLL_1443X_RATE(786432000U, 328, 5, 1, -20972),	/* 32 * MCLK for 48 kHz */
+	PLL_1443X_RATE(722534400U, 301, 5, 1, 3670),	/* 32 * MCLK for 44.1 kHz */
 };
 
 struct imx_pll14xx_clk imx_1443x_pll = {
