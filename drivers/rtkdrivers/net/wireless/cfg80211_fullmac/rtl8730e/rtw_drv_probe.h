@@ -18,8 +18,8 @@ struct axi_data {
 	unsigned long		axi_mem_end; /* shared mem end */
 	unsigned long		axi_mem_start; /* shared mem start */
 
-	void __iomem		*km4_mem_end;
-	void __iomem		*km4_mem_start;
+	phys_addr_t		km4_map_phys_base;
+	void __iomem		*km4_map_virt_base;
 
 	u8			bdma64;
 };

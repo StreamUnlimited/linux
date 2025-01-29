@@ -143,7 +143,7 @@ int rtw_netdev_probe(struct device *pdev)
 		goto os_ndevs_deinit;
 	}
 
-	ret = llhw_init(paxi_data_global->km4_mem_start);
+	ret = llhw_init(paxi_data_global->km4_map_phys_base, paxi_data_global->km4_map_virt_base);
 	if (ret < 0) {
 		dev_err(global_idev.fullmac_dev, "llhw init fail");
 		goto os_ndevs_deinit;
@@ -249,15 +249,15 @@ static void platform_device_init(struct platform_device *pdev)
 		goto exit;
 	}
 
-	axi_data->km4_mem_start = devm_ioremap_nocache(&pdev->dev, res_mem->start, resource_size(res_mem));
-	if (!axi_data->km4_mem_start) {
+	axi_data->km4_map_phys_base = res_mem->start;
+	axi_data->km4_map_virt_base = devm_ioremap_nocache(&pdev->dev, res_mem->start, resource_size(res_mem));
+	if (!axi_data->km4_map_virt_base) {
 		pr_err("Failed to map KM4 mem\n");
 		goto exit;
 	}
-	axi_data->km4_mem_end = axi_data->km4_mem_start + resource_size(res_mem);
 
 	pr_info("Memory mapped KM4 space start: 0x%08lx len:%08x, after map:0x%08lx\n",
-			 (unsigned long)res_mem->start, resource_size(res_mem), (unsigned long)axi_data->km4_mem_start);
+			 (unsigned long)axi_data->km4_map_phys_base, resource_size(res_mem), (unsigned long)axi_data->km4_map_virt_base);
 
 	status = true;
 

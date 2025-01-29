@@ -105,7 +105,7 @@ void llhw_ipc_event_ch_deinit(void)
 	global_idev.event_ch = NULL;
 }
 
-int llhw_init(void __iomem *km4_map_start)
+int llhw_init(phys_addr_t km4_map_phys_base, void __iomem *km4_map_virt_base)
 {
 	int ret = 0;
 	struct inic_device *idev = &global_idev;
@@ -119,7 +119,8 @@ int llhw_init(void __iomem *km4_map_start)
 	}
 	global_idev.ipc_dev = global_idev.data_ch->pdev;
 
-	global_idev.km4_map_start = km4_map_start;
+	global_idev.km4_map_phys_base = km4_map_phys_base;
+	global_idev.km4_map_virt_base = km4_map_virt_base;
 
 	/* initialize the message queue, and assign the task haddle function */
 	ret = inic_msg_q_init(global_idev.ipc_dev, llhw_recv_task_from_msg);

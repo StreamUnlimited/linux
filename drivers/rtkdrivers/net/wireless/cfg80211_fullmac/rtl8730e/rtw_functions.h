@@ -23,7 +23,7 @@ int llhw_wifi_connect(struct _rtw_network_info_t *connect_param, unsigned char b
 int llhw_wifi_disconnect(void);
 int llhw_wifi_is_connected_to_ap(void);
 int llhw_wifi_get_channel(u32 wlan_idx, u8 *ch);
-int llhw_init(void __iomem *km4_map_start);
+int llhw_init(phys_addr_t km4_map_phys_base, void __iomem *km4_map_virt_base);
 void llhw_deinit(void);
 int llhw_wifi_del_sta(u8 wlan_idx, u8 *mac);
 int llhw_wifi_init_ap(void);

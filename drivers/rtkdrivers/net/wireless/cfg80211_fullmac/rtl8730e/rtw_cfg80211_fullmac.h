@@ -332,7 +332,7 @@ static inline u8 rtw_80211_cipher_suite_to_driver(const u32 _80211_suite)
 
 static inline __iomem void *km4_phys_to_virt(phys_addr_t p)
 {
-	return (p - 0x60000020) + global_idev.km4_map_start;
+	return global_idev.km4_map_virt_base + (p - global_idev.km4_map_phys_base);
 }
 
 #endif // _RTW_TOP_HEADER_

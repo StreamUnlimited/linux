@@ -129,7 +129,8 @@ struct inic_device {
 	struct p2p_priv_t		p2p_global;
 #endif
 
-	void __iomem			*km4_map_start;
+	phys_addr_t	km4_map_phys_base;
+	void __iomem	*km4_map_virt_base;
 };
 
 extern struct inic_device global_idev;
