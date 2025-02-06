@@ -275,7 +275,7 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 		}
 		mutex_unlock(&sport->state_mutex);
 
-		if (sport->play_record_in_use & 0x03 == 0)
+		if ((sport->play_record_in_use & (PLAY_IN_USE | RECORD_IN_USE)) == 0)
 			audio_sp_dma_cmd(sport->addr, false);
 
 		if (is_playback) {
@@ -775,7 +775,7 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
-	if (sport->play_record_in_use & 0x03 == 0) {
+	if ((sport->play_record_in_use & (PLAY_IN_USE | RECORD_IN_USE)) == 0) {
 		clk_disable_unprepare(sport->clock);
 		sport->clock_enabled = 0;
 		//below to be done
