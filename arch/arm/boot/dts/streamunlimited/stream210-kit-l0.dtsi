@@ -227,6 +227,10 @@
 	pinctrl-0 = <&spi1_dabfm_pins>;
 	status = "okay";
 
+	// This is needed otherwise the Realtek driver will register an `spidev`
+	// node for us implicitly thus creating a chip-select conflict.
+	rtk,spi-for-kernel = <1>;
+
 	rtk,spi-slave-mode = <0>;
 	rtk,spi-cs-gpios = <&gpioa 12 0>;
 
