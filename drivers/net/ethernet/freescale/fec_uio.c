@@ -1328,7 +1328,6 @@ enet_fec_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ndev);
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	fep->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
 	if (IS_ERR(fep->clk_ipg)) {
@@ -1467,7 +1466,6 @@ failed_clk_enet_out_res_release:
 failed_clk_ahb_res_release:
 	devm_clk_put(&pdev->dev, fep->clk_ipg);
 failed_clk_ipg_res_release:
-	release_bus_freq(BUS_FREQ_HIGH);
 	dev_id--;
 failed_ioremap:
 	kfree(fec_dev);
@@ -1503,7 +1501,6 @@ fec_enet_uio_remove(struct platform_device *pdev)
 	devm_clk_put(&pdev->dev, fep->clk_ahb);
 	devm_clk_put(&pdev->dev, fep->clk_ipg);
 	pm_runtime_disable(&pdev->dev);
-	release_bus_freq(BUS_FREQ_HIGH);
 	fep->dev_id--;
 	kfree(fec_dev);
 	free_netdev(ndev);

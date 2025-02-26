@@ -2053,7 +2053,6 @@ static int __maybe_unused hantro_resume(struct device *dev)
 }
 static int hantro_runtime_suspend(struct device *dev)
 {
-	release_bus_freq(BUS_FREQ_HIGH);
 	return 0;
 }
 
@@ -2061,7 +2060,6 @@ static int hantro_runtime_resume(struct device *dev)
 {
 	hantrodec_t *hantrodev = dev_get_drvdata(dev);
 
-	request_bus_freq(BUS_FREQ_HIGH);
 	hantro_ctrlblk_reset(hantrodev);
 	return 0;
 }

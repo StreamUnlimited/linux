@@ -5903,7 +5903,6 @@ static int mxc_epdc_fb_resume(struct device *dev)
 #ifdef CONFIG_PM
 static int mxc_epdc_fb_runtime_suspend(struct device *dev)
 {
-	release_bus_freq(BUS_FREQ_HIGH);
 	dev_dbg(dev, "epdc busfreq high release.\n");
 
 	return 0;
@@ -5911,7 +5910,6 @@ static int mxc_epdc_fb_runtime_suspend(struct device *dev)
 
 static int mxc_epdc_fb_runtime_resume(struct device *dev)
 {
-	request_bus_freq(BUS_FREQ_HIGH);
 	dev_dbg(dev, "epdc busfreq high request.\n");
 
 	return 0;

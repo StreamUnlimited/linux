@@ -1200,7 +1200,6 @@ static int mx6s_csi_open(struct file *file)
 
 		pm_runtime_get_sync(csi_dev->dev);
 
-		request_bus_freq(BUS_FREQ_HIGH);
 
 		v4l2_subdev_call(sd, core, s_power, 1);
 		mx6s_csi_init(csi_dev);
@@ -1229,7 +1228,6 @@ static int mx6s_csi_close(struct file *file)
 
 		file->private_data = NULL;
 
-		release_bus_freq(BUS_FREQ_HIGH);
 
 		pm_runtime_put_sync_suspend(csi_dev->dev);
 	}

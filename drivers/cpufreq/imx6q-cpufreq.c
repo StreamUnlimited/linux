@@ -115,10 +115,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 		new_freq / 1000, volt / 1000);
 
 	if (low_power_run_support) {
-		if (old_freq == freq_table[0].frequency)
-			request_bus_freq(BUS_FREQ_HIGH);
 	} else if (old_freq <= FREQ_396_MHZ && new_freq > FREQ_396_MHZ) {
-		request_bus_freq(BUS_FREQ_HIGH);
 	}
 
 	/* scaling up?  scale voltage before frequency */
@@ -235,10 +232,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 	 * for a high bus frequency.
 	 */
 	if (low_power_run_support) {
-		if (new_freq == freq_table[0].frequency)
-			release_bus_freq(BUS_FREQ_HIGH);
 	} else if (old_freq > FREQ_396_MHZ && new_freq <= FREQ_396_MHZ) {
-		release_bus_freq(BUS_FREQ_HIGH);
 	}
 
 	return 0;
@@ -252,9 +246,7 @@ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
 	policy->suspend_freq = max_freq;
 
 	if (low_power_run_support && policy->cur > freq_table[0].frequency) {
-		request_bus_freq(BUS_FREQ_HIGH);
 	} else if (policy->cur > FREQ_396_MHZ) {
-		request_bus_freq(BUS_FREQ_HIGH);
 	}
 
 	return 0;

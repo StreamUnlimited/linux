@@ -2402,9 +2402,6 @@ static int mxsfb_runtime_suspend(struct device *dev)
 {
 	struct mxsfb_info *host = dev_get_drvdata(dev);
 
-	if (host->devdata->flags & MXSFB_FLAG_BUSFREQ)
-		release_bus_freq(BUS_FREQ_HIGH);
-
 	if (host->devdata->flags & MXSFB_FLAG_PMQOS)
 		cpu_latency_qos_remove_request(&host->pm_qos_req);
 
@@ -2416,9 +2413,6 @@ static int mxsfb_runtime_suspend(struct device *dev)
 static int mxsfb_runtime_resume(struct device *dev)
 {
 	struct mxsfb_info *host = dev_get_drvdata(dev);
-
-	if (host->devdata->flags & MXSFB_FLAG_BUSFREQ)
-		request_bus_freq(BUS_FREQ_HIGH);
 
 	if (host->devdata->flags & MXSFB_FLAG_PMQOS)
 		cpu_latency_qos_add_request(&host->pm_qos_req, 0);

@@ -1063,13 +1063,11 @@ static int __maybe_unused hantro_h1_resume(struct device *dev)
 }
 static int hantro_h1_runtime_suspend(struct device *dev)
 {
-	//release_bus_freq(BUS_FREQ_HIGH);
 	return 0;
 }
 
 static int hantro_h1_runtime_resume(struct device *dev)
 {
-	//request_bus_freq(BUS_FREQ_HIGH);
 	hantro_h1_ctrlblk_reset(dev);
 	return 0;
 }

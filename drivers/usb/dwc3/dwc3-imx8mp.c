@@ -222,7 +222,6 @@ static int dwc3_imx8mp_probe(struct platform_device *pdev)
 			return PTR_ERR(dwc3_imx->glue_base);
 	}
 
-	request_bus_freq(BUS_FREQ_HIGH);
 	dwc3_imx->hsio_clk = devm_clk_get(dev, "hsio");
 	if (IS_ERR(dwc3_imx->hsio_clk)) {
 		err = PTR_ERR(dwc3_imx->hsio_clk);
@@ -309,7 +308,6 @@ disable_clks:
 disable_hsio_clk:
 	clk_disable_unprepare(dwc3_imx->hsio_clk);
 rel_high_bus:
-	release_bus_freq(BUS_FREQ_HIGH);
 
 	return err;
 }
@@ -324,7 +322,6 @@ static void dwc3_imx8mp_remove(struct platform_device *pdev)
 
 	clk_disable_unprepare(dwc3_imx->suspend_clk);
 	clk_disable_unprepare(dwc3_imx->hsio_clk);
-	release_bus_freq(BUS_FREQ_HIGH);
 	pm_runtime_disable(dev);
 	pm_runtime_put_noidle(dev);
 }
@@ -339,7 +336,6 @@ static int __maybe_unused dwc3_imx8mp_suspend(struct dwc3_imx8mp *dwc3_imx,
 	if (PMSG_IS_AUTO(msg) || device_may_wakeup(dwc3_imx->dev))
 		dwc3_imx8mp_wakeup_enable(dwc3_imx, msg);
 
-	release_bus_freq(BUS_FREQ_HIGH);
 	dwc3_imx->pm_suspended = true;
 
 	return 0;
@@ -354,7 +350,6 @@ static int __maybe_unused dwc3_imx8mp_resume(struct dwc3_imx8mp *dwc3_imx,
 	if (!dwc3_imx->pm_suspended)
 		return 0;
 
-	request_bus_freq(BUS_FREQ_HIGH);
 	/* Wakeup disable */
 	dwc3_imx8mp_wakeup_disable(dwc3_imx);
 	dwc3_imx->pm_suspended = false;

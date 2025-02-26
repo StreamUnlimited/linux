@@ -1812,13 +1812,11 @@ int set_clock(int gpu, int enable)
 #if defined(CONFIG_PM_RUNTIME) || LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
 static int gpu_runtime_suspend(struct device *dev)
 {
-    release_bus_freq(BUS_FREQ_HIGH);
     return 0;
 }
 
 static int gpu_runtime_resume(struct device *dev)
 {
-    request_bus_freq(BUS_FREQ_HIGH);
     return 0;
 }
 #endif

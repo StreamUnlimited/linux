@@ -1269,13 +1269,11 @@ static int __maybe_unused hantro_vc8000e_resume(struct device *dev)
 }
 static int hantro_vc8000e_runtime_suspend(struct device *dev)
 {
-	//release_bus_freq(BUS_FREQ_HIGH);
 	return 0;
 }
 
 static int hantro_vc8000e_runtime_resume(struct device *dev)
 {
-	//request_bus_freq(BUS_FREQ_HIGH);
 	hantro_vc8000e_ctrlblk_reset(dev);
 	return 0;
 }

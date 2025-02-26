@@ -203,11 +203,9 @@ static int imx_dwmac_clks_config(void *priv, bool enabled)
 					    dwmac->clk_en_cnt - 1 : 0;
 			return ret;
 		}
-		request_bus_freq(BUS_FREQ_HIGH);
 		dwmac->clk_en_cnt++;
 	} else {
 		if (dwmac->clk_en_cnt > 0) {
-			release_bus_freq(BUS_FREQ_HIGH);
 			clk_disable_unprepare(dwmac->clk_tx);
 			clk_disable_unprepare(dwmac->clk_mem);
 			dwmac->clk_en_cnt--;

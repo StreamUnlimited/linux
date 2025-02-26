@@ -854,7 +854,6 @@ static int mipi_dsi_runtime_suspend(struct device *dev)
 	struct mipi_dsi_info *mipi_dsi = dev_get_drvdata(&pdev->dev);
 
 	if (mipi_dsi->dsi_power_on) {
-		release_bus_freq(BUS_FREQ_HIGH);
 		dev_dbg(dev, "mipi dsi busfreq high release.\n");
 
 		mipi_dsi->dsi_power_on = 0;
@@ -869,7 +868,6 @@ static int mipi_dsi_runtime_resume(struct device *dev)
 	struct mipi_dsi_info *mipi_dsi = dev_get_drvdata(&pdev->dev);
 
 	if (!mipi_dsi->dsi_power_on) {
-		request_bus_freq(BUS_FREQ_HIGH);
 		dev_dbg(dev, "mipi dsi busfreq high request.\n");
 
 		mipi_dsi->dsi_power_on = 1;

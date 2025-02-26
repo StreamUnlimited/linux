@@ -1887,9 +1887,6 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
 
 	imx_data->socdata = device_get_match_data(&pdev->dev);
 
-	if (imx_data->socdata->flags & ESDHC_FLAG_BUSFREQ)
-		request_bus_freq(BUS_FREQ_HIGH);
-
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_add_request(&imx_data->pm_qos_req, 0);
 
@@ -2026,9 +2023,6 @@ free_sdhci:
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_remove_request(&imx_data->pm_qos_req);
 
-	if (imx_data->socdata->flags & ESDHC_FLAG_BUSFREQ)
-		release_bus_freq(BUS_FREQ_HIGH);
-
 	sdhci_pltfm_free(pdev);
 	return err;
 }
@@ -2053,9 +2047,6 @@ static void sdhci_esdhc_imx_remove(struct platform_device *pdev)
 
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_remove_request(&imx_data->pm_qos_req);
-
-	if (imx_data->socdata->flags & ESDHC_FLAG_BUSFREQ)
-		release_bus_freq(BUS_FREQ_HIGH);
 
 	sdhci_pltfm_free(pdev);
 
@@ -2237,9 +2228,6 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_remove_request(&imx_data->pm_qos_req);
 
-	if (imx_data->socdata->flags & ESDHC_FLAG_BUSFREQ)
-		release_bus_freq(BUS_FREQ_HIGH);
-
 	return ret;
 }
 
@@ -2249,9 +2237,6 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
 	int err;
-
-	if (imx_data->socdata->flags & ESDHC_FLAG_BUSFREQ)
-		request_bus_freq(BUS_FREQ_HIGH);
 
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_add_request(&imx_data->pm_qos_req, 0);
@@ -2292,8 +2277,6 @@ remove_pm_qos_request:
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_remove_request(&imx_data->pm_qos_req);
 
-	if (imx_data->socdata->flags & ESDHC_FLAG_BUSFREQ)
-		release_bus_freq(BUS_FREQ_HIGH);
 	return err;
 }
 #endif

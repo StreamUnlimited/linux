@@ -1950,13 +1950,11 @@ static int hantro_resume(struct device *dev)
 }
 static int hantro_runtime_suspend(struct device *dev)
 {
-//	release_bus_freq(BUS_FREQ_HIGH);
 	return 0;
 }
 
 static int hantro_runtime_resume(struct device *dev)
 {
-//	request_bus_freq(BUS_FREQ_HIGH);
 	hantro_ctrlblk_reset(dev);
 	return 0;
 }

@@ -2906,7 +2906,6 @@ static int gpmi_runtime_suspend(struct device *dev)
 	struct gpmi_nand_data *this = dev_get_drvdata(dev);
 
 	gpmi_disable_clk(this);
-	release_bus_freq(BUS_FREQ_HIGH);
 	release_dma_channels(this);
 
 	return 0;
@@ -2921,7 +2920,6 @@ static int gpmi_runtime_resume(struct device *dev)
 	if (ret)
 		return ret;
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	ret = acquire_dma_channels(this);
 	if (ret < 0)

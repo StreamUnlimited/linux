@@ -1358,7 +1358,6 @@ static void imx_uart_dma_exit(struct imx_port *sport)
 	}
 
 	cpu_latency_qos_remove_request(&sport->pm_qos_req);
-	release_bus_freq(BUS_FREQ_HIGH);
 }
 
 static int imx_uart_dma_init(struct imx_port *sport)
@@ -1368,7 +1367,6 @@ static int imx_uart_dma_init(struct imx_port *sport)
 	int ret;
 
 	/* request high bus for DMA mode */
-	request_bus_freq(BUS_FREQ_HIGH);
 	cpu_latency_qos_add_request(&sport->pm_qos_req, 0);
 
 	/* Prepare for RX : */
