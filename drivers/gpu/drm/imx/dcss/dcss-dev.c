@@ -321,7 +321,6 @@ static int dcss_dev_suspend(struct device *dev)
 
 	dcss_clocks_disable(dcss);
 
-	release_bus_freq(BUS_FREQ_HIGH);
 
 	return 0;
 }
@@ -339,7 +338,6 @@ static int dcss_dev_resume(struct device *dev)
 		return 0;
 	}
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	dcss_clocks_enable(dcss);
 
@@ -366,7 +364,6 @@ static int dcss_dev_runtime_suspend(struct device *dev)
 
 	dcss_clocks_disable(dcss);
 
-	release_bus_freq(BUS_FREQ_HIGH);
 
 	return 0;
 }
@@ -378,7 +375,6 @@ static int dcss_dev_runtime_resume(struct device *dev)
 	if (!dcss)
 		return 0;
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	dcss_clocks_enable(dcss);
 

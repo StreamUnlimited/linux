@@ -3555,7 +3555,6 @@ EXPORT_SYMBOL(ipu_ch_param_get_axi_id);
 #ifdef CONFIG_PM
 static int ipu_runtime_suspend(struct device *dev)
 {
-	release_bus_freq(BUS_FREQ_HIGH);
 	dev_dbg(dev, "ipu busfreq high release.\n");
 
 	return 0;
@@ -3563,7 +3562,6 @@ static int ipu_runtime_suspend(struct device *dev)
 
 static int ipu_runtime_resume(struct device *dev)
 {
-	request_bus_freq(BUS_FREQ_HIGH);
 	dev_dbg(dev, "ipu busfreq high requst.\n");
 
 	return 0;

@@ -449,7 +449,6 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	u32 bus_format = 0;
 	dma_addr_t dma_addr;
 
-	request_bus_freq(BUS_FREQ_HIGH);
 	pm_runtime_get_sync(drm->dev);
 	mxsfb_enable_axi_clk(mxsfb);
 
@@ -514,7 +513,6 @@ static void mxsfb_crtc_atomic_disable(struct drm_crtc *crtc,
 
 	mxsfb_disable_axi_clk(mxsfb);
 	pm_runtime_put_sync(drm->dev);
-	release_bus_freq(BUS_FREQ_HIGH);
 }
 
 static int mxsfb_crtc_enable_vblank(struct drm_crtc *crtc)

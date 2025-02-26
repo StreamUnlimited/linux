@@ -469,7 +469,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 	if (pdata.flags & CI_HDRC_PMQOS)
 		cpu_latency_qos_add_request(&data->pm_qos_req, 0);
 
-	request_bus_freq(BUS_FREQ_HIGH);
 	ret = imx_get_clks(dev);
 	if (ret)
 		goto qos_remove_request;
@@ -584,7 +583,6 @@ err_clk:
 err_wakeup_clk:
 	imx_disable_unprepare_clks(dev);
 qos_remove_request:
-	release_bus_freq(BUS_FREQ_HIGH);
 	if (pdata.flags & CI_HDRC_PMQOS)
 		cpu_latency_qos_remove_request(&data->pm_qos_req);
 	data->ci_pdev = NULL;
@@ -610,7 +608,6 @@ static void ci_hdrc_imx_remove(struct platform_device *pdev)
 	if (data->ci_pdev) {
 		imx_disable_unprepare_clks(&pdev->dev);
 		clk_disable_unprepare(data->clk_wakeup);
-		release_bus_freq(BUS_FREQ_HIGH);
 		if (data->plat_data->flags & CI_HDRC_PMQOS)
 			cpu_latency_qos_remove_request(&data->pm_qos_req);
 	}
@@ -640,7 +637,6 @@ static int imx_controller_suspend(struct device *dev,
 	}
 
 	imx_disable_unprepare_clks(dev);
-	release_bus_freq(BUS_FREQ_HIGH);
 
 	if (data->wakeup_irq > 0)
 		enable_irq(data->wakeup_irq);
@@ -671,7 +667,6 @@ static int imx_controller_resume(struct device *dev,
 	    !irqd_irq_disabled(irq_get_irq_data(data->wakeup_irq)))
 		disable_irq_nosync(data->wakeup_irq);
 
-	request_bus_freq(BUS_FREQ_HIGH);
 	ret = imx_prepare_enable_clks(dev);
 	if (ret)
 		return ret;

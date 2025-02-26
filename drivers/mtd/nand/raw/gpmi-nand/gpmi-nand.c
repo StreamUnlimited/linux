@@ -2926,7 +2926,6 @@ static int gpmi_runtime_suspend(struct device *dev)
 {
 	struct gpmi_nand_data *this = dev_get_drvdata(dev);
 
-	release_bus_freq(BUS_FREQ_HIGH);
 	gpmi_disable_clk(this);
 
 	return 0;
@@ -2941,7 +2940,6 @@ static int gpmi_runtime_resume(struct device *dev)
 	if (ret)
 		return ret;
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	return 0;
 

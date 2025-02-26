@@ -1759,7 +1759,6 @@ static int fsl_spdif_runtime_suspend(struct device *dev)
 			&spdif_priv->regcache_srpc);
 	regcache_cache_only(spdif_priv->regmap, true);
 
-	release_bus_freq(BUS_FREQ_HIGH);
 
 	for (i = 0; i < STC_TXCLK_SRC_MAX; i++)
 		clk_disable_unprepare(spdif_priv->txclk[i]);
@@ -1797,7 +1796,6 @@ static int fsl_spdif_runtime_resume(struct device *dev)
 			goto disable_tx_clk;
 	}
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	regcache_cache_only(spdif_priv->regmap, false);
 	regcache_mark_dirty(spdif_priv->regmap);

@@ -708,7 +708,6 @@ static int imx_lcdifv3_runtime_suspend(struct device *dev)
 
 	lcdifv3_disable_clocks(lcdifv3);
 
-	release_bus_freq(BUS_FREQ_HIGH);
 
 	/* clear LCDIF QoS and cache */
 	if (of_device_is_compatible(dev->of_node, "fsl,imx93-lcdif"))
@@ -734,11 +733,9 @@ static int imx_lcdifv3_runtime_resume(struct device *dev)
 	if (of_device_is_compatible(dev->of_node, "fsl,imx93-lcdif"))
 		regmap_write(lcdifv3->gpr, 0xc, 0x3712);
 
-	request_bus_freq(BUS_FREQ_HIGH);
 
 	ret = lcdifv3_enable_clocks(lcdifv3);
 	if (ret) {
-		release_bus_freq(BUS_FREQ_HIGH);
 		return ret;
 	}
 
