@@ -819,7 +819,7 @@ static int ameba_dsi_remove(struct platform_device *pdev)
 	MIPI CG/PG Issue
 	switch mipi mode to support CG/PG suspend/resume
 */
-int rtk_dsi_pm_resume_early(struct device *dev)
+int rtk_dsi_pm_resume(struct device *dev)
 {
 	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
 	void __iomem                *bg_ctrl = dsi->bg_ctrl;
@@ -894,7 +894,7 @@ static int rtk_dsi_pm_suspend(struct device *dev)
 }
 
 static const struct dev_pm_ops ameba_dsi_pm_ops = {
-	.resume_early = rtk_dsi_pm_resume_early,   // resume  begin
+	.resume       = rtk_dsi_pm_resume,   // resume begin
 	.complete     = rtk_dsi_pm_resume_complete,// resume  complete
 	.prepare      = rtk_dsi_pm_prepare,        // suspend begin
 	.suspend      = rtk_dsi_pm_suspend,        // suspend
