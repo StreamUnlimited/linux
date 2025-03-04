@@ -2,6 +2,7 @@
 ccflags-$(CONFIG_USB_DWC2_DEBUG)	+= -DDEBUG
 ccflags-$(CONFIG_USB_DWC2_VERBOSE)	+= -DVERBOSE_DEBUG
 ccflags-y += -I$(srctree)/drivers/rtkdrivers/usb_phy
+ccflags-y += -I$(srctree)/drivers/usb/dwc2
 
 obj-$(CONFIG_USB_DWC2)			+= dwc2.o
 dwc2-y					:= core.o core_intr.o platform.o drd.o
