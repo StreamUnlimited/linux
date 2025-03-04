@@ -203,7 +203,7 @@ int rtk_otp_process(void* data, u8 *result)
 		goto err_ret;
 	}
 
-	v_recv_res = ioremap_nocache((resource_size_t)p_recv_res, sizeof(*v_recv_res));
+	v_recv_res = ioremap((resource_size_t)p_recv_res, sizeof(*v_recv_res));
 	if (v_recv_res == NULL) {
 		pr_warn("ioremap() failed\n");
 		goto err_ret;
