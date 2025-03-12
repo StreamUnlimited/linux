@@ -7,7 +7,7 @@ if RTK_DRIVERS
 
 if NETDEVICES
 if CFG80211
-source "drivers/rtkdrivers/net/wireless/cfg80211_fullmac/Kconfig"
+source "drivers/rtkdrivers/net/wireless/whc_host_linux/Kconfig"
 endif
 endif
 
