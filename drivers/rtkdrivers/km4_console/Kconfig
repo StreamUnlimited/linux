@@ -1,4 +1,10 @@
-config KM4_CONSOLE_AMEBA
-	tristate "KM4 Console"
+config KM4_CONSOLE_CORE_AMEBA
+	tristate "KM4 Console Core"
 	help
-	  Driver for Realtek KM4 Console
+	  Core for Realtek KM4 Console
+
+config KM4_CONSOLE_CDEV_AMEBA
+	tristate "KM4 Console Character Device"
+	select KM4_CONSOLE_CORE_AMEBA
+	help
+	  Character device driver for Realtek KM4 Console
