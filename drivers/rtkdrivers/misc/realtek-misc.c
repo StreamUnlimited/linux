@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
+#include <misc/realtek-console-core.h>
 #include <uapi/misc/realtek-misc.h>
 
 #define MISC_CTRL	"misc-ioctl"
@@ -44,6 +45,7 @@ static struct class *misc_class;
 /* proc fs dir entry */
 static struct proc_dir_entry *misc_proc_dir;
 static struct proc_dir_entry *uuid_proc_ent;
+static struct proc_dir_entry *fw_log_config_proc_ent;
 
 int rtk_misc_wake_voltage_set(u8 voltage)
 {
@@ -101,6 +103,44 @@ static const struct file_operations rtk_uuid_proc_fops = {
 	.release = single_release,
 };
 
+static ssize_t fw_log_config_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
+{
+	int ret;
+	char data[32];
+	char tag[10];	// The firmware defines `LOG_TAG_MAX_LEN` to 9
+	int loglevel;
+	console_ipc_host_req_t cmd_req;
+
+	if (count >= sizeof(data))
+		return -EINVAL;
+
+	if (copy_from_user(data, buffer, count))
+		return -EFAULT;
+
+	data[count] = '\0';
+
+	if (sscanf(data, "%9s %d", tag, &loglevel) != 2)
+		return -EINVAL;
+
+	if (loglevel < 0 || loglevel > 5)
+		return -EINVAL;
+
+	// Assemble console_ipc_host_req_t by formatting a "log <tag> <level>" string and setting `.buf_len`
+	snprintf(cmd_req.param_buf, sizeof(cmd_req.param_buf), "log %s %d", tag, loglevel);
+	cmd_req.buf_len = strlen(cmd_req.param_buf);
+
+	ret = rtk_console_process((char *)&cmd_req, sizeof(cmd_req), NULL);
+	if (ret != 0)
+		return ret;
+
+	return count;
+}
+
+static struct file_operations fw_log_config_proc_fops = {
+	.owner = THIS_MODULE,
+	.write = fw_log_config_write,
+};
+
 static long rtk_misc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = -1;
@@ -151,6 +191,7 @@ static void rtk_misc_create_proc(struct device *dev)
 	}
 
 	uuid_proc_ent = proc_create("uuid", 0644, misc_proc_dir, &rtk_uuid_proc_fops);
+	fw_log_config_proc_ent = proc_create("fw_log_config", 0222, misc_proc_dir, &fw_log_config_proc_fops);
 }
 
 static void rtk_misc_remove_proc(void)

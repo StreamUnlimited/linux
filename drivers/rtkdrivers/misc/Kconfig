@@ -1,5 +1,6 @@
 config MISC_RTK_AMEBA
 	tristate "Misc ioctl driver"
+	select KM4_CONSOLE_CORE_AMEBA
 	help
 		This enables the miscellaneous ioctl affairs.
 
