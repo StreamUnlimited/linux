@@ -110,7 +110,7 @@ int rtk_console_process(char *data, int len, u8 *result)
 
 	while (!console_done) {
 		retry++;
-		msleep(2);
+		mdelay(2);
 		if (retry > 1000) {
 			dev_err(console_d->dev, "Wait for KM4 IPC channel empty handshake timeout\n");
 			goto err_ret;
