@@ -30,7 +30,7 @@
 
 #include <ameba_ipc/ameba_ipc.h>
 
-#define CONSOLE_MAX_CHAR	128
+#define CONSOLE_MAX_CHAR	127
 
 enum {
 	IPC_USER_POINT = 0,
@@ -38,6 +38,7 @@ enum {
 };
 
 typedef struct console_ipc_host_req_msg {
+	u8 buf_len;
 	char param_buf[CONSOLE_MAX_CHAR];
 } console_ipc_host_req_t;
 
