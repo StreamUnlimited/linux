@@ -101,7 +101,7 @@ int rtk_console_process(char *data, int len, u8 *result)
 		return -EBUSY;
 	}
 
-	if (len > CONSOLE_MAX_CHAR) {
+	if (len > sizeof(console_ipc_host_req_t)) {
 		dev_err(console_d->dev, "KM4 console parameters requested is too much. Maximum for %d bytes\n", CONSOLE_MAX_CHAR);
 		goto err_ret;
 	}
