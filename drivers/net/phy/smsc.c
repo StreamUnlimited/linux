@@ -213,6 +213,25 @@ static int lan95xx_config_aneg_ext(struct phy_device *phydev)
 	return lan87xx_config_aneg(phydev);
 }
 
+/*
+ * Custom suspend/resume callbacks
+ *
+ * Called when interface goes down/up
+ */
+static int smsc_phy_suspend(struct phy_device *phydev)
+{
+	/* From datasheet, autoneg has to be disabled before PDOWN */
+	phy_modify(phydev, MII_BMCR, BMCR_ANENABLE, 0);
+	phy_modify(phydev, MII_BMCR, BMCR_PDOWN, BMCR_PDOWN);
+	return 0;
+}
+
+static int smsc_phy_resume(struct phy_device *phydev)
+{
+	phy_modify(phydev, MII_BMCR, BMCR_ANENABLE | BMCR_PDOWN, BMCR_ANENABLE);
+	return 0;
+}
+
 int lan87xx_read_status(struct phy_device *phydev)
 {
 	struct smsc_phy_priv *priv = phydev->priv;
@@ -248,9 +267,7 @@ int lan87xx_read_status(struct phy_device *phydev)
 		if (priv->dbg)
 			netdev_info(phydev->attached_dev, "powering down\n");
 
-		/* From datasheet, autoneg has to be disabled before PDOWN */
-		phy_modify(phydev, MII_BMCR, BMCR_ANENABLE, 0);
-		phy_modify(phydev, MII_BMCR, BMCR_PDOWN, BMCR_PDOWN);
+		smsc_phy_suspend(phydev);
 
 		goto out;
 	}
@@ -272,7 +289,7 @@ int lan87xx_read_status(struct phy_device *phydev)
 	if (phydev->drv->soft_reset)
 		phydev->drv->soft_reset(phydev);
 
-	phy_modify(phydev, MII_BMCR, BMCR_ANENABLE | BMCR_PDOWN, BMCR_ANENABLE);
+	smsc_phy_resume(phydev);
 
 out:
 	priv->last_transition = jiffies;
@@ -659,6 +676,9 @@ int smsc_phy_probe(struct phy_device *phydev)
 
 	phydev->priv = priv;
 
+	// set by default powersave mode
+	smsc_phy_suspend(phydev);
+
 	/* Make clk optional to keep DTB backward compatibility. */
 	refclk = devm_clk_get_optional_enabled(dev, NULL);
 	if (IS_ERR(refclk))
@@ -841,6 +861,8 @@ static struct phy_driver smsc_phy_driver[] = {
 
 	.suspend	= genphy_suspend,
 	.resume		= genphy_resume,
+	.suspend	= smsc_phy_suspend,
+	.resume		= smsc_phy_resume,
 }, {
 	.phy_id		= 0x0007c130,	/* 0x0007c130 and 0x0007c131 */
 	/* This mask (0xfffffff2) is to differentiate from
