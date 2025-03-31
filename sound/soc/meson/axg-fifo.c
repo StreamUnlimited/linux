@@ -28,6 +28,7 @@ static struct snd_pcm_hardware axg_fifo_hw = {
 		 SNDRV_PCM_INFO_MMAP |
 		 SNDRV_PCM_INFO_MMAP_VALID |
 		 SNDRV_PCM_INFO_BLOCK_TRANSFER |
+		 SNDRV_PCM_INFO_BATCH |
 		 SNDRV_PCM_INFO_PAUSE |
 		 SNDRV_PCM_INFO_NO_PERIOD_WAKEUP),
 	.formats = AXG_FIFO_FORMATS,
@@ -69,6 +70,9 @@ static void __dma_enable(struct axg_fifo *fifo,  bool enable)
 {
 	regmap_update_bits(fifo->map, FIFO_CTRL0, CTRL0_DMA_EN,
 			   enable ? CTRL0_DMA_EN : 0);
+
+	// Read back initial dma_pos so that it is reported correctly
+	regmap_read(fifo->map, FIFO_STATUS2, &fifo->dma_pos);
 }
 
 int axg_fifo_pcm_trigger(struct snd_soc_component *component,
@@ -100,11 +104,8 @@ snd_pcm_uframes_t axg_fifo_pcm_pointer(struct snd_soc_component *component,
 {
 	struct axg_fifo *fifo = axg_fifo_data(ss);
 	struct snd_pcm_runtime *runtime = ss->runtime;
-	unsigned int addr;
 
-	regmap_read(fifo->map, FIFO_STATUS2, &addr);
-
-	return bytes_to_frames(runtime, addr - (unsigned int)runtime->dma_addr);
+	return bytes_to_frames(runtime, fifo->dma_pos - (unsigned int)runtime->dma_addr);
 }
 EXPORT_SYMBOL_GPL(axg_fifo_pcm_pointer);
 
@@ -149,6 +150,7 @@ int axg_fifo_pcm_hw_params(struct snd_soc_component *component,
 			   CTRL0_INT_EN,
 			   FIELD_PREP(CTRL0_INT_EN, irq_en));
 
+	fifo->dma_pos = runtime->dma_addr;
 	return 0;
 }
 EXPORT_SYMBOL_GPL(axg_fifo_pcm_hw_params);
@@ -167,6 +169,7 @@ int g12a_fifo_pcm_hw_params(struct snd_soc_component *component,
 
 	/* Set the initial memory address of the DMA */
 	regmap_write(fifo->map, FIFO_INIT_ADDR, runtime->dma_addr);
+	fifo->dma_pos = runtime->dma_addr;
 
 	return 0;
 }
@@ -212,6 +215,7 @@ static irqreturn_t axg_fifo_pcm_irq_block(int irq, void *dev_id)
 			status);
 
 	if (status & FIFO_INT_COUNT_REPEAT) {
+		regmap_read(fifo->map, FIFO_STATUS2, &fifo->dma_pos);
 		snd_pcm_period_elapsed(ss);
 		return IRQ_HANDLED;
 	}

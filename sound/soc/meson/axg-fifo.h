@@ -66,6 +66,7 @@ struct axg_fifo {
 	struct regmap_field *field_threshold;
 	unsigned int depth;
 	int irq;
+	unsigned int dma_pos;
 };
 
 struct axg_fifo_match_data {
