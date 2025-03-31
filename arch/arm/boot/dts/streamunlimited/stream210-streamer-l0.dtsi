@@ -1,0 +1,287 @@
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/sound/pcm9211.h>
+
+/ {
+	sue {
+		carrierboard = "stream210streamer";
+	};
+
+	aliases {
+		i2c1 = &i2c1_gpio;
+		i2c2 = &i2c2_gpio;
+	};
+
+	reg_aud_enable: reg-aud-enable {
+		compatible = "regulator-fixed";
+		regulator-name = "aud-enable";
+		gpio = <&gpioc 0 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	clk_pcm9211_xti: clk-pcm9211-xti {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24576000>;
+		clock-output-names = "xti";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&buttons_pins>;
+
+		pair {
+			label = "pair";
+			gpios = <&gpioa 0 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_KEY>;
+			linux,code = <KEY_BLUETOOTH>;
+		};
+
+		onoff {
+			label = "onoff";
+			gpios = <&gpioa 1 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_KEY>;
+			linux,code = <KEY_SLEEP>;
+		};
+
+		voldown {
+			label = "voldown";
+			gpios = <&gpioa 3 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_KEY>;
+			linux,code = <KEY_VOLUMEDOWN>;
+		};
+
+		playpause {
+			label = "playpause";
+			gpios = <&gpioa 4 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_KEY>;
+			linux,code = <KEY_PLAYPAUSE>;
+		};
+
+		volup {
+			label = "volup";
+			gpios = <&gpioa 6 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_KEY>;
+			linux,code = <KEY_VOLUMEUP>;
+		};
+
+		preset {
+			label = "preset";
+			gpios = <&gpioa 8 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_KEY>;
+			linux,code = <BTN_1>;
+		};
+	};
+
+	i2c1_gpio: i2c1_gpio {
+		compatible = "i2c-gpio";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c1_gpio_pins>;
+
+		sda-gpios = <&gpiob 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&gpiob 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+
+		status = "okay";
+	};
+
+	i2c2_gpio: i2c2_gpio {
+		compatible = "i2c-gpio";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2c2_gpio_pins>;
+
+		sda-gpios = <&gpioa 11 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&gpioa 12 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+
+		status = "okay";
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&ac1_led_pins>;
+
+		led_ac1 {
+			label = "ac1-led";
+			gpios = <&gpioa 13 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	sue-hsmp {
+		compatible = "sue,hsmp-rtk-mcu-ipc";
+		status = "okay";
+
+		state-controller {
+			compatible = "sue,hsmp-state-controller";
+			status = "okay";
+		};
+
+		gpio_hsmp: gpio {
+			gpio-controller;
+			#gpio-cells = <2>;
+			compatible = "sue,hsmp-gpio";
+			status = "okay";
+		};
+	};
+
+};
+
+&adc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&adc_pins_streamer>;
+	status = "okay";
+	rtk,adc-channels = <2>;
+};
+
+&codec {
+	status = "okay";
+	enable-dac-asrc;
+};
+
+&i2c2_gpio {
+	pcm9211: pcm9211@42 {
+		compatible = "ti,pcm9211";
+		reg = <0x42>;
+		#sound-dai-cells = <1>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pcm9211_pins>;
+
+		reset-gpios = <&gpioa 10 GPIO_ACTIVE_LOW>;
+
+		clock-names = "xti";
+		clocks = <&clk_pcm9211_xti>;
+
+		interrupt-names = "int0", "int1";
+		interrupts-extended = <&gpiob 29 IRQ_TYPE_EDGE_FALLING>, <&gpiob 25 IRQ_TYPE_EDGE_FALLING>;
+
+		// Configure MPIO groups
+		// - MPIO_A: Biphase Input Extension (RXIN8 to RXIN11)
+		// - MPIO_B: AUXOUT
+		// - MPIO_C: DIT Standalone Operation, Clock, and Data I/O, TXSCK/TXBCK/TXLRCK/TXDIN
+		ti,group-function = /bits/ 8 <
+			PCM9211_MPIO_A_GROUP_BIPHASE_INPUT
+			PCM9211_MPIO_B_GROUP_AUXOUT
+			PCM9211_MPIO_C_GROUP_DIT_CLOCK_DATA
+		>;
+
+		// - MPIO_A:	0xF => All Hi-Z
+		// - MPIO_B:	0x7 => Set Hi-Z for B0, B1, B2
+		// - MPIO_C:	0x0 => All driven
+		// - MAIN_OUT:	0x0 => All driven
+		ti,hiz-mask = /bits/ 8 <0xF 0x7 0x0 0x0>;
+	};
+};
+
+&pinctrl {
+	adc_pins_streamer: adc_pins_streamer {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 2, GPIO)>;
+			bias-disable;
+		};
+	};
+
+	buttons_pins: buttons_pins {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 0, GPIO)>,	// PAIR
+				 <REALTEK_PINMUX('A', 1, GPIO)>,	// ON/OFF
+				 <REALTEK_PINMUX('A', 3, GPIO)>,	// VOL-
+				 <REALTEK_PINMUX('A', 4, GPIO)>,	// PLAY/PAUSE
+				 <REALTEK_PINMUX('A', 6, GPIO)>,	// VOL+
+				 <REALTEK_PINMUX('A', 8, GPIO)>;	// PRESET
+			bias-pull-up;
+		};
+	};
+
+	i2c1_gpio_pins: i2c1_gpios {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 12, GPIO)>,	 // I2C1_SDA
+					<REALTEK_PINMUX('B', 13, GPIO)>; // I2C1_SCL
+			bias-pull-up;
+		};
+	};
+
+	i2c2_gpio_pins: i2c2_gpios {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 11, GPIO)>,	// I2C1_SDA
+				 <REALTEK_PINMUX('A', 12, GPIO)>;	// I2C1_SCL
+			bias-pull-up;
+		};
+	};
+
+	i2s2_pins_streamer: i2s2_pins_streamer {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 16, I2S2)>,
+				 <REALTEK_PINMUX('B', 17, I2S2)>,
+				 <REALTEK_PINMUX('B', 21, I2S2)>;
+		};
+	};
+
+	i2s3_pins_streamer: i2s3_pins_streamer {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 7, I2S3)>,
+				 <REALTEK_PINMUX('B', 8, I2S3)>,
+				 <REALTEK_PINMUX('B', 9, I2S3)>,
+				 <REALTEK_PINMUX('B', 10, I2S3)>;
+		};
+	};
+
+	ac1_led_pins: ac1_led_pins {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 13, GPIO)>;
+			bias-pull-up;
+			swd-disable;
+		};
+	};
+
+	pcm9211_pins: pcm9211_pins {
+		pins {
+			pinmux = <REALTEK_PINMUX('A', 10, GPIO)>,	// RESET_N_9211
+				 <REALTEK_PINMUX('B', 29, GPIO)>;	// SPDIFRX_ERROR (INT0)
+		};
+	};
+};
+
+&sound {
+	amp-supply = <&reg_aud_enable>;
+	amp_mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;
+	hp_mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
+
+	// SPORT2 I2S -> 0: pcm9211-main-hifi
+	// SPORT3 I2S -> 2: pcm9211-dit-hifi
+	sue,audio-codec = <&pcm9211 0>, <&pcm9211 2>;
+};
+
+// I2S input from the PCM9211 from the ADC, clock slave
+&sport2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2s2_pins_streamer>;
+
+	rtk,sport-multi-io = <1>;
+	rtk,sport-mode = <1>;
+	rtk,sport-mclk-multiplier = <256>;
+};
+
+// I2S output to PCM9211 for S/PDIF Tx, clock master
+&sport3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2s3_pins_streamer>;
+
+	rtk,sport-multi-io = <1>;
+	rtk,sport-mode = <0>;
+	// This settings makes sure that the MCLK always runs at 24.576 MHz or 22.5792 MHz.
+	rtk,sport-mclk-fixed-max = <24576000>;
+
+	sue,continuous-clock;
+};
