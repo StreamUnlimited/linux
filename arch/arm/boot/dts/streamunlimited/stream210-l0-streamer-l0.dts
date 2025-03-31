@@ -1,0 +1,8 @@
+/dts-v1/;
+
+#include "stream210-l0.dtsi"
+#include "stream210-streamer-l0.dtsi"
+
+/ {
+	model = "Stream210 L0, Streamer L0";
+};
