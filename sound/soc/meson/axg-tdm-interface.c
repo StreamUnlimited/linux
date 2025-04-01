@@ -546,6 +546,7 @@ static int axg_tdm_iface_drift_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_dai *cpu_dai = snd_kcontrol_chip(kcontrol);
 	struct axg_tdm_iface *iface = snd_soc_dai_get_drvdata(cpu_dai);
+	int ret;
 
 	if (ucontrol->value.integer.value[0] == iface->drift_comp_value)
 		return 0;
@@ -555,8 +556,12 @@ static int axg_tdm_iface_drift_put(struct snd_kcontrol *kcontrol,
 	if (iface->sysclk_nominal == 0)
 		return 0;
 
-	return snd_soc_dai_set_sysclk(cpu_dai, 0, iface->sysclk_nominal,
+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, iface->sysclk_nominal,
 			SND_SOC_CLOCK_OUT);
+	if (ret)
+		return ret;
+
+	return 1;
 }
 
 static int axg_tdm_iface_remove_dai(struct snd_soc_dai *dai)
