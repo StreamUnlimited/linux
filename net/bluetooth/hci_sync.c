@@ -1057,6 +1057,7 @@ int hci_setup_ext_adv_instance_sync(struct hci_dev *hdev, u8 instance)
 {
 	struct hci_cp_le_set_ext_adv_params cp;
 	bool connectable;
+	bool periodic = false;
 	u32 flags;
 	bdaddr_t random_addr;
 	u8 own_addr_type;
@@ -1083,12 +1084,17 @@ int hci_setup_ext_adv_instance_sync(struct hci_dev *hdev, u8 instance)
 	}
 
 	flags = hci_adv_instance_flags(hdev, instance);
+	if (adv)
+		periodic = adv->periodic;
 
 	/* If the "connectable" instance flag was not set, then choose between
 	 * ADV_IND and ADV_NONCONN_IND based on the global connectable setting.
+	 * But we don't want periodic advertisement to be connectable, as
+	 * periodic is related to BAP broadcast and broadcast advertisement
+	 * can't be connectable.
 	 */
 	connectable = (flags & MGMT_ADV_FLAG_CONNECTABLE) ||
-		      mgmt_get_connectable(hdev);
+		      (mgmt_get_connectable(hdev) && !periodic);
 
 	if (!is_advertising_allowed(hdev, connectable))
 		return -EPERM;
