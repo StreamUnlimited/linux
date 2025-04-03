@@ -1,0 +1,102 @@
+PCM9211 audio CODEC
+
+This device supports both I2C and SPI (configured with pin strapping
+on the board). The driver is currently implementing I2C only.
+
+Required properties:
+
+  - compatible : "ti,pcm9211"
+
+  - reg : the I2C address of the device for I2C, the chip select
+          number for SPI.
+
+Optional properties:
+
+  - clocks : A clock specifier for the clock connected to XTI. While the
+    device could work without it, this driver currently relies on it being
+    available
+
+  - clock-names : Must specify "xti" to match the requested clock.
+
+  - reset-gpios : GPIO wired to the reset pin, if not supplied a soft-reset is
+    used as fallback
+
+  - interrupt-names: Can contain "int0", "int1" or both.
+
+  - interrupts-extended: Specify up to two interrupts that correspond to
+    int0 and int1. Currently the functionality of the interrupts is hardcoded,
+    int0 is used for detecting SPDIF (DIR) errors and non-PCM data and int1 is
+    used for the ADC threshold detection.
+
+  - ti,group-function: An array with size 3 specifying function for pingroups
+    A, B and C. Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-a-flags-gpio: An array with size 4 specifying flags out or gpio
+    mode per pin, when function DIR_FLAGS_GPIO is selected for group a.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-b-flags-gpio: An array with size 4 specifying flags out or gpio
+    mode per pin, when function DIR_FLAGS_GPIO is selected for group b.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-c-flags-gpio: An array with size 4 specifying flags out or gpio
+    mode per pin, when function DIR_FLAGS_GPIO is selected for group c.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-a-flag: An array with size 4 specifying flag assigned per pin,
+    when function DIR_FLAGS_GPIO is selected for group a and pin is set to
+    flags mode.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-b-flag: An array with size 4 specifying flag assigned per pin,
+    when function DIR_FLAGS_GPIO is selected for group b and pin is set to
+    flags mode.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpio-c-flag: An array with size 4 specifying flag assigned per pin,
+    when function DIR_FLAGS_GPIO is selected for group c and pin is set to
+    flags mode.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,mpo-function: An array with size 2 specifying flag assigned per mpo
+    pin.
+    Possible values are defined in dt-bindings/sound/pcm9211.h
+
+  - ti,hiz-mask: An array with size 4 specifying the Hi-Z register setting for
+    MPIO_A, MPIO_B, MPIO_C and the MAIN_OUT ports respectively.
+
+Examples:
+
+	pcm9211: pcm9211@43 {
+		compatible = "ti,pcm9211";
+		reg = <0x43>;
+
+		clocks = <&xti_clk>;
+		clock-names = "xti";
+	};
+
+
+	pcm9211: pcm9211@43 {
+		compatible = "ti,pcm9211";
+		reg = <0x43>;
+
+		clocks = <&xti_clk>;
+		clock-names = "xti";
+
+		reset-gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+
+		ti,group-function = /bits/ 8
+			<PCM9211_MPIO_A_GROUP_BIPHASE_INPUT,
+			PCM9211_MPIO_B_GROUP_DIR_FLAGS_GPIO,
+			PCM9211_MPIO_C_GROUP_AUXIN1>;
+		ti,mpio-b-flags-gpio = /bits/ 8
+			<PCM9211_MPIO_DIR_FLAGS,
+			PCM9211_MPIO_DIR_FLAGS,
+			PCM9211_MPIO_DIR_FLAGS,
+			PCM9211_MPIO_DIR_FLAGS>;
+		ti,mpio-b-flag = /bits/ 8
+			<PCM9211_MPIO_FLAG_INT0,
+			PCM9211_MPIO_FLAG_CLKST,
+			PCM9211_MPIO_FLAG_CLKST,
+			PCM9211_MPIO_FLAG_CLKST>;
+	};

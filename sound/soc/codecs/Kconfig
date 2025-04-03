@@ -901,6 +901,15 @@ config SND_SOC_PCM512x_SPI
 	select SND_SOC_PCM512x
 	select REGMAP_SPI
 
+config SND_SOC_PCM9211
+	tristate
+
+config SND_SOC_PCM9211_I2C
+	tristate "Texas Instruments PCM9211 CODEC - I2C"
+	depends on I2C
+	select SND_SOC_PCM9211
+	select REGMAP_I2C
+
 config SND_SOC_RK3328
 	tristate "Rockchip RK3328 audio CODEC"
 	select REGMAP_MMIO
