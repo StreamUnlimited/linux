@@ -1553,6 +1553,7 @@ static int qos_set_big(struct hci_dev *hdev, struct bt_iso_qos *qos)
 static int qos_set_bis(struct hci_dev *hdev, struct bt_iso_qos *qos)
 {
 	struct hci_conn *conn;
+	struct adv_info *adv;
 	u8  bis;
 
 	/* Allocate BIS if not set */
@@ -1576,7 +1577,8 @@ static int qos_set_bis(struct hci_dev *hdev, struct bt_iso_qos *qos)
 		     bis++) {
 
 			conn = hci_conn_hash_lookup_bis(hdev, BDADDR_ANY, bis);
-			if (!conn)
+			adv = hci_find_adv_instance(hdev, bis);
+			if (!conn && !adv)
 				break;
 		}
 
