@@ -317,6 +317,12 @@ struct adv_monitor {
 	} state;
 };
 
+struct per_adv_to_remove {
+	struct list_head list;
+	u8  big;
+	u8  bis;
+};
+
 #define HCI_MIN_ADV_MONITOR_HANDLE		1
 #define HCI_MAX_ADV_MONITOR_NUM_HANDLES		32
 #define HCI_MAX_ADV_MONITOR_NUM_PATTERNS	16
@@ -593,6 +599,7 @@ struct hci_dev {
 	__u8			cur_adv_instance;
 	__u16			adv_instance_timeout;
 	struct delayed_work	adv_instance_expire;
+	struct list_head	bis_adv_to_remove;
 
 	struct idr		adv_monitors_idr;
 	unsigned int		adv_monitors_cnt;

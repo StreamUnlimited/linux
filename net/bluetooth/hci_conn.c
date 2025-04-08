@@ -756,15 +756,22 @@ static void bis_list(struct hci_conn *conn, void *data)
 static int terminate_big_sync(struct hci_dev *hdev, void *data)
 {
 	struct iso_list_data *d = data;
+	struct per_adv_to_remove *adv;
 
 	bt_dev_dbg(hdev, "big 0x%2.2x bis 0x%2.2x", d->big, d->bis);
 
-	hci_disable_per_advertising_sync(hdev, d->bis);
-	hci_remove_ext_adv_instance_sync(hdev, d->bis, NULL);
-
 	/* Only terminate BIG if it has been created */
-	if (!d->big_term)
+	if (!d->big_term) {
+		hci_disable_per_advertising_sync(hdev, d->bis);
+		hci_remove_ext_adv_instance_sync(hdev, d->bis, NULL);
 		return 0;
+	}
+
+	/* Queue adv to be terminated after Terminate BIG Complete event arrives */
+	adv = kzalloc(sizeof(*adv), GFP_KERNEL);
+	adv->big = d->big;
+	adv->bis = d->bis;
+	list_add(&adv->list, &hdev->bis_adv_to_remove);
 
 	return hci_le_terminate_big_sync(hdev, d->big,
 					 HCI_ERROR_LOCAL_HOST_TERM);

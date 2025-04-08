@@ -6850,6 +6850,43 @@ static void hci_le_create_big_complete_evt(struct hci_dev *hdev, void *data,
 	hci_dev_unlock(hdev);
 }
 
+static int terminate_big_adv_sync(struct hci_dev *hdev, void *data)
+{
+	struct per_adv_to_remove *adv = data;
+
+	bt_dev_dbg(hdev, "big 0x%2.2x bis 0x%2.2x", adv->big, adv->bis);
+
+	hci_disable_per_advertising_sync(hdev, adv->bis);
+	hci_remove_ext_adv_instance_sync(hdev, adv->bis, NULL);
+
+	return 0;
+}
+
+static void terminate_big_adv_destroy(struct hci_dev *hdev, void *data, int err)
+{
+	kfree(data);
+}
+
+static void hci_le_terminate_big_complete_evt(struct hci_dev *hdev, void *data,
+					   struct sk_buff *skb)
+{
+	struct hci_evt_le_terminate_big_complete *ev = data;
+	struct per_adv_to_remove *adv, *n;
+	int ret;
+
+	bt_dev_dbg(hdev, "handle 0x%2.2x", ev->handle);
+
+	list_for_each_entry_safe(adv, n, &hdev->bis_adv_to_remove, list) {
+		if (ev->handle == adv->big) {
+			list_del(&adv->list);
+			ret = hci_cmd_sync_queue(hdev, terminate_big_adv_sync, adv,
+				terminate_big_adv_destroy);
+			if (ret)
+				kfree(adv);
+		}
+	}
+}
+
 static void hci_le_big_sync_established_evt(struct hci_dev *hdev, void *data,
 					    struct sk_buff *skb)
 {
@@ -7054,6 +7091,11 @@ static const struct hci_le_ev {
 		     hci_le_create_big_complete_evt,
 		     sizeof(struct hci_evt_le_create_big_complete),
 		     HCI_MAX_EVENT_SIZE),
+	/* [0x1c = HCI_EVT_LE_TERMINATE_BIG_COMPLETE] */
+	HCI_LE_EV_VL(HCI_EVT_LE_TERMINATE_BIG_COMPLETE,
+			 hci_le_terminate_big_complete_evt,
+			 sizeof(struct hci_evt_le_terminate_big_complete),
+			 HCI_MAX_EVENT_SIZE),
 	/* [0x1d = HCI_EV_LE_BIG_SYNC_ESTABILISHED] */
 	HCI_LE_EV_VL(HCI_EVT_LE_BIG_SYNC_ESTABILISHED,
 		     hci_le_big_sync_established_evt,

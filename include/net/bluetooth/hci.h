@@ -2757,6 +2757,12 @@ struct hci_evt_le_create_big_complete {
 	__le16  bis_handle[];
 } __packed;
 
+#define HCI_EVT_LE_TERMINATE_BIG_COMPLETE	0x1c
+struct hci_evt_le_terminate_big_complete {
+	__u8    handle;
+	__u8    reason;
+} __packed;
+
 #define HCI_EVT_LE_BIG_SYNC_ESTABILISHED 0x1d
 struct hci_evt_le_big_sync_estabilished {
 	__u8    status;
