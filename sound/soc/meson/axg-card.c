@@ -45,8 +45,15 @@ static int axg_card_tdm_be_hw_params(struct snd_pcm_substream *substream,
 	struct meson_card *priv = snd_soc_card_get_drvdata(rtd->card);
 	struct axg_dai_link_tdm_data *be =
 		(struct axg_dai_link_tdm_data *)priv->link_data[rtd->num];
+	int ret;
 
-	return meson_card_i2s_set_sysclk(substream, params, be->mclk_fs);
+	ret = meson_card_i2s_set_sysclk(substream, params, be->mclk_fs);
+	if (ret < 0)
+		return ret;
+
+	meson_card_store_tdm_rate(rtd->card, params_rate(params));
+
+	return 0;
 }
 
 bool continuous_clk_requested(struct snd_soc_pcm_runtime *rtd)

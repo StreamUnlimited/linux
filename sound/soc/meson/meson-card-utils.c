@@ -42,6 +42,20 @@ int meson_card_i2s_set_sysclk(struct snd_pcm_substream *substream,
 }
 EXPORT_SYMBOL_GPL(meson_card_i2s_set_sysclk);
 
+void meson_card_store_tdm_rate(struct snd_soc_card *card, unsigned int rate)
+{
+	struct meson_card *priv = snd_soc_card_get_drvdata(card);
+	priv->tdm_rate = rate;
+}
+EXPORT_SYMBOL_GPL(meson_card_store_tdm_rate);
+
+unsigned int meson_card_get_tdm_rate(struct snd_soc_card *card)
+{
+	struct meson_card *priv = snd_soc_card_get_drvdata(card);
+	return priv->tdm_rate;
+}
+EXPORT_SYMBOL_GPL(meson_card_get_tdm_rate);
+
 int meson_card_reallocate_links(struct snd_soc_card *card,
 				unsigned int num_links)
 {

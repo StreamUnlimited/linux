@@ -26,6 +26,7 @@ struct meson_card {
 	const struct meson_card_match_data *match_data;
 	struct gpio_desc *mute;
 	struct gpio_desc *pdown;
+	unsigned int tdm_rate;
 	struct snd_soc_card card;
 	void **link_data;
 };
@@ -36,6 +37,8 @@ unsigned int meson_card_parse_daifmt(struct device_node *node,
 int meson_card_i2s_set_sysclk(struct snd_pcm_substream *substream,
 			      struct snd_pcm_hw_params *params,
 			      unsigned int mclk_fs);
+void meson_card_store_tdm_rate(struct snd_soc_card *card, unsigned int rate);
+unsigned int meson_card_get_tdm_rate(struct snd_soc_card *card);
 
 int meson_card_reallocate_links(struct snd_soc_card *card,
 				unsigned int num_links);

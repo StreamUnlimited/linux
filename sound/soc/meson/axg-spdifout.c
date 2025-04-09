@@ -4,6 +4,7 @@
 // Author: Jerome Brunet <jbrunet@baylibre.com>
 
 #include <linux/clk.h>
+#include <linux/gcd.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/regmap.h>
@@ -11,6 +12,7 @@
 #include <sound/soc-dai.h>
 #include <sound/pcm_params.h>
 #include <sound/pcm_iec958.h>
+#include "meson-card.h"
 
 /*
  * NOTE:
@@ -216,30 +218,41 @@ static int axg_spdifout_hw_params(struct snd_pcm_substream *substream,
 				  struct snd_pcm_hw_params *params,
 				  struct snd_soc_dai *dai)
 {
+	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
 	struct axg_spdifout *priv = snd_soc_dai_get_drvdata(dai);
 	unsigned int rate = params_rate(params);
-	unsigned long ppm, actual_rate, requested_rate;
+	unsigned int tdm_rate = meson_card_get_tdm_rate(rtd->card);
+	unsigned long requested_rate, base;
 	int ret;
 
-	/* 2 * 32bits per subframe * 2 channels = 128 */
+	/*
+	* TDM interface controls the hifi_pll so we need to check if the spdif out rate
+	* is in the same rate family as the tdm rate
+	*/
+	if (tdm_rate == 0) {
+		dev_err(dai->dev, "tdm_rate not set\n");
+		return -EINVAL;
+	}
+	base = gcd(rate, tdm_rate);
+	/* 
+	 * Must be a meaningful base rate
+	 * For 48KHz playback: 8000
+	 * For 44.1KHz playback: 11025
+	 */
+	if (base < 8000) {
+		dev_err(dai->dev,
+			"the greatest common divisor (%lu) of SPDIF requested rate (%d) and TDM rate (%d) is too small\n",
+			base, rate, tdm_rate);
+		return -EINVAL;
+	}
+
+	/* 2 * 32bits per subfraíme * 2 channels = 128 */
 	requested_rate = rate * 128;
 	ret = clk_set_rate(priv->mclk, requested_rate);
 	if (ret) {
 		dev_err(dai->dev, "failed to set spdif clock\n");
 		return ret;
 	}
-	/*
-	* TDM interface controls the hifi_pll and the drift compensator so rates can be mismatched
-	* Kernel can still find a rate within 500ppm even when parent_clk is configured for an unsuitable base freq
-	* (For example playing 44.1KHz when hifi_pll is configured for 48KHz)
-	* But we check for any obvious misconfigurations with best effort
-	*/
-	ppm = DIV_ROUND_UP_ULL(requested_rate*500, 1000000UL);
-	actual_rate = clk_get_rate(priv->mclk);
-	if (actual_rate < requested_rate - ppm || actual_rate > requested_rate + ppm)
-		dev_warn(dai->dev,
-			      "SPDIF clock rate %ld doesn't match requested rate %lu within 500ppm\n",
-			      clk_get_rate(priv->mclk), requested_rate);
 
 	ret = axg_spdifout_sample_fmt(params, dai);
 	if (ret) {
