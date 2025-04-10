@@ -28,7 +28,7 @@
 #define DEAL_ADC_ENABLE_DCHPF_FUNC(x) { \
 										tmp = readl(audio_base_addr + CODEC_ADC_##x##_CONTROL_0);\
 										tmp &= ~AUD_MASK_ADC_##x##_DCHPF_FC_SEL;\
-										tmp |= AUD_BIT_ADC_##x##_DCHPF_EN | AUD_ADC_##x##_DCHPF_FC_SEL(2);\
+										tmp |= AUD_BIT_ADC_##x##_DCHPF_EN | AUD_ADC_##x##_DCHPF_FC_SEL(7);\
 										writel(tmp, audio_base_addr + CODEC_ADC_##x##_CONTROL_0); }
 
 /*micros for amic*/
