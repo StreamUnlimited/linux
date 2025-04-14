@@ -290,6 +290,63 @@ static struct snd_soc_card ameba_snd = {
 	.num_dapm_widgets	= ARRAY_SIZE(ameba_dapm_widgets),
 };
 
+/*
+ * This function allows to change the codecs for the AIF3 (I2S2) and AIF4 (I2S3) interfaces
+ * by parsing the `sue,audio-codec` device-tree property.
+ * If this property is not specified or it only contains one entry then the dummy codec
+ * will be kept as specified above by using `SND_SOC_DAILINK_DEFS()`.
+ */
+static int sue_parse_digital_audio_codecs(struct snd_soc_card *card)
+{
+	struct snd_soc_dai_link_component * const per_aif_codecs[2] = { aif3_codecs, aif4_codecs };
+	struct device_node *np = card->dev->of_node;
+	int num_sue_codecs, ret, i;
+
+	num_sue_codecs = of_count_phandle_with_args(np, "sue,audio-codec", "#sound-dai-cells");
+	if (num_sue_codecs < 0 && num_sue_codecs != -ENOENT) {
+		dev_err(card->dev, "failed to parse sue,audio-codec node: %d\n", num_sue_codecs);
+		return ret;
+	}
+
+	if (num_sue_codecs > 2) {
+		dev_warn(card->dev, "sue,audio-codec: excess entries ignored (max 2)\n");
+		num_sue_codecs = 2;
+	}
+
+	for (i = 0; i < num_sue_codecs; i++) {
+		struct of_phandle_args args;
+		struct snd_soc_dai_link_component *comp = &per_aif_codecs[i][0];
+
+		ret = of_parse_phandle_with_args(np, "sue,audio-codec", "#sound-dai-cells", i, &args);
+		if (ret < 0) {
+			/*
+			 * If there was a sentinel value specified (<0>) then we get -ENOENT, so
+			 * let's skip the codec and do nothing as we statically already defined a
+			 * dummy codec.
+			 */
+			if (ret == -ENOENT)
+				continue;
+
+			dev_err(card->dev, "failed to parse sue,audio-codec[%d]: %d\n", i, ret);
+			return ret;
+		}
+
+		comp->name = NULL;
+		comp->of_node = args.np;
+
+		ret = snd_soc_get_dai_name(&args, &comp->dai_name);
+		of_node_put(args.np);
+
+		if (ret < 0) {
+			dev_err(card->dev, "failed to get dai_name for codec sue,audio-codec %d: %d\n", i, ret);
+			return ret;
+		}
+
+	}
+
+	return 0;
+}
+
 static int ameba_audio_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -314,6 +371,12 @@ static int ameba_audio_probe(struct platform_device *pdev)
 	} else {
 		card->dai_link = ameba_dai;
 		card->num_links = ARRAY_SIZE(ameba_dai);
+	}
+
+	ret = sue_parse_digital_audio_codecs(card);
+	if (ret < 0) {
+		dev_err(card->dev, "failed to parse SUE audio codecs: %d\n", ret);
+		return ret;
 	}
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
