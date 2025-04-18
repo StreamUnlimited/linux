@@ -20,6 +20,8 @@ struct ameba_priv {
 	int cur_pll_ppm;
 	struct gpio_desc *amp_mute_gpio;
 	struct gpio_desc *hp_mute_gpio;
+
+	bool regulator_is_enabled;
 	struct regulator *enable_regulator;
 };
 
@@ -177,6 +179,39 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 	},
 };
 
+static void set_amp_mute(struct ameba_priv *priv, bool mute)
+{
+	if (priv->amp_mute_gpio)
+		gpiod_set_value_cansleep(priv->amp_mute_gpio, mute);
+}
+
+static void set_hp_mute(struct ameba_priv *priv, bool mute)
+{
+	if (priv->hp_mute_gpio)
+		gpiod_set_value_cansleep(priv->hp_mute_gpio, mute);
+}
+
+static int set_regulator_enable(struct ameba_priv *priv, bool enable)
+{
+	int ret = 0;
+
+	if (!priv->enable_regulator)
+		return 0;
+
+	if (priv->regulator_is_enabled == enable)
+		return 0;
+
+	if (enable)
+		ret = regulator_enable(priv->enable_regulator);
+	else
+		ret = regulator_disable(priv->enable_regulator);
+
+	if (!ret)
+		priv->regulator_is_enabled = enable;
+
+	return ret;
+}
+
 static int amp_power_event(struct snd_soc_dapm_widget *w,
 			   struct snd_kcontrol *kcontrol, int event)
 {
@@ -189,17 +224,17 @@ static int amp_power_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		gpiod_set_value_cansleep(priv->amp_mute_gpio, 1);
-		gpiod_set_value_cansleep(priv->hp_mute_gpio, 1);
-		ret = !regulator_is_enabled(priv->enable_regulator) ? regulator_enable(priv->enable_regulator) : 0;
+		set_amp_mute(priv, true);
+		set_hp_mute(priv, true);
+		ret = set_regulator_enable(priv, true);
 		msleep(50);
-		gpiod_set_value_cansleep(priv->amp_mute_gpio, 0);
-		gpiod_set_value_cansleep(priv->hp_mute_gpio, 0);
+		set_amp_mute(priv, false);
+		set_hp_mute(priv, false);
 	break;
 	case SND_SOC_DAPM_PRE_PMD:
-		gpiod_set_value_cansleep(priv->amp_mute_gpio, 1);
-		gpiod_set_value_cansleep(priv->hp_mute_gpio, 1);
-		ret = regulator_is_enabled(priv->enable_regulator) ? regulator_disable(priv->enable_regulator) : 0;
+		set_amp_mute(priv, true);
+		set_hp_mute(priv, true);
+		ret = set_regulator_enable(priv, false);
 	break;
 	default:
 		return 0;
@@ -214,16 +249,22 @@ static int ameba_card_probe(struct snd_soc_card *card)
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
 
 	priv->amp_mute_gpio = devm_gpiod_get(card->dev, "amp_mute", GPIOD_OUT_HIGH);
-	if (IS_ERR(priv->amp_mute_gpio))
-		return PTR_ERR(priv->amp_mute_gpio);
+	if (IS_ERR(priv->amp_mute_gpio)) {
+		priv->amp_mute_gpio = NULL;
+		dev_warn(card->dev, "No AMP mute gpio\n");
+	}
 
 	priv->hp_mute_gpio = devm_gpiod_get(card->dev, "hp_mute", GPIOD_OUT_HIGH);
-	if (IS_ERR(priv->hp_mute_gpio))
-		return PTR_ERR(priv->hp_mute_gpio);
+	if (IS_ERR(priv->hp_mute_gpio)) {
+		priv->hp_mute_gpio = NULL;
+		dev_warn(card->dev, "No HP mute gpio\n");
+	}
 
 	priv->enable_regulator = devm_regulator_get_exclusive(card->dev, "amp");
-	if (IS_ERR(priv->enable_regulator))
-		return PTR_ERR(priv->enable_regulator);
+	if (IS_ERR(priv->enable_regulator)) {
+		priv->enable_regulator = NULL;
+		dev_warn(card->dev, "No enable regulator\n");
+	}
 
 	return 0;
 }
