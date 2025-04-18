@@ -12,7 +12,13 @@
 
 void llhw_xmit_done(int idx_wlan)
 {
+	int skb_num_ap = global_idev.wifi_user_config.skb_num_ap;
+
 	atomic_inc(&global_idev.xmit_priv.skb_free_num);
+	if (atomic_read(&global_idev.xmit_priv.skb_free_num) > skb_num_ap) {
+		dev_err(global_idev.fullmac_dev, "%s: skb_free_num > skb_num_ap\n", __func__);
+	}
+
 	if (atomic_read(&global_idev.xmit_priv.skb_free_num) >= QUEUE_WAKE_THRES) {
 		//dev_dbg(global_idev.fullmac_dev, "wq %d\n", free_num);
 		netif_tx_wake_all_queues(global_idev.pndev[0]);
@@ -121,7 +127,7 @@ int llhw_xmit_init(void)
 		return -ENOMEM;
 	}
 
-	xmit_priv->host_skb_buff = (struct dev_sk_buff *)dmam_alloc_coherent(pdev, sizeof(struct dev_sk_buff) * skb_num_ap, &xmit_priv->host_skb_buff_phy, GFP_KERNEL);
+	xmit_priv->host_skb_buff = (struct dev_sk_buff *)dma_alloc_coherent(pdev, sizeof(struct dev_sk_buff) * skb_num_ap, &xmit_priv->host_skb_buff_phy, GFP_KERNEL);
 	if (!xmit_priv->host_skb_buff) {
 		dev_err(global_idev.fullmac_dev, "%s: malloc failed.", __func__);
 		return -ENOMEM;

@@ -23,6 +23,7 @@ int llhw_wifi_connect(struct _rtw_network_info_t *connect_param, unsigned char b
 int llhw_wifi_disconnect(void);
 int llhw_wifi_is_connected_to_ap(void);
 int llhw_wifi_get_channel(u32 wlan_idx, u8 *ch);
+int llhw_wifi_set_channel(u32 wlan_idx, u8 ch);
 int llhw_init(void);
 void llhw_deinit(void);
 int llhw_wifi_del_sta(u8 wlan_idx, u8 *mac);
@@ -102,6 +103,7 @@ int llhw_wifi_set_country_code(char *cc);
 int llhw_wifi_get_country_code(struct country_code_table_t *table);
 int llhw_wifi_driver_is_mp(void);
 int wifi_btcoex_bt_hci_notify(uint8_t *pdata, uint16_t len, uint8_t dir);
+int llhw_wifi_set_promisc_enable(u32 enable, u8 mode);
 
 void *rtw_malloc(size_t size, dma_addr_t *paddr);
 void rtw_mfree(size_t size, void *vaddr, dma_addr_t paddr);

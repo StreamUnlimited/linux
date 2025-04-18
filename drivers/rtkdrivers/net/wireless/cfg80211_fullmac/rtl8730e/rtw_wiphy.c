@@ -219,6 +219,7 @@ int rtw_wiphy_init_params(struct wiphy *pwiphy)
 	pwiphy->max_scan_ie_len = RTW_SCAN_IE_LEN_MAX;
 	pwiphy->max_num_pmkids = RTW_MAX_NUM_PMKIDS;
 	pwiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+							  | BIT(NL80211_IFTYPE_MONITOR)
 							  | BIT(NL80211_IFTYPE_AP)
 #ifdef CONFIG_NAN
 							  | BIT(NL80211_IFTYPE_NAN)

@@ -58,17 +58,18 @@ int llhw_wifi_set_user_config(struct wifi_user_conf *pwifi_usrcfg)
 	u32 param_buf[1];
 	dma_addr_t phy_addr;
 	int ret = 0;
-	struct device *pdev = global_idev.ipc_dev;
+	struct wifi_user_conf *pusrcfg;
 
-	phy_addr = dma_map_single(pdev, (void *)pwifi_usrcfg, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
-	if (dma_mapping_error(pdev, phy_addr)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
+	pusrcfg = rtw_malloc(sizeof(struct wifi_user_conf), &phy_addr);
+	if (!pusrcfg) {
+		dev_err(global_idev.fullmac_dev, "%s: malloc failed!\n", __func__);
 		return -1;
 	}
-	param_buf[0] = (u32)phy_addr;
+	memcpy(pusrcfg, pwifi_usrcfg, sizeof(struct wifi_user_conf));
 
+	param_buf[0] = (u32)phy_addr;
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_USR_CFG, param_buf, 1);
-	dma_unmap_single(pdev, phy_addr, sizeof(struct wifi_user_conf), DMA_TO_DEVICE);
+	rtw_mfree(sizeof(struct wifi_user_conf), pusrcfg, phy_addr);
 
 	return ret;
 }
@@ -101,7 +102,7 @@ int llhw_wifi_set_mac_addr(u32 wlan_idx, u8 *addr)
 	param_buf[2] = 0;
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_MAC_ADDR, param_buf, 3);
-	dma_unmap_single(pdev, phy_addr, sizeof(struct _rtw_scan_param_t), DMA_TO_DEVICE);
+	dma_unmap_single(pdev, phy_addr, ETH_ALEN, DMA_TO_DEVICE);
 
 	return ret;
 }
@@ -240,7 +241,7 @@ int llhw_wifi_get_channel(u32 wlan_idx, u8 *ch)
 {
 	int ret = -1;
 	u32 param_buf[2];
-	int *channel_temp = NULL;
+	u8 *channel_temp = NULL;
 	dma_addr_t dma_addr = 0;
 	struct device *pdev = global_idev.ipc_dev;
 
@@ -249,7 +250,7 @@ int llhw_wifi_get_channel(u32 wlan_idx, u8 *ch)
 		goto func_exit;
 	}
 
-	dma_addr = dma_map_single(pdev, channel_temp, sizeof(u8), DMA_TO_DEVICE);
+	dma_addr = dma_map_single(pdev, channel_temp, sizeof(u8), DMA_FROM_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		ret = -EINVAL;
@@ -267,6 +268,18 @@ free_buf:
 	kfree((u8 *)channel_temp);
 
 func_exit:
+	return ret;
+}
+
+int llhw_wifi_set_channel(u32 wlan_idx, u8 ch)
+{
+	int ret = -1;
+	u32 param_buf[2];
+
+	param_buf[0] = wlan_idx;
+	param_buf[1] = (u32)ch;
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_CHANNEL, param_buf, 2);
+
 	return ret;
 }
 
@@ -316,7 +329,7 @@ int llhw_wifi_start_ap(struct _rtw_softap_info_t *softAP_config)
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_START_AP, param_buf, 1);
 
-	dma_unmap_single(pdev, dma_addr_softap_config, sizeof(struct _rtw_softap_info_t), DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, dma_addr_softap_config, sizeof(struct _rtw_softap_info_t), DMA_TO_DEVICE);
 
 	return ret;
 }
@@ -333,20 +346,12 @@ int llhw_wifi_stop_ap(void)
 int llhw_wifi_set_EDCA_params(unsigned int *AC_param)
 {
 	int ret = 0;
-	dma_addr_t dma_addr_ac_param = 0;
-	struct device *pdev = global_idev.ipc_dev;
 	u32 param_buf[1] = {0};
+	unsigned int ac_param = *AC_param;
 
-	dma_addr_ac_param = dma_map_single(pdev, AC_param, sizeof(unsigned int), DMA_TO_DEVICE);
-	if (dma_mapping_error(pdev, dma_addr_ac_param)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
-		return -1;
-	}
-	param_buf[0] = (u32)dma_addr_ac_param;
+	param_buf[0] = ac_param;
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SET_EDCA_PARAM, param_buf, 1);
-	dma_unmap_single(pdev, dma_addr_ac_param, sizeof(unsigned int), DMA_TO_DEVICE);
-
 	return ret;
 }
 
@@ -367,7 +372,7 @@ int llhw_wifi_add_key(struct rtw_crypt_info *crypt)
 
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_ADD_KEY, param_buf, 1);
 
-	dma_unmap_single(pdev, dma_addr_crypt, sizeof(struct rtw_crypt_info), DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, dma_addr_crypt, sizeof(struct rtw_crypt_info), DMA_TO_DEVICE);
 	return ret;
 }
 
@@ -403,8 +408,8 @@ int llhw_wifi_tx_mgnt(u8 wlan_idx, const u8 *buf, size_t buf_len, u8 need_wait_a
 	param_buf[0] = (u32)dma_addr_desc;
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_SEND_MGNT, param_buf, 1);
 
-	dma_unmap_single(pdev, dma_addr_desc, sizeof(struct _raw_data_desc_t), DMA_FROM_DEVICE);
-	dma_unmap_single(pdev, dma_addr_buf, buf_len, DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, dma_addr_desc, sizeof(struct _raw_data_desc_t), DMA_TO_DEVICE);
+	dma_unmap_single(pdev, dma_addr_buf, buf_len, DMA_TO_DEVICE);
 
 	return ret;
 }
@@ -445,17 +450,16 @@ u32 llhw_wifi_update_ip_addr(void)
 	struct event_priv_t *event_priv = &global_idev.event_priv;
 	u32 param_buf[1] = {0};
 	u32 try_cnt = 5000;//wait 10ms
-	static u8 *ip_addr = NULL;
-	static dma_addr_t ip_addr_phy = 0;
+	u8 *ip_addr = NULL;
+	dma_addr_t ip_addr_phy = 0;
 
-	if (ip_addr == NULL) {
-		ip_addr = dmam_alloc_coherent(global_idev.fullmac_dev, sizeof(u32), &ip_addr_phy, GFP_KERNEL);
-		if (!ip_addr) {
-			dev_err(global_idev.fullmac_dev, "%s: allloc ip_addr error.\n", __func__);
-			return -ENOMEM;
-		}
-		memcpy(ip_addr, global_idev.ip_addr, 4);
+	ip_addr = dma_alloc_coherent(global_idev.fullmac_dev, sizeof(u32), &ip_addr_phy, GFP_KERNEL);
+	if (!ip_addr) {
+		dev_err(global_idev.fullmac_dev, "%s: allloc ip_addr error.\n", __func__);
+		return -ENOMEM;
 	}
+	memcpy(ip_addr, global_idev.ip_addr, 4);
+
 	dev_dbg(global_idev.fullmac_dev, "%s ip=[%d.%d.%d.%d]\n", __func__, ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]);
 
 	param_buf[0] = (u32)ip_addr_phy;
@@ -961,7 +965,7 @@ int llhw_wifi_get_edcca_mode(u8 *edcca_mode)
 		goto func_exit;
 	}
 
-	dma_addr = dma_map_single(pdev, virt_addr, sizeof(u8), DMA_TO_DEVICE);
+	dma_addr = dma_map_single(pdev, virt_addr, sizeof(u8), DMA_FROM_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		ret = -EINVAL;
@@ -995,7 +999,7 @@ int llhw_wifi_get_ant_info(u8 *antdiv_mode, u8 *curr_ant)
 		goto func_exit;
 	}
 
-	dma_addr = dma_map_single(pdev, virt_addr, sizeof(u8), DMA_TO_DEVICE);
+	dma_addr = dma_map_single(pdev, virt_addr, 2 * sizeof(u8), DMA_FROM_DEVICE);
 	if (dma_mapping_error(pdev, dma_addr)) {
 		dev_err(global_idev.fullmac_dev, "%s: mapping dma error!\n", __func__);
 		ret = -EINVAL;
@@ -1104,5 +1108,18 @@ int wifi_btcoex_bt_hci_notify(uint8_t *pdata, uint16_t len, uint8_t dir)
 	param_buf[2] = (u32)dir;
 	ret = llhw_ipc_send_msg(INIC_API_WIFI_COEX_BT_HCI, param_buf, 3);
 	dma_unmap_single(pdev, dma_data, len, DMA_TO_DEVICE);
+	return ret;
+}
+
+int llhw_wifi_set_promisc_enable(u32 enable, u8 mode)
+{
+	int ret = 0;
+	u32 param_buf[3];
+
+	param_buf[0] = enable;
+	param_buf[1] = (u32)mode;
+	param_buf[2] = (u32)0xffffffff;
+	ret = llhw_ipc_send_msg(INIC_API_WIFI_PROMISC_INIT, param_buf, 3);
+
 	return ret;
 }

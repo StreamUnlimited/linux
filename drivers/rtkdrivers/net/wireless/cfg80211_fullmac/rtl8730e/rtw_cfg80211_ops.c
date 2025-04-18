@@ -56,6 +56,9 @@ static int cfg80211_rtw_change_iface(struct wiphy *wiphy, struct net_device *nde
 	} else if ((widx == 1) && (type == NL80211_IFTYPE_STATION)) {
 		dev_err(global_idev.fullmac_dev, "Port1 no STA mode!\n");
 		return -EPERM;
+	} else if ((widx == 1) && (type == NL80211_IFTYPE_MONITOR)) {
+		dev_err(global_idev.fullmac_dev, "Port1 no monitor mode!\n");
+		return -EPERM;
 	}
 #ifdef CONFIG_NAN
 	if (ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_NAN) {
@@ -79,6 +82,12 @@ static int cfg80211_rtw_change_iface(struct wiphy *wiphy, struct net_device *nde
 		llhw_wifi_set_p2p_role(P2P_ROLE_CLIENT);
 	}
 #endif
+
+	if (type == NL80211_IFTYPE_MONITOR) {
+		ndev->type = ARPHRD_IEEE80211_RADIOTAP;
+	} else {
+		ndev->type = ARPHRD_ETHER;
+	}
 
 	ndev->ieee80211_ptr->iftype = type;
 	return 0;
@@ -779,16 +788,31 @@ static int cfg80211_rtw_set_power_mgmt(struct wiphy *wiphy, struct net_device *n
 
 static int cfg80211_rtw_set_monitor_channel(struct wiphy *wiphy, struct cfg80211_chan_def *chandef)
 {
-	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
-	return 0;
+	int ret = 0;
+	int ch = 0;
+
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s, channel %d", __func__, chandef->center_freq1);
+
+	if (global_idev.mp_fw) {
+		return -EPERM;
+	}
+
+	ch = rtw_freq2ch(chandef->center_freq1);
+	ret = llhw_wifi_set_channel(0, ch);
+	if (ret < 0) {
+		dev_err(global_idev.fullmac_dev, "[fullmac] set channel failed(%d).", ret);
+		return ret;
+	}
+
+	return ret;
 }
 
 static int cfg80211_rtw_get_channel(struct wiphy *wiphy,
-				    struct wireless_dev *wdev,
+									struct wireless_dev *wdev,
 #if (KERNEL_VERSION(6, 6, 0) <= LINUX_VERSION_CODE)
-				    unsigned int link_id,
+									unsigned int link_id,
 #endif
-				    struct cfg80211_chan_def *chandef)
+									struct cfg80211_chan_def *chandef)
 {
 	u32 wlan_idx = 0;
 	struct net_device *pnetdev = NULL;
@@ -809,12 +833,12 @@ static int cfg80211_rtw_get_channel(struct wiphy *wiphy,
 		wlan_idx = global_idev.p2p_global.pd_wlan_idx;
 	} else
 #endif
-	if (pnetdev) {
-		wlan_idx = rtw_netdev_idx(pnetdev);
-	} else {
-		dev_err(global_idev.fullmac_dev, "[fullmac]: %s, cannot find wlan idx.", __func__);
-		return -EINVAL;
-	}
+		if (pnetdev) {
+			wlan_idx = rtw_netdev_idx(pnetdev);
+		} else {
+			dev_err(global_idev.fullmac_dev, "[fullmac]: %s, cannot find wlan idx.", __func__);
+			return -EINVAL;
+		}
 
 	ret = llhw_wifi_get_channel(wlan_idx, &ch);
 	if (ret < 0) {
