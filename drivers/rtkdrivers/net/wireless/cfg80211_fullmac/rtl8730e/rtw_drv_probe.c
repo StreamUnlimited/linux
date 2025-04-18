@@ -211,7 +211,6 @@ int rtw_netdev_remove(struct device *pdev)
 
 static void platform_device_init(struct platform_device *pdev)
 {
-	u32 status = false;
 	struct resource *res_mem = NULL;
 	unsigned long pmem_len = 0;
 	struct axi_data *axi_data;
@@ -235,7 +234,7 @@ static void platform_device_init(struct platform_device *pdev)
 	axi_data->axi_mem_start = (unsigned long)devm_ioremap_resource(&pdev->dev, res_mem);
 	if (!axi_data->axi_mem_start) {
 		pr_err("Can't map CTRL mem\n");
-		goto exit;
+		goto free_dvobj;
 	}
 	axi_data->axi_mem_end = axi_data->axi_mem_start + pmem_len;
 
@@ -246,27 +245,28 @@ static void platform_device_init(struct platform_device *pdev)
 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res_mem) {
 		pr_err("Can't get KM4 mem\n");
-		goto exit;
+		goto free_dvobj;
 	}
 
 	axi_data->km4_map_phys_base = res_mem->start;
 	axi_data->km4_map_virt_base = devm_ioremap_nocache(&pdev->dev, res_mem->start, resource_size(res_mem));
 	if (!axi_data->km4_map_virt_base) {
 		pr_err("Failed to map KM4 mem\n");
-		goto exit;
+		goto free_dvobj;
 	}
 
 	pr_info("Memory mapped KM4 space start: 0x%08lx len:%08x, after map:0x%08lx\n",
 			 (unsigned long)axi_data->km4_map_phys_base, resource_size(res_mem), (unsigned long)axi_data->km4_map_virt_base);
 
-	status = true;
+	return;
 
 free_dvobj:
-	if (status != true) {
-		platform_set_drvdata(pdev, NULL);
-	}
+	kfree((u8 *)axi_data);
+	paxi_data_global = NULL;
+	platform_set_drvdata(pdev, NULL);
+
 exit:
-	return ;
+	return;
 }
 
 static void platform_device_deinit(struct platform_device *pdev)
@@ -275,11 +275,6 @@ static void platform_device_deinit(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, NULL);
 	if (axi_data) {
-		if (axi_data->axi_mem_start != 0) {
-			devm_iounmap(&pdev->dev, (void *)axi_data->axi_mem_start);
-			axi_data->axi_mem_start = 0;
-		}
-
 		kfree((u8 *)axi_data);
 		paxi_data_global = NULL;
 	}
@@ -394,6 +389,8 @@ void __exit rtw_drv_halt(void)
 	pr_info("Fullmac module exit start\n");
 	dev_dbg(global_idev.fullmac_dev, "%s", __func__);
 	platform_driver_unregister(&axi_drvpriv.rtw_axi_drv);
+
+	rtw_inetaddr_notifier_unregister();
 	pr_info("Fullmac module exit success\n");
 }
 

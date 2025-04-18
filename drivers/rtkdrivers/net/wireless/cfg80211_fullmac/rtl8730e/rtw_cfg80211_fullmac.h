@@ -118,6 +118,7 @@
 #include "rtw_cfgvendor.h"
 #include "rtw_proc.h"
 #include "rtw_acs.h"
+#include "rtw_promisc.h"
 
 /******************************************************************/
 /********** Definitions between Linux and FULLMAC. **************/

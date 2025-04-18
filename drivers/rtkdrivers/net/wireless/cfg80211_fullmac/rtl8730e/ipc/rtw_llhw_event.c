@@ -226,6 +226,7 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, struct in
 	}
 	if (!global_idev.pndev[idx]) {
 		/*when GC netdev close, need revert mac address in driver, but netdev0 may already be closed*/
+		dma_unmap_single(pdev, dma_addr, ETH_ALEN, DMA_FROM_DEVICE);
 		goto func_exit;
 	}
 #endif
@@ -239,9 +240,9 @@ static void llhw_event_set_netif_info(struct event_priv_t *event_priv, struct in
 	if (!global_idev.pndev[0]) {
 		/*set ap port mac address*/
 		memcpy(global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-		if(softap_addr_offset_idx == 0){
+		if (softap_addr_offset_idx == 0) {
 			global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + (1 << 1);
-		}else{
+		} else {
 			global_idev.pndev[1]->dev_addr[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
 		}
 	}
@@ -311,6 +312,41 @@ static void llhw_event_get_network_info(struct event_priv_t *event_priv, struct 
 	memcpy(global_idev.event_priv.dev_req_network_info, rsp_ptr, rsp_len);
 	p_ipc_msg->ret = (u32)global_idev.event_priv.dev_req_network_info_phy;
 
+func_exit:
+	return;
+}
+
+static void iiha_event_promisc_pkt_hdl(struct event_priv_t *event_priv, struct inic_ipc_dev_req_msg *p_ipc_msg)
+{
+	struct device *pdev = NULL;
+	struct rx_pkt_info *ppktinfo = (struct rx_pkt_info *)phys_to_virt(p_ipc_msg->param_buf[0]);
+	dma_addr_t phy_pkt = 0, phy_buf = 0;
+	uint8_t *buf = NULL;
+
+	pdev = global_idev.ipc_dev;
+	if (!pdev) {
+		dev_err(global_idev.fullmac_dev, "%s,%s: device is NULL!\n", "event", __func__);
+		goto func_exit;
+	}
+
+	phy_pkt = dma_map_single(pdev, ppktinfo, sizeof(struct rx_pkt_info), DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, phy_pkt)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping rx_pkt_info dma error!\n", __func__);
+		goto func_exit;
+	}
+
+	buf = phys_to_virt(ppktinfo->buf);
+	phy_buf = dma_map_single(pdev, buf, ppktinfo->len, DMA_FROM_DEVICE);
+	if (dma_mapping_error(pdev, phy_buf)) {
+		dev_err(global_idev.fullmac_dev, "%s: mapping buf dma error!\n", __func__);
+		dma_unmap_single(pdev, phy_pkt, sizeof(struct rx_pkt_info), DMA_FROM_DEVICE);
+		goto func_exit;
+	}
+	ppktinfo->buf = buf;
+	rtw_promisc_rx(ppktinfo);
+
+	dma_unmap_single(pdev, phy_buf, ppktinfo->len, DMA_FROM_DEVICE);
+	dma_unmap_single(pdev, phy_pkt, sizeof(struct rx_pkt_info), DMA_FROM_DEVICE);
 func_exit:
 	return;
 }
@@ -423,7 +459,7 @@ void llhw_event_task(unsigned long data)
 		llhw_event_join_status_indicate(event_priv, p_recv_msg);
 		break;
 	case INIC_API_PROMISC_CALLBACK:
-		//iiha_wifi_promisc_hdl(event_priv, p_recv_msg);
+		iiha_event_promisc_pkt_hdl(event_priv, p_recv_msg);
 		break;
 	case INIC_API_GET_LWIP_INFO:
 		llhw_event_get_network_info(event_priv, p_recv_msg);
@@ -497,14 +533,14 @@ int llhw_event_init(struct inic_device *idev)
 	/* initialize the mutex to send event_priv message. */
 	mutex_init(&(event_priv->iiha_send_mutex));
 
-	event_priv->preq_msg = dmam_alloc_coherent(event_ch->pdev, sizeof(struct inic_ipc_host_req_msg), &event_priv->req_msg_phy_addr, GFP_KERNEL);
+	event_priv->preq_msg = dma_alloc_coherent(event_ch->pdev, sizeof(struct inic_ipc_host_req_msg), &event_priv->req_msg_phy_addr, GFP_KERNEL);
 	if (!event_priv->preq_msg) {
 		dev_err(global_idev.fullmac_dev, "%s: allloc req_msg error.\n", "event");
 		return -ENOMEM;
 	}
 
 	/* coherent alloc some non-cache memory for transmit network_info to NP */
-	event_priv->dev_req_network_info = dmam_alloc_coherent(event_ch->pdev, DEV_REQ_NETWORK_INFO_MAX_LEN, &event_priv->dev_req_network_info_phy, GFP_KERNEL);
+	event_priv->dev_req_network_info = dma_alloc_coherent(event_ch->pdev, DEV_REQ_NETWORK_INFO_MAX_LEN, &event_priv->dev_req_network_info_phy, GFP_KERNEL);
 	if (!event_priv->dev_req_network_info) {
 		dev_err(global_idev.fullmac_dev, "%s: allloc dev_req_network_info error.\n", "event");
 		return -ENOMEM;
@@ -519,13 +555,14 @@ int llhw_event_init(struct inic_device *idev)
 void llhw_event_deinit(void)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
+	aipc_ch_t	*event_ch = global_idev.event_ch;
 
 	/* free sema to wakeup the message queue task */
 	tasklet_kill(&(event_priv->api_tasklet));
 
-	dma_free_coherent(global_idev.ipc_dev, DEV_REQ_NETWORK_INFO_MAX_LEN,
+	dma_free_coherent(event_ch->pdev, DEV_REQ_NETWORK_INFO_MAX_LEN,
 					  event_priv->dev_req_network_info, event_priv->dev_req_network_info_phy);
-	dma_free_coherent(global_idev.ipc_dev, sizeof(struct inic_ipc_host_req_msg), event_priv->preq_msg, event_priv->req_msg_phy_addr);
+	dma_free_coherent(event_ch->pdev, sizeof(struct inic_ipc_host_req_msg), event_priv->preq_msg, event_priv->req_msg_phy_addr);
 
 	/* deinitialize the mutex to send event_priv message. */
 	mutex_destroy(&(event_priv->iiha_send_mutex));

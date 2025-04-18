@@ -547,7 +547,7 @@ typedef enum _WL_BAND_TYPE {
    */
 struct rx_pkt_info {
 	s8 recv_signal_power;
-	enum mgn_rate_type data_rate;
+	u8 data_rate;
 	u8 channel;
 	u8 *buf;
 	u32 len;
