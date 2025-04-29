@@ -82,7 +82,7 @@
 			  <0x4200827C 4>;
 	};
 
-	psci {
+	psci: psci {
 		migrate = <0x84000005>;
 		cpu_on = <0x84000003>;
 		cpu_off = <0x84000002>;
