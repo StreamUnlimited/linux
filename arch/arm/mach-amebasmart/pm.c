@@ -17,6 +17,7 @@
 #include <asm/suspend.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/reboot.h>
 
 #define REG_CTRL_BASE_LP			0x42008000
 #define REG_LSYS_AP_STATUS_SW 		0x266
@@ -77,7 +78,7 @@ static int  rtk_pm_valid(suspend_state_t state)
 	return (state == PM_SUSPEND_MEM) || (state == PM_SUSPEND_CG) || (state == PM_SUSPEND_PG);
 }
 
-static int rtk_pm_enter(suspend_state_t state)
+static int rtk_pm_ch_init(void)
 {
 	int ret;
 
@@ -85,6 +86,7 @@ static int rtk_pm_enter(suspend_state_t state)
 		pm_ch = ameba_ipc_alloc_ch(sizeof(SLEEP_ParamDef) + 20);
 		if (!pm_ch) {
 			pr_err("ipc channel alloc failed\n");
+			return -ENOMEM;
 		}
 
 		pm_ch->port_id = AIPC_PORT_LP;
@@ -95,9 +97,22 @@ static int rtk_pm_enter(suspend_state_t state)
 
 		ret = ameba_ipc_channel_register(pm_ch);
 		if (ret) {
-			pr_err("ipc channel register failed\n");
+			pr_err("ipc channel register failed: %d\n", ret);
+			kfree(pm_ch);
+			return ret;
 		}
 	}
+	return 0;
+}
+
+
+static int rtk_pm_enter(suspend_state_t state)
+{
+	int ret;
+
+	ret = rtk_pm_ch_init();
+	if (ret)
+		return ret;
 
 	if (state == PM_SUSPEND_CG) {
 		pr_info("sleep mode cg\n");
@@ -144,6 +159,47 @@ static const struct platform_suspend_ops rtk_pm_ops = {
 	.enter	= rtk_pm_enter,
 };
 
+/* Poweroff is almost same as CG mode. The difference is that we don't expect to wake up. */
+static int ameba_poweroff_do_poweroff(struct sys_off_data *data)
+{
+	int ret;
+	SLEEP_ParamDef local_pm_param;
+
+	pr_info("ameba-poweroff: initiating power off\n");
+
+	ret = rtk_pm_ch_init();
+	if (ret) {
+		pr_err("ameba-poweroff: IPC channel init failed: %d\n", ret);
+		return ret;
+	}
+
+	/* set flag that ap is not running */
+	writeb(readb(reg_lsys_ap_status_sw) & (~ LSYS_BIT_AP_RUNNING),
+		   reg_lsys_ap_status_sw);
+
+	memset(&local_pm_param, 0, sizeof(local_pm_param));
+	local_pm_param.sleep_type = 0x1;
+	local_pm_param.sleep_time = 0;
+	local_pm_param.dlps_enable = 0x1;
+	clean_dcache_area(&local_pm_param, sizeof(local_pm_param));
+	ret = ameba_ipc_channel_send(pm_ch, (ipc_msg_struct_t *)&local_pm_param);
+	if (ret < 0) {
+		pr_err("ameba-poweroff: IPC channel send failed: %d\n", ret);
+		return ret;
+	}
+
+	/* disable cke by itself */
+	writel(readl(reg_hsys_hp_cke) & (~HSYS_BIT_CKE_AP),
+		   reg_hsys_hp_cke);
+
+	rtk_pm_delay();
+
+	/* We should never get here because system is put to sleep */
+
+	pr_emerg("ameba-poweroff: Unable to power off system!\n");
+	return -EIO;
+}
+
 static int __init rtk_pm_init(void)
 {
 	pr_info("rtk_pm_init\n");
@@ -161,6 +217,10 @@ static int __init rtk_pm_init(void)
 	}
 
 	suspend_set_ops(&rtk_pm_ops);
+
+	register_sys_off_handler(SYS_OFF_MODE_POWER_OFF,
+		SYS_OFF_PRIO_DEFAULT,
+		ameba_poweroff_do_poweroff, NULL);
 
 	return 0;
 }
