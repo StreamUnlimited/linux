@@ -226,6 +226,15 @@ static int sue_hsmp_state_controller_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void sue_hsmp_state_controller_shutdown(struct platform_device *pdev)
+{
+	struct state_controller_data *data = dev_get_drvdata(&pdev->dev);
+
+	pr_emerg("Setting HSMP power state to STATE_POWEROFF, allowing power to be cut externally!\n");
+
+	regmap_write(data->hsmp_regmap, HSMP_POWER_STATE_REG, STATE_POWEROFF);
+}
+
 static const struct of_device_id sue_hsmp_state_controller_of_match[] = {
 	{ .compatible = "sue,hsmp-state-controller", },
 	{},
@@ -243,6 +252,7 @@ static struct platform_driver sue_hsmp_state_controller = {
 	},
 	.probe = sue_hsmp_state_controller_probe,
 	.remove = sue_hsmp_state_controller_remove,
+	.shutdown = sue_hsmp_state_controller_shutdown,
 };
 
 module_platform_driver(sue_hsmp_state_controller);
