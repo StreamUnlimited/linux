@@ -62,6 +62,10 @@
 	};
 };
 
+&psci {
+	disable-poweroff;
+};
+
 &aes {
 	status = "okay";
 };
