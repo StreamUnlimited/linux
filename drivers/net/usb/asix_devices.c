@@ -293,6 +293,7 @@ static const struct ethtool_ops ax88772_ethtool_ops = {
 	.nway_reset		= usbnet_nway_reset,
 	.get_link_ksettings	= usbnet_get_link_ksettings,
 	.set_link_ksettings	= usbnet_set_link_ksettings,
+	.get_ts_info		= ethtool_op_get_ts_info,
 };
 
 static int ax88772_link_reset(struct usbnet *dev)
