@@ -339,6 +339,7 @@ static const struct ethtool_ops ax88772_ethtool_ops = {
 	.get_sset_count		= ax88772_ethtool_get_sset_count,
 	.get_pauseparam		= ax88772_ethtool_get_pauseparam,
 	.set_pauseparam		= ax88772_ethtool_set_pauseparam,
+	.get_ts_info		= ethtool_op_get_ts_info,
 };
 
 static int ax88772_reset(struct usbnet *dev)
