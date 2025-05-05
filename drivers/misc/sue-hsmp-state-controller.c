@@ -10,6 +10,7 @@
 #include <linux/regmap.h>
 #include <linux/of.h>
 #include <linux/leds.h>
+#include <linux/suspend.h>
 
 #include <misc/sue-hsmp-common.h>
 
@@ -25,6 +26,9 @@ struct rgb_led_data {
 struct state_controller_data {
 	struct regmap *hsmp_regmap;
 	struct rgb_led_data rgb_led_data;
+#ifdef CONFIG_PM
+	enum hsmp_power_state prev_power_state;
+#endif
 };
 
 static ssize_t state_show(struct device *dev, struct device_attribute *attr,
@@ -120,6 +124,50 @@ static void set_brightness_rgb(struct led_classdev *led_cdev,
 	set_rgb_data(data->hsmp_regmap, led_data->red, led_data->green, led_data->blue);
 }
 
+#ifdef CONFIG_PM
+static int sue_hsmp_state_controller_suspend(struct device *dev)
+{
+	struct state_controller_data *data = dev_get_drvdata(dev);
+	uint32_t value;
+	int ret;
+
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		ret = regmap_read(data->hsmp_regmap, HSMP_POWER_STATE_REG, &value);
+		if (ret) {
+			dev_err(dev, "Failed to save state\n");
+			return ret;
+		}
+		ret = regmap_write(data->hsmp_regmap, HSMP_POWER_STATE_REG, STATE_SUSPEND_TO_RAM);
+		if (ret) {
+			dev_err(dev, "Failed to set state to STATE_SUSPEND_TO_RAM\n");
+			return ret;
+		}
+		data->prev_power_state = value;
+	}
+	return 0;
+}
+
+static int sue_hsmp_state_controller_resume(struct device *dev)
+{
+	struct state_controller_data *data = dev_get_drvdata(dev);
+	int ret;
+
+	if (pm_suspend_target_state == PM_SUSPEND_CG || pm_suspend_target_state == PM_SUSPEND_PG) {
+		ret = regmap_write(data->hsmp_regmap, HSMP_POWER_STATE_REG, data->prev_power_state);
+		if (ret) {
+			dev_err(dev, "Failed to restore state after resume\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops sue_hsmp_state_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sue_hsmp_state_controller_suspend, sue_hsmp_state_controller_resume)
+};
+#endif
+
 static int sue_hsmp_state_controller_probe(struct platform_device *pdev)
 {
 	struct state_controller_data *data;
@@ -190,6 +238,9 @@ MODULE_DEVICE_TABLE(of, sue_hsmp_state_controller_of_match);
 static struct platform_driver sue_hsmp_state_controller = {
 	.driver = {
 		.name = "sue-hsmp-state-controller",
+#ifdef CONFIG_PM
+		.pm = &sue_hsmp_state_pm_ops,
+#endif
 		.of_match_table = sue_hsmp_state_controller_of_match,
 	},
 	.probe = sue_hsmp_state_controller_probe,
