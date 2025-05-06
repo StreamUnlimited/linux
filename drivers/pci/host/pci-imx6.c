@@ -1438,6 +1438,7 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	imx6_pcie->pcie_dev_regulator = devm_regulator_get(pp->dev, "pcie-dev");
 	if (IS_ERR(imx6_pcie->pcie_dev_regulator)) {
 		dev_warn(&pdev->dev, "failed to get pcie-dev-supply\n");
+		imx6_pcie->pcie_dev_regulator = NULL;
 	} else {
 		ret = regulator_enable(imx6_pcie->pcie_dev_regulator);
 		if (ret) {
