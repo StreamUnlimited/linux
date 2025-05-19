@@ -9,6 +9,8 @@ export CONFIG_FULLMAC_HCI_SPI = n
 export CONFIG_FULLMAC_HCI_USB = n
 export CONFIG_WHC_BRIDGE = n
 
+FULLMAC_PATH=$(srctree)/$(src)
+
 ifeq ($(CONFIG_FULLMAC_HCI_IPC),y)
 
 ccflags-$(CONFIG_NAN) += -DCONFIG_NAN
@@ -22,6 +24,8 @@ ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -I$(srctree)/../../firmware/component/wifi/
 ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -I$(srctree)/$(src)/fullmac/ipc
 ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -I$(srctree)/$(src)/common/netdev
 ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -I$(srctree)/$(src)/fullmac
+ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -I$(FULLMAC_PATH)
+ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -I$(FULLMAC_PATH)/imported_headers
 
 ccflags-$(CONFIG_FULLMAC_HCI_IPC) += -DCONFIG_FULLMAC_HCI_IPC
 
