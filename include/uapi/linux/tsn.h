@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) WITH Linux-syscall-note */
+/* SPDX-License-Identifier: ((GPL-2.0+ WITH Linux-syscall-note) OR BSD-3-Clause) */
 /* Copyright 2017-2023 NXP */
 
 #ifndef __UAPI_GENL_TSN_H
