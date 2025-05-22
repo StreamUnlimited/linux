@@ -13,6 +13,7 @@
 #include <drm/drm_print.h>
 #include <drm/drm_drv.h>
 #include <video/mipi_display.h>
+#include <linux/backlight.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio/consumer.h>
 #include <linux/regulator/consumer.h>
@@ -25,6 +26,7 @@
 
 struct st7701s {
 	int                     gpio;
+	struct backlight_device *backlight;
 };
 
 /*
@@ -234,12 +236,20 @@ static int st7701s_enable(struct drm_panel *panel)
 		return ret ;
 	}
 
+	if (handle->backlight)
+		backlight_enable(handle->backlight);
+
 	return 0;
 }
 
 static int st7701s_disable(struct drm_panel *panel)
 {
-	(void)panel;
+	struct ameba_panel_desc  *desc = panel_to_desc(panel);
+	struct st7701s           *handle = desc->priv;
+
+	if (handle->backlight)
+		backlight_disable(handle->backlight);
+
 	return 0;
 }
 
@@ -267,6 +277,7 @@ static int st7701s_get_modes(struct drm_panel *panel)
 static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct device_node              *np = dev->of_node;
+	struct device_node              *backlight_node;
 	struct st7701s                  *st7701s_data;
 	enum of_gpio_flags              flags;
 
@@ -283,6 +294,15 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 		return -ENODEV;
 	}
 
+	backlight_node = of_parse_phandle(np, "backlight", 0);
+	if (backlight_node) {
+		st7701s_data->backlight = of_find_backlight_by_node(backlight_node);
+		of_node_put(backlight_node);
+
+		if (!st7701s_data->backlight)
+			return -EPROBE_DEFER;
+	}
+
 	return 0;
 }
 
@@ -293,6 +313,9 @@ static int st7701s_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 
 	//disable gpio 
 	gpio_free(handle->gpio);
+	// disable backlight
+	if (handle->backlight)
+		put_device(&handle->backlight->dev);
 	//devm_kfree
 	return 0;
 }
