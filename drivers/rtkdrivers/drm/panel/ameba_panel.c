@@ -91,13 +91,18 @@ static int ameba_panel_probe(struct platform_device *pdev)
 
 	drm_panel_init(&priv_data->panel);
 
-	if (priv_data->init)
-		priv_data->init(dev,priv_data);
+	if (priv_data->init) {
+		ret = priv_data->init(dev,priv_data);
+		if (ret)
+			return ret;
+	}
 
 	priv_data->panel.dev = dev;
 	priv_data->panel.funcs = priv_data->rtk_panel_funcs;
 
 	ret = drm_panel_add(&priv_data->panel);
+	if (ret)
+		return ret;
 
 	return component_add(dev, &ameba_panel_ops);
 }
