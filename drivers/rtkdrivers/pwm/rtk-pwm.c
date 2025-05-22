@@ -303,6 +303,8 @@ static int rtk_pwm_probe(struct platform_device *pdev)
 	pwm->chip.dev = &pdev->dev;
 	pwm->chip.ops = &rtk_pwm_ops;
 	pwm->chip.npwm = AMEBA_PWM_CHAN_NUM;
+	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+	pwm->chip.of_pwm_n_cells = 3;
 	pwm->chip.base = -1;
 
 	ret = pwmchip_add(&pwm->chip);
