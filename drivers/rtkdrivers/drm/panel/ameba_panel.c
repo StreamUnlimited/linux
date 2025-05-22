@@ -95,8 +95,11 @@ static int ameba_panel_probe(struct platform_device *pdev)
 
 	drm_panel_init(&priv_data->panel, dev, priv_data->rtk_panel_funcs, DRM_MODE_CONNECTOR_DSI);
 
-	if (priv_data->init)
-		priv_data->init(dev,priv_data);
+	if (priv_data->init) {
+		int ret = priv_data->init(dev,priv_data);
+		if (ret)
+			return ret;
+	}
 
 	priv_data->panel.dev = dev;
 	priv_data->panel.funcs = priv_data->rtk_panel_funcs;
