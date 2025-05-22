@@ -384,6 +384,7 @@
 			pwm: pwm@0 {
 				compatible = "realtek,ameba-pwm";
 				status = "disabled";
+				#pwm-cells = <3>;
 			};
 		};
 
