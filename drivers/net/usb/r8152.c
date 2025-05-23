@@ -7018,6 +7018,10 @@ static void r8152b_init(struct r8152 *tp)
 
 	r8152_aldps_en(tp, false);
 
+	/* LED0 (green): link activity, LED1 (amber): link speed */
+	data = 0x38;
+	ocp_write_word(tp, MCU_TYPE_PLA, PLA_LEDSEL, data);
+
 	if (tp->version == RTL_VER_01) {
 		ocp_data = ocp_read_word(tp, MCU_TYPE_PLA, PLA_LED_FEATURE);
 		ocp_data &= ~LED_MODE_MASK;
