@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/misc/sue-pm-switch.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Simple Suspend/Resume Regulator Toggle
+
+maintainers:
+  - Martin Pietryka <martin.pietryka@streamunlimited.com>
+
+description: |
+  A simple platform device that enables a regulator on boot and toggles
+  it off during suspend/shutdown and back on during resume.
+
+properties:
+  compatible:
+    const: sue,pm-switch
+
+  vdd-supply:
+    description: Regulator that will be enabled at probe and disabled during suspend.
+    $ref: /schemas/types.yaml#/definitions/phandle
+
+required:
+  - compatible
+  - vdd-supply
+
+additionalProperties: false
+
+examples:
+  - |
+    pm_switch0: pm-switch@0 {
+      compatible = "sue,pm-switch";
+      vdd-supply = <&usb_eth_power>;
+    };
