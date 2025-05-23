@@ -2315,6 +2315,16 @@ static int set_ethernet_addr(struct r8152 *tp, bool in_resume)
 	struct sockaddr_storage ss;
 	int ret;
 
+	/* During suspend, the hardware loses its internal MAC register state.
+	 * We don't want to re-determine the MAC from the OTP/const partition
+	 * on wakeup, Instead, we explicitly restore the known, existing
+	 * MAC address to the hardware so it can successfully receive packets.
+	 */
+	if (in_resume) {
+		ether_addr_copy(ss.__data, dev->dev_addr);
+		return __rtl8152_set_mac_address(dev, &ss, in_resume);
+	}
+
 	ret = determine_ethernet_addr(tp, &ss);
 	if (ret < 0)
 		return ret;
@@ -13333,6 +13343,9 @@ static int r8152b_init(struct r8152 *tp)
 	ret = r8152_aldps_en(tp, false);
 	if (ret < 0)
 		goto out;
+
+	/* LED0 (green): link activity, LED1 (amber): link speed */
+	ocp_write_word(tp, MCU_TYPE_PLA, PLA_LEDSEL, 0x38);
 
 	if (tp->version == RTL_VER_01) {
 		ret = ocp_word_clr_bits(tp, MCU_TYPE_PLA, PLA_LED_FEATURE,
