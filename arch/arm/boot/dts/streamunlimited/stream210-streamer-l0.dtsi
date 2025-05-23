@@ -18,6 +18,17 @@
 		enable-active-high;
 	};
 
+	reg_eth_enable: reg-eth-enable {
+		compatible = "regulator-fixed";
+		regulator-name = "eth-enable";
+		gpio = <&gpioa 9 GPIO_ACTIVE_LOW>;
+	};
+
+	usb-eth-power {
+		compatible = "sue,pm-switch";
+		vdd-supply = <&reg_eth_enable>;
+	};
+
 	clk_pcm9211_xti: clk-pcm9211-xti {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
