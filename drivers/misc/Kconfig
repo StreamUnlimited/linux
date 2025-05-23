@@ -568,6 +568,17 @@ config SUE_HSMP_STATE_CONTROLLER
 	help
 	  This allows userspace to manage the device state using the HSMP protocol.
 
+config SUE_PM_SWITCH
+	tristate "Simple PM-based regulator switch"
+	depends on PM
+	help
+	  This is a minimal platform driver that enables a regulator
+	  on probe (boot), disables it during suspend and shutdown/reboot,
+	  and re-enables it on resume.
+
+	  Useful for devices like USB Ethernet PHYs that require
+	  power toggling aligned with system power state.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

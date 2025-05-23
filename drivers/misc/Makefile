@@ -68,3 +68,4 @@ obj-$(CONFIG_TMR_INJECT)	+= xilinx_tmr_inject.o
 obj-$(CONFIG_TPS6594_ESM)	+= tps6594-esm.o
 obj-$(CONFIG_TPS6594_PFSM)	+= tps6594-pfsm.o
 obj-$(CONFIG_SUE_HSMP_STATE_CONTROLLER) += sue-hsmp-state-controller.o
+obj-$(CONFIG_SUE_PM_SWITCH)	+= sue-pm-switch.o
