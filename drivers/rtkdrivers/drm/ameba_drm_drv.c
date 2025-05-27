@@ -297,6 +297,8 @@ static int ameba_drm_bind(struct device *dev)
 		goto err_kms_cleanup;
 	}
 
+	drm_fbdev_generic_setup(drm, 24);
+
 	DRM_INFO("DRM Bind Success!\n");
 
 	return 0;

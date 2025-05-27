@@ -861,6 +861,12 @@ static struct drm_driver ameba_lcdc_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
 	.fops = &ameba_fops,
 	DRM_GEM_DMA_DRIVER_OPS,
+
+	.prime_handle_to_fd	    = drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle	    = drm_gem_prime_fd_to_handle,
+	.gem_prime_import = drm_gem_prime_import,
+	.gem_prime_import_sg_table  = drm_gem_dma_prime_import_sg_table,
+
 	.name  = "ameba",
 	.desc  = "Realtek Ameba SoC DRM Driver",
 	.date  = "20210916",
