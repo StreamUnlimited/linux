@@ -231,7 +231,7 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 {
 	struct realtek_thermal_data *thermal;
 	struct resource *res;
-	int ret;
+	int ret, i;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "Invalid device node\n");
@@ -276,6 +276,26 @@ static int realtek_thermal_probe(struct platform_device *pdev)
 		return ret;
 	}
 	thermal->th_dev->devdata = thermal;
+
+	/* set temperatures */
+	for (i = 0; i < thermal_zone_get_num_trips(thermal->th_dev); i++) {
+		struct thermal_trip trip;
+
+		ret = thermal_zone_get_trip(thermal->th_dev, i, &trip);
+		if (ret)
+			return ret;
+
+		if (trip.type == THERMAL_TRIP_PASSIVE)
+			thermal->temp_passive = celsius(trip.temperature);
+		if (trip.type == THERMAL_TRIP_CRITICAL)
+			thermal->temp_critical = celsius(trip.temperature);
+	}
+
+	if (thermal->temp_critical == 0) {
+		dev_err(&pdev->dev, "Failed to read critical temperature\n");
+		ret = -EINVAL;
+		goto err_tz;
+	}
 
 	thermal->atim_clk = devm_clk_get(&pdev->dev, "rtk_aon_tim_clk");
 	if (IS_ERR(thermal->atim_clk)) {
