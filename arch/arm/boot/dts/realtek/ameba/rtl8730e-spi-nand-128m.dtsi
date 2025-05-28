@@ -68,12 +68,12 @@
 					};
 					partition@8 {
 						label = "Rootfs Image A";
-						reg = <0x1BE0000 0x2800000>;
+						reg = <0x1BE0000 0x3C00000>;
 						read-only;
 					};
 					partition@9 {
 						label = "Userdata Area";
-						reg = <0x43E0000 0x3C20000>;
+						reg = <0x57E0000 0x2820000>;
 					};
 				};
 			};
