@@ -323,21 +323,21 @@ END:
 
 static int rtk_touch_handler(void *unused)
 {
-	struct sched_param param = { .sched_priority = 4 };
+	set_user_nice(current, -19);
 
-	sched_setscheduler(current, SCHED_RR, &param);
-	do {
-
+	while (!kthread_should_stop()) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		wait_event(waiter, thread_ts_flag != 0);
+		if (wait_event_interruptible(waiter, thread_ts_flag != 0 || kthread_should_stop()))
+			break;
+
+		if (kthread_should_stop())
+			break;
 
 		thread_ts_flag = 0;
-
 		set_current_state(TASK_RUNNING);
 
 		rtk_ts_touch_report();
-
-	} while (!kthread_should_stop());
+	}
 
 	return 0;
 }
@@ -380,10 +380,11 @@ static int rtk_input_dev_init(struct cst328_ts_data *ts_data)
 		return ret;
 	}
 
-	thread = kthread_run(rtk_touch_handler, 0, RTK_DRIVER_NAME);
+	thread = kthread_run(rtk_touch_handler, NULL, RTK_DRIVER_NAME);
 	if (IS_ERR(thread)) {
 		ret = PTR_ERR(thread);
 		dev_err(ts_data->dev, "Failed to create touch event handler thread: %d\n", ret);
+		return ret;
 	}
 
 	return ret;
@@ -776,6 +777,11 @@ static void rtk_ts_remove(struct i2c_client *client)
 
 	if (!ts) {
 		return;
+	}
+
+	if (thread) {
+		kthread_stop(thread);
+		thread = NULL;
 	}
 
 	if (ts->pdata && gpio_is_valid(ts->pdata->reset_gpio)) {
