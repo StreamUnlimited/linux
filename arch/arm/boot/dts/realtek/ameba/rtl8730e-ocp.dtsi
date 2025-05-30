@@ -476,7 +476,7 @@
 				<0x01 0xE0 0x00>,
 				<0x01 0xE0 0x04>;
 			rtk,usb-phandle = <&usb>;
-			rtk,usb-force-role-en = <0>;
+			rtk,usb-force-role-en = <1>;
 			status = "okay";
 		};
 
