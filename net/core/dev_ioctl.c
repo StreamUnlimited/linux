@@ -12,6 +12,7 @@
 #include <net/dsa_stubs.h>
 #include <net/netdev_lock.h>
 #include <net/wext.h>
+#include <linux/ptp_clock_kernel.h>
 
 #include "dev.h"
 
@@ -285,6 +286,11 @@ static int dev_get_hwtstamp(struct net_device *dev, struct ifreq *ifr)
 	struct hwtstamp_config cfg;
 	int err;
 
+	if (!IS_ERR_OR_NULL(dev->ptpv)) {
+		ptp_virt_get(dev->ptpv, &kernel_cfg);
+		goto copy;
+	}
+
 	if (!ops->ndo_hwtstamp_get)
 		return dev_eth_ioctl(dev, ifr, SIOCGHWTSTAMP); /* legacy */
 
@@ -298,6 +304,7 @@ static int dev_get_hwtstamp(struct net_device *dev, struct ifreq *ifr)
 	if (err)
 		return err;
 
+copy:
 	/* If the request was resolved through an unconverted driver, omit
 	 * the copy_to_user(), since the implementation has already done that
 	 */
@@ -412,6 +419,11 @@ static int dev_set_hwtstamp(struct net_device *dev, struct ifreq *ifr)
 		return err;
 	}
 
+	if (!IS_ERR_OR_NULL(dev->ptpv)) {
+		err = ptp_virt_set(dev->ptpv, &kernel_cfg);
+		goto copy;
+	}
+
 	if (!ops->ndo_hwtstamp_set)
 		return dev_eth_ioctl(dev, ifr, SIOCSHWTSTAMP); /* legacy */
 
@@ -424,6 +436,7 @@ static int dev_set_hwtstamp(struct net_device *dev, struct ifreq *ifr)
 	if (err)
 		return err;
 
+copy:
 	/* The driver may have modified the configuration, so copy the
 	 * updated version of it back to user space
 	 */
