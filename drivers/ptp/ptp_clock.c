@@ -668,6 +668,145 @@ void ptp_cancel_worker_sync(struct ptp_clock *ptp)
 }
 EXPORT_SYMBOL(ptp_cancel_worker_sync);
 
+/* virtual ptp stuff */
+static int ptp_virt_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
+{
+	struct ptp_virt *ptpv = container_of(ptp, struct ptp_virt, ptp_info);
+	u64 now = ktime_get_raw_ns();
+
+	/* we move sys_base_ns forward using the old scale so that the new
+	   scale only applies starting from the moment this is called */
+	ptpv->sys_base_ns += adjust_by_scaled_ppm(now - ptpv->raw_base_ns, ptpv->scaled_ppm);
+	ptpv->raw_base_ns = now;
+	ptpv->scaled_ppm = scaled_ppm;
+
+	return 0;
+}
+
+static int ptp_virt_adjtime(struct ptp_clock_info *ptp, s64 delta)
+{
+	struct ptp_virt *ptpv = container_of(ptp, struct ptp_virt, ptp_info);
+
+	ptpv->sys_base_ns += delta;
+
+	return 0;
+}
+
+static int ptp_virt_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
+{
+	struct ptp_virt *ptpv = container_of(ptp, struct ptp_virt, ptp_info);
+
+	*ts = ns_to_timespec64(ptp_virt_gettime_ns(ptpv));
+
+	return 0;
+}
+
+static int ptp_virt_settime(struct ptp_clock_info *ptp, const struct timespec64 *ts)
+{
+	struct ptp_virt *ptpv = container_of(ptp, struct ptp_virt, ptp_info);
+
+	ptpv->sys_base_ns = timespec64_to_ns(ts);
+	ptpv->raw_base_ns = ktime_get_raw_ns();
+	ptpv->scaled_ppm = 0;
+
+	return 0;
+}
+
+u64 ptp_virt_gettime_ns(struct ptp_virt *ptpv)
+{
+	u64 now = ktime_get_raw_ns();
+	return ptpv->sys_base_ns + adjust_by_scaled_ppm(now - ptpv->raw_base_ns, ptpv->scaled_ppm);
+}
+EXPORT_SYMBOL(ptp_virt_gettime_ns);
+
+int ptp_virt_set(struct ptp_virt *ptpv, struct kernel_hwtstamp_config *config)
+{
+	switch (config->tx_type) {
+	case HWTSTAMP_TX_OFF:
+		ptpv->hwts_tx_en = 0;
+		break;
+	case HWTSTAMP_TX_ON:
+		ptpv->hwts_tx_en = 1;
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	switch (config->rx_filter) {
+	case HWTSTAMP_FILTER_NONE:
+		ptpv->hwts_rx_en = 0;
+		break;
+
+	default:
+		ptpv->hwts_rx_en = 1;
+		config->rx_filter = HWTSTAMP_FILTER_ALL;
+		break;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(ptp_virt_set);
+
+void ptp_virt_get(struct ptp_virt *ptpv, struct kernel_hwtstamp_config *config)
+{
+	config->flags = 0;
+	config->tx_type = ptpv->hwts_tx_en ? HWTSTAMP_TX_ON : HWTSTAMP_TX_OFF;
+	config->rx_filter = (ptpv->hwts_rx_en ?
+				HWTSTAMP_FILTER_ALL : HWTSTAMP_FILTER_NONE);
+}
+EXPORT_SYMBOL(ptp_virt_get);
+
+struct ptp_virt *ptp_virt_init(struct module *owner, struct device *dev)
+{
+	struct ptp_virt *ptpv;
+	int err = 0;
+
+	ptpv = kzalloc(sizeof(struct ptp_virt), GFP_KERNEL);
+	if (!ptpv)
+		return ERR_PTR(-ENOMEM);
+
+	if (!owner)
+		owner = THIS_MODULE;
+
+	ptpv->ptp_info.owner = owner;
+	snprintf(ptpv->ptp_info.name, sizeof(ptpv->ptp_info.name), "ptpv: %s", owner->name);
+
+	ptpv->ptp_info.max_adj = 250000000; /* 25% in ppb */
+	ptpv->ptp_info.adjfine = ptp_virt_adjfine;
+	ptpv->ptp_info.adjtime = ptp_virt_adjtime;
+	ptpv->ptp_info.gettime64 = ptp_virt_gettime;
+	ptpv->ptp_info.settime64 = ptp_virt_settime;
+
+	ptpv->sys_base_ns = ktime_get_real_ns();
+	ptpv->raw_base_ns = ktime_get_raw_ns();
+
+	ptpv->ptp_clock = ptp_clock_register(&ptpv->ptp_info, dev);
+	if (IS_ERR(ptpv->ptp_clock)) {
+		err = PTR_ERR(ptpv->ptp_clock);
+		dev_err(dev, "ptp_clock_register failed %d\n", err);
+		goto err_ptp;
+	}
+
+	return ptpv;
+
+err_ptp:
+	kfree(ptpv);
+	return ERR_PTR(err);
+}
+EXPORT_SYMBOL(ptp_virt_init);
+
+void ptp_virt_free(struct ptp_virt *ptpv)
+{
+	if (IS_ERR_OR_NULL(ptpv))
+		return;
+
+	if (!IS_ERR_OR_NULL(ptpv->ptp_clock))
+		ptp_clock_unregister(ptpv->ptp_clock);
+
+	kfree(ptpv);
+}
+EXPORT_SYMBOL(ptp_virt_free);
+
 /* module operations */
 
 static void __exit ptp_exit(void)

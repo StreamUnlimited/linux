@@ -13,6 +13,7 @@
 #include <linux/ptp_clock.h>
 #include <linux/timecounter.h>
 #include <linux/skbuff.h>
+#include <linux/net_tstamp.h>
 
 #define PTP_CLOCK_NAME_LEN	32
 /**
@@ -518,5 +519,30 @@ static inline void ptp_read_system_postts(struct ptp_system_timestamp *sts)
 	if (sts)
 		ktime_get_clock_ts64(sts->clockid, &sts->post_ts);
 }
+
+/* virtual ptp stuff */
+struct ptp_virt {
+	struct ptp_clock_info ptp_info;
+	struct ptp_clock *ptp_clock;
+	/* timestamping starts disabled and can be enabled by userspace,
+	 * we keep track of that here, separately for RX and TX */
+	int hwts_rx_en;
+	int hwts_tx_en;
+	/* our time reference starts from ktime_get_real_ns() but
+	 * userspace can also set it via ptp_info.settime64() */
+	u64 sys_base_ns;
+	/* this is the monotonic (raw) timestamp when sys_base_ns was
+	 * last set and is used to compute the current time */
+	u64 raw_base_ns;
+	/* the scaling to be applied to the timestamps we return, in the
+	 * same units as the parameter to ptp_info.adjfine() */
+	long scaled_ppm;
+};
+
+struct ptp_virt *ptp_virt_init(struct module *owner, struct device *dev);
+void ptp_virt_free(struct ptp_virt *ptpv);
+void ptp_virt_get(struct ptp_virt *ptpv, struct kernel_hwtstamp_config *config);
+int ptp_virt_set(struct ptp_virt *ptpv, struct kernel_hwtstamp_config *config);
+u64 ptp_virt_gettime_ns(struct ptp_virt *ptpv);
 
 #endif
