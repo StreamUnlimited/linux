@@ -13,24 +13,7 @@
 #include "panel/ameba_panel_base.h"
 #include "ameba_drm_comm.h"
 
-//should remove this to mode params
-#define MIPI_DSI_RTNI         2//4
-
-#define MIPI_DSI_HSA          4  //hsw mode->hsync_end - mode->hsync_start;
-#define MIPI_DSI_HBP          30 //hbp mode->htotal - mode->hsync_end;
-#define MIPI_DSI_HFP          30 //hfp hsync_start - mode->hdisplay;
-
-#define MIPI_DSI_VSA          5  //vsw mode->vsync_end - mode->vsync_start;
-#define MIPI_DSI_VBP          20 //vbp mode->vtotal - mode->vsync_end;
-#define MIPI_DSI_VFP          15 //vfp mode->vsync_start - mode->vdisplay;
-
 #define Mhz                   1000000UL
-#define T_LPX                 5
-#define T_HS_PREP             6
-#define T_HS_TRAIL            8
-#define T_HS_EXIT             7
-#define T_HS_ZERO             10
-
 #define DUMP_REG(a,b)         b,readl(a + b)
 
 /*
