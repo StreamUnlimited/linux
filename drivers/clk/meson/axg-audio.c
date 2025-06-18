@@ -611,6 +611,8 @@ static struct clk_regmap mst_f_mclk_sel =
 
 static const struct clk_div_table axg_mst_mclk_div_table[] = {
 	{ .val = 0x13, .div = 20, },
+	{ .val = 0x27, .div = 40, },
+	{ .val = 0x4F, .div = 80, },
 	{ /* sentinel */ },
 };
 
