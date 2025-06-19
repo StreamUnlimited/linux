@@ -11,7 +11,7 @@
 #include "ameba_drm_base.h"
 #include "ameba_lcdc.h"
 #include "ameba_mipi.h"
-
+#include "ameba_drm_drv.h"
 
 /*
 	APIs define
@@ -71,6 +71,6 @@ u32  ameba_dsi_reg_read(void __iomem *address);
 void ameba_dsi_reg_write(void __iomem *address,u32 Value32);
 void ameba_dsi_reg_dump(void __iomem * address);
 void ameba_dsi_do_init(void __iomem *address, MIPI_InitTypeDef *MIPI_InitStruct,u32* txdone,u32 *rxcmd,void *init_table);
-void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct,u32 width,u32 height,u32 framerate, u32 *mipi_ckd);
+void ameba_dsi_init_config(MIPI_InitTypeDef *MIPI_InitStruct, struct ameba_drm_struct *ameba_struct, u32 *mipi_ckd);
 
 #endif  /*_AMEBA_DRM_BASE_COMMON_H_*/

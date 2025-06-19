@@ -505,8 +505,8 @@ static void ameba_plane_atomic_update(struct drm_plane *plane,
 	}
 
 	ameba_struct = drm->dev_private;
-	display_width = ameba_struct->display_width;
-	display_height = ameba_struct->display_height;
+	display_width = ameba_struct->display_hdisplay;
+	display_height = ameba_struct->display_vdisplay;
 
 	/*
 	 * crtc_* is the display position
@@ -740,7 +740,7 @@ static void *ameba_hw_ctx_alloc(struct platform_device *pdev,
 	return lcdc_ctx;
 }
 
-static void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx,struct ameba_drm_struct *ameba_struct)
+static void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx, struct ameba_drm_struct *ameba_struct)
 {
 	u8                          idx;
 	size_t                      new_size;
@@ -751,8 +751,8 @@ static void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx,struct ameba
 	lcdc_tmp = &(lcdc_ctx->lcdc_initdef) ;
 
 	/* init the lcdc info */
-	ameba_lcdc_reset_config(lcdc_tmp, ameba_struct->display_width, ameba_struct->display_height, lcdc_ctx->lcdc_bkg_color);
-	ameba_lcdc_set_planesize(lcdc_tmp, ameba_struct->display_width, ameba_struct->display_height);
+	ameba_lcdc_reset_config(lcdc_tmp, ameba_struct->display_hdisplay, ameba_struct->display_vdisplay, lcdc_ctx->lcdc_bkg_color);
+	ameba_lcdc_set_planesize(lcdc_tmp, ameba_struct->display_hdisplay, ameba_struct->display_vdisplay);
 	ameba_lcdc_set_background_color(lcdc_tmp, lcdc_ctx->lcdc_bkg_color);
 
 	/* dma issue */
@@ -760,7 +760,7 @@ static void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx,struct ameba
 	ameba_lcdc_dma_config_keeplastFrm(lcdc_ctx->lcdc_reg, lcdc_ctx->lcdc_undflw_mode, lcdc_ctx->lcdc_undflw_color);
 
 	/* line number interrupt */
-	ameba_lcdc_irq_linepos(lcdc_ctx->lcdc_reg, ameba_struct->display_height * 4 / 5);
+	ameba_lcdc_irq_linepos(lcdc_ctx->lcdc_reg, ameba_struct->display_vdisplay * 4 / 5);
 	/* enable dma underflow interrupt */
 	ameba_lcdc_irq_config(lcdc_ctx->lcdc_reg, LCDC_BIT_DMA_UN_INTEN, 1);
 
@@ -785,7 +785,7 @@ static void ameba_drm_reconfig_hw(struct lcdc_hw_ctx_type *lcdc_ctx,struct ameba
 	/* second surface init */
 	for (idx = 0 ; idx < LCDC_LAYER_MAX_NUM; idx ++) {
 		struct ameba_buf_struct * layinfo = &(sec_layer_info[idx]);
-		new_size = round_up(ameba_struct->display_width * ameba_struct->display_height * 4, PAGE_SIZE);
+		new_size = round_up(ameba_struct->display_hdisplay * ameba_struct->display_vdisplay * 4, PAGE_SIZE);
 		if(layinfo->sec_vaddr && new_size != layinfo->size){
 			layinfo->layer_address = 0;
 			layinfo->use_sec_buffer = 0;
