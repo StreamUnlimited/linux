@@ -53,6 +53,7 @@
 #include <net/net_debug.h>
 #include <net/dropreason-core.h>
 
+struct ptp_virt;
 struct netpoll_info;
 struct device;
 struct ethtool_ops;
@@ -2417,6 +2418,8 @@ struct net_device {
 	struct rtnl_hw_stats64	*offload_xstats_l3;
 
 	struct devlink_port	*devlink_port;
+
+	struct ptp_virt *ptpv;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
