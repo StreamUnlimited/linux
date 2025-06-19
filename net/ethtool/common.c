@@ -1038,7 +1038,16 @@ int __ethtool_get_ts_info(struct net_device *dev,
 		struct phy_device *phydev = dev->phydev;
 
 		ethtool_init_tsinfo(info);
-		if (phy_is_default_hwtstamp(phydev) &&
+		if (!IS_ERR_OR_NULL(dev->ptpv)) {
+			info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
+						SOF_TIMESTAMPING_RX_HARDWARE |
+						SOF_TIMESTAMPING_RAW_HARDWARE;
+			info->phc_index = ptp_clock_index(dev->ptpv->ptp_clock);
+			info->tx_types = (1 << HWTSTAMP_TX_OFF) | (1 << HWTSTAMP_TX_ON);
+			info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) | (1 << HWTSTAMP_FILTER_ALL);
+			info->phc_source = HWTSTAMP_SOURCE_NETDEV;
+		}
+		else if (phy_is_default_hwtstamp(phydev) &&
 		    phy_has_tsinfo(phydev)) {
 			err = phy_ts_info(phydev, info);
 			/* Report the phc source only if we have a real

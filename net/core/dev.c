@@ -163,6 +163,7 @@
 #include <net/page_pool/memory_provider.h>
 #include <net/rps.h>
 #include <linux/phy_link_topology.h>
+#include <linux/ptp_clock_kernel.h>
 
 #include "dev.h"
 #include "devmem.h"
@@ -2407,6 +2408,8 @@ static inline void net_timestamp_set(struct sk_buff *skb)
 		if ((COND) && !(SKB)->tstamp)			\
 			(SKB)->tstamp = ktime_get_real();	\
 	}							\
+	if (!IS_ERR_OR_NULL((SKB)->dev->ptpv) && (SKB)->dev->ptpv->hwts_rx_en) \
+		skb_hwtstamps(SKB)->hwtstamp = ns_to_ktime(ptp_virt_gettime_ns((SKB)->dev->ptpv)); \
 
 bool is_skb_forwardable(const struct net_device *dev, const struct sk_buff *skb)
 {
@@ -3831,6 +3834,23 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_skb_features);
 
+static netdev_tx_t netdev_start_xmit_wrapper(struct sk_buff *skb, struct net_device *dev,
+					struct netdev_queue *txq, bool more)
+{
+	int ptpv_tx_tstamp = (!IS_ERR_OR_NULL(dev->ptpv) &&
+				skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP &&
+				dev->ptpv->hwts_tx_en);
+
+	if (ptpv_tx_tstamp) {
+		struct skb_shared_hwtstamps shhwts;
+		shhwts.hwtstamp = ns_to_ktime(ptp_virt_gettime_ns(dev->ptpv));
+		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+		skb_tstamp_tx(skb, &shhwts);
+	}
+
+	return netdev_start_xmit(skb, dev, txq, more);
+}
+
 static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 		    struct netdev_queue *txq, bool more)
 {
@@ -3842,7 +3862,7 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 
 	len = skb->len;
 	trace_net_dev_start_xmit(skb, dev);
-	rc = netdev_start_xmit(skb, dev, txq, more);
+	rc = netdev_start_xmit_wrapper(skb, dev, txq, more);
 	trace_net_dev_xmit(skb, rc, dev, len);
 
 	return rc;
@@ -4816,7 +4836,7 @@ int __dev_direct_xmit(struct sk_buff *skb, u16 queue_id)
 	dev_xmit_recursion_inc();
 	HARD_TX_LOCK(dev, txq, smp_processor_id());
 	if (!netif_xmit_frozen_or_drv_stopped(txq))
-		ret = netdev_start_xmit(skb, dev, txq, false);
+		ret = netdev_start_xmit_wrapper(skb, dev, txq, false);
 	HARD_TX_UNLOCK(dev, txq);
 	dev_xmit_recursion_dec();
 
@@ -5511,7 +5531,7 @@ void generic_xdp_tx(struct sk_buff *skb, const struct bpf_prog *xdp_prog)
 	cpu = smp_processor_id();
 	HARD_TX_LOCK(dev, txq, cpu);
 	if (!netif_xmit_frozen_or_drv_stopped(txq)) {
-		rc = netdev_start_xmit(skb, dev, txq, 0);
+		rc = netdev_start_xmit_wrapper(skb, dev, txq, 0);
 		if (dev_xmit_complete(rc))
 			free_skb = false;
 	}
@@ -11304,6 +11324,26 @@ int register_netdevice(struct net_device *dev)
 	__netdev_update_features(dev);
 	netdev_unlock_ops(dev);
 
+	{
+		const struct ethtool_ops *ops = dev->ethtool_ops;
+		struct kernel_ethtool_ts_info info = {
+			.cmd = ETHTOOL_GET_TS_INFO,
+			.phc_index = -1,
+		};
+
+		if (ops && ops->get_ts_info)
+			ops->get_ts_info(dev, &info);
+
+		if (info.phc_index < 0) {
+			dev->ptpv = ptp_virt_init(THIS_MODULE, &dev->dev);
+			if (IS_ERR(dev->ptpv)) {
+				ret = PTR_ERR(dev->ptpv);
+				dev_err(&dev->dev, "ptp_virt_init failed %d\n", ret);
+				goto err_uninit_notify;
+			}
+		}
+	}
+
 	/*
 	 *	Default initial state at registry is that the
 	 *	device is present.
@@ -12314,6 +12354,9 @@ void unregister_netdevice_many_notify(struct list_head *head,
 		/* Notifier chain MUST detach us all upper devices. */
 		WARN_ON(netdev_has_any_upper_dev(dev));
 		WARN_ON(netdev_has_any_lower_dev(dev));
+
+		ptp_virt_free(dev->ptpv);
+		dev->ptpv = NULL;
 
 		/* Remove entries from kobject tree */
 		netdev_unregister_kobject(dev);

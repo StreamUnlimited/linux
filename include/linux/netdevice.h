@@ -54,6 +54,7 @@
 #include <net/dropreason-core.h>
 #include <net/neighbour_tables.h>
 
+struct ptp_virt;
 struct netpoll_info;
 struct device;
 struct ethtool_ops;
@@ -2558,6 +2559,7 @@ struct net_device {
 	struct hlist_head neighbours[NEIGH_NR_TABLES];
 
 	struct hwtstamp_provider __rcu	*hwprov;
+	struct ptp_virt *ptpv;
 
 	u8			priv[] ____cacheline_aligned
 				       __counted_by(priv_len);
