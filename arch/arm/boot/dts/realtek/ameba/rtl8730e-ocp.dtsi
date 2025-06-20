@@ -246,10 +246,6 @@
 			};
 		};
 
-		otp_ipc: otp_ipc@0 {
-			compatible = "realtek,ameba-otp-ipc";
-		};
-
 		rtc: rtc@4200E000 {
 			compatible = "realtek,ameba-rtc";
 			reg = <0x4200E000 0x1000>;

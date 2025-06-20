@@ -36,5 +36,4 @@ obj-$(CONFIG_MISC_RTK_AMEBA)			+= misc/
 obj-$(CONFIG_KM4_CONSOLE_AMEBA)			+= km4_console/
 obj-$(CONFIG_WIFI_RTK_CFG80211_FULLMAC)		+= net/wireless/whc_host_linux/
 obj-$(CONFIG_BT_IOCTL_RTK_AMEBA)		+= bluetooth/
-obj-$(CONFIG_OTP_IPC_RTK_AMEBA_CDEV)	+= otp_ipc/
 obj-$(CONFIG_AUDIO_PLL_RTK_AMEBA)		+= audio_pll/
