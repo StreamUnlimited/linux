@@ -83,6 +83,7 @@ static void rtk_i2c_struct_init(
 	char s3[] = "rtk,wait-timeout";
 	char s4[] = "rtk,use-poll-type";
 	char s5[] = "rtk,i2c-reg-slave-num";
+	char s6[] = "rtk,i2c-sda-hold-time";
 	u32 user_set_poll_mode;
 
 	rtk_get_dts_info(i2c_dev, np, &i2c_param->i2c_index, 0, s1);
@@ -97,13 +98,14 @@ static void rtk_i2c_struct_init(
 	if (i2c_dev->nr_slaves > 2) {
 		dev_warn(i2c_dev->dev, "Realtek I2C slave only support no more than 2 devices\n");
 	}
+	/* Set the required SDA hold time in units of ic_clk_period. */
+	rtk_get_dts_info(i2c_dev, np, &i2c_param->i2c_sda_hold, 2, s6);
 
 	/* Load HAL initial data structure default value */
 	i2c_param->i2c_master = I2C_MASTER_MODE;
 	i2c_param->i2c_addr_mode = I2C_ADDR_7BIT;
 	i2c_param->i2c_speed_mode = I2C_SS_MODE;
 	i2c_param->i2c_ack_addr = 0x11;
-	i2c_param->i2c_sda_hold = 2;
 	i2c_param->i2c_slv_setup = 0x3;
 	i2c_param->i2c_rx_thres = 0x00;
 	i2c_param->i2c_tx_thres = 0x10;

@@ -124,6 +124,7 @@
 			rtk,i2c-clk = <100000>;
 			rtk,wait-timeout = <0x7D0>;
 			rtk,i2c-reg-slave-num = <0>;
+			rtk,i2c-sda-hold-time = <2>;
 			status = "disabled";
 		};
 
@@ -137,6 +138,7 @@
 			rtk,i2c-clk = <100000>;
 			rtk,wait-timeout = <0x7D0>;
 			rtk,i2c-reg-slave-num = <0>;
+			rtk,i2c-sda-hold-time = <2>;
 			status = "disabled";
 		};
 
@@ -150,6 +152,7 @@
 			rtk,i2c-clk = <100000>;
 			rtk,wait-timeout = <0x7D0>;
 			rtk,i2c-reg-slave-num = <0>;
+			rtk,i2c-sda-hold-time = <2>;
 			status = "disabled";
 		};
 
