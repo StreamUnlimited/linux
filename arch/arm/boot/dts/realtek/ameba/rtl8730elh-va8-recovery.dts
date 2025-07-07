@@ -11,6 +11,7 @@
 #include <dt-bindings/realtek/clock/realtek-ameba-clock.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/realtek/pinctrl/realtek-ameba-pinfunc.h>
+#include <dt-bindings/realtek/ameba_ipc/ameba_ipc_resource.h>
 
 / {
 	model = "Ameba Platform";
@@ -231,6 +232,15 @@
 					drive-strength = <0>;
 				};
 			};
+
+			wifi_ant_sel: ant_sel@0 {
+				pins {
+					pinmux = <REALTEK_PINMUX('A', 15, GPIO)>,
+						<REALTEK_PINMUX('A', 16, GPIO)>;
+					bbias-disable;
+				};
+			};
+
 		};
 
 		sdioh: sdioh@400D0000 {
@@ -315,6 +325,28 @@
 			rtk,usb-phandle = <&usb>;
 			rtk,usb-force-role-en = <0>;
 			status = "okay";
+		};
+
+		aipc: aipc@41000580 {
+			compatible = "realtek,aipc";
+			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+			wakeup-source;
+			reg = <AIPC_SHARED_MEM_ADDR AIPC_SHARED_MEM_SIZE>, // res 0
+				<AIPC_REG_TX_DATA AIPC_REG_SIZE>, // res 1
+				<AIPC_REG_RX_DATA AIPC_REG_SIZE>, // res 2
+				<AIPC_REG_ISR AIPC_REG_SIZE>, // res 3
+				<AIPC_REG_IMR AIPC_REG_SIZE>, // res 4
+				<AIPC_REG_ICR AIPC_REG_SIZE>; // res 5
+		};
+
+		axi_wlan: axi_wlan@40000000 {
+			compatible = "realtek,rtl8730e_nic";
+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
+				<GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+			reg = <0x40000000 0x80000>, // wifi register base address and length
+				<0x60000020 0x15B000>; // km4 ram base address and length in amebasmart_layout.ld
+			pinctrl-names = "default";
+			pinctrl-0 = <&wifi_ant_sel>;
 		};
 
 		lsys: lsys@42008000 {
