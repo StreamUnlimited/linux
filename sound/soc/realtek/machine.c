@@ -248,23 +248,17 @@ static int ameba_card_probe(struct snd_soc_card *card)
 {
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
 
-	priv->amp_mute_gpio = devm_gpiod_get(card->dev, "amp_mute", GPIOD_OUT_HIGH);
-	if (IS_ERR(priv->amp_mute_gpio)) {
-		priv->amp_mute_gpio = NULL;
-		dev_warn(card->dev, "No AMP mute gpio\n");
-	}
+	priv->amp_mute_gpio = devm_gpiod_get_optional(card->dev, "mute", GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->amp_mute_gpio))
+		return dev_err_probe(card->dev, PTR_ERR(priv->amp_mute_gpio), "Failed to get mute gpio\n");
 
-	priv->hp_mute_gpio = devm_gpiod_get(card->dev, "hp_mute", GPIOD_OUT_HIGH);
-	if (IS_ERR(priv->hp_mute_gpio)) {
-		priv->hp_mute_gpio = NULL;
-		dev_warn(card->dev, "No HP mute gpio\n");
-	}
+	priv->hp_mute_gpio = devm_gpiod_get_optional(card->dev, "hp_mute", GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->hp_mute_gpio))
+		return dev_err_probe(card->dev, PTR_ERR(priv->hp_mute_gpio), "Failed to get HP mute gpio\n");
 
 	priv->enable_regulator = devm_regulator_get_exclusive(card->dev, "amp");
-	if (IS_ERR(priv->enable_regulator)) {
-		priv->enable_regulator = NULL;
-		dev_warn(card->dev, "No enable regulator\n");
-	}
+	if (IS_ERR(priv->enable_regulator))
+		return dev_err_probe(card->dev, PTR_ERR(priv->enable_regulator), "Failed to get regulator\n");
 
 	priv->drift_kcontrol = snd_soc_card_get_kcontrol(card, KCONTROL_DRIFT_COMPENSATOR_NAME);
 
