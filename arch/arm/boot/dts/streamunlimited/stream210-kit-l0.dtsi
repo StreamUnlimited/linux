@@ -161,6 +161,7 @@
 	amp-supply = <&amp_regulator>;
 	mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;	// AMP mute
 	hp_mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
+	hp-det-gpio = <&gpiob 20 GPIO_ACTIVE_LOW>;
 };
 
 &ledc {
