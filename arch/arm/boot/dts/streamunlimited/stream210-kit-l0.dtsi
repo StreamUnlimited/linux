@@ -159,7 +159,7 @@
 
 &sound {
 	amp-supply = <&amp_regulator>;
-	amp_mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;
+	mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;	// AMP mute
 	hp_mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
 };
 

@@ -280,8 +280,7 @@
 
 &sound {
 	amp-supply = <&reg_aud_enable>;
-	amp_mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;
-	hp_mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
+	mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
 
 	// SPORT2 I2S -> 0: pcm9211-main-hifi
 	// SPORT3 I2S -> 2: pcm9211-dit-hifi
