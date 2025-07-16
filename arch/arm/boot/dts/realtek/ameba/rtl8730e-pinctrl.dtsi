@@ -23,14 +23,6 @@
 				};
 			};
 
-			wifi_ant_sel: ant_sel@0 {
-				pins {
-					pinmux = <REALTEK_PINMUX('A', 15, GPIO)>,
-						 <REALTEK_PINMUX('A', 16, GPIO)>;
-					bbias-disable;
-				};
-			};
-
 			captouch_pins: captouch@0 {
 				pins {
 					pinmux = <REALTEK_PINMUX('A', 0, CAPTOUCH_AUX_ADC)>, // TOUCH0_ADC0
