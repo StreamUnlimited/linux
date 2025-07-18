@@ -5,12 +5,14 @@
 * Copyright (C) 2021, Realtek Corporation. All rights reserved.
 */
 
+#include <linux/atomic.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <linux/gpio/consumer.h>
+#include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
 
 #include <uapi/ameba/audio_pll.h>
@@ -20,6 +22,8 @@ struct ameba_priv {
 	int cur_pll_ppm;
 	struct gpio_desc *amp_mute_gpio;
 	struct gpio_desc *hp_mute_gpio;
+	struct work_struct mute_work;
+	atomic_t playing;
 
 	struct snd_kcontrol *drift_kcontrol;
 
@@ -110,6 +114,72 @@ static const struct snd_kcontrol_new snd_soc_ameba_controls[] = {
 	},
 };
 
+static void set_amp_mute(struct ameba_priv *priv, bool mute)
+{
+	if (priv->amp_mute_gpio)
+		gpiod_set_value_cansleep(priv->amp_mute_gpio, mute);
+}
+
+static void set_hp_mute(struct ameba_priv *priv, bool mute)
+{
+	if (priv->hp_mute_gpio)
+		gpiod_set_value_cansleep(priv->hp_mute_gpio, mute);
+}
+
+static int set_regulator_enable(struct ameba_priv *priv, bool enable)
+{
+	int ret = 0;
+
+	if (!priv->enable_regulator)
+		return 0;
+
+	if (priv->regulator_is_enabled == enable)
+		return 0;
+
+	if (enable)
+		ret = regulator_enable(priv->enable_regulator);
+	else
+		ret = regulator_disable(priv->enable_regulator);
+
+	if (!ret)
+		priv->regulator_is_enabled = enable;
+
+	return ret;
+}
+
+static void ameba_mute_work_handler(struct work_struct *work)
+{
+	struct ameba_priv *priv = container_of(work, struct ameba_priv, mute_work);
+
+	if (!atomic_read(&priv->playing)) {
+		set_amp_mute(priv, true);
+		set_hp_mute(priv, true);
+	} else {
+		set_amp_mute(priv, false);
+		set_hp_mute(priv, false);
+	}
+}
+
+static int ameba_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+	int ret = 0;
+
+	ret = set_regulator_enable(priv, true);
+	msleep(50);
+
+	return ret;
+}
+
+static void ameba_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+
+	set_regulator_enable(priv, false);
+}
+
 static int ameba_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
@@ -127,8 +197,39 @@ static int ameba_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int ameba_trigger(struct snd_pcm_substream *substream, int cmd)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+
+	// nothing to do on capture for now
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		return 0;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		atomic_set(&priv->playing, true);
+		break;
+
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		atomic_set(&priv->playing, false);
+		break;
+	}
+
+	// This is an atomic context, and since the gpio is managed through IPC, we need to do this async
+	schedule_work(&priv->mute_work);
+	return 0;
+}
+
 static struct snd_soc_ops ameba_ops = {
+	.startup = ameba_startup,
+	.shutdown = ameba_shutdown,
 	.hw_params = ameba_hw_params,
+	.trigger = ameba_trigger,
 };
 
 static struct snd_soc_dai_link ameba_dai[] = {
@@ -179,71 +280,6 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 	},
 };
 
-static void set_amp_mute(struct ameba_priv *priv, bool mute)
-{
-	if (priv->amp_mute_gpio)
-		gpiod_set_value_cansleep(priv->amp_mute_gpio, mute);
-}
-
-static void set_hp_mute(struct ameba_priv *priv, bool mute)
-{
-	if (priv->hp_mute_gpio)
-		gpiod_set_value_cansleep(priv->hp_mute_gpio, mute);
-}
-
-static int set_regulator_enable(struct ameba_priv *priv, bool enable)
-{
-	int ret = 0;
-
-	if (!priv->enable_regulator)
-		return 0;
-
-	if (priv->regulator_is_enabled == enable)
-		return 0;
-
-	if (enable)
-		ret = regulator_enable(priv->enable_regulator);
-	else
-		ret = regulator_disable(priv->enable_regulator);
-
-	if (!ret)
-		priv->regulator_is_enabled = enable;
-
-	return ret;
-}
-
-static int amp_power_event(struct snd_soc_dapm_widget *w,
-			   struct snd_kcontrol *kcontrol, int event)
-{
-	struct ameba_priv *priv = snd_soc_card_get_drvdata(w->dapm->card);
-	int ret = 0;
-	static int last_event = 0;
-
-	if(last_event == event)
-		return 0;
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		set_amp_mute(priv, true);
-		set_hp_mute(priv, true);
-		ret = set_regulator_enable(priv, true);
-		msleep(50);
-		set_amp_mute(priv, false);
-		set_hp_mute(priv, false);
-	break;
-	case SND_SOC_DAPM_PRE_PMD:
-		set_amp_mute(priv, true);
-		set_hp_mute(priv, true);
-		ret = set_regulator_enable(priv, false);
-	break;
-	default:
-		return 0;
-	}
-
-	last_event = event;
-	return ret;
-}
-
 static int ameba_card_probe(struct snd_soc_card *card)
 {
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
@@ -266,23 +302,12 @@ static int ameba_card_probe(struct snd_soc_card *card)
 	return 0;
 }
 
-/*
-* HACK: I think ameba does not support proper dapm, so handling AMP power events like this instead
-* Later we could take a look at sound/soc/codecs/simple-amplifier.c which was made for this purpose but needs full dapm
-*/
-static const struct snd_soc_dapm_widget ameba_dapm_widgets[] = {
-	SND_SOC_DAPM_PRE("Amplifier prepare", amp_power_event),
-	SND_SOC_DAPM_POST("Amplifier unprepare", amp_power_event),
-};
-
 static struct snd_soc_card ameba_snd = {
 	.name = "Ameba-snd",
 	.owner = THIS_MODULE,
 	.controls = snd_soc_ameba_controls,
 	.num_controls = ARRAY_SIZE(snd_soc_ameba_controls),
 	.probe = ameba_card_probe,
-	.dapm_widgets = ameba_dapm_widgets,
-	.num_dapm_widgets	= ARRAY_SIZE(ameba_dapm_widgets),
 };
 
 /*
@@ -353,6 +378,8 @@ static int ameba_audio_probe(struct platform_device *pdev)
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
+
+	INIT_WORK(&priv->mute_work, ameba_mute_work_handler);
 
 	snd_soc_card_set_drvdata(card, priv);
 
