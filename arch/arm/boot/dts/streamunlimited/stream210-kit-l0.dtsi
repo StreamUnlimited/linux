@@ -97,7 +97,7 @@
 	rtk,ctc-pnoise = <200>, <200>, <200>, <200>, <200>, <200>, <200>, <200>, <200>;
 	rtk,ctc-ch-status = <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>, <1>;
 	rtk,ctc-keycodes = <KEY_DOWN>,
-			   <KEY_SLEEP>,
+			   <KEY_SUSPEND>,
 			   <KEY_PREVIOUSSONG>,
 			   <KEY_VOLUMEDOWN>,
 			   <KEY_PLAYPAUSE>,

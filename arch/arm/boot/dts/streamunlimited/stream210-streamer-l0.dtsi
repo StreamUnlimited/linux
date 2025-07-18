@@ -52,7 +52,7 @@
 			label = "onoff";
 			gpios = <&gpioa 1 GPIO_ACTIVE_LOW>;
 			linux,input-type = <EV_KEY>;
-			linux,code = <KEY_SLEEP>;
+			linux,code = <KEY_SUSPEND>;
 		};
 
 		voldown {
