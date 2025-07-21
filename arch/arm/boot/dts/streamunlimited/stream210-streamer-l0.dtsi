@@ -253,6 +253,16 @@
 		};
 	};
 
+	i2s3_suspend_pins_streamer: i2s3_suspend_pins_streamer {
+		pins {
+			pinmux = <REALTEK_PINMUX('B', 7, GPIO)>,
+				 <REALTEK_PINMUX('B', 8, GPIO)>,
+				 <REALTEK_PINMUX('B', 9, GPIO)>,
+				 <REALTEK_PINMUX('B', 10, GPIO)>;
+			bias-pull-down;
+		};
+	};
+
 	ac1_led_pins: ac1_led_pins {
 		pins {
 			pinmux = <REALTEK_PINMUX('A', 13, GPIO)>;
@@ -299,8 +309,9 @@
 
 // I2S output to PCM9211 for S/PDIF Tx, clock master
 &sport3 {
-	pinctrl-names = "default";
+	pinctrl-names = "default", "suspend";
 	pinctrl-0 = <&i2s3_pins_streamer>;
+	pinctrl-1 = <&i2s3_suspend_pins_streamer>;
 
 	rtk,sport-multi-io = <1>;
 	rtk,sport-mode = <0>;
