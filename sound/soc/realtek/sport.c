@@ -17,6 +17,8 @@
 #include <linux/of_address.h>
 #include <linux/dmaengine.h>
 #include <linux/delay.h>
+#include <linux/pm_runtime.h>
+#include <linux/pinctrl/consumer.h>
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
 
@@ -89,6 +91,10 @@ struct sport_dai {
 	u8 play_record_in_use;
 	/* guard play_record_in_use */
 	spinlock_t state_lock;
+
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pins_state;
+	struct pinctrl_state *pins_state_suspend;
 
 	bool sue_continuous_clock;
 };
@@ -748,6 +754,13 @@ static int sport_startup(struct snd_pcm_substream *substream,
 	int ret;
 	sport_info(1,&sport->pdev->dev,"%s",__func__);
 
+	ret = pm_runtime_get_sync(&sport->pdev->dev);
+	if (ret < 0) {
+		dev_err(&sport->pdev->dev, "pm_runtime_get_sync failed: %d\n", ret);
+		pm_runtime_put_noidle(&sport->pdev->dev);
+		return ret;
+	}
+
 	/* enable sport clock */
 	ret = clk_prepare_enable(sport->clock);
 	if (ret < 0) {
@@ -780,6 +793,8 @@ static void sport_shutdown(struct snd_pcm_substream *substream,
 			//enable_audio_source_clock(sport->audio_clock_params, sport->id, false);
 		}
 	}
+
+	pm_runtime_put(&sport->pdev->dev);
 
 	sport_info(1, &sport->pdev->dev,"close");
 }
@@ -1114,6 +1129,38 @@ err:
 	return ret;
 }
 
+static int ameba_sport_runtime_suspend(struct device *dev)
+{
+	struct sport_dai *sport = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (sport->pins_state_suspend) {
+		int ret = pinctrl_select_state(sport->pinctrl, sport->pins_state_suspend);
+		if (ret < 0)
+			dev_err(&sport->pdev->dev, "failed to set suspend pin state: %d\n", ret);
+	}
+
+	return ret;
+}
+
+static int ameba_sport_runtime_resume(struct device *dev)
+{
+	struct sport_dai *sport = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (sport->pins_state) {
+		ret = pinctrl_select_state(sport->pinctrl, sport->pins_state);
+		if (ret < 0)
+			dev_err(&sport->pdev->dev, "failed to set normal pin state: %d\n", ret);
+	}
+
+	return ret;
+}
+
+static const struct dev_pm_ops ameba_sport_pm_ops = {
+	.runtime_suspend = ameba_sport_runtime_suspend,
+	.runtime_resume = ameba_sport_runtime_resume,
+};
 
 static int ameba_sport_probe(struct platform_device *pdev)
 {
@@ -1185,6 +1232,27 @@ static int ameba_sport_probe(struct platform_device *pdev)
 	sport->sport_mode = 0;
 	/* Reads the sport_mode value from the device tree and stores in data->sport_mode */
 	of_property_read_u32_index(dev->of_node, "rtk,sport-mode", 0, &sport->sport_mode);
+
+	sport->pinctrl = devm_pinctrl_get(dev);
+	if (!IS_ERR_OR_NULL(sport->pinctrl)) {
+		sport->pins_state = pinctrl_lookup_state(sport->pinctrl, "default");
+		sport->pins_state_suspend = pinctrl_lookup_state(sport->pinctrl, "suspend");
+
+		if (IS_ERR_OR_NULL(sport->pins_state_suspend)) {
+			sport->pins_state_suspend = NULL;
+			dev_info(dev, "could not get suspend pins\n");
+		}
+
+		// Only makes sense to have suspend state if there is a default state
+		if (IS_ERR_OR_NULL(sport->pins_state)) {
+			sport->pins_state = NULL;
+			sport->pins_state_suspend = NULL;
+			dev_warn(dev, "could not get normal pins\n");
+		}
+	} else {
+		sport->pinctrl = NULL;
+		dev_warn(dev, "failed to get pinctrl\n");
+	}
 
 	sport->sue_continuous_clock = of_property_read_bool(dev->of_node, "sue,continuous-clock");
 
@@ -1262,6 +1330,9 @@ static int ameba_sport_probe(struct platform_device *pdev)
 	ret = devm_snd_soc_register_component(&pdev->dev,
 					&ameba_sport_component,
 					&ameba_sport_dai_drv[sport->id], 1);
+
+	pm_runtime_enable(&pdev->dev);
+
 	return 0;
 
 err:
@@ -1292,6 +1363,7 @@ static struct platform_driver ameba_sport_driver = {
 	.driver = {
 		.name = "ameba-sport",
 		.of_match_table = of_match_ptr(ameba_sport_match),
+		.pm	= &ameba_sport_pm_ops,
 	},
 };
 
