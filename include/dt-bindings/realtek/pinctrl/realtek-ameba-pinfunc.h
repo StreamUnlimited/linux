@@ -39,6 +39,14 @@
 #define HS_TIMER_TRIG                            0x1c
 #define DEBUG_PORT                               0x1d
 #define WAKEUP                                   0x1e
+#define SWD_EXTRA                                0x20
+#define SDIO_EXTRA                               0x21
+#define I2S2_EXTRA1                              0x22
+#define I2S2_EXTRA2                              0x23
+#define I2S2_DOUT_EXTRA                          0x24
+#define I2S3_EXTRA                               0x25
+#define I2S3_DOUT_EXTRA                          0x26
+#define I2S3_DIN_EXTRA                           0x27
 
 /* define Pins number*/
 #define PIN_NO(port, line)	((((port) - 'A') << 5) + (line))

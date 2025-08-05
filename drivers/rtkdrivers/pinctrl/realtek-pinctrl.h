@@ -24,9 +24,9 @@
 #define PAD_BIT_GPIOx_PUPDC            ((u32)0x00000001 << 10)          /*!<R/W 0h  Some pad may have two type of PU/PD resistor, this bit can select it. 1: small resistor 0: big resistor */
 #define PAD_BIT_GPIOx_PD               ((u32)0x00000001 << 9)          /*!<R/W 0h  PAD pull down enable when system is in active. */
 #define PAD_BIT_GPIOx_PU               ((u32)0x00000001 << 8)          /*!<R/W 0h  PAD pull up enable when system is in active. */
-#define PAD_MASK_GPIOx_SEL             ((u32)0x0000001F << 0)          /*!<R/W/ES 0h  PAD pinmux func id select */
-#define PAD_GPIOx_SEL(x)               ((u32)(((x) & 0x0000001F) << 0))
-#define PAD_GET_GPIOx_SEL(x)           ((u32)(((x >> 0) & 0x0000001F)))
+#define PAD_MASK_GPIOx_SEL             ((u32)0x0000003F << 0)          /*!<R/W/ES 0h  PAD pinmux func id select */
+#define PAD_GPIOx_SEL(x)               ((u32)(((x) & 0x0000003F) << 0))
+#define PAD_GET_GPIOx_SEL(x)           ((u32)(((x >> 0) & 0x0000003F)))
 
 /**************************************************************************//**
  * @defgroup REG_PAD_AUD_PAD_CTRL
