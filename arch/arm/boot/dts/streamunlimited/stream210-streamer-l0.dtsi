@@ -144,15 +144,18 @@
 			compatible = "sue,hsmp-gpio";
 			status = "okay";
 		};
+
+		adc_hsmp: adc {
+			compatible = "sue,hsmp-adc";
+			status = "okay";
+		};
 	};
 
 };
 
+// ADC can't be configured by linux, because it is used by the M0, all ADC requests go through HSMP to the M0
 &adc {
-	pinctrl-names = "default";
-	pinctrl-0 = <&adc_pins_streamer>;
-	status = "okay";
-	rtk,adc-channels = <2>;
+	status = "disabled";
 };
 
 &codec {
@@ -196,13 +199,6 @@
 };
 
 &pinctrl {
-	adc_pins_streamer: adc_pins_streamer {
-		pins {
-			pinmux = <REALTEK_PINMUX('A', 2, GPIO)>;
-			bias-disable;
-		};
-	};
-
 	buttons_pins: buttons_pins {
 		pins {
 			pinmux = <REALTEK_PINMUX('A', 0, GPIO)>,	// PAIR
