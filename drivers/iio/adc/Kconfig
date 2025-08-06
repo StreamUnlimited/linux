@@ -1115,6 +1115,13 @@ config STMPE_ADC
 	  Say yes here to build support for ST Microelectronics STMPE
 	  built-in ADC block (stmpe811).
 
+config SUE_HSMP_ADC
+	tristate "SUE HSMP ADC driver"
+	depends on IIO
+	depends on HAVE_SUE_HSMP
+	help
+	  Say yes here to build support for SUE HSMP ADC driver.
+
 config SUN4I_GPADC
 	tristate "Allwinner A10/A13/A31 and similar GPADCs driver"
 	depends on IIO

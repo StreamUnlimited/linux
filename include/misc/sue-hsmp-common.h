@@ -30,8 +30,10 @@ struct __attribute__((__packed__)) sue_hsmp_packet {
  * Bits: [24:16] red, [16:8] green, [8:0] blue
  */
 #define HSMP_RGB_LED_REG		0x10
+#define HSMP_ADC_CHANNEL_SELECT_REG	0x20	// Write only ADC select register
+#define HSMP_ADC_VALUE_REG		0x21	// Read only value register
 
-#define HSMP_MAX_REG			HSMP_RGB_LED_REG
+#define HSMP_MAX_REG			HSMP_ADC_VALUE_REG
 
 enum hsmp_power_state {
 	STATE_POWERON = 0x00,

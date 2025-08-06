@@ -112,12 +112,29 @@ static int sue_rtk_ipc_hsmp_send_and_recv(struct sue_hsmp_rtk_mcu_ipc *ipc, uint
 
 static bool sue_rtk_ipc_hsmp_regmap_readable(struct device *dev, unsigned int reg)
 {
-	return true;
+	return (
+		HSMP_POWER_STATE_REG == reg ||
+		HSMP_GPIO_VAL_REG == reg ||
+		HSMP_RGB_LED_REG == reg ||
+		HSMP_ADC_VALUE_REG == reg
+	);
 }
 
 static bool sue_rtk_ipc_hsmp_regmap_writeable(struct device *dev, unsigned int reg)
 {
-	return true;
+	return (
+		HSMP_POWER_STATE_REG == reg ||
+		HSMP_GPIO_VAL_REG == reg ||
+		HSMP_RGB_LED_REG == reg ||
+		HSMP_ADC_CHANNEL_SELECT_REG == reg
+	);
+}
+
+static bool sue_rtk_ipc_hsmp_regmap_volatile(struct device *dev, unsigned int reg)
+{
+	return (
+		HSMP_ADC_VALUE_REG == reg
+	);
 }
 
 static struct regmap_config sue_rtk_ipc_hsmp_regmap_config = {
@@ -128,6 +145,7 @@ static struct regmap_config sue_rtk_ipc_hsmp_regmap_config = {
 	.cache_type = REGCACHE_RBTREE,
 	.readable_reg = sue_rtk_ipc_hsmp_regmap_readable,
 	.writeable_reg = sue_rtk_ipc_hsmp_regmap_writeable,
+	.volatile_reg = sue_rtk_ipc_hsmp_regmap_volatile,
 };
 
 static int regmap_sue_rtk_ipc_hsmp_write(void *context, unsigned int reg, unsigned int val)
