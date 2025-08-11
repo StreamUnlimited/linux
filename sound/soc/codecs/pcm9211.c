@@ -599,29 +599,14 @@ static int pcm9211_startup(struct snd_pcm_substream *substream,
 				0, SNDRV_PCM_HW_PARAM_RATE,
 				&adc_rate_constraints);
 	} else if (port == PCM9211_MOSRC_DIR) {
-		unsigned long flags;
-		unsigned int dir_rate;
+		dev_info(dev, "DIR capture on DAI %d\n", dai->id);
 
-		spin_lock_irqsave(&priv->status_lock, flags);
-		dir_rate = priv->dir_rate;
-		spin_unlock_irqrestore(&priv->status_lock, flags);
-
-		dev_info(dev, "DIR capture on DAI %d, detected biphase rate is %d Hz\n",
-				dai->id, biphase_rate_values[dir_rate]);
-
-		if (dir_rate == 0) {
-			/* rate is invalid */
-			return -EIO;
-		} else {
-			/* sample rate detector is locked */
-			priv->rate_constraints.count = 1;
-			priv->rate_constraints.list = &biphase_rate_values[dir_rate];
-			priv->rate_constraints.mask = 0;
-
-			return snd_pcm_hw_constraint_list(substream->runtime,
-					0, SNDRV_PCM_HW_PARAM_RATE,
-					&priv->rate_constraints);
-		}
+		/*
+		 * The actual rate limiting for DIR will happen in the .hw_params callback
+		 * and we expect the user to open the DIR with the correct rate that was
+		 * detected.
+		 */
+		return 0;
 	} else { /* AUXIN# */
 		dev_info(dev, "AUXIN%d capture on DAI %d\n",
 				port - PCM9211_MOSRC_AUXIN0, dai->id);
@@ -807,6 +792,20 @@ static int pcm9211_hw_params(struct snd_pcm_substream *substream,
 		}
 
 		priv->adc_rate = rate;
+	} else if (port == PCM9211_MOSRC_DIR) {
+		unsigned long flags;
+		unsigned int dir_rate;
+
+		spin_lock_irqsave(&priv->status_lock, flags);
+		dir_rate = priv->dir_rate;
+		spin_unlock_irqrestore(&priv->status_lock, flags);
+
+		dev_info(dev, "Requested DIR rate (%u), detected DIR rate (%u)\n", rate, biphase_rate_values[dir_rate]);
+
+		if (biphase_rate_values[dir_rate] != rate) {
+			dev_err(dev, "Requested DIR rate is invalid\n");
+			return -EINVAL;
+		}
 	}
 
 	return 0;
