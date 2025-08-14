@@ -51,6 +51,7 @@ struct stream195x_simple_priv {
 	struct gpio_desc *powerdown_gpio;
 	struct snd_soc_stream195x_dai_link_data *dai_link_data;
 	bool ignore_suspend;
+	u32 current_tx_rate;
 	/* END SUE addition 2 */
 };
 
@@ -107,8 +108,14 @@ static int snd_soc_stream195x_ppm_put(struct snd_kcontrol *kcontrol, struct snd_
 	unsigned int clk_rate;
 	int ppm = ucontrol->value.integer.value[0];
 
-	comp = DIV_ROUND_CLOSEST_ULL((u64)PLL_NOMINAL_RATE_48k * abs(ppm), 1000000UL);
-	clk_rate = PLL_NOMINAL_RATE_48k;
+	// If we only have one PLL available (pll11k missing), then the nominal rate
+	// of this single PLL depends on the currenty playing rate.
+	u32 pll8k_nominal_rate = PLL_NOMINAL_RATE_48k;
+	if (!priv->pll11k_clk && !((priv->current_tx_rate % 8000) == 0))
+		pll8k_nominal_rate = PLL_NOMINAL_RATE_44k1;
+
+	comp = DIV_ROUND_CLOSEST_ULL((u64)pll8k_nominal_rate * abs(ppm), 1000000UL);
+	clk_rate = pll8k_nominal_rate;
 	if (ppm > 0)
 		clk_rate -= comp;
 	else
@@ -196,7 +203,26 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	struct snd_kcontrol *kcontrol;
 
 	unsigned int rate = params_rate(params);
-	unsigned int mclk_rate = (rate % 8000) == 0 ? MCLK_RATE_48k : MCLK_RATE_44k1;
+	unsigned int pll_rate, mclk_rate;
+	struct clk *pll;
+
+	if ((rate % 8000) == 0) {
+		pll_rate = PLL_NOMINAL_RATE_48k;
+		mclk_rate = MCLK_RATE_48k;
+		pll = priv->pll8k_clk;
+	} else {
+		pll_rate = PLL_NOMINAL_RATE_44k1;
+		mclk_rate = MCLK_RATE_44k1;
+
+		/*
+		 * If a pll11k was specified we use it, otherwise we use the pll8k even
+		 * for 44.1 kHz, assuming it's table is correclty configured.
+		 */
+		pll = priv->pll11k_clk ? priv->pll11k_clk : priv->pll8k_clk;
+	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		priv->current_tx_rate = rate;
 
 	// Double the MCLK if we are at 705.6kHz or 768kHz
 	// This provides the headroom for the BCLK (Fs * 64)
@@ -217,17 +243,13 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 		return ret;
 
 	/*
-	 * Reset the PLLs to the nominal value, otherwise when the PLL is
+	 * Reset the PLL to the nominal value, otherwise when the PLL is
 	 * not at the nomial value, the calulations inside snd_soc_dai_set_sysclk()
 	 * might fail because the frequency cannot be cleanly divided down
 	 * anymore.
 	 */
 	priv->cur_ppm = 0;
-	ret = clk_set_rate(priv->pll8k_clk, PLL_NOMINAL_RATE_48k);
-	if (ret)
-		return ret;
-
-	ret = clk_set_rate(priv->pll11k_clk, PLL_NOMINAL_RATE_44k1);
+	ret = clk_set_rate(pll, pll_rate);
 	if (ret)
 		return ret;
 

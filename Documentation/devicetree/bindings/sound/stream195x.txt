@@ -9,12 +9,13 @@ Required properties:
 
 - compatible				: "sue,stream195x-audio"
 - sue-card,name				: User specified sound card name, one string
-- clocks				: Must contain entries to two clocks, ideally different ones
-					  which can generate a rate that divides down to audio frequencies.
-- clock-names				: Must contain "pll8k" and "pll11k", the respective clock will
-					  be chosen based on the requested sample rate. E.g. for 48 kHz, the
-					  pll8k clock will be used and for 44.1 kHz the pll11k one will be
-					  used.
+- clocks				: Must contain clock entries that match up with the "clock-names"
+					  property.
+- clock-names				: Must contain at least "pll8k" and can contain "pll11k".
+					  If both entries are specified the I²S clock source will be chosen
+					  based on the requested sample rate. E.g. for 48 kHz, the pll8k
+					  clock will be used and for 44.1 kHz the pll11k one will be used.
+
 - sue-card,dai-link			: Container for dai-link level properties and the CPU and CODEC
 					  sub-nodes.
 
