@@ -28,7 +28,10 @@ static u32 share_count_disp;
 static u32 share_count_pdm;
 static u32 share_count_nand;
 
-static const char *pll_ref_sels[] = { "osc_24m", "dummy", "dummy", "dummy", };
+static const char *clk_pad_sels[] = { "dummy", "clk_clkin2", "clk_clkin1", "dummy", };
+static const char *audio_pll1_ref_sels[] = { "osc_24m", "audio_pll1_pad_sel", "dummy", "dummy", };
+static const char *audio_pll2_ref_sels[] = { "osc_24m", "audio_pll2_pad_sel", "dummy", "dummy", };
+static const char *pll_ref_sels[] = { "osc_24m", "clk_pad", "dummy", "dummy", };
 static const char *audio_pll1_bypass_sels[] = {"audio_pll1", "audio_pll1_ref_sel", };
 static const char *audio_pll2_bypass_sels[] = {"audio_pll2", "audio_pll2_ref_sel", };
 static const char *video_pll1_bypass_sels[] = {"video_pll1", "video_pll1_ref_sel", };
@@ -345,6 +348,8 @@ static int imx8mm_clocks_probe(struct platform_device *pdev)
 	hws[IMX8MM_CLK_EXT2] = imx_get_clk_hw_by_name(np, "clk_ext2");
 	hws[IMX8MM_CLK_EXT3] = imx_get_clk_hw_by_name(np, "clk_ext3");
 	hws[IMX8MM_CLK_EXT4] = imx_get_clk_hw_by_name(np, "clk_ext4");
+	hws[IMX8MM_CLK_CLKIN1] = imx_get_clk_hw_by_name(np, "clk_clkin1");
+	hws[IMX8MM_CLK_CLKIN2] = imx_get_clk_hw_by_name(np, "clk_clkin2");
 
 	np = of_find_compatible_node(NULL, NULL, "fsl,imx8mm-anatop");
 	base = of_iomap(np, 0);
@@ -352,8 +357,10 @@ static int imx8mm_clocks_probe(struct platform_device *pdev)
 	if (WARN_ON(!base))
 		return -ENOMEM;
 
-	hws[IMX8MM_AUDIO_PLL1_REF_SEL] = imx_clk_hw_mux("audio_pll1_ref_sel", base + 0x0, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
-	hws[IMX8MM_AUDIO_PLL2_REF_SEL] = imx_clk_hw_mux("audio_pll2_ref_sel", base + 0x14, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+	hws[IMX8MM_AUDIO_PLL1_PAD_SEL] = imx_clk_hw_mux("audio_pll1_pad_sel", base + 0x0, 2, 2, clk_pad_sels, ARRAY_SIZE(clk_pad_sels));
+	hws[IMX8MM_AUDIO_PLL2_PAD_SEL] = imx_clk_hw_mux("audio_pll2_pad_sel", base + 0x14, 2, 2, clk_pad_sels, ARRAY_SIZE(clk_pad_sels));
+	hws[IMX8MM_AUDIO_PLL1_REF_SEL] = imx_clk_hw_mux("audio_pll1_ref_sel", base + 0x0, 0, 2, audio_pll1_ref_sels, ARRAY_SIZE(audio_pll1_ref_sels));
+	hws[IMX8MM_AUDIO_PLL2_REF_SEL] = imx_clk_hw_mux("audio_pll2_ref_sel", base + 0x14, 0, 2, audio_pll2_ref_sels, ARRAY_SIZE(audio_pll2_ref_sels));
 	hws[IMX8MM_VIDEO_PLL1_REF_SEL] = imx_clk_hw_mux("video_pll1_ref_sel", base + 0x28, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
 	hws[IMX8MM_DRAM_PLL_REF_SEL] = imx_clk_hw_mux("dram_pll_ref_sel", base + 0x50, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
 	hws[IMX8MM_GPU_PLL_REF_SEL] = imx_clk_hw_mux("gpu_pll_ref_sel", base + 0x64, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
