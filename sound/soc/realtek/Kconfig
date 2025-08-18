@@ -20,6 +20,7 @@ config SND_SOC_RTK_AMEBA
 	select SND_SOC_CODEC_RTK_AMEBA
 	select SND_SOC_SPORT_RTK_AMEBA
 	select SND_SOC_DMA_RTK_AMEBA
+	select SND_SIMPLE_CARD_UTILS
 	select AUDIO_PLL_RTK_AMEBA
 	help
 	Say Y if you want to add support for SoC audio on the AMEBA.

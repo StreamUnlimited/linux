@@ -11,6 +11,8 @@
 #include <linux/of_device.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#include <sound/jack.h>
+#include <sound/simple_card_utils.h>
 #include <linux/gpio/consumer.h>
 #include <linux/workqueue.h>
 #include <linux/regulator/consumer.h>
@@ -26,6 +28,8 @@ struct ameba_priv {
 	atomic_t playing;
 
 	struct snd_kcontrol *drift_kcontrol;
+	struct asoc_simple_jack hp_jack;
+	atomic_t hp_jack_inserted;
 
 	bool regulator_is_enabled;
 	struct regulator *enable_regulator;
@@ -147,6 +151,11 @@ static int set_regulator_enable(struct ameba_priv *priv, bool enable)
 	return ret;
 }
 
+static const struct snd_soc_dapm_widget ameba_dapm_widgets[] = {
+	// Just to suppress the error message from the kernel about unexistent dapm route
+	SND_SOC_DAPM_HP("Headphone Jack", NULL),
+};
+
 static void ameba_mute_work_handler(struct work_struct *work)
 {
 	struct ameba_priv *priv = container_of(work, struct ameba_priv, mute_work);
@@ -155,8 +164,13 @@ static void ameba_mute_work_handler(struct work_struct *work)
 		set_amp_mute(priv, true);
 		set_hp_mute(priv, true);
 	} else {
-		set_amp_mute(priv, false);
-		set_hp_mute(priv, false);
+		if (atomic_read(&priv->hp_jack_inserted)) {
+			set_amp_mute(priv, true);
+			set_hp_mute(priv, false);
+		} else {
+			set_hp_mute(priv, true);
+			set_amp_mute(priv, false);
+		}
 	}
 }
 
@@ -232,6 +246,22 @@ static struct snd_soc_ops ameba_ops = {
 	.trigger = ameba_trigger,
 };
 
+static int hp_jack_event(struct notifier_block *nb, unsigned long event,
+	void *data)
+{
+	struct snd_soc_jack *jack = data;
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(jack->card);
+
+	atomic_set(&priv->hp_jack_inserted, (event & SND_JACK_HEADPHONE));
+	schedule_work(&priv->mute_work);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block hp_jack_nb = {
+	.notifier_call = hp_jack_event,
+};
+
 static struct snd_soc_dai_link ameba_dai[] = {
 	{
 		.name = "codec AIF1",
@@ -283,6 +313,7 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 static int ameba_card_probe(struct snd_soc_card *card)
 {
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
+	struct device_node *np = card->dev->of_node;
 
 	priv->amp_mute_gpio = devm_gpiod_get_optional(card->dev, "mute", GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->amp_mute_gpio))
@@ -291,6 +322,15 @@ static int ameba_card_probe(struct snd_soc_card *card)
 	priv->hp_mute_gpio = devm_gpiod_get_optional(card->dev, "hp_mute", GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->hp_mute_gpio))
 		return dev_err_probe(card->dev, PTR_ERR(priv->hp_mute_gpio), "Failed to get HP mute gpio\n");
+
+	if (of_property_read_bool(np, "hp-det-gpio")) {
+		int ret = asoc_simple_init_jack(card, &priv->hp_jack, 1, NULL, "Headphone Jack");
+		if (ret < 0) {
+			dev_err(card->dev, "Failed to init HP detect gpio: %d\n", ret);
+			return ret;
+		}
+		snd_soc_jack_notifier_register(&priv->hp_jack.jack, &hp_jack_nb);
+	}
 
 	priv->enable_regulator = devm_regulator_get_exclusive(card->dev, "amp");
 	if (IS_ERR(priv->enable_regulator))
