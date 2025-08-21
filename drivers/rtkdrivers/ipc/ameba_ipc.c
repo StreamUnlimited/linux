@@ -402,18 +402,15 @@ static int ameba_ipc_init_hw(struct aipc_device *pipc)
 	int ret = 0;
 
 	/* Request interrupt for IPC port. */
-	spin_lock(&pipc->lock);
-	if (request_irq(pipc->irq, ameba_ipc_int_hdl, 0, \
-					dev_name(pipc->dev), pipc)) {
-		dev_err(pipc->dev, "Failed to request IRQ\n");
-		ret = -EIO;
-		goto func_exit;
+	ret = request_irq(pipc->irq, ameba_ipc_int_hdl, 0, \
+					dev_name(pipc->dev), pipc);
+	if (ret) {
+		dev_err(pipc->dev, "Failed to request IRQ: %d\n", ret);
+		return ret;
 	}
 	disable_irq(pipc->irq);
-	spin_unlock(&pipc->lock);
 
-func_exit:
-	return ret;
+	return 0;
 }
 
 /**
