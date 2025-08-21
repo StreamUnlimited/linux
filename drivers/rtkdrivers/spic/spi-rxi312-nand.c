@@ -552,6 +552,8 @@ static int rxi312_spi_probe(struct platform_device *pdev)
 	spi = spi_master_get_devdata(master);
 	spi->master = master;
 
+	mutex_init(&spi->lock);
+
 	master->bus_num = 0;
 	if (pdev->dev.of_node) {
 		if (!of_property_read_u32(pdev->dev.of_node, "bus_num", &bus_num)) {
