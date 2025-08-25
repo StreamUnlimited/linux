@@ -82,6 +82,7 @@
 		regulator-name = "amp-regulator";
 		gpio = <&gpioa 16 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-boot-on;
 	};
 };
 

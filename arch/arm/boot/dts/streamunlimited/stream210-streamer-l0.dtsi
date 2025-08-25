@@ -16,6 +16,7 @@
 		regulator-name = "aud-enable";
 		gpio = <&gpioc 0 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-boot-on;
 	};
 
 	reg_eth_enable: reg-eth-enable {
