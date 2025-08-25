@@ -21,7 +21,15 @@
 #include "main.h"
 
 static char *reg_alpha2;
+static int country_ie_ignore;
+static int beacon_hints;
 module_param(reg_alpha2, charp, 0);
+module_param(country_ie_ignore, int, 0440);
+MODULE_PARM_DESC(country_ie_ignore,
+		 "0: Follow countryIE from AP and beacon hint enable; 1: Ignore countryIE from AP and beacon hint disable");
+module_param(beacon_hints, int, 0440);
+MODULE_PARM_DESC(beacon_hints,
+		 "0: enable beacon hints(default); 1: disable beacon hints");
 
 static const struct ieee80211_iface_limit mwifiex_ap_sta_limits[] = {
 	{
@@ -3567,6 +3575,21 @@ int mwifiex_register_cfg80211(struct mwifiex_adapter *adapter)
 	/* Initialize cipher suits */
 	wiphy->cipher_suites = mwifiex_cipher_suites;
 	wiphy->n_cipher_suites = ARRAY_SIZE(mwifiex_cipher_suites);
+
+	if (beacon_hints)
+		wiphy->regulatory_flags |= REGULATORY_DISABLE_BEACON_HINTS;
+	if (country_ie_ignore)
+		wiphy->regulatory_flags |= REGULATORY_COUNTRY_IE_IGNORE;
+
+	if (wiphy->regulatory_flags & REGULATORY_DISABLE_BEACON_HINTS)
+		wiphy_info(wiphy, "Beacon hints disabled!\n");
+	else
+		wiphy_info(wiphy, "Beacon hints enabled!\n");
+
+	if (wiphy->regulatory_flags & REGULATORY_COUNTRY_IE_IGNORE)
+		wiphy_info(wiphy, "Don't follow countryIE provided by AP\n");
+	else
+		wiphy_info(wiphy, "Follow countryIE provided by AP\n");
 
 	ether_addr_copy(wiphy->perm_addr, adapter->perm_addr);
 	wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
