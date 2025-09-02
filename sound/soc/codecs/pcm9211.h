@@ -152,6 +152,7 @@ extern void pcm9211_remove(struct device *dev);
 
 /* PCM9211_SYS_RESET */
 #define PCM9211_SYS_RESET_MRST		BIT(7)
+#define PCM9211_SYS_RESET_TXDIS_MASK	BIT(1)
 #define PCM9211_SYS_RESET_RXDIS_SHIFT	4
 #define PCM9211_SYS_RESET_ADDIS_SHIFT	5
 
