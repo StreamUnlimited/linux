@@ -77,6 +77,61 @@
 		gpio_wl_reg_on = <&gpio2 8 GPIO_ACTIVE_HIGH>;
 		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
 	};
+
+	// modified version of arch/arm64/boot/dts/freescale/imx8mm.dtsi
+	thermal-zones {
+		cpu-thermal {
+			trips {
+				cpu_alert0: trip0 {
+					temperature = <85000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+
+				cpu_alert1: trip1 {
+					temperature = <90000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+
+				cpu_crit: trip2 {
+					temperature = <95000>;
+					hysteresis = <2000>;
+					type = "critical";
+				};
+			};
+
+			/*
+			 * Cooling states map to the OPP table (state 0 = fastest OPP).
+			 * map0 limits the governor to the next OPP down (state 1).
+			 * map1's THERMAL_NO_LIMIT allows the governor to pick the slowest OPP
+			 * (max state), which corresponds to opp-1200000000 in a53_opp_table.
+			 * bang-bang governor will chose lowest state when trip point is hit.
+			 */
+			cooling-maps {
+				map0 {
+					trip = <&cpu_alert0>;
+					// state 0 corresponds to opp-1800000000 in a53_opp_table
+					// state 1 corresponds to opp-1600000000 in a53_opp_table
+					cooling-device =
+						<&A53_0 0 1>,
+						<&A53_1 0 1>,
+						<&A53_2 0 1>,
+						<&A53_3 0 1>,
+						<&imx8_gpu_ss 0 1>;
+				};
+				map1 {
+					trip = <&cpu_alert1>;
+					cooling-device =
+						<&A53_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+						<&A53_1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+						<&A53_2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+						<&A53_3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+						<&imx8_gpu_ss 0 1>;
+				};
+			};
+		};
+	};
 };
 
 &A53_0 {
