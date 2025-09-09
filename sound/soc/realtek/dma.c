@@ -694,6 +694,8 @@ static int gdma_trigger(struct snd_soc_component *component, struct snd_pcm_subs
 		if (IS_6_8_CHANNEL(runtime->channels)) {
 			ret = gdma_trigger_start(substream, data_1);
 		}
+
+		dev_info(component->dev, "no_period_wakeup: %d\n", runtime->no_period_wakeup);
 		break;
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
