@@ -803,8 +803,10 @@ static int pcm9211_hw_params(struct snd_pcm_substream *substream,
 		dev_info(dev, "Requested DIR rate (%u), detected DIR rate (%u)\n", rate, biphase_rate_values[dir_rate]);
 
 		if (biphase_rate_values[dir_rate] != rate) {
-			dev_err(dev, "Requested DIR rate is invalid\n");
-			return -EINVAL;
+			dev_warn(dev, "Requested DIR rate does not match detected DIR rate\n");
+			// HACK: Do not fail here and instead allow to open the device with a mismatched rate, this helps
+			// to workaround the issue where PipeWire puts the node/device into an permanent error state.
+			// return -EINVAL;
 		}
 	}
 
