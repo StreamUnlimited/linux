@@ -251,7 +251,8 @@ static LCM_setting_table_t gh7220_initialization[] = {/* DCS Write Long */
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x12, 0xda}},  // VDDH
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x13, 0x1c}},
 	// {MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x14, 0x10}},
-	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x18, 0x30}},
+	// below setting changes mipi's electric current, 0x20 and 0x10 are both ok.
+	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x18, 0x10}},
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x20, 0x80}},
 	// PAGEf
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xee, 0x0f}},  // PAGEf
