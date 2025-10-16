@@ -1824,6 +1824,14 @@ static int set_ethernet_addr(struct r8152 *tp, bool in_resume)
 	struct sockaddr sa;
 	int ret;
 
+	/* We don't want to set eth address after wakeup from suspend
+	 * as we don't have stored eth address in the chip otp
+	 * but in const partition. Without this below function detects empty
+	 * eth address after wakeup and sets a random eth address.
+	 */
+	if (in_resume)
+		return 0;
+
 	ret = determine_ethernet_addr(tp, &sa);
 	if (ret < 0)
 		return ret;
