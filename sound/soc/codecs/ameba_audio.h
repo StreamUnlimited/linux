@@ -5225,7 +5225,7 @@ void audio_codec_mute_dmic_input(bool NewState, u32 ad_channel_num, u32 sel_dmic
 void audio_codec_sel_dmic_channel(u32 ad_channel_num,void __iomem	* audio_base_addr);
 void audio_codec_zdet_init(int timeout_level, void __iomem	* audio_base_addr);
 void audio_adc_dchpf_level_select(u32 level);
-
+void audio_codec_enable_adc_lpf(bool enable, u32 ad_channel_num, void __iomem * audio_base_addr);
 
 /* MANUAL_GEN_END */
 

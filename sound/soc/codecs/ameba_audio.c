@@ -37,6 +37,20 @@
 										tmp &= ~AUD_BIT_ADC_##x##_DCHPF_EN;\
 										writel(tmp, audio_base_addr + CODEC_ADC_##x##_CONTROL_0); }
 
+/*micros for amic*/
+#define DEAL_ADC_ENABLE_LPF1ST_FUNC(x) { \
+										tmp = readl(audio_base_addr + CODEC_ADC_##x##_CONTROL_0);\
+										tmp |= AUD_BIT_ADC_##x##_AD_LPF1ST_EN;\
+										writel(tmp, audio_base_addr + CODEC_ADC_##x##_CONTROL_0); }
+
+/*micros for amic*/
+#define DEAL_ADC_DISABLE_LPF1ST_FUNC(x) { \
+										tmp = readl(audio_base_addr + CODEC_ADC_##x##_CONTROL_0);\
+										tmp &= ~AUD_BIT_ADC_##x##_AD_LPF1ST_EN;\
+										writel(tmp, audio_base_addr + CODEC_ADC_##x##_CONTROL_0); }
+
+
+
 void audio_codec_mute_adc_input(bool NewState, u32 ad_channel_num, u32 sel_adc_sdm_num,void __iomem	* audio_base_addr)
 {
 	u32 tmp;
@@ -171,6 +185,72 @@ void audio_codec_enable_adc_dchpf(bool NewState, u32 ad_channel_num, void __iome
 
 	}
 
+}
+
+void audio_codec_enable_adc_lpf(bool enable, u32 ad_channel_num, void __iomem * audio_base_addr)
+{
+	u32 tmp;
+
+	if (enable == false) {
+		switch (ad_channel_num)
+		{
+			case AD_CHANNEL_0:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(0);
+				break;
+			case AD_CHANNEL_1:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(1);
+				break;
+			case AD_CHANNEL_2:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(2);
+				break;
+			case AD_CHANNEL_3:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(3);
+				break;
+			case AD_CHANNEL_4:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(4);
+				break;
+			case AD_CHANNEL_5:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(5);
+				break;
+			case AD_CHANNEL_6:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(6);
+				break;
+			case AD_CHANNEL_7:
+				DEAL_ADC_DISABLE_LPF1ST_FUNC(7);
+				break;
+			default:
+				break;
+		}
+	} else {
+		switch (ad_channel_num){
+			case AD_CHANNEL_0:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(0);
+				break;
+			case AD_CHANNEL_1:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(1);
+				break;
+			case AD_CHANNEL_2:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(2);
+				break;
+			case AD_CHANNEL_3:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(3);
+				break;
+			case AD_CHANNEL_4:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(4);
+				break;
+			case AD_CHANNEL_5:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(5);
+				break;
+			case AD_CHANNEL_6:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(6);
+				break;
+			case AD_CHANNEL_7:
+				DEAL_ADC_ENABLE_LPF1ST_FUNC(7);
+				break;
+			default:
+				break;
+		}
+	}
 }
 
 /*micros for dmic*/
