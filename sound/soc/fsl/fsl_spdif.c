@@ -257,12 +257,6 @@ static void spdif_irq_dpll_lock(struct fsl_spdif_priv *spdif_priv)
 			locked ? "locked" : "loss lock");
 
 	spdif_priv->dpll_locked = locked ? true : false;
-
-	if (spdif_priv->snd_card && spdif_priv->rxrate_kcontrol) {
-		snd_ctl_notify(spdif_priv->snd_card,
-			       SNDRV_CTL_EVENT_MASK_VALUE,
-			       &spdif_priv->rxrate_kcontrol->id);
-	}
 }
 
 /* Receiver found illegal symbol interrupt handler */
@@ -372,11 +366,14 @@ static irqreturn_t spdif_isr(int irq, void *devid)
 	struct fsl_spdif_priv *spdif_priv = (struct fsl_spdif_priv *)devid;
 	struct platform_device *pdev = spdif_priv->pdev;
 	u32 sis;
+	int ret = IRQ_HANDLED;
 
 	sis = spdif_intr_status_clear(spdif_priv);
 
-	if (sis & INT_DPLL_LOCKED)
+	if (sis & INT_DPLL_LOCKED) {
 		spdif_irq_dpll_lock(spdif_priv);
+		ret = IRQ_WAKE_THREAD;
+	}
 
 	if (sis & INT_TXFIFO_UNOV)
 		dev_dbg(&pdev->dev, "isr: Tx FIFO under/overrun\n");
@@ -384,19 +381,8 @@ static irqreturn_t spdif_isr(int irq, void *devid)
 	if (sis & INT_TXFIFO_RESYNC)
 		dev_dbg(&pdev->dev, "isr: Tx FIFO resync\n");
 
-	if (sis & INT_CNEW) {
+	if (sis & INT_CNEW)
 		dev_dbg(&pdev->dev, "isr: cstatus new\n");
-
-		if (spdif_priv->dpll_locked) {
-			struct snd_soc_card *scard = spdif_priv->card;
-			struct snd_kcontrol *ctrl_sample_rate = snd_soc_card_get_kcontrol(scard,
-					SPDIFIN_SAMPLE_RATE_ENUM_NAME);
-
-			snd_ctl_notify(spdif_priv->card->snd_card,
-						   SNDRV_CTL_EVENT_MASK_VALUE,
-						   &ctrl_sample_rate->id);
-		}
-	}
 
 	if (sis & INT_VAL_NOGOOD)
 		dev_dbg(&pdev->dev, "isr: validity flag no good\n");
@@ -431,8 +417,10 @@ static irqreturn_t spdif_isr(int irq, void *devid)
 	if (sis & INT_RXFIFO_RESYNC)
 		dev_dbg(&pdev->dev, "isr: Rx FIFO resync\n");
 
-	if (sis & INT_LOSS_LOCK)
+	if (sis & INT_LOSS_LOCK) {
 		spdif_irq_dpll_lock(spdif_priv);
+		ret = IRQ_WAKE_THREAD;
+	}
 
 	/* FIXME: Write Tx FIFO to clear TxEm */
 	if (sis & INT_TX_EM)
@@ -441,6 +429,25 @@ static irqreturn_t spdif_isr(int irq, void *devid)
 	/* FIXME: Read Rx FIFO to clear RxFIFOFul */
 	if (sis & INT_RXFIFO_FUL)
 		dev_dbg(&pdev->dev, "isr: Rx FIFO full\n");
+
+	return ret;
+}
+
+static irqreturn_t spdif_isr_thread(int irq, void *devid)
+{
+	struct fsl_spdif_priv *spdif_priv = (struct fsl_spdif_priv *)devid;
+	struct snd_kcontrol *ctrl_sample_rate = snd_soc_card_get_kcontrol(spdif_priv->card,
+		SPDIFIN_SAMPLE_RATE_ENUM_NAME);
+
+	if (spdif_priv->snd_card && spdif_priv->rxrate_kcontrol) {
+		snd_ctl_notify(spdif_priv->snd_card,
+			       SNDRV_CTL_EVENT_MASK_VALUE,
+			       &spdif_priv->rxrate_kcontrol->id);
+	}
+
+	snd_ctl_notify(spdif_priv->card->snd_card,
+					SNDRV_CTL_EVENT_MASK_VALUE,
+					&ctrl_sample_rate->id);
 
 	return IRQ_HANDLED;
 }
@@ -703,6 +710,8 @@ static void fsl_spdif_shutdown(struct snd_pcm_substream *substream,
 		scr = SCR_RXFIFO_OFF | SCR_RXFIFO_CTL_ZERO;
 		mask = SCR_RXFIFO_FSEL_MASK | SCR_RXFIFO_AUTOSYNC_MASK|
 			SCR_RXFIFO_CTL_MASK | SCR_RXFIFO_OFF_MASK;
+
+		spdif_priv->dpll_locked = 0;
 
 		// Notify userspace that the actual sample rate will be N/A when closing.
 		// This makes sure that any processes watching only on ALSA mixer changes
@@ -1648,7 +1657,7 @@ static int fsl_spdif_probe(struct platform_device *pdev)
 		if (irq < 0)
 			return irq;
 
-		ret = devm_request_irq(&pdev->dev, irq, spdif_isr, 0,
+		ret = devm_request_threaded_irq(&pdev->dev, irq, spdif_isr, spdif_isr_thread, 0,
 				       dev_name(&pdev->dev), spdif_priv);
 		if (ret) {
 			dev_err(&pdev->dev, "could not claim irq %u\n", irq);
