@@ -7122,6 +7122,12 @@ static void create_big_complete(struct hci_dev *hdev, void *data, int err)
 	if (err == -ECANCELED)
 		return;
 
+	if (err) {
+		bt_dev_err(hdev, "Unable to create BIG: %d", err);
+		hci_conn_failed(conn, bt_to_errno(err));
+		return;
+	}
+
 	if (hci_conn_valid(hdev, conn))
 		clear_bit(HCI_CONN_CREATE_BIG_SYNC, &conn->flags);
 }
