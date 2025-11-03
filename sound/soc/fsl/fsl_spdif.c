@@ -358,7 +358,7 @@ static u32 spdif_intr_status_clear(struct fsl_spdif_priv *spdif_priv)
 
 	regmap_write(regmap, REG_SPDIF_SIC, val & val2);
 
-	return val;
+	return val & val2;
 }
 
 static irqreturn_t spdif_isr(int irq, void *devid)
