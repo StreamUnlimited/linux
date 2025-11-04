@@ -35,7 +35,11 @@
 				INT_UQ_SYNC | INT_UQ_ERR | INT_RXFIFO_RESYNC |\
 				INT_LOSS_LOCK | INT_DPLL_LOCKED)
 
+/* Always-on IRQs when capturing. Used for PLL locking. */
+#define INTR_FOR_CAPTURE_AO	(INT_LOSS_LOCK | INT_DPLL_LOCKED)
+
 #define SIE_INTR_FOR(tx)	(tx ? INTR_FOR_PLAYBACK : INTR_FOR_CAPTURE)
+#define SIE_AO_INTR_FOR(tx)	(tx ? 0 : INTR_FOR_CAPTURE_AO)
 
 #define SPDIFIN_SAMPLE_RATE_ENUM_NAME		"SPDIFIN Sample Rate"
 
@@ -684,6 +688,17 @@ static int fsl_spdif_startup(struct snd_pcm_substream *substream,
 	/* Power up SPDIF module */
 	regmap_update_bits(regmap, REG_SPDIF_SCR, SCR_LOW_POWER, 0);
 
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		/* Setup rx clock source */
+		ret = spdif_set_rx_clksrc(spdif_priv, SPDIF_DEFAULT_GAINSEL, 1);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to setup rx clock source\n");
+			return ret;
+		}
+
+		/* Enable interrupts to be able to lock PLL */
+		regmap_update_bits(regmap, REG_SPDIF_SIE, INTR_FOR_CAPTURE_AO, INTR_FOR_CAPTURE_AO);
+	}
 	return 0;
 }
 
@@ -710,6 +725,9 @@ static void fsl_spdif_shutdown(struct snd_pcm_substream *substream,
 		scr = SCR_RXFIFO_OFF | SCR_RXFIFO_CTL_ZERO;
 		mask = SCR_RXFIFO_FSEL_MASK | SCR_RXFIFO_AUTOSYNC_MASK|
 			SCR_RXFIFO_CTL_MASK | SCR_RXFIFO_OFF_MASK;
+
+		/* Disable interrupts for PLL lock */
+		regmap_update_bits(regmap, REG_SPDIF_SIE, INTR_FOR_CAPTURE_AO, 0);
 
 		spdif_priv->dpll_locked = 0;
 
@@ -781,9 +799,6 @@ static int fsl_spdif_hw_params(struct snd_pcm_substream *substream,
 		spdif_set_cstatus(ctrl, IEC958_AES3_CON_CLOCK,
 				  IEC958_AES3_CON_CLOCK_1000PPM);
 		spdif_write_channel_status(spdif_priv);
-	} else {
-		/* Setup rx clock source */
-		ret = spdif_set_rx_clksrc(spdif_priv, SPDIF_DEFAULT_GAINSEL, 1);
 	}
 
 	return ret;
@@ -810,7 +825,7 @@ static int fsl_spdif_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		regmap_update_bits(regmap, REG_SPDIF_SCR, dmaen, 0);
-		regmap_update_bits(regmap, REG_SPDIF_SIE, intr, 0);
+		regmap_update_bits(regmap, REG_SPDIF_SIE, intr, SIE_AO_INTR_FOR(tx));
 		regmap_write(regmap, REG_SPDIF_STL, 0x0);
 		regmap_write(regmap, REG_SPDIF_STR, 0x0);
 		break;
