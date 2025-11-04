@@ -1125,6 +1125,13 @@ static int spdif_get_rxclk_rate(struct fsl_spdif_priv *spdif_priv,
 	u32 freqmeas, phaseconf;
 	u8 clksrc;
 
+	/*
+	 * After dpll_locked IRQ, it takes around 15ms (in worst cases) to get a correct value
+	 * in the REG_SPDIF_SRFM register. Before that, the value can't be trusted.
+	 * Sleep double that time here so we get the right value all the time.
+	 */
+	msleep(30);
+
 	regmap_read(regmap, REG_SPDIF_SRFM, &freqmeas);
 	regmap_read(regmap, REG_SPDIF_SRPC, &phaseconf);
 
