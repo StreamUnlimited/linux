@@ -25,7 +25,8 @@
 			#io-channel-cells = <1>;
 			reg = <0x42012000 0x100>,
 				<0x42012800 0x100>,
-				<0x420082F8 0x4>;//Control digital path input for ADC and CTC pad
+				<0x420082F8 0x4>,//Control digital path input for ADC and CTC pad
+				<0x42010400 0x1>; // Vref control register
 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
 			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
@@ -33,8 +34,8 @@
 			rtk,adc-timer-period = <200000000>; // Useful only in timer-trigger mode. Unit: ns. Range: 100ms~2s
 			//rtk,adc-channels = <0>, <1>, <2>, <6>;
 			//rtk,adc-diff-channels = <4 5>;
-			nvmem-cells = <&adc_normal_cal>, <&adc_vbat_cal>;
-			nvmem-cell-names = "normal_cal", "vbat_cal";
+			nvmem-cells = <&adc_normal_cal>, <&adc_vbat_cal>, <&adc_vref_cal>;
+			nvmem-cell-names = "normal_cal", "vbat_cal", "vref_cal";
 			status = "disabled";
 
 			comparator: comparator@0 {
@@ -226,6 +227,10 @@
 
 			efuse_uuid: uuid@7F4 {
 				reg = <0x07F4 0x4>;
+			};
+
+			adc_vref_cal: vref_cal@7EB {
+				reg = <0x07EB 0x1>;
 			};
 
 			adc_normal_cal: normal_cal@704 {
