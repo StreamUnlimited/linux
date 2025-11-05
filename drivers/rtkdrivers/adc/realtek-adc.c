@@ -262,6 +262,37 @@ static int realtek_adc_single_read(struct iio_dev *indio_dev,
 	return ret;
 }
 
+static int realtek_adc_vref_init(struct iio_dev *indio_dev)
+{
+	struct realtek_adc_data *adc = iio_priv(indio_dev);
+	struct nvmem_cell *cell = nvmem_cell_get(&indio_dev->dev, "vref_cal");
+	u8 *EfuseBuf = NULL;
+	u8 vref_sel = 0x7;
+	u32 value;
+	int len = 0;
+
+	if (IS_ERR(cell)) {
+		dev_err(&indio_dev->dev, "OTP read fail\n");
+		return (int)PTR_ERR(cell);
+	}
+
+	EfuseBuf = nvmem_cell_read(cell, &len);
+	nvmem_cell_put(cell);
+
+	vref_sel = EfuseBuf[0] & 0x7;
+
+	value = readl(adc->captouch_vref_base);
+	value &= ~(0x7 << 8);
+	if (vref_sel == 0x3) {
+		value |= (0x3 << 8); // 011:0.85V
+	} else {
+		value |= (0x2 << 8); // 010:0.80V
+	}
+	writel(value, adc->captouch_vref_base);
+
+	return 0;
+}
+
 /**
   * @brief  Read calibration params (A, B, C) from otp_addr
   * @indio_dev: IIO device
@@ -658,6 +689,8 @@ static void realtek_adc_hw_init(struct iio_dev *indio_dev)
 	// disable interrupt, clear all interrupts
 	writel(0, adc->base + RTK_ADC_INTR_CTRL);
 	writel(0x3FFFF, adc->base + RTK_ADC_INTR_STS);
+	// init vref
+	realtek_adc_vref_init(indio_dev);
 	// set clock divider
 	writel(ADC_CLK_DIV(realtek_adc_cfg.clk_div), adc->base + RTK_ADC_CLK_DIV);
 	//set adc mode and channel list len
@@ -995,6 +1028,11 @@ static int realtek_adc_probe(struct platform_device *pdev)
 		goto err_fail;
 	}
 
+	adc->captouch_vref_base = of_iomap(pdev->dev.of_node, 3);
+	if (IS_ERR(adc->captouch_vref_base)) {
+		goto map_path_base_fail;
+	}
+
 	dev_info(&pdev->dev, "ADC mode %d\n", adc->mode);
 
 	if (adc->mode != ADC_COMP_ASSIST_MODE) {
@@ -1053,6 +1091,8 @@ err_dev_register:
 	iio_device_unregister(indio_dev);
 	realtek_adc_hw_deinit(indio_dev);
 map_fail:
+	iounmap(adc->captouch_vref_base);
+map_path_base_fail:
 	iounmap(adc->path_base);
 err_fail:
 	clk_disable_unprepare(adc->ctc_clk);
@@ -1068,6 +1108,7 @@ static int realtek_adc_remove(struct platform_device *pdev)
 
 	clk_disable_unprepare(adc->adc_clk);
 	clk_disable_unprepare(adc->ctc_clk);
+	iounmap(adc->captouch_vref_base);
 	iounmap(adc->path_base);
 	iio_device_unregister(indio_dev);
 	realtek_adc_hw_deinit(indio_dev);
