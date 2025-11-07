@@ -267,6 +267,7 @@ struct realtek_adc_data {
 	void __iomem *base;
 	void __iomem *comp_base;
 	void __iomem *path_base;
+	void __iomem *captouch_vref_base;
 	struct completion completion;
 	int irq;
 	spinlock_t lock;		/* interrupt lock */
