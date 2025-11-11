@@ -27,5 +27,8 @@
 				  "mclk3",
 				  "pll8k", "pll11k";
 
+	/* This is needed to output clocks */
+	fsl,sai-mclk-direction-output;
+
 	status = "okay";
 };
