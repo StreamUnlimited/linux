@@ -4376,7 +4376,7 @@ static int _dwc2_hcd_suspend(struct usb_hcd *hcd)
 	if (hsotg->bus_suspended)
 		goto skip_power_saving;
 
-	if (!(dwc2_read_hprt0(hsotg) & HPRT0_CONNSTS))
+	if (!(dwc2_read_hprt0(hsotg) & HPRT0_CONNSTS) && pm_suspend_target_state == PM_SUSPEND_ON)
 		goto skip_power_saving;
 
 	switch (hsotg->params.power_down) {
@@ -4457,7 +4457,7 @@ static int _dwc2_hcd_resume(struct usb_hcd *hcd)
 	 * Partial Power Down mode from _dwc2_hcd_resume() if not in Partial
 	 * Power Down mode.
 	 */
-	if (hprt0 & HPRT0_CONNSTS) {
+	if (hprt0 & HPRT0_CONNSTS && pm_suspend_target_state != PM_SUSPEND_ON) {
 		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 		hsotg->lx_state = DWC2_L0;
 		goto unlock;
