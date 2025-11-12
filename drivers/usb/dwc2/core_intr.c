@@ -880,6 +880,15 @@ irqreturn_t dwc2_handle_common_intr(int irq, void *dev)
 				" --Port interrupt received in Device mode--\n");
 			dwc2_handle_usb_port_intr(hsotg);
 			retval = IRQ_HANDLED;
+		} else {
+			/*
+			 * This interrupt should probably never happen, but in rare cases it does after resuming from suspend.
+			 * Let's handle it just in case to prevent the kernel from disabling this IRQ.
+			 */
+			dev_dbg(hsotg->dev,
+				" --Port interrupt received in host mode--\n");
+			dwc2_handle_usb_port_intr(hsotg);
+			retval = IRQ_HANDLED;
 		}
 	}
 
