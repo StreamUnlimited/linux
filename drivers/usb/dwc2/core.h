@@ -1075,6 +1075,7 @@ struct dwc2_hsotg {
 	struct dwc2_hsotg_plat *plat;
 	struct regulator_bulk_data supplies[DWC2_NUM_SUPPLIES];
 	struct regulator *vbus_supply;
+	bool vbus_enabled;
 	struct regulator *usb33d;
 
 	spinlock_t lock;

@@ -136,17 +136,45 @@ static void dwc2_gusbcfg_init(struct dwc2_hsotg *hsotg)
 
 static int dwc2_vbus_supply_init(struct dwc2_hsotg *hsotg)
 {
-	if (hsotg->vbus_supply)
-		return regulator_enable(hsotg->vbus_supply);
+	int ret;
 
+	if (!hsotg->vbus_supply)
+		return 0;
+
+	if (hsotg->vbus_enabled) {
+		dev_dbg(hsotg->dev, "vbus already enabled, skipping init\n");
+		return 0;
+	}
+
+	ret = regulator_enable(hsotg->vbus_supply);
+	if (ret) {
+		dev_err(hsotg->dev, "failed to enable vbus regulator: %d\n", ret);
+		return ret;
+	}
+
+	hsotg->vbus_enabled = true;
 	return 0;
 }
 
 static int dwc2_vbus_supply_exit(struct dwc2_hsotg *hsotg)
 {
-	if (hsotg->vbus_supply)
-		return regulator_disable(hsotg->vbus_supply);
+	int ret;
 
+	if (!hsotg->vbus_supply)
+		return 0;
+
+	if (!hsotg->vbus_enabled) {
+		dev_dbg(hsotg->dev, "vbus already disabled, skip exit\n");
+		return 0;
+	}
+
+	ret = regulator_disable(hsotg->vbus_supply);
+	if (ret) {
+		dev_err(hsotg->dev, "failed to disable vbus regulator: %d\n", ret);
+		return ret;
+	}
+
+	hsotg->vbus_enabled = false;
 	return 0;
 }
 
