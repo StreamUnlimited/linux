@@ -286,7 +286,7 @@ static void dwc2_set_realtek_hsotg_params(struct dwc2_hsotg *hsotg)
 	p->reload_ctl = false;
 	p->ahbcfg = GAHBCFG_HBSTLEN_INCR4 << GAHBCFG_HBSTLEN_SHIFT;
 	p->change_speed_quirk = true;
-	p->power_down = false;
+	p->power_down = DWC2_POWER_DOWN_PARAM_NONE;
 }
 
 const struct of_device_id dwc2_of_match_table[] = {
