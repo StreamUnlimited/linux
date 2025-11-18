@@ -34,11 +34,10 @@
 	};
 };
 
-&cpu_opp_table{
-	opp1_3GHz: opp@1344000000 {
-		opp-hz = /bits/ 64 <1344000000>;
-		opp-microvolt = <1080000>;
-		clock-latency-ns = <200>;
-		opp-workmode = <1>; /* 1: REGULATOR_MODE_FAST => PWM only mode on AXP152 */
-	};
+&opp1_2GHz {
+	opp-microvolt = <1060000>;
+};
+
+&opp1_3GHz {
+	opp-microvolt = <1090000>;
 };
