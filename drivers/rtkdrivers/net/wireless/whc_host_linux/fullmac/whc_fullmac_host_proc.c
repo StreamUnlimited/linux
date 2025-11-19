@@ -105,6 +105,53 @@ static int proc_read_edcca_mode(struct seq_file *m, void *v)
 	return ret;
 }
 
+static ssize_t proc_write_edcca_th(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	char tmp[32];
+	int edcca_th = 0;
+	int ret = -EINVAL;
+
+	char *cmd_buf = NULL, *user_buf = NULL;
+	dma_addr_t cmd_buf_phy = 0, user_buf_phy = 0;
+
+	if (count == 0 || count > sizeof(tmp) - 1) {
+		return -EFAULT;
+	}
+
+	if (copy_from_user(tmp, buffer, count)) {
+		return -EFAULT;
+	}
+	tmp[count] = '\0';
+
+	ret = kstrtoint(tmp, 10, &edcca_th);
+	if (ret) {
+		return ret;
+	}
+
+	cmd_buf = rtw_malloc(WIFI_MP_MSG_BUF_SIZE, &cmd_buf_phy);
+	if (!cmd_buf) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	user_buf = rtw_malloc(WIFI_MP_MSG_BUF_SIZE, &user_buf_phy);
+	if (!user_buf) {
+		ret = -ENOMEM;
+		goto free_cmd_buf;
+	}
+
+	dev_info(global_idev.fullmac_dev, "setting fix_edcca_th=%d", edcca_th);
+
+	snprintf(cmd_buf, WIFI_MP_MSG_BUF_SIZE, "dbg fix_edcca_th %d", edcca_th);
+	ret = whc_fullmac_host_iwpriv_cmd(cmd_buf_phy, WIFI_MP_MSG_BUF_SIZE, cmd_buf, user_buf);
+
+	rtw_mfree(WIFI_MP_MSG_BUF_SIZE, user_buf, user_buf_phy);
+free_cmd_buf:
+	rtw_mfree(WIFI_MP_MSG_BUF_SIZE, cmd_buf, cmd_buf_phy);
+out:
+	return ret < 0 ? ret : count;
+}
+
 static int proc_read_beacon_rssi(struct seq_file *m, void *v)
 {
 	signed char	beacon_rssi;
@@ -359,6 +406,7 @@ static void rtw_ndev_ap_proc_deinit(const char *name)
 const struct rtw_proc_hdl ndev_sta_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("bcn_time", proc_get_sta_tsf, NULL),
 	RTW_PROC_HDL_SSEQ("edcca_mode", proc_read_edcca_mode, proc_write_edcca_mode),
+	RTW_PROC_HDL_SSEQ("edcca_th", NULL, proc_write_edcca_th),
 	RTW_PROC_HDL_SSEQ("beacon_rssi", proc_read_beacon_rssi, NULL),
 	RTW_PROC_HDL_SSEQ("data_rssi", proc_read_data_rssi, NULL),
 	RTW_PROC_HDL_SSEQ("antdiv_mode", proc_read_antdiv_mode, NULL),
