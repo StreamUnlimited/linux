@@ -21,6 +21,8 @@ struct ameba_priv {
 	struct gpio_desc *amp_mute_gpio;
 	struct gpio_desc *hp_mute_gpio;
 
+	struct snd_kcontrol *drift_kcontrol;
+
 	bool regulator_is_enabled;
 	struct regulator *enable_regulator;
 };
@@ -111,7 +113,6 @@ static const struct snd_kcontrol_new snd_soc_ameba_controls[] = {
 static int ameba_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
-	struct snd_kcontrol *kcontrol;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
 
@@ -119,9 +120,8 @@ static int ameba_hw_params(struct snd_pcm_substream *substream,
 	priv->cur_pll_ppm = 0;
 	snd_soc_ameba_set_pll_ppm(priv->cur_pll_ppm);
 
-	kcontrol = snd_soc_card_get_kcontrol(rtd->card, KCONTROL_DRIFT_COMPENSATOR_NAME);
-	if (kcontrol) {
-		snd_ctl_notify(rtd->card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &kcontrol->id);
+	if (priv->drift_kcontrol) {
+		snd_ctl_notify(rtd->card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &priv->drift_kcontrol->id);
 	}
 
 	return 0;
@@ -265,6 +265,8 @@ static int ameba_card_probe(struct snd_soc_card *card)
 		priv->enable_regulator = NULL;
 		dev_warn(card->dev, "No enable regulator\n");
 	}
+
+	priv->drift_kcontrol = snd_soc_card_get_kcontrol(card, KCONTROL_DRIFT_COMPENSATOR_NAME);
 
 	return 0;
 }
