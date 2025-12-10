@@ -1252,6 +1252,14 @@ static struct dma_async_tx_descriptor
 		return NULL;
 	}
 
+	if (vchan->hwlli_buffers) {
+		dev_dbg(rsdma->dma.dev, "freeing previous dma allocation of sg_len: %d", vchan->hw_lli_size / sizeof(struct hw_lli_block));
+		dma_free_coherent(rsdma->dma.dev, vchan->hw_lli_size,
+							vchan->hwlli_buffers, vchan->hwlli_dma_addrs);
+		vchan->hwlli_buffers = NULL;
+		vchan->hw_lli_size = 0;
+	}
+
 	txd = rtk_dma_find_unused_txd(vchan);
 	INIT_LIST_HEAD(&txd->lli_list);
 
