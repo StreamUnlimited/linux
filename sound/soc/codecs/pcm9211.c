@@ -1382,7 +1382,7 @@ static int pcm9211_dit_hw_params(struct snd_pcm_substream *substream, struct snd
 	return regmap_update_bits(priv->regmap, PCM9211_DIT_CTRL2, PCM9211_DIT_TXSCK_MASK, txsck << PCM9211_DIT_TXSCK_SHIFT);
 }
 
-static int pcm9211_dit_trigger(struct snd_pcm_substream *substream, int cmd, struct snd_soc_dai *dai)
+static int pcm9211_dit_startup(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
 {
 	struct snd_soc_component *component = dai->component;
 	struct pcm9211_priv *priv = snd_soc_component_get_drvdata(component);
@@ -1391,25 +1391,26 @@ static int pcm9211_dit_trigger(struct snd_pcm_substream *substream, int cmd, str
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		return 0;
 
-	switch (cmd) {
-	case SNDRV_PCM_TRIGGER_START:
-	case SNDRV_PCM_TRIGGER_RESUME:
-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		return regmap_update_bits(priv->regmap, PCM9211_SYS_RESET, PCM9211_SYS_RESET_TXDIS_MASK, 0);
+	return regmap_update_bits(priv->regmap, PCM9211_SYS_RESET, PCM9211_SYS_RESET_TXDIS_MASK, 0);
+}
 
-	case SNDRV_PCM_TRIGGER_STOP:
-	case SNDRV_PCM_TRIGGER_SUSPEND:
-	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		return regmap_update_bits(priv->regmap, PCM9211_SYS_RESET, PCM9211_SYS_RESET_TXDIS_MASK, PCM9211_SYS_RESET_TXDIS_MASK);
-	}
+static void pcm9211_dit_shutdown(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
+{
+	struct snd_soc_component *component = dai->component;
+	struct pcm9211_priv *priv = snd_soc_component_get_drvdata(component);
 
-	return 0;
+	// nothing to do on capture for now
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		return;
+
+	regmap_update_bits(priv->regmap, PCM9211_SYS_RESET, PCM9211_SYS_RESET_TXDIS_MASK, PCM9211_SYS_RESET_TXDIS_MASK);
 }
 
 static struct snd_soc_dai_ops pcm9211_dit_dai_ops = {
 	.probe = pcm9211_dit_probe,
+	.startup = pcm9211_dit_startup,
+	.shutdown = pcm9211_dit_shutdown,
 	.hw_params = pcm9211_dit_hw_params,
-	.trigger = pcm9211_dit_trigger,
 };
 
 /* BCLK is always 64 * FS == 32 bit/channel */
