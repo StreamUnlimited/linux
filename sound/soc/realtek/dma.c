@@ -617,15 +617,26 @@ static int gdma_prepare(struct snd_soc_component *component, struct snd_pcm_subs
 	struct ameba_pcm_dma_private *dma_private = runtime->private_data;
 	struct ameba_pcm_dma_data *data_0 = NULL;
 	struct ameba_pcm_dma_data *data_1 = NULL;
+	int ret;
 
 	data_0 = &(dma_private->pcm_data_0);
 	data_0->be_running = 0;
 	data_0->dma_addr_offset = 0;
+	ret = load_dma_period(substream, data_0);
+	if (ret < 0) {
+		dev_err(component->dev, "Failed to load dma period for ch0\n");
+		return ret;
+	}
 
 	if (IS_6_8_CHANNEL(runtime->channels)) {
 		data_1 = &(dma_private->pcm_data_1);
 		data_1->be_running = 0;
 		data_1->dma_addr_offset = data_1->period_bytes * 4 / data_1->channels;
+		ret = load_dma_period(substream, data_1);
+		if (ret < 0) {
+			dev_err(component->dev, "Failed to load dma period for ch1\n");
+			return ret;
+		}
 	}
 
 	return 0;
@@ -641,8 +652,6 @@ static int gdma_trigger_start(struct snd_pcm_substream *substream, struct ameba_
 		dev_err(component->dev, "%s data is NULL \n", __func__);
 		return -EINVAL;
 	}
-
-	load_dma_period(substream, data);
 
 	if (!data->desc)
 		return -EINVAL;
