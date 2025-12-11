@@ -283,9 +283,7 @@
 			dma-names = "spi0-tx","spi0-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
-			rtk,max-cs-num = <2>;
-			//only master mode set SPI_CS to GPIO, so spi0_pins only set SPI0_CLK, SPI0_MOSI and SPI0_MISO.
-			rtk,spi-cs-gpios = <&gpiob 17 0>;
+			rtk,max-cs-num = <3>;
 			status = "disabled";
 		};
 
@@ -305,7 +303,7 @@
 			dma-names = "spi1-tx","spi1-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
-			rtk,max-cs-num = <2>;
+			rtk,max-cs-num = <3>;
 			//rtk,spi-cs-gpios = <&gpioa 2 0>;//only master mode set SPI_CS to GPIO.
 			status = "disabled";
 		};
