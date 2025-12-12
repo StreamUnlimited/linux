@@ -87,8 +87,6 @@ struct sport_dai {
 
 	/* bit0: play in use, bit1: record in use*/
 	u8 play_record_in_use;
-	/* guard play_record_in_use */
-	struct mutex state_mutex;
 };
 
 #define sport_info(mask,dev, ...)						\
@@ -215,13 +213,11 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 
-		mutex_lock(&sport->state_mutex);
 		if (is_playback) {
 			sport->play_record_in_use |= PLAY_IN_USE;
 		} else {
 			sport->play_record_in_use |= RECORD_IN_USE;
 		}
-		mutex_unlock(&sport->state_mutex);
 
 		audio_sp_dma_cmd(sport->addr, true);
 
@@ -267,13 +263,11 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		mutex_lock(&sport->state_mutex);
 		if (is_playback) {
 			sport->play_record_in_use &= ~PLAY_IN_USE;
 		} else {
 			sport->play_record_in_use &= ~RECORD_IN_USE;
 		}
-		mutex_unlock(&sport->state_mutex);
 
 		if ((sport->play_record_in_use & 0x03) == 0)
 			audio_sp_dma_cmd(sport->addr, false);
@@ -1222,7 +1216,6 @@ static int ameba_sport_probe(struct platform_device *pdev)
 	sport->fifo_num = 0;
 	sport->clock_enabled = 0;
 	sport->play_record_in_use = 0x00;
-	mutex_init(&sport->state_mutex);
 
 	spin_lock_init(&sport->lock);
 
