@@ -364,8 +364,20 @@ static int fec_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	struct fec_enet_private *fep =
 	    container_of(ptp, struct fec_enet_private, ptp_caps);
 
-	if (ppb == 0)
+	if (ppb == 0) {
+		/* Clear correction registers when resetting to 0 */
+		spin_lock_irqsave(&fep->tmreg_lock, flags);
+
+		tmp = readl(fep->hwp + FEC_ATIME_INC) & FEC_T_INC_MASK;
+		writel(tmp, fep->hwp + FEC_ATIME_INC);
+		writel(0, fep->hwp + FEC_ATIME_CORR);
+		/* dummy read to update the timer. */
+		timecounter_read(&fep->tc);
+
+		spin_unlock_irqrestore(&fep->tmreg_lock, flags);
+
 		return 0;
+	}
 
 	if (ppb < 0) {
 		ppb = -ppb;
