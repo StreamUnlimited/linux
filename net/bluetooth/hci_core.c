@@ -1649,7 +1649,9 @@ int hci_remove_adv_instance(struct hci_dev *hdev, u8 instance)
 		hdev->cur_adv_instance = 0x00;
 	}
 
-	cancel_delayed_work_sync(&adv_instance->rpa_expired_cb);
+	if (delayed_work_pending(&adv_instance->rpa_expired_cb)) {
+		cancel_delayed_work_sync(&adv_instance->rpa_expired_cb);
+	}
 
 	list_del(&adv_instance->list);
 	kfree(adv_instance);
@@ -1678,7 +1680,10 @@ void hci_adv_instances_clear(struct hci_dev *hdev)
 	}
 
 	list_for_each_entry_safe(adv_instance, n, &hdev->adv_instances, list) {
-		disable_delayed_work_sync(&adv_instance->rpa_expired_cb);
+		if (delayed_work_pending(&adv_instance->rpa_expired_cb)) {
+			disable_delayed_work_sync(&adv_instance->rpa_expired_cb);
+		}
+
 		list_del(&adv_instance->list);
 		kfree(adv_instance);
 	}
