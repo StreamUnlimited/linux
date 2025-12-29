@@ -1739,6 +1739,9 @@ struct adv_info *hci_add_adv_instance(struct hci_dev *hdev, u8 instance,
 
 		list_add(&adv->list, &hdev->adv_instances);
 		hdev->adv_instance_cnt++;
+
+		/* Initialize the work queue only for new instances */
+		INIT_DELAYED_WORK(&adv->rpa_expired_cb, adv_instance_rpa_expired);
 	}
 
 	adv->flags = flags;
@@ -1761,8 +1764,6 @@ struct adv_info *hci_add_adv_instance(struct hci_dev *hdev, u8 instance,
 		adv->duration = hdev->def_multi_adv_rotation_duration;
 	else
 		adv->duration = duration;
-
-	INIT_DELAYED_WORK(&adv->rpa_expired_cb, adv_instance_rpa_expired);
 
 	BT_DBG("%s for %dMR", hdev->name, instance);
 
