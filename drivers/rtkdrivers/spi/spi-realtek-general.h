@@ -19,9 +19,10 @@
 
 #include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
-#define RTK_SPI_DEBUG_DETAILS			    0
-#define RTK_SPI_REG_DUMP			        0
+#define RTK_SPI_DEBUG_DETAILS				0
+#define RTK_SPI_REG_DUMP					0
 #define RTK_SPI_HW_CONTROL_FOR_FUTURE_USE	0
+#define DEUG_UNDERRUN_IN_DMA_MODE			0
 
 /**************************************************************************//**
  * @defgroup AMEBA_SPI
@@ -403,7 +404,7 @@
 #define RTK_SPI_FIFO_HALF		32
 #define RTK_SPI_FIFO_ALL		64
 #define MAX_DMA_LENGTH			8192
-#define MAX_SSI_CLOCK			50000000
+#define MAX_SSI_CLOCK			100000000
 
 #define SPI_SHIFT_WAIT_MSECS		8000LL
 #define SPI_WAIT_TOLERANCE			200

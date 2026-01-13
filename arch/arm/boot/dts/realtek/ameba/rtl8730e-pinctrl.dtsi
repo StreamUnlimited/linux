@@ -236,7 +236,7 @@
 							<REALTEK_PINMUX('B', 20, SPI)>;   // SPI0_MISO
 					bias-pull-up;
 					slew-rate = <0>;
-					drive-strength = <0>;
+					drive-strength = <1>;
 				};
 			};
 
@@ -248,7 +248,7 @@
 							<REALTEK_PINMUX('A', 5, SPI)>;  // SPI1_MOSI
 					bias-pull-up;
 					slew-rate = <0>;
-					drive-strength = <0>;
+					drive-strength = <1>;
 				};
 			};
 

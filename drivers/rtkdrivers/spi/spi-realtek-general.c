@@ -70,6 +70,8 @@ void rtk_spi_reg_dump(struct rtk_spi_controller *rtk_spi)
 	dev_dbg(rtk_spi->dev, "SPI_IMR[0x%04X] = 0x%08X\n", SPI_IMR, rtk_spi_readl(rtk_spi->base, SPI_IMR));
 	dev_dbg(rtk_spi->dev, "SPI_ISR[0x%04X] = 0x%08X\n", SPI_ISR, rtk_spi_readl(rtk_spi->base, SPI_ISR));
 	dev_dbg(rtk_spi->dev, "SPI_RISR[0x%04X] = 0x%08X\n", SPI_RISR, rtk_spi_readl(rtk_spi->base, SPI_RISR));
+	dev_dbg(rtk_spi->dev, "SPI_DMATDLR[0x%04X] = 0x%08X\n", SPI_DMATDLR, rtk_spi_readl(rtk_spi->base, SPI_DMATDLR));
+	dev_dbg(rtk_spi->dev, "SPI_DMARDLR[0x%04X] = 0x%08X\n", SPI_DMARDLR, rtk_spi_readl(rtk_spi->base, SPI_DMARDLR));
 #endif // RTK_SPI_REG_DUMP
 }
 
@@ -1095,8 +1097,16 @@ int rtk_spi_do_dma_transfer(
 	dma_params->tx_dma_addr = transfer->tx_dma;
 
 	rtk_spi_enable_cmd(rtk_spi, DISABLE);
-	rtk_spi_set_dma_level(rtk_spi, 1, 3);
-	rtk_spi_set_sample_delay(rtk_spi, 1);
+	rtk_spi_set_dma_level(rtk_spi, rtk_spi->spi_param.dma_tx_data_level, rtk_spi->spi_param.dma_rx_data_level);
+
+	if (!rtk_spi->spi_manage.is_slave) {
+		if (MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider >= 50000000) {
+			rtk_spi_set_sample_delay(rtk_spi, 2);
+		} else {
+			rtk_spi_set_sample_delay(rtk_spi, 0);
+		}
+	}
+
 	rtk_spi_set_read_len(rtk_spi, transfer->len);
 	if (!rtk_spi->spi_manage.is_slave) {
 		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(0));
@@ -1186,6 +1196,10 @@ int rtk_spi_do_dma_transfer(
 		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_TX_MODE);
 		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_RX_MODE);
 	}
+
+	#if DEUG_UNDERRUN_IN_DMA_MODE
+	rtk_spi_interrupt_config(rtk_spi, SPI_BIT_TXUIM, ENABLE);
+	#endif
 
 	if (!rtk_spi->spi_manage.is_slave) {
 		timeout = wait_for_completion_timeout(&dma_params->dma_tx_completion,
@@ -1368,7 +1382,7 @@ int rtk_spi_transfer_one(
 		}
 		dev_dbg(rtk_spi->dev, "Upper level given speed_hz = %d\n", transfer->speed_hz);
 		dev_dbg(rtk_spi->dev, "Clock divider caculated = %d\n", rtk_spi->spi_param.clock_divider);
-		dev_dbg(rtk_spi->dev, "Actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
+		dev_info(rtk_spi->dev, "Actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
 		rtk_spi_set_baud_div(rtk_spi, rtk_spi->spi_param.clock_divider);
 	}
 
