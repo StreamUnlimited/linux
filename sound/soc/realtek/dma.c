@@ -628,11 +628,19 @@ static int gdma_prepare(struct snd_soc_component *component, struct snd_pcm_subs
 		data_1->dma_addr_offset = data_1->period_bytes * 4 / data_1->channels;
 	}
 
+	if (runtime->no_period_wakeup) {
+		load_dma_period(substream, data_0);
+		if (IS_6_8_CHANNEL(runtime->channels)) {
+			load_dma_period(substream, data_1);
+		}
+	}
+
 	return 0;
 }
 
 static int gdma_trigger_start(struct snd_pcm_substream *substream, struct ameba_pcm_dma_data *data)
 {
+	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, "ameba-gdma");
 	int ret;
@@ -642,7 +650,9 @@ static int gdma_trigger_start(struct snd_pcm_substream *substream, struct ameba_
 		return -EINVAL;
 	}
 
-	load_dma_period(substream, data);
+	if (!runtime->no_period_wakeup) {
+		load_dma_period(substream, data);
+	}
 
 	if (!data->desc)
 		return -EINVAL;
