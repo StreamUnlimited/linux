@@ -39,6 +39,24 @@
 		};
 	};
 
+	gpt1: gpt@302d0000 {
+		compatible = "fsl,hte-imx-gpt";
+		reg = <0x0 0x302d0000 0x0 0x10000>;
+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+
+		/* 24MHz Oscillator is usually best for capture precision */
+		clocks = <&clk IMX8MM_CLK_GPT1_ROOT>,
+				<&clk IMX8MM_CLK_GPT1_ROOT>,
+				<&clk IMX8MM_CLK_24M>;
+		clock-names = "ipg", "per", "osc_per";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpt1_capture>;
+		status = "okay";
+		#timestamp-cells = <1>;
+	};
+
+
 	simple-busfreq {
 		compatible = "sue,simple-busfreq-imx8mm";
 		clocks = <&clk IMX8MM_CLK_NOC>,
@@ -76,6 +94,8 @@
 		compatible = "android,bcmdhd_wlan";
 		gpio_wl_reg_on = <&gpio2 8 GPIO_ACTIVE_HIGH>;
 		gpio_wl_host_wake = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+		timestamps = <&gpt1 1>; // TSF is captured on GPT1 Capture 2 line
+		timestamp-names = "tsf";
 	};
 
 	// modified version of arch/arm64/boot/dts/freescale/imx8mm.dtsi
@@ -207,6 +227,12 @@
 			fsl,pins = <
 				MX8MM_IOMUXC_I2C1_SCL_I2C1_SCL			(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
 				MX8MM_IOMUXC_I2C1_SDA_I2C1_SDA			(IOMUX_CONFIG_SION | PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST | PAD_CTL_DSE6x)
+			>;
+		};
+
+		pinctrl_gpt1_capture: gpt1captgrp {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI3_TXFS_GPT1_CAPTURE2	(PAD_CTL_PE_UP | PAD_CTL_HYS | PAD_CTL_FAST)
 			>;
 		};
 
