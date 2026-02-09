@@ -38,7 +38,7 @@ static int whc_fullmac_host_p2p_ndev_close(struct net_device *pnetdev)
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s %d\n", __func__, rtw_netdev_idx(pnetdev));
 
-	ret = whc_fullmac_host_scan_abort(1);
+	ret = whc_fullmac_host_scan_abort();
 	if (ret) {
 		dev_err(global_idev.fullmac_dev, "[fullmac]: %s abort wifi scan failed!\n", __func__);
 		return -EPERM;
@@ -87,12 +87,12 @@ const struct net_device_ops whc_fullmac_host_ndev_ops_p2p = {
 #endif
 };
 
-
 int whc_fullmac_host_ndev_p2p_register(enum nl80211_iftype type, const char *name, u8 wlan_idx)
 {
 	int ret = false;
 	struct net_device *ndev = NULL;
 	struct wireless_dev *wdev;
+	u8 dev_addr[ETH_ALEN] = {0};
 
 	/*step1: alloc netdev*/
 	ndev = alloc_etherdev_mq(sizeof(struct netdev_priv_t), 1);
@@ -122,8 +122,13 @@ int whc_fullmac_host_ndev_p2p_register(enum nl80211_iftype type, const char *nam
 	/* step3: special setting for netdev */
 	if (type == NL80211_IFTYPE_P2P_GO) {
 		/* set p2p mac address, otherwise the intend interface addr in GO neg will be zero*/
-		memcpy(global_idev.pndev[wlan_idx]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-		global_idev.pndev[wlan_idx]->dev_addr[1] = global_idev.pndev[0]->dev_addr[1] + 1;
+		memcpy(dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
+		dev_addr[1] = global_idev.pndev[0]->dev_addr[1] + 1;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
+		memcpy((void *)global_idev.pndev[wlan_idx]->dev_addr, dev_addr, ETH_ALEN);
+#else
+		eth_hw_addr_set(global_idev.pndev[wlan_idx], dev_addr);
+#endif
 	} else if (type == NL80211_IFTYPE_P2P_CLIENT) {
 		whc_fullmac_host_init_ap();
 		global_idev.p2p_global.pd_wlan_idx = 1;
@@ -137,8 +142,11 @@ int whc_fullmac_host_ndev_p2p_register(enum nl80211_iftype type, const char *nam
 		dev_err(global_idev.fullmac_dev, "dev_alloc_name, fail!\n");
 	}
 	netif_carrier_off(global_idev.pndev[wlan_idx]);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+	ret = (cfg80211_register_netdevice(global_idev.pndev[wlan_idx]) == 0) ? true : false;
+#else
 	ret = (register_netdevice(global_idev.pndev[wlan_idx]) == 0) ? true : false;
-
+#endif
 	if (ret != true) {
 		dev_err(global_idev.fullmac_dev, "netdevice register fail!\n");
 		goto dev_fail;
@@ -151,8 +159,7 @@ int whc_fullmac_host_ndev_p2p_register(enum nl80211_iftype type, const char *nam
 		whc_fullmac_host_set_p2p_role(P2P_ROLE_CLIENT);
 		global_idev.p2p_global.p2p_role = P2P_ROLE_CLIENT;
 	}
-
-	return ret;
+	return true;
 
 dev_fail:
 	if (global_idev.pwdev_global[wlan_idx]) { //wdev
@@ -188,7 +195,11 @@ int whc_fullmac_host_p2p_iface_alloc(struct wiphy *wiphy, const char *name,
 		memset(&(global_idev.p2p_global), 0, sizeof(struct p2p_priv_t));
 		/*step0: unregister original softap netdev and wdev for later P2P GO usage*/
 		if (global_idev.pwdev_global[1]) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+			cfg80211_unregister_netdevice(global_idev.pndev[1]);
+#else
 			unregister_netdevice(global_idev.pndev[1]);
+#endif
 			kfree((u8 *)global_idev.pwdev_global[1]);
 			global_idev.pwdev_global[1] = NULL;
 			/* remove wireless_dev in ndev. */

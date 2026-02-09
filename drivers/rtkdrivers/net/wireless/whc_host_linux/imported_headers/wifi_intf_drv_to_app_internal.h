@@ -140,7 +140,7 @@ struct rtw_crypt_info {
  * @brief  The structure is status of wpa_4way.
  */
 struct rtw_wpa_4way_status {
-	u8 *mac_addr;             /**< Mac addr of 4-way interactive peer device. */
+	u8 mac_addr[6];             /**< Mac addr of 4-way interactive peer device. */
 	u8 wlan_idx;              /**< Index of wlan interface. */
 	u8 is_start : 1;          /**< Start(1) or stop(0) of 4way/2way exchange. */
 	u8 is_grpkey_update : 1;  /**< Indicate first key change(0) or update grp_key change(1). */
@@ -192,10 +192,8 @@ struct rtw_kvr_param_t {
 /**
  * @brief  The structure is join block param.
  */
-struct internal_join_block_param {
-	void				*join_sema;
-	unsigned int		join_timeout;
-	unsigned char		block;
+struct internal_block_param {
+	void				*sema;
 };
 
 /**
@@ -321,6 +319,14 @@ int wifi_set_mfp_support(unsigned char value);
  * @return  RTK_FAIL otherwise.
  */
 int wifi_set_group_id(unsigned char value);
+
+/**
+ * @brief  Enqueue join cmd.
+ * @param[in]  None
+ * @return  RTK_SUCCESS if enqueue join cmd successful.
+ * @return  RTK_FAIL otherwise.
+ */
+int wifi_start_join_cmd(void);
 
 /**
  * @brief  for wpa supplicant indicate sae status.

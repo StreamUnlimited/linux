@@ -151,11 +151,13 @@ enum rtw_disconn_reason {
 /**
  * @brief  Supported Wi-Fi frequency bands (size: u8).
  */
+/*TODO: rom should check because (#define BAND_CAP_2G BIT(0), #define BAND_CAP_5G BIT(1)) from rom_rtw_defs.h*/
 enum rtw_support_band {
-	RTW_SUPPORT_BAND_2_4G = 0,     /**< 2.4 GHz band. */
-	RTW_SUPPORT_BAND_5G,           /**< 5 GHz band. */
-	RTW_SUPPORT_BAND_2_4G_5G_BOTH, /**< Both 2.4 GHz and 5 GHz bands. */
-	RTW_SUPPORT_BAND_MAX            /**< Maximum band type (for bounds checking). */
+	RTW_SUPPORT_BAND_RSVD = 0,
+	RTW_SUPPORT_BAND_2_4G = BIT(0),                    /**< 2.4 GHz band. */
+	RTW_SUPPORT_BAND_5G = BIT(1),                      /**< 5 GHz band. */
+	RTW_SUPPORT_BAND_2_4G_5G_BOTH = (BIT(0) | BIT(1)), /**< Both 2.4 GHz and 5 GHz bands. */
+	RTW_SUPPORT_BAND_MAX                               /**< Maximum band type (for bounds checking). */
 };
 
 /**
@@ -626,6 +628,20 @@ enum rtw_frame_type_subtype {
 	RTW_QOS_DATA_NULL	= (BIT(6) | RTW_QOS_DATA_TYPE),
 };
 
+/**
+ * @brief update_masks fields definition for struct rtw_tx_advanced_cfg{} (size: u16).
+ */
+
+enum rtw_tx_advanced_cfg_update_masks {
+	RTW_UPDATE_TXCFG_TX_LIFE_TIME_BEBK      = BIT(0),
+	RTW_UPDATE_TXCFG_TX_LIFE_TIME_VIVO      = BIT(1),
+	RTW_UPDATE_TXCFG_BCN_TX_PROTECT_TIME    = BIT(2),
+	RTW_UPDATE_TXCFG_BCN_RX_PROTECT_TIME    = BIT(3),
+	RTW_UPDATE_TXCFG_NAV_UPDATE_TH          = BIT(4),
+	RTW_UPDATE_TXCFG_IGNORE_TX_NAV          = BIT(5),
+	RTW_UPDATE_TXCFG_PARAM_ALL              = 0xFFFF,
+};
+
 /** @} End of WIFI_Exported_Enumeration_Types group*/
 
 /** @addtogroup WIFI_Exported_Structure_Types Structure Type
@@ -869,8 +885,9 @@ struct rtw_client_list {
 struct rtw_csa_parm {
 	u8 new_chl; /**< Target channel to switch to. */
 	u8 chl_switch_cnt; /**< Countdown to channel switch, in units of 102ms (`chl_switch_cnt`*102ms). */
-	u8 action_type;	/**< CSA action frame type: 0 - unicast, 1 - broadcast, other - disable CSA transmission. */
+	u8 action_type;	/**< CSA action frame type: 0 - unicast, 1 - broadcast, other - disable CSA action frame. */
 	u8 bc_action_cnt; /**< Number of broadcast CSA actions sent per beacon interval. Only valid when `action_type = 1`.*/
+	u8 chl_switch_mode; /**< Restrictions on connected STAs transmission until a channel switch: 1 - disable STAs from transmitting any frames; 0 - no restrictions. */
 	/** @brief Callback function invoked after channel switch completion.
 	  * @param[in] channel:  New channel number.
 	  * @param[in] ret: Result of channel switch: @ref RTK_FAIL or @ref RTK_SUCCESS.
@@ -910,6 +927,32 @@ struct rtw_promisc_para {
 	u8(*callback)(struct rtw_rx_pkt_info *pkt_info);
 };
 
+/**
+*@brief Provide necessary parameters for set EDCA
+*/
+struct rtw_edca_param {
+	u8	aci;  /**< AC_BE[0], AC_BK[1], AC_VI[2], AC_VO[3] */
+	u8	aifsn; /**< Arbitration inter-frame space number,specifies the inter-frame interval (waiting time) before transmission: unit: (*slot_time), + sifs*/
+	u8	cw_max; /**< Maximum contention window: unit: *slot_time */
+	u8	cw_min; /**< Minimum contention window: unit: *slot_time */
+	u16	txop_limit;/**< Indicates that a single MSDU or MMPDU in addition to a protection frame exchange can be transmitted at any rate*/
+	u8	slot_time;/**< The slot time value mentioned in 802.11 specification in units, Recommended value: 20us for 2G band, 9us for 5G band[value 0 = use internal chipset default] */
+};
+
+/**
+*@brief Provide optional parameters for improving tx performance in special scenario
+*/
+
+struct rtw_tx_advanced_cfg {
+	u16 update_masks;             /**< Mask subfield. If a parameter is set, its corresponding bit in update_masks must also be set. @ref RTW_UPDATE_TXCFG_TX_LIFE_TIME_BEBK... */
+	u16 pkt_lifetime_bebk;        /**< Packet lifetime in units of 256us for AC_BE/AC_BK. */
+	u16 pkt_lifetime_vivo;        /**< Packet lifetime in units of 256us for AC_VI/AC_VO. */
+	u16 tx_bcn_protect_time;      /**< A reserved period for Beacon TX, preventing other transmissions, unit:32us */
+	u8 rx_bcn_protect_time;       /**< A reserved period for Beacon RX, preventing other transmissions, unit:2.048ms; */
+	u8 rx_nav_update_th;          /**< Rx NAV (Network Allocation Vector) update threshold in units of 128us[can not tx during Rx NAV]. */
+	u8 b_ignore_tx_nav : 1;       /**< Queue BKF not need to wait TX Nav finished. */
+};
+
 /**********************************************************************************************
  *                                     speaker structures
  *********************************************************************************************/
@@ -918,19 +961,18 @@ struct rtw_promisc_para {
  */
 union rtw_speaker_set {
 	struct rtw_speaker_init {
-		u8 mode;              /**< 0 for slave, 1 for master. */
-		u8 nav_thresh;        /**< NAV (Network Allocation Vector) threshold in units of 128us. */
-		u8 relay_en;          /**< Relay control. */
-	} init; /**< For wifi speaker setting case @ref RTW_SPEAKER_SET_INIT.*/
+		u8 mode;                     /**< 0 for slave, 1 for master. */
+		u8 relay_en : 1;             /**< Relay control. */
+	} init; /**< For Wi-Fi speaker setting case @ref RTW_SPEAKER_SET_INIT.*/
 	struct rtw_speaker_i2s {
 		u8 port;           /**< Port selection for TSFT trigger: 0 for port 0, 1 for port 1. */
 		u8 latch_period;   /**< Audio latch period: 0 for 4.096ms, 1 for 8.192ms. */
-	} latch_i2s_count; /**< For wifi speaker setting case @ref RTW_SPEAKER_SET_LATCH_I2S_COUNT.*/
+	} latch_i2s_count; /**< For Wi-Fi speaker setting case @ref RTW_SPEAKER_SET_LATCH_I2S_COUNT.*/
 	struct rtw_speaker_tsf_timer {
 		u8 enable;			/**< 1 for enable, 0 for disable. */
 		u64 tsft;           /**< Unit us. */
 		u8 port;           /**< Port selection for TSFT trigger: 0 for port 0, 1 for port 1. */
-	} tsf_timer; /**< For wifi speaker setting case @ref RTW_SPEAKER_SET_TSF_TIMER.*/
+	} tsf_timer; /**< For Wi-Fi speaker setting case @ref RTW_SPEAKER_SET_TSF_TIMER.*/
 };
 
 /**********************************************************************************************
@@ -1021,6 +1063,7 @@ struct rtw_raw_frame_desc {
 	u8 ac_queue;      /**< Access Category Queue: 0/3 for BE, 1/2 for BK, 4/5 for VI, 6/7 for VO. */
 	u8 sgi : 1;       /**< Short Guard Interval: 1 to enable, 0 to disable. */
 	u8 agg_en : 1;    /**< Frame Aggregation: 1 to enable, 0 to disable for tx raw frames. */
+	u8 bw_40_en : 1;    /**< Bandwidth: 1 to 40M, 0 to 20M. */
 };
 
 /**

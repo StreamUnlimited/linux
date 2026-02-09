@@ -38,18 +38,15 @@ extern "C" {
  ******************************************************/
 
 /**
- * @brief  Abort onoging wifi scan.
- * @param[in]  block: Set 1 for wait scan actually aborted.
+ * @brief  Abort onoging Wi-Fi scan.
  * @return  @ref RTK_SUCCESS or @ref RTK_FAIL.
  * @note
- *     - If `block` set to 0, this will be an asynchronized function and will return immediately,
- * 	     return value only indicates whether the scan abort cmd is successfully notified to driver or not.
- *	   - If `block` set to 1, this will be a synchronized function and will return when scan is actually aborted.
+ *	   - This will return when scan is actually aborted.
  * 	     When scan is actually aborted, the user callback registered in wifi_scan_networks()
- * 	     will be executed. If there is no wifi scan in progress, this function will just return
+ * 	     will be executed. If there is no Wi-Fi scan in progress, this function will just return
  * 	     @ref RTK_SUCCESS and user callback won't be executed.
  */
-s32 wifi_scan_abort(u8 block);
+s32 wifi_scan_abort(void);
 
 /**
  * @brief  Enable or disable Legacy Power Save (LPS) mode.
@@ -80,6 +77,26 @@ s32 wifi_set_lps_enable(u8 enable);
  */
 s32 wifi_set_lps_listen_interval(u8 interval);
 
+
+/**
+ * @brief Set up custom TCP/UDP broadcast port filter white list for wifi wake application core under tickless state
+ * @warning There are up to 6 port numbers.
+ * @param[in] port_list: port list need to add in port filter white list
+ * @param[in] list_count: number of port list
+ * @code
+ * u16 port_list[] = {1234, 2234, 3234, 4234};
+ * wifi_set_broadcast_port_wakeup_white_list(port_list, 4);
+ * @endcode
+ * @return
+ *    - @ref RTK_SUCCESS : The API executed successfully.
+ *    - @ref RTK_FAIL: The API executed fail.
+ *    - @ref RTK_ERR_WIFI_NOT_INIT: wifi not initial
+ *    - @ref RTK_ERR_WIFI_POWEROFF: Wi-Fi is powered off in IPS(Inactive Power Save) mode.
+ * @note
+ *    - If the port of TCP/UDP broadcast packet not match port_list, drop the packet and not wakeup host
+ *    - If this API is not set, all ports will not be filtered
+ */
+s32 wifi_set_broadcast_port_wakeup_white_list(u16 *port_list, u8 list_count);
 
 /**
  * @brief  Set the auto-reconnect mode for Wi-Fi connection.
@@ -142,7 +159,9 @@ s32 wifi_ap_switch_chl_and_inform(struct rtw_csa_parm *csa_param);
   * @brief  Toggle whether SoftAP can be discovered.
   * @param[in]  enable: 1-invisible, 0-visible.
   * @return  None
-  * @note  SoftAP becomes invisible by pausing tx beacon and not responsing to probe request.
+  * @note
+  *    - SoftAP becomes invisible by pausing tx beacon and not responsing to probe request.
+  *    - Should be deauth all associted STAs[ref wifi_ap_del_client()] when set ap invisible.
   */
 void wifi_ap_set_invisible(u8 enable);
 
@@ -270,8 +289,10 @@ s32 wifi_set_wireless_mode(u32 wmode);
  *                 - Filter mode: Receive all packets unconditionally or only packets from the connected AP.
  *                 - Callback: Provides details of the received packets. The return value of the callback determines
  *                   whether the driver should continue processing the packet.
- * @note  Enabling promisc mode temporarily disables LPS(Legacy Power Save) and IPS(Inactive Power Save).
- *        Original power save settings are restored when promisc mode is disabled.
+ * @note
+ *        - Do not support calling APIs in callback.
+ *        - Enabling promisc mode temporarily disables LPS(Legacy Power Save) and IPS(Inactive Power Save).
+ *        - Original power save settings are restored when promisc mode is disabled.
  * @return  None.
  */
 void wifi_promisc_enable(u32 enable, struct rtw_promisc_para *para);
@@ -367,7 +388,7 @@ s32 wifi_get_antdiv_info(u8 *antdiv_mode, u8 *curr_ant);
 s32 wifi_get_band_type(u8 *band_type);
 
 /**
- * @brief	Get wifi TSF register value (64-bit).
+ * @brief	Get Wi-Fi TSF register value (64-bit).
  * @param[in]	wlan_idx: @ref STA_WLAN_INDEX or @ref SOFTAP_WLAN_INDEX.
  * @param[out] tsf: Pointer to store the 64-bit TSF value.
  * @return
@@ -432,7 +453,8 @@ s32 wifi_del_custom_ie(u8 wlan_idx);
  *             details such as raw data pointer and transmission rate.
  * @return
  *    - @ref RTK_SUCCESS : The API executed successfully.
- *    - @ref RTK_FAIL : Driver internal error.
+ *    - -@ref RTK_ERR_WIFI_TX_BUF_FULL : HW & SW tx buffer full, please wait for a while.
+ *    - -@ref RTK_ERR_BUFFER_OVERFLOW : The packet length exceeds the SW per buf size.
  *    - -@ref RTK_ERR_BADARG : NULL pointer passed for `raw_frame_desc`.
  * @note  For unassociated peer devices in RX mode, only unencrypted frames are currently supported.
  */
@@ -451,18 +473,14 @@ s32 wifi_send_raw_frame(struct rtw_raw_frame_desc *raw_frame_desc);
 s32 wifi_set_tx_rate_by_tos(u8 enable, u8 tos_precedence, u8 tx_rate);
 
 /**
- * @brief  Set EDCA parameters for STA.
- * @param[in]  ac_param: EDCA parameters format (as per 802.11 spec):
- * <table>
- *   <tr><th>BIT31~16</th><th>BIT15~8</th><th>BIT7~0</th></tr>
- *   <tr><td>TXOP Limit</td><td>ECWmin/ECWmax</td><td>ACI/AIFSN</td></tr>
- * </table>
+ * @brief  Set EDCA parameters for STA/SOFTAP.
+ * @param[in]  pedca_param: EDCA parameters (as per 802.11 spec):
  * @return
  *    - @ref RTK_SUCCESS : The API executed successfully.
  *    - -@ref RTK_ERR_WIFI_POWEROFF : Wi-Fi is powered off in IPS(Inactive Power Save) mode,
  *                      unable to access Wi-Fi registers.
  */
-s32 wifi_set_edca_param(u32 ac_param);
+s32 wifi_set_edca_param(struct rtw_edca_param *pedca_param);
 
 /**
  * @brief  Enable or disable CCA/EDCCA for TX.
@@ -517,26 +535,6 @@ s32 wifi_set_cts2self_duration_and_send(u8 wlan_idx, u16 duration);
  *     - 40MHz bandwidth (`act_param->data_bw = 1`) is supported only on RTL8721Dx chip.
  */
 s32 wifi_csi_config(struct rtw_csi_action_parm *act_param);
-
-/**
- * @brief  Get CSI raw data and header information.
- * @param[in]  buf_len: Size of the buffer to store CSI information.
- * @param[in]  csi_buf: Pointer to the CSI data buffer.
- * @param[in]  len:  Pointer to the size of CSI raw data.
- * @code
- *    u8 *csi_buf = NULL;
- *    u32 len;
- *    csi_buf = rtos_mem_zmalloc(buf_len);
- *    wifi_csi_report(buf_len,csi_buf,&len);
- * @endcode
- * @return
- *    - @ref RTK_SUCCESS : The API executed successfully.
- *    - @ref RTK_FAIL : CONFIG_CSI is not defined or driver internal error.
- *    - -@ref RTK_ERR_BADARG :
- *      - NULL pointer passed for `csi_buf`.
- *      - CSI packet length (CSI header + raw data) exceeds `buf_len`.
- */
-s32 wifi_csi_report(u32 buf_len, u8 *csi_buf, u32 *len);
 
 /**
  * @brief  Configure Wi-Fi speaker settings for audio module.
@@ -602,6 +600,16 @@ void wifi_set_conn_step_try_limit(struct rtw_conn_step_retries *conn_step_retrie
   *      - Get acs report fail
   */
 s32 wifi_acs_find_ideal_channel(struct rtw_acs_config *acs_config, u8 *ideal_ch);
+
+/**
+ * @brief  Configure Wi-Fi tx advanced settings for special scenario.
+ * @param[in]  tx_setting: A pointer to specific parameters.
+ * @return
+ *    - @ref RTK_SUCCESS : The API executed successfully.
+ *    - -@ref RTK_ERR_WIFI_POWEROFF : Wi-Fi is powered off in IPS(Inactive Power Save) mode,
+ *                      unable to access Wi-Fi registers.
+ */
+s32 wifi_set_tx_advanced_config(struct rtw_tx_advanced_cfg *tx_setting);
 
 /** @} End of Extended_Functions group */
 /** @} End of WIFI_Exported_Functions group*/

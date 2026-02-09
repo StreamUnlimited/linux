@@ -40,6 +40,16 @@ func_exit:
 	return;
 }
 
+static void whc_fullmac_host_event_update_regd_indicate(struct event_priv_t *event_priv, struct whc_ipc_dev_req_msg *p_ipc_msg)
+{
+	struct rtw_country_code_table *ptab = (struct rtw_country_code_table *)llhw_ipc_fw_phy_to_virt(p_ipc_msg->param_buf[0]);
+	(void)event_priv;
+
+	rtw_regd_update(ptab);
+
+	return;
+}
+
 static void whc_fullmac_host_event_set_acs_info(struct whc_ipc_dev_req_msg *p_ipc_msg)
 {
 	u8 idx = 0;
@@ -86,6 +96,8 @@ static void whc_fullmac_host_event_join_status_indicate(struct event_priv_t *eve
 #ifdef CONFIG_P2P
 	u16 frame_type;
 #endif
+	u8 wlan_idx;
+	struct rtw_wpa_4way_status	rpt_4way = {0};
 
 	if (!global_idev.event_ch) {
 		dev_err(global_idev.fullmac_dev, "%s,%s: event_priv_t is NULL in!\n", "event", __func__);
@@ -120,6 +132,22 @@ static void whc_fullmac_host_event_join_status_indicate(struct event_priv_t *eve
 
 	if (event == RTW_EVENT_STA_DISASSOC) {
 		dev_dbg(global_idev.fullmac_dev, "%s: sta disassoc \n", __func__);
+
+		wlan_idx = 1;
+		dev_dbg(global_idev.fullmac_dev, "[fullmac]: wlan_idx = %d, is_need_4way= %d, is_4way_ongoing =%d", wlan_idx, global_idev.is_need_4way[wlan_idx],
+				global_idev.is_4way_ongoing[wlan_idx]);
+		//notify NP coex, 4-way handshake end
+		if (global_idev.is_need_4way[wlan_idx] && global_idev.is_4way_ongoing[wlan_idx] > 0) {
+			global_idev.is_4way_ongoing[wlan_idx] --;
+			if (0 == global_idev.is_4way_ongoing[wlan_idx]) {// no client ongoing 4-way process, then notify NP end. otherwise, not notify 4-way end.
+				rpt_4way.is_start = false;//
+				rpt_4way.is_success = true;//4-way process end
+				rpt_4way.wlan_idx = wlan_idx;
+				whc_fullmac_host_wpa_4way_status_indicate(&rpt_4way);
+				dev_dbg(global_idev.fullmac_dev, "fullmac indicate 4-way end\n");
+			}
+		}
+
 		cfg80211_del_sta(global_idev.pndev[1], buf, GFP_ATOMIC);
 	}
 
@@ -325,7 +353,7 @@ func_exit:
 static void whc_fullmac_host_event_promisc_pkt_hdl(struct event_priv_t *event_priv, struct whc_ipc_dev_req_msg *p_ipc_msg)
 {
 	struct device *pdev = NULL;
-	struct rtw_rx_pkt_info *ppktinfo = (struct rtw_rx_pkt_info *)phys_to_virt(p_ipc_msg->param_buf[0]);
+	struct rtw_rx_pkt_info *ppktinfo = NULL;
 	dma_addr_t phy_pkt = 0, phy_buf = 0;
 	uint8_t *buf = NULL;
 
@@ -335,24 +363,11 @@ static void whc_fullmac_host_event_promisc_pkt_hdl(struct event_priv_t *event_pr
 		goto func_exit;
 	}
 
-	phy_pkt = dma_map_single(pdev, ppktinfo, sizeof(struct rtw_rx_pkt_info), DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, phy_pkt)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping rtw_rx_pkt_info dma error!\n", __func__);
-		goto func_exit;
-	}
+	ppktinfo = llhw_ipc_fw_phy_to_virt(p_ipc_msg->param_buf[0]);
+	buf = llhw_ipc_fw_phy_to_virt(ppktinfo->buf);
 
-	buf = phys_to_virt(ppktinfo->buf);
-	phy_buf = dma_map_single(pdev, buf, ppktinfo->len, DMA_FROM_DEVICE);
-	if (dma_mapping_error(pdev, phy_buf)) {
-		dev_err(global_idev.fullmac_dev, "%s: mapping buf dma error!\n", __func__);
-		dma_unmap_single(pdev, phy_pkt, sizeof(struct rtw_rx_pkt_info), DMA_FROM_DEVICE);
-		goto func_exit;
-	}
 	ppktinfo->buf = buf;
 	rtw_promisc_rx(ppktinfo);
-
-	dma_unmap_single(pdev, phy_buf, ppktinfo->len, DMA_FROM_DEVICE);
-	dma_unmap_single(pdev, phy_pkt, sizeof(struct rtw_rx_pkt_info), DMA_FROM_DEVICE);
 func_exit:
 	return;
 }
@@ -420,7 +435,7 @@ func_exit:
 
 #endif
 
-void whc_fullmac_host_event_task(unsigned long data)
+void whc_fullmac_host_event_task(struct work_struct *data)
 {
 	struct event_priv_t *event_priv = &global_idev.event_priv;
 	struct device *pdev = NULL;
@@ -466,6 +481,14 @@ void whc_fullmac_host_event_task(unsigned long data)
 		/* If user callback provided as NULL, param_buf[1] appears NULL here. Do not make ptr. */
 		/* https://jira.realtek.com/browse/AMEBAD2-1543 */
 		whc_fullmac_host_scan_done_indicate(p_recv_msg->param_buf[0], NULL);
+
+		/* if Synchronous scan/scan abort, up sema when scan done */
+		if (global_idev.mlme_priv.scan_block_param) {
+			complete(&global_idev.mlme_priv.scan_block_param->sema);
+		}
+		if (global_idev.mlme_priv.scan_abort_block_param) {
+			complete(&global_idev.mlme_priv.scan_abort_block_param->sema);
+		}
 		break;
 	case WHC_API_IP_ACS:
 		whc_fullmac_host_event_set_acs_info(p_recv_msg);
@@ -516,6 +539,10 @@ void whc_fullmac_host_event_task(unsigned long data)
 								  global_idev.p2p_global.roch_duration, GFP_KERNEL);
 		break;
 #endif
+	case WHC_API_UPDATE_REGD_EVENT:
+		whc_fullmac_host_event_update_regd_indicate(event_priv, p_recv_msg);
+		break;
+
 	default:
 		dev_err(global_idev.fullmac_dev, "%s: Unknown Device event(%d)!\n\r", "event", p_recv_msg->enevt_id);
 		break;
@@ -540,7 +567,7 @@ static u32 whc_fullmac_host_event_interrupt(aipc_ch_t *ch, ipc_msg_struct_t *pms
 
 	/* copy ipc_msg from temp memory in ipc interrupt. */
 	memcpy((u8 *) & (event_priv->recv_ipc_msg), (u8 *)pmsg, sizeof(ipc_msg_struct_t));
-	tasklet_schedule(&(event_priv->api_tasklet));
+	queue_work(event_priv->api_workqueue, &(event_priv->api_work));
 
 func_exit:
 	return ret;
@@ -564,11 +591,21 @@ int whc_fullmac_host_event_init(struct whc_device *idev)
 	event_priv->dev_req_network_info = dma_alloc_coherent(event_ch->pdev, DEV_REQ_NETWORK_INFO_MAX_LEN, &event_priv->dev_req_network_info_phy, GFP_KERNEL);
 	if (!event_priv->dev_req_network_info) {
 		dev_err(global_idev.fullmac_dev, "%s: allloc dev_req_network_info error.\n", "event");
+		dma_free_coherent(event_ch->pdev, sizeof(struct whc_ipc_host_req_msg), event_priv->preq_msg, event_priv->req_msg_phy_addr);
 		return -ENOMEM;
 	}
 
-	/* initialize event tasklet */
-	tasklet_init(&(event_priv->api_tasklet), whc_fullmac_host_event_task, (unsigned long)event_priv);
+	/* initialize event work */
+	event_priv->api_workqueue = alloc_ordered_workqueue("api_ordered_wq", 0);
+	if (!event_priv->api_workqueue) {
+		dev_err(global_idev.fullmac_dev, "%s: Failed to create workqueue\n", "event");
+		dma_free_coherent(event_ch->pdev, DEV_REQ_NETWORK_INFO_MAX_LEN,
+						  event_priv->dev_req_network_info, event_priv->dev_req_network_info_phy);
+		dma_free_coherent(event_ch->pdev, sizeof(struct whc_ipc_host_req_msg), event_priv->preq_msg, event_priv->req_msg_phy_addr);
+		return -ENOMEM;
+	}
+
+	INIT_WORK(&(event_priv->api_work), whc_fullmac_host_event_task);
 
 	return 0;
 }
@@ -579,7 +616,9 @@ void whc_fullmac_host_event_deinit(void)
 	aipc_ch_t	*event_ch = global_idev.event_ch;
 
 	/* free sema to wakeup the message queue task */
-	tasklet_kill(&(event_priv->api_tasklet));
+	if (event_priv->api_workqueue) {
+		destroy_workqueue(event_priv->api_workqueue);
+	}
 
 	dma_free_coherent(event_ch->pdev, DEV_REQ_NETWORK_INFO_MAX_LEN,
 					  event_priv->dev_req_network_info, event_priv->dev_req_network_info_phy);

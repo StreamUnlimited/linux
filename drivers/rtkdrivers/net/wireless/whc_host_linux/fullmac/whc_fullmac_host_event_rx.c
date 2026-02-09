@@ -17,6 +17,15 @@ static void whc_fullmac_host_event_scan_report_indicate(struct event_priv_t *eve
 	return;
 }
 
+static void whc_fullmac_host_event_update_regd_indicate(struct event_priv_t *event_priv, u32 *param_buf)
+{
+	struct rtw_country_code_table *ptab = (struct rtw_country_code_table *)&param_buf[0];
+	(void)event_priv;
+
+	rtw_regd_update(ptab);
+	return;
+}
+
 static void whc_fullmac_host_event_set_acs_info(u32 *param_buf)
 {
 	u8 idx = 0;
@@ -141,8 +150,8 @@ static void whc_fullmac_host_event_set_netif_info(struct event_priv_t *event_pri
 {
 	int idx = (int)param_buf[0];
 	unsigned char *dev_addr = (u8 *)&param_buf[1];
-	unsigned char last;
 	int softap_addr_offset_idx = global_idev.wifi_user_config.softap_addr_offset_idx;
+	unsigned char softap_mac[ETH_ALEN];
 
 	dev_dbg(global_idev.fullmac_dev, "[fullmac]: set netif info.");
 
@@ -166,7 +175,11 @@ static void whc_fullmac_host_event_set_netif_info(struct event_priv_t *event_pri
 	}
 #endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
 	memcpy((void *)global_idev.pndev[idx]->dev_addr, dev_addr, ETH_ALEN);
+#else
+	eth_hw_addr_set(global_idev.pndev[idx], dev_addr);
+#endif
 	dev_dbg(global_idev.fullmac_dev, "MAC ADDR [%02x:%02x:%02x:%02x:%02x:%02x]", *global_idev.pndev[idx]->dev_addr,
 			*(global_idev.pndev[idx]->dev_addr + 1), *(global_idev.pndev[idx]->dev_addr + 2),
 			*(global_idev.pndev[idx]->dev_addr + 3), *(global_idev.pndev[idx]->dev_addr + 4),
@@ -174,14 +187,17 @@ static void whc_fullmac_host_event_set_netif_info(struct event_priv_t *event_pri
 
 	if (global_idev.pndev[0]) {
 		/*set ap port mac address*/
-		memcpy((void *)global_idev.pndev[1]->dev_addr, global_idev.pndev[0]->dev_addr, ETH_ALEN);
-
+		memcpy(softap_mac, global_idev.pndev[0]->dev_addr, ETH_ALEN);
 		if (softap_addr_offset_idx == 0) {
-			last = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + (1 << 1);
+			softap_mac[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + (1 << 1);
 		} else {
-			last = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
+			softap_mac[softap_addr_offset_idx] = global_idev.pndev[0]->dev_addr[softap_addr_offset_idx] + 1;
 		}
-		memcpy((void *)&global_idev.pndev[1]->dev_addr[softap_addr_offset_idx], &last, 1);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
+		memcpy((void *)global_idev.pndev[1]->dev_addr, softap_mac, ETH_ALEN);
+#else
+		eth_hw_addr_set(global_idev.pndev[1], softap_mac);
+#endif
 	}
 
 func_exit:
@@ -335,6 +351,14 @@ void whc_fullmac_host_event_task(struct work_struct *data)
 		/* If user callback provided as NULL, param_buf[1] appears NULL here. Do not make ptr. */
 		/* https://jira.realtek.com/browse/AMEBAD2-1543 */
 		whc_fullmac_host_scan_done_indicate(param_buf[0], NULL);
+
+		/* if Synchronous scan/scan abort, up sema when scan done */
+		if (global_idev.mlme_priv.scan_block_param) {
+			complete(&global_idev.mlme_priv.scan_block_param->sema);
+		}
+		if (global_idev.mlme_priv.scan_abort_block_param) {
+			complete(&global_idev.mlme_priv.scan_abort_block_param->sema);
+		}
 		break;
 	case WHC_API_IP_ACS:
 		whc_fullmac_host_event_set_acs_info(param_buf);
@@ -385,6 +409,9 @@ void whc_fullmac_host_event_task(struct work_struct *data)
 								  global_idev.p2p_global.roch_duration, GFP_KERNEL);
 		break;
 #endif
+	case WHC_API_UPDATE_REGD_EVENT:
+		whc_fullmac_host_event_update_regd_indicate(event_priv, param_buf);
+		break;
 
 	default:
 		dev_err(global_idev.fullmac_dev, "%s: Unknown Device event(%x)!\n\r", "event", p_recv_msg->event);

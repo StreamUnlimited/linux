@@ -8,6 +8,9 @@
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
 
+
+
+
 #include <whc_host_linux.h>
 
 #define CREATE_WIFI_CFG_MOD_PARAM(_name, _default) \
@@ -17,13 +20,14 @@
 #define SET_WIFI_CFG_FROM_MOD_PARAM(_struct, _name) \
 	_struct._name = wifi_cfg_mod_param_##_name
 
-CREATE_WIFI_CFG_MOD_PARAM(rtw_tx_pwr_lmt_enable, 2);
-CREATE_WIFI_CFG_MOD_PARAM(rtw_tx_pwr_by_rate, 2);
+CREATE_WIFI_CFG_MOD_PARAM(freq_band_support, RTW_SUPPORT_BAND_MAX);
+CREATE_WIFI_CFG_MOD_PARAM(tx_pwr_table_selection, 2);
 CREATE_WIFI_CFG_MOD_PARAM(rtw_802_11d_en, 0);
 CREATE_WIFI_CFG_MOD_PARAM(rtw_trp_tis_cert_en, RTW_TRP_TIS_DISABLE);
 CREATE_WIFI_CFG_MOD_PARAM(rtw_edcca_mode, RTW_EDCCA_NORM);
 CREATE_WIFI_CFG_MOD_PARAM(tdma_dig_enable, 0);
 CREATE_WIFI_CFG_MOD_PARAM(antdiv_mode, RTW_ANTDIV_DISABLE);
+CREATE_WIFI_CFG_MOD_PARAM(probe_hidden_ap_on_passive_ch, 1);
 
 CREATE_WIFI_CFG_MOD_PARAM(ips_enable, 1);
 CREATE_WIFI_CFG_MOD_PARAM(ips_level, RTW_IPS_WIFI_OFF);
@@ -132,6 +136,7 @@ int whc_host_init(void)
 {
 	int ret = 0;
 	struct whc_device *idev = &global_idev;
+	int i;
 
 	/* IPC channel of data and event init. */
 	global_idev.data_ch = whc_fullmac_host_ipc_data_ch_init(&whc_fullmac_ipc_host_recv_ops);
@@ -155,16 +160,22 @@ int whc_host_init(void)
 		goto ipc_deinit;
 	}
 
+	for (i = 0; i < WHC_MAX_NET_PORT_NUM; i++) {
+		global_idev.is_need_4way[i] = 0;
+		global_idev.is_4way_ongoing[i] = 0;
+	}
+
 	wifi_set_user_config();
 
 	// Override some parameters from the module arguments
-	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_tx_pwr_lmt_enable);
-	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_tx_pwr_by_rate);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, freq_band_support);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, tx_pwr_table_selection);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_802_11d_en);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_trp_tis_cert_en);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, rtw_edcca_mode);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, tdma_dig_enable);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, antdiv_mode);
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, probe_hidden_ap_on_passive_ch);
 
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, ips_enable);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, ips_level);

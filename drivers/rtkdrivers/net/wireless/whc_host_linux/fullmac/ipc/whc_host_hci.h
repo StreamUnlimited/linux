@@ -29,7 +29,8 @@
 
 /* Layer 1 structs. */
 struct event_priv_t {
-	struct tasklet_struct		api_tasklet; /* event_priv task to haddle event_priv msg */
+	struct work_struct		api_work; /* event_priv work to haddle event_priv msg */
+	struct workqueue_struct *api_workqueue; /* event_priv work queue to haddle event_priv msg */
 	ipc_msg_struct_t		api_ipc_msg; /* to store ipc msg for event_priv */
 	struct mutex			iiha_send_mutex; /* mutex to protect send host event_priv message */
 	struct whc_ipc_host_req_msg	*preq_msg;/* host event_priv message to send to device */
@@ -70,7 +71,9 @@ struct mlme_priv_t {
 	bool b_in_scan;
 
 	/* join parameters. */
-	struct internal_join_block_param	*join_block_param;
+	struct internal_block_param	*join_block_param;
+	struct internal_block_param	*scan_block_param;
+	struct internal_block_param	*scan_abort_block_param;
 	unsigned int		rtw_join_status;
 	u8				assoc_req_ie[ASSOC_IE_MAX_LEN];
 	u8				assoc_rsp_ie[ASSOC_IE_MAX_LEN];
@@ -95,6 +98,11 @@ struct p2p_priv_t {
 	unsigned int			roch_duration;
 	u64						roch_cookie;
 	struct ieee80211_channel roch;
+};
+
+static struct netdev_work {
+	struct work_struct work;
+	int op;  // 0: NETDEV_REGISTER, 1: NETDEV_UNREGISTER
 };
 #endif
 
@@ -123,6 +131,8 @@ struct whc_device {
 	u8				ip_addr[RTW_IP_ADDR_LEN];
 	u8				ipv6_addr[RTW_IPv6_ADDR_LEN];
 	u8				wowlan_state; /* 0: resume, 1: suspend */
+	u8				is_need_4way[WHC_MAX_NET_PORT_NUM]; /* 0: no need, 1: need */
+	u8				is_4way_ongoing[WHC_MAX_NET_PORT_NUM]; /* 0: 4-way is not ongoing, 1: 4-way is going */
 
 	/* wifi user config */
 	struct  wifi_user_conf	wifi_user_config;

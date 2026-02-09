@@ -97,6 +97,7 @@ static int whc_fullmac_host_del_station(struct wiphy *wiphy, struct net_device *
 	u8 wlan_idx = rtw_netdev_idx(ndev);
 	u8 *mac_vir = NULL;
 	dma_addr_t mac_phy;
+	struct rtw_wpa_4way_status	rpt_4way = {0};
 
 	if (!params->mac) {
 		/*null means delete all sta, not implement right now*/
@@ -110,6 +111,21 @@ static int whc_fullmac_host_del_station(struct wiphy *wiphy, struct net_device *
 		return -ENOMEM;
 	}
 	memcpy(mac_vir, params->mac, 6);
+
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: wlan_idx = %d, is_need_4way= %d, is_4way_ongoing =%d", wlan_idx, global_idev.is_need_4way[wlan_idx],
+			global_idev.is_4way_ongoing[wlan_idx]);
+	//notify NP coex, 4-way handshake end
+	if (global_idev.is_need_4way[wlan_idx] && global_idev.is_4way_ongoing[wlan_idx] > 0) {
+		global_idev.is_4way_ongoing[wlan_idx] --;
+		if (0 == global_idev.is_4way_ongoing[wlan_idx]) {// no client ongoing 4-way process, then notify NP end. otherwise, not notify 4-way end.
+			rpt_4way.is_start = false;//
+			rpt_4way.is_success = true;//4-way process end
+			rpt_4way.wlan_idx = wlan_idx;
+			ret = whc_fullmac_host_wpa_4way_status_indicate(&rpt_4way);
+			dev_dbg(global_idev.fullmac_dev, "fullmac host indicate 4-way end\n");
+		}
+	}
+
 	ret = whc_fullmac_host_ap_del_client(wlan_idx, (u8 *) mac_phy);
 
 	if (mac_vir) {
@@ -136,15 +152,7 @@ static int whc_fullmac_host_change_bss(struct wiphy *wiphy, struct net_device *n
 static int whc_fullmac_host_set_txq_params(struct wiphy *wiphy, struct net_device *ndev, struct ieee80211_txq_params *params)
 {
 	int ret = 0;
-	/*
-	 * @AC_param: format is shown as in below ,
-	 * +--------------------------+-------------+-------------+
-	 * |        TXOP Limit        |ECWmin/ECWmax|  ACI/AIFSN  |
-	 * +--------------------------+-------------+-------------+
-	 * 	BIT31~16 corresponding to TXOP Limit, BIT15~8 corresponding
-	 * 	to ECWmin/ECWmax, BIT7~0 corresponding to ACI/AIFSN.
-	*/
-	unsigned int AC_param = 0;
+	struct rtw_edca_param edca_param = {0};
 	u8	shift_count = 0;
 	u8 aifsn, aci = 0, ECWMin, ECWMax;
 	u16 TXOP;
@@ -188,12 +196,13 @@ static int whc_fullmac_host_set_txq_params(struct wiphy *wiphy, struct net_devic
 	TXOP = params->txop;
 	aifsn = params->aifs;
 
-	AC_param = (aifsn & 0xf) | ((aci & 0x3) << 5) | ((ECWMin & 0xf) << 8) | ((ECWMax & 0xf) << 12) | ((TXOP & 0xffff) << 16);
+	edca_param.aci = aci;
+	edca_param.aifsn = aifsn;
+	edca_param.cw_max = ECWMax;
+	edca_param.cw_min = ECWMin;
+	edca_param.txop_limit = TXOP;
 
-	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Set TXQ params: aifsn=%d aci=%d ECWmin=%d, ECWmax=%d, TXOP=%d, AC_param=0x%x\n",
-			FUNC_NDEV_ARG(ndev), aifsn, aci, ECWMin, ECWMax, TXOP, AC_param);
-
-	ret = whc_fullmac_host_set_EDCA_params(&AC_param);
+	ret = whc_fullmac_host_set_EDCA_params(&edca_param);
 
 	return ret;
 }
@@ -205,17 +214,28 @@ static int whc_fullmac_host_probe_client(struct wiphy *wiphy, struct net_device 
 }
 #endif // CONFIG_CFG80211_SME_OFFLOAD
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0))
 static int whc_fullmac_host_change_beacon(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_beacon_data *info)
+#else
+static int whc_fullmac_host_change_beacon(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_ap_update *info)
+#endif
 {
 #ifdef CONFIG_P2P
 	struct element *target_ptr = NULL;
+	struct cfg80211_beacon_data *beacon;
 
-	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT, WLAN_OUI_TYPE_MICROSOFT_WPS, info->beacon_ies, info->beacon_ies_len);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
+	beacon = &info->beacon;
+#else
+	beacon = info;
+#endif
+
+	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT, WLAN_OUI_TYPE_MICROSOFT_WPS, beacon->beacon_ies, beacon->beacon_ies_len);
 	if (target_ptr) {
 		whc_fullmac_host_update_custom_ie((u8 *)target_ptr, (global_idev.p2p_global.beacon_wps_ie_idx + 1), (RTW_CUS_IE_BEACON | RTW_CUS_IE_PROBERSP));
 	}
 
-	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_WFA, WLAN_OUI_TYPE_WFA_P2P, info->beacon_ies, info->beacon_ies_len);
+	target_ptr = (struct element *)cfg80211_find_vendor_ie(WLAN_OUI_WFA, WLAN_OUI_TYPE_WFA_P2P, beacon->beacon_ies, beacon->beacon_ies_len);
 	if (target_ptr) {
 		whc_fullmac_host_update_custom_ie((u8 *)target_ptr, (global_idev.p2p_global.beacon_p2p_ie_idx + 1), (RTW_CUS_IE_BEACON | RTW_CUS_IE_PROBERSP));
 	}
@@ -262,6 +282,8 @@ void whc_fullmac_host_sta_assoc_indicate(char *buf, int buf_len)
 {
 	struct station_info sinfo;
 	u8 frame_styp, ie_offset = 0;
+	struct rtw_wpa_4way_status	rpt_4way = {0};
+	u8 wlan_idx = WHC_AP_PORT;
 
 	memset(&sinfo, 0, sizeof(sinfo));
 	frame_styp = le16_to_cpu(((struct rtw_ieee80211_hdr_3addr *)buf)->frame_ctl) & IEEE80211_FCTL_STYPE;
@@ -274,6 +296,18 @@ void whc_fullmac_host_sta_assoc_indicate(char *buf, int buf_len)
 	sinfo.assoc_req_ies = buf + WLAN_HDR_A3_LEN + 4;
 	sinfo.assoc_req_ies_len = buf_len - WLAN_HDR_A3_LEN - 4;
 	cfg80211_new_sta(global_idev.pndev[1], get_addr2_ptr(buf), &sinfo, GFP_ATOMIC);
+
+	dev_dbg(global_idev.fullmac_dev, "[fullmac]: wlan_idx = %d, is_need_4wway= %d, is_4way_ongoing =%d", wlan_idx, global_idev.is_need_4way[wlan_idx],
+			global_idev.is_4way_ongoing[wlan_idx]);
+	//send message notify NP coex, 4-way handshake start
+	if (global_idev.is_need_4way[wlan_idx]) {
+		rpt_4way.is_start = true;
+		rpt_4way.is_success = false;
+		rpt_4way.wlan_idx = wlan_idx;
+		whc_fullmac_host_wpa_4way_status_indicate(&rpt_4way);
+		global_idev.is_4way_ongoing[wlan_idx]++;
+		dev_dbg(global_idev.fullmac_dev, "fullmac host indicate 4-way start, ongoing 4way client cnt=%d \n", global_idev.is_4way_ongoing[wlan_idx]);
+	}
 }
 
 static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_ap_settings *settings)
@@ -290,13 +324,14 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 	u8 P2P_OUI[4] = {0x50, 0x6f, 0x9a, 0x09};
 	u8 WPS_OUI[4] = {0x00, 0x50, 0xf2, 0x04};
 #endif
+	u8 wlan_idx = rtw_netdev_idx(ndev);
 	dev_dbg(global_idev.fullmac_dev, "=>"FUNC_NDEV_FMT" - Start Softap\n", FUNC_NDEV_ARG(ndev));
 
 	if (whc_fullmac_host_dev_driver_is_mp()) {
 		return -EPERM;
 	}
 
-	if (rtw_netdev_idx(ndev) == 0) {
+	if (wlan_idx == 0) {
 		return -EPERM;
 	}
 
@@ -314,6 +349,7 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 	memcpy(softAP_config->ssid.val, (u8 *)settings->ssid, settings->ssid_len);
 	softAP_config->ssid.len = settings->ssid_len;
 	softAP_config->channel = (u8) ieee80211_frequency_to_channel(settings->chandef.chan->center_freq);
+	softAP_config->hidden_ssid = settings->hidden_ssid;
 
 	dev_dbg(global_idev.fullmac_dev, "wpa_versions=%d\n", settings->crypto.wpa_versions);
 	dev_dbg(global_idev.fullmac_dev, "n_ciphers_pairwise=%d\n", settings->crypto.n_ciphers_pairwise);
@@ -325,6 +361,9 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 	dev_dbg(global_idev.fullmac_dev, "wep_tx_key=%d\n", settings->crypto.wep_tx_key);
 #endif
 	dev_dbg(global_idev.fullmac_dev, "sae_pwd_len=%d\n", settings->crypto.sae_pwd_len);
+	dev_dbg(global_idev.fullmac_dev, "hidden_ssid=%d\n", settings->hidden_ssid);
+	global_idev.is_need_4way[wlan_idx] = 0;
+	global_idev.is_4way_ongoing[wlan_idx] = 0;
 
 	if (settings->privacy) {
 		if (settings->crypto.n_ciphers_pairwise > 1 || settings->crypto.n_akm_suites > 1) {
@@ -333,10 +372,13 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 		}
 		if ((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.akm_suites[0] == 0x08)) {
 			softAP_config->security_type = RTW_SECURITY_WPA3_AES_PSK;
+			global_idev.is_need_4way[wlan_idx] = 1;
 		} else if ((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.ciphers_pairwise[0] == 0x04)) {
 			softAP_config->security_type = RTW_SECURITY_WPA2_AES_PSK;
+			global_idev.is_need_4way[wlan_idx] = 1;
 		} else if ((settings->crypto.wpa_versions == 2) && ((u8)settings->crypto.ciphers_pairwise[0] == 0x02)) {
 			softAP_config->security_type = RTW_SECURITY_WPA2_TKIP_PSK;
+			global_idev.is_need_4way[wlan_idx] = 1;
 		} else if (settings->crypto.wpa_versions == 1) {
 			dev_dbg(global_idev.fullmac_dev, "wpa_versions=1, not support right now!\n");
 			return -EPERM;
@@ -345,6 +387,8 @@ static int whc_fullmac_host_start_ap_ops(struct wiphy *wiphy, struct net_device 
 			dev_err(global_idev.fullmac_dev, "ERR: AP in WEP security mode is not supported!!");
 			return -EPERM;
 		}
+
+		dev_dbg(global_idev.fullmac_dev, "wlan_idx:%d, is_need_4way=%d, \n", wlan_idx, global_idev.is_need_4way[wlan_idx]);
 
 		/* If not fake, copy from upper layer, like WEP(unsupported). */
 		/* fix CWE-170, null terminated string, so to add 1. */

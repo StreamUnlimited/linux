@@ -5,6 +5,16 @@
 extern "C" {
 #endif
 
+/** @addtogroup WIFI_API Wi-Fi APIs
+ *  @brief      WIFI_API module
+ *  @{
+ */
+/** @addtogroup WIFI_Exported_Types Wi-Fi Exported Types
+* @{
+*/
+/** @addtogroup WIFI_Exported_Structure_Types Structure Type
+ * @{
+ */
 /**
   * @brief  The structure is used to describe the wifi user configuration, can be configured in ameba_wificfg.c.
   */
@@ -16,13 +26,11 @@ struct wifi_user_conf {
 		- \b RTW_EDCCA_DISABLE: Ingore EDCCA. */
 	u8 rtw_edcca_mode;
 
-	/*!	For power limit, see Ameba Wi-Fi TX power and Country code Setup Guideline.pdf.\n
-		0: Disable, 1: Enable, 2: Depend on efuse(flash). */
-	u8 rtw_tx_pwr_lmt_enable;
-
-	/*!	For power by rate, see Ameba Wi-Fi TX power and Country code Setup Guideline.pdf.\n
-		0: Disable, 1: Enable, 2: Depend on efuse(flash). */
-	u8 rtw_tx_pwr_by_rate;
+	/*! For power by rate and power by limit table selection, refer to Ameba Wi-Fi TX Power and Country Code Setup Guideline.pdf.
+		- 0: Disable power by limit, enable power by rate;
+		- 1: Enable both power by limit and power by rate;
+		- 2: Depend on efuse (flash). */
+	u8 tx_pwr_table_selection;
 
 	/*!	Enabled during TRP TIS certification. */
 	u8 rtw_trp_tis_cert_en;
@@ -129,6 +137,13 @@ struct wifi_user_conf {
 	/*!	Bandwidth 40MHz, some IC hardware does not support.*/
 	u8 bw_40_enable;
 
+	/*!	Support frequency band types, some IC hardware does not support 5 GHz.
+		- @ref RTW_SUPPORT_BAND_2_4G : Only support 2.4 GHz band;
+		- @ref RTW_SUPPORT_BAND_5G : Only support 5 GHz band
+		- @ref RTW_SUPPORT_BAND_2_4G_5G_BOTH : Support both 2.4 GHz and 5 GHz bands;
+		- @ref RTW_SUPPORT_BAND_MAX : Default types supported by IC hardware. */
+	u8 freq_band_support;
+
 	/*!	Refe to 802.11d spec, obtain the country code information from beacon, and set the pwr limit and channel plan.*/
 	u8 rtw_802_11d_en;
 
@@ -173,12 +188,18 @@ struct wifi_user_conf {
 		@note Mcc performance has limitations, please contact Realtek before use to clarify your requirements. */
 	u8 en_mcc;
 
-	/* Used for configuring mcc port1 slot ratio by user: optional values:[12,80] */
+	/*!	Used for configuring mcc port1 slot ratio by user: optional values:[12,80] */
 	unsigned char mcc_force_p1_slot_ratio;
 
+	/*!	Simplify transmit pathway for faster data frame handling. */
 	u8 tx_shortcut_enable;
 
+	/*!	Simplify receive pathway for faster data frame handling. */
 	u8 rx_shortcut_enable;
+
+	/*!	0: No probe request will be sent on passive channel;
+		1: A unicast probe request will be sent when a null-SSID beacon is received on passive channel to obtain the ssid of the AP */
+	u8 probe_hidden_ap_on_passive_ch;
 
 	/*! For concurrent mode:
 	    - \b 0: STA or SoftAP only at any time, The MAC address of TA or Softap is the MAC address of chip;
@@ -196,6 +217,9 @@ struct wifi_user_conf {
 		skb_num_np needs to be adjusted simultaneously.*/
 	u8 rx_ampdu_num;
 
+	/* set cck rate mask for tx data frame. Set bit to 1 to mask corresponding cck rate (bit 0 ~ 3: CCK 1M, 2M, 5.5M, 11M) */
+	u8 rate_mask_cck;
+
 	/*!	Linux Fullmac architecture, ignore in RTOS.*/
 	u8 cfg80211;
 
@@ -211,6 +235,11 @@ struct wifi_user_conf {
 
 	/*! STA mode will periodically send null packet to AP to keepalive, unit: second. */
 	u8 keepalive_interval;
+
+	/*! Configure Wi-Fi minimum receivable signal strength, unit: dBm.
+		- 0: Rsvd, will use internal dynamic mechanism of the RTK driver determines the received power threshold.
+		- [-100, 0): Specify the minimum received power threshold, Wi-Fi can only receive the packets with rssi greater than this thresh. */
+	s8 rx_cca_thresh;
 
 	/*! 0: Disable R-mesh function, 1: Enable R-mesh function.*/
 	u8 wtn_en;
@@ -236,6 +265,10 @@ struct wifi_user_conf {
 	/*! Max node number in R-mesh network, this is used for decide each node's beacon window.*/
 	u16 wtn_max_node_num;
 };
+
+/** @} End of WIFI_Exported_Structure_Types group*/
+/** @} End of WIFI_Exported_Types group*/
+/** @} End of WIFI_API group */
 
 extern struct wifi_user_conf wifi_user_config __attribute__((aligned(64)));
 

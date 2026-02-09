@@ -48,13 +48,14 @@ _WEAK void wifi_set_user_config(void)
 	/*Regulatory related*/
 	wifi_user_config.country_code[0] = 0;
 	wifi_user_config.country_code[1] = 0;
-	wifi_user_config.rtw_tx_pwr_lmt_enable = 2;
-	wifi_user_config.rtw_tx_pwr_by_rate	= 2;
+	wifi_user_config.freq_band_support = RTW_SUPPORT_BAND_MAX;
+	wifi_user_config.tx_pwr_table_selection = 2;
 	wifi_user_config.rtw_802_11d_en = 0;
 	wifi_user_config.rtw_trp_tis_cert_en = RTW_TRP_TIS_DISABLE;
 	wifi_user_config.rtw_edcca_mode = RTW_EDCCA_NORM;
 	wifi_user_config.tdma_dig_enable = 0; /*add for customer ctrl tdma dig on/off*/
 	wifi_user_config.antdiv_mode = RTW_ANTDIV_DISABLE;
+	wifi_user_config.probe_hidden_ap_on_passive_ch = 1;
 
 
 	/* IPS(Inactive Power Save), power save when wifi unconnected */
@@ -89,6 +90,8 @@ _WEAK void wifi_set_user_config(void)
 	wifi_user_config.tx_shortcut_enable = 1;
 	wifi_user_config.rx_shortcut_enable = 1;
 	wifi_user_config.keepalive_interval = 20;
+	wifi_user_config.rx_cca_thresh = 0;
+	wifi_user_config.rate_mask_cck = 0x0;
 
 #ifdef CONFIG_FULLMAC
 	/* Linux wifi supports cfg80211 ops. */
