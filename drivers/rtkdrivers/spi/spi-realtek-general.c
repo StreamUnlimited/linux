@@ -156,7 +156,6 @@ void rtk_spi_struct_init(
 	char s4[] = "rtk,spi-index";
 	char s5[] = "rtk,spi-dma-en";
 	char s6[] = "rtk,spi-master-poll-mode";
-	int ret = 0;
 
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.dma_params.spi_phy_addr, 0, s0);
 	rtk_get_dts_info(rtk_spi, np, &rtk_spi->spi_manage.spi_default_cs, 0, s1);
@@ -966,7 +965,7 @@ void rtk_spi_gdma_deinit(struct rtk_spi_controller *rtk_spi)
 		dma_unmap_single(rtk_spi->dev,
 						 rtk_spi->spi_manage.dma_params.tx_dma_addr,
 						 rtk_spi->spi_manage.dma_params.tx_dma_length,
-						 DMA_MEM_TO_DEV);
+						 DMA_TO_DEVICE);
 		rtk_spi->spi_manage.dma_params.tx_dma_addr = 0;
 	}
 	if (rtk_spi->spi_manage.dma_enabled && rtk_spi->spi_manage.dma_params.tx_chan) {
@@ -983,7 +982,7 @@ void rtk_spi_gdma_deinit(struct rtk_spi_controller *rtk_spi)
 		dma_unmap_single(rtk_spi->dev,
 						 rtk_spi->spi_manage.dma_params.rx_dma_addr,
 						 rtk_spi->spi_manage.dma_params.rx_dma_length,
-						 DMA_DEV_TO_MEM);
+						 DMA_FROM_DEVICE);
 		rtk_spi->spi_manage.dma_params.rx_dma_addr = 0;
 	}
 	if (rtk_spi->spi_manage.dma_enabled && rtk_spi->spi_manage.dma_params.rx_chan) {
@@ -1089,14 +1088,14 @@ int rtk_spi_do_dma_transfer(
 	dma_params->tx_config->dst_port_window_size = 0;
 	dma_params->tx_config->src_port_window_size = 0;
 
-	transfer->rx_dma = dma_map_single(rtk_spi->dev, transfer->rx_buf, transfer->len, DMA_DEV_TO_MEM);
+	transfer->rx_dma = dma_map_single(rtk_spi->dev, transfer->rx_buf, transfer->len, DMA_TO_DEVICE);
 	if (!transfer->rx_dma) {
 		goto cannot_dma;
 	}
 
 	dma_params->rx_dma_addr = transfer->rx_dma;
 
-	transfer->tx_dma = dma_map_single(rtk_spi->dev, (void *)transfer->tx_buf, transfer->len, DMA_MEM_TO_DEV);
+	transfer->tx_dma = dma_map_single(rtk_spi->dev, (void *)transfer->tx_buf, transfer->len, DMA_FROM_DEVICE);
 	if (!transfer->tx_dma) {
 		goto cannot_dma;
 	}
@@ -1475,6 +1474,8 @@ void rtk_spi_set_cs(
 	bool enable)
 {
 	struct rtk_spi_controller *rtk_spi = spi_controller_get_devdata(spi->controller);
+	struct rtk_spi_device *dev = NULL;
+	int i;
 
 	if (rtk_spi->spi_manage.is_slave) {
 		return;
@@ -1487,8 +1488,7 @@ void rtk_spi_set_cs(
 
 	dev_dbg(rtk_spi->dev, "chip_select: %d", spi->chip_select);
 
-	struct rtk_spi_device *dev;
-	for (int32_t i = 0; i < rtk_spi->num_devices; i++) {
+	for (i = 0; i < rtk_spi->num_devices; i++) {
 		if (rtk_spi->cs_devices[i].chip_select == spi->chip_select) {
 			dev = &rtk_spi->cs_devices[i];
 			break;
