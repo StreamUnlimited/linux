@@ -251,7 +251,6 @@
 	status = "okay";
 
 	rtk,spi-slave-mode = <0>;
-	rtk,spi-cs-gpios = <&gpioa 12 0>;
 
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -261,6 +260,9 @@
 		reg = <0>;
 		compatible = "sue,dabfm";
 		spi-max-frequency = <10000000>;
+		// On realtek CS gpio is, quite unusually, active high
+		// becasue the driver set SPI_CS_HIGH in the mode bits.
+		rtk,spi-cs-gpios = <&gpioa 12 GPIO_ACTIVE_HIGH>;
 	};
 };
 
