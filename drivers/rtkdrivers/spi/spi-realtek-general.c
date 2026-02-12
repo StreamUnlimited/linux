@@ -135,7 +135,7 @@ static int rtk_spi_parse_cs_gpios(struct rtk_spi_controller *rtk_spi, struct dev
 		}
 
 		if (dev->cs_gpiod) {
-			printk("parsed gpio:%ld", desc_to_gpio(dev->cs_gpiod));
+			dev_dbg(rtk_spi->dev, "parsed cs gpio: %d", desc_to_gpio(dev->cs_gpiod));
 		}
 
 		rtk_spi->num_devices++;
@@ -687,7 +687,7 @@ static irqreturn_t rtk_spi_interrupt_handler(int irq, void *dev_id)
 	rtk_spi_clean_interrupt(rtk_spi, int_status);
 
 	if (int_status & (SPI_BIT_TXOIS | SPI_BIT_RXUIS | SPI_BIT_RXOIS | SPI_BIT_TXUIS)) {
-		dev_info(rtk_spi->dev, "TX and RX warning = 0x%08X\n", int_status);
+		dev_warn(rtk_spi->dev, "TX and RX warning = 0x%08X\n", int_status);
 	}
 
 	if (int_status & SPI_BIT_SSRIS) {
@@ -1389,7 +1389,7 @@ int rtk_spi_transfer_one(
 		}
 		dev_dbg(rtk_spi->dev, "Upper level given speed_hz = %d\n", transfer->speed_hz);
 		dev_dbg(rtk_spi->dev, "Clock divider caculated = %d\n", rtk_spi->spi_param.clock_divider);
-		dev_info(rtk_spi->dev, "Actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
+		dev_dbg(rtk_spi->dev, "Actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
 		rtk_spi_set_baud_div(rtk_spi, rtk_spi->spi_param.clock_divider);
 	}
 
@@ -1485,10 +1485,9 @@ void rtk_spi_set_cs(
 		dev_warn(rtk_spi->dev, "Set CS id = %d\n", spi->chip_select);
 	}
 
-	dev_info(rtk_spi->dev, "chip_select: %d", spi->chip_select);
+	dev_dbg(rtk_spi->dev, "chip_select: %d", spi->chip_select);
 
 	struct rtk_spi_device *dev;
-
 	for (int32_t i = 0; i < rtk_spi->num_devices; i++) {
 		if (rtk_spi->cs_devices[i].chip_select == spi->chip_select) {
 			dev = &rtk_spi->cs_devices[i];
@@ -1497,15 +1496,15 @@ void rtk_spi_set_cs(
 	}
 
 	if (!dev || !dev->cs_gpiod) {
-		dev_dbg(&spi->dev, "No CS GPIO for chip_select=%d\n", spi->chip_select);
+		dev_warn(&spi->dev, "No CS GPIO for chip_select=%d\n", spi->chip_select);
 		return;
 	}
 
 	if (enable) {
-		printk("set high:%ld", desc_to_gpio(dev->cs_gpiod));
+		dev_dbg(rtk_spi->dev, "set high: %d", desc_to_gpio(dev->cs_gpiod));
 		gpiod_set_value(dev->cs_gpiod, 1);
 	} else {
-		printk("set low:%ld", desc_to_gpio(dev->cs_gpiod));
+		dev_dbg(rtk_spi->dev, "set low: %d", desc_to_gpio(dev->cs_gpiod));
 		rtk_spi_set_slave_enable(rtk_spi, 0);
 		gpiod_set_value(dev->cs_gpiod, 0);
 	}
