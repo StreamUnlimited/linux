@@ -1422,7 +1422,9 @@ void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request)
 	case NL80211_REGDOM_SET_BY_DRIVER:
 	case NL80211_REGDOM_SET_BY_CORE:
 	case NL80211_REGDOM_SET_BY_COUNTRY_IE:
+		wiphy_lock(wiphy);
 		_rtl_reg_set_country_code(wiphy, request->alpha2);
+		wiphy_unlock(wiphy);
 		break;
 	default:
 		/* do nothing */
@@ -1466,11 +1468,13 @@ int rtw_regd_init(void)
 	wiphy->regulatory_flags &= ~REGULATORY_COUNTRY_IE_IGNORE;
 
 	rtnl_lock();
+	wiphy_lock(wiphy);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
 	ret = regulatory_set_wiphy_regd_sync(wiphy, regd);
 #else
 	ret = regulatory_set_wiphy_regd_sync_rtnl(wiphy, regd);
 #endif
+	wiphy_unlock(wiphy);
 	rtnl_unlock();
 
 	if (ret != 0) {
