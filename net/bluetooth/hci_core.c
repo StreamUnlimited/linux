@@ -2707,11 +2707,11 @@ void hci_unregister_dev(struct hci_dev *hdev)
 	synchronize_srcu(&hdev->srcu);
 	cleanup_srcu_struct(&hdev->srcu);
 
-	disable_work_sync(&hdev->rx_work);
-	disable_work_sync(&hdev->cmd_work);
-	disable_work_sync(&hdev->tx_work);
-	disable_work_sync(&hdev->power_on);
-	disable_work_sync(&hdev->error_reset);
+	cancel_work_sync(&hdev->rx_work);
+	cancel_work_sync(&hdev->cmd_work);
+	cancel_work_sync(&hdev->tx_work);
+	cancel_work_sync(&hdev->power_on);
+	cancel_work_sync(&hdev->error_reset);
 
 	hci_cmd_sync_clear(hdev);
 
