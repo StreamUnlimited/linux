@@ -121,7 +121,7 @@ static int rtk_spi_parse_cs_gpios(struct rtk_spi_controller *rtk_spi, struct dev
 		dev->cs_gpiod = devm_fwnode_gpiod_get(rtk_spi->dev,
 												of_fwnode_handle(child),
 												"rtk,spi-cs",
-												GPIOD_OUT_HIGH,
+												GPIOD_OUT_LOW,
 												"spi-cs");
 
 		if (IS_ERR(dev->cs_gpiod)) {
