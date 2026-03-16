@@ -429,7 +429,7 @@ static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)
 	 * edges. When an edge interrupt is received, the interrupt edge is
 	 * swapped for the next to come.
 	 */
-	irq_set_irq_type(bdata->irq, gpiod_get_raw_value(bdata->gpiod) ?
+	irq_set_irq_type(bdata->irq, gpiod_get_raw_value_cansleep(bdata->gpiod) ?
 			 IRQF_TRIGGER_FALLING : IRQF_TRIGGER_RISING);
 
 	if (bdata->button->wakeup) {
@@ -623,7 +623,7 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 		 * This initializes the edge to be expected first depending on
 		 * the current state of the gpio.
 		 */
-		irqflags = gpiod_get_raw_value(bdata->gpiod) ?
+		irqflags = gpiod_get_raw_value_cansleep(bdata->gpiod) ?
 			IRQF_TRIGGER_FALLING : IRQF_TRIGGER_RISING;
 
 		switch (button->wakeup_event_action) {
@@ -692,8 +692,9 @@ static int gpio_keys_setup_key(struct platform_device *pdev,
 	if (!button->can_disable)
 		irqflags |= IRQF_SHARED;
 
-	error = devm_request_any_context_irq(dev, bdata->irq, isr, irqflags,
-					     desc, bdata);
+	// Always request threaded IRQ, because A113X GPIO might sleep.
+	error = devm_request_threaded_irq(dev, bdata->irq, NULL, isr,
+					  irqflags | IRQF_ONESHOT, desc, bdata);
 	if (error < 0) {
 		dev_err(dev, "Unable to claim irq %d; error %d\n",
 			bdata->irq, error);
