@@ -980,9 +980,9 @@ static void lt7381_reset(struct fbtft_par *par)
 	if (desc_to_gpio(par->gpio.reset) == -1)
 		return;
 	fbtft_par_dbg(DEBUG_RESET, par, "%s()\n", __func__);
-	gpio_set_value(desc_to_gpio(par->gpio.reset), 0);
+	gpio_set_value_cansleep(desc_to_gpio(par->gpio.reset), 0);
 	msleep(RESET_HOLD_TIME);
-	gpio_set_value(desc_to_gpio(par->gpio.reset), 1);
+	gpio_set_value_cansleep(desc_to_gpio(par->gpio.reset), 1);
 	msleep(RESET_RELEASE_TIME);
 }
 
