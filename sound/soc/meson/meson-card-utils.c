@@ -287,7 +287,7 @@ static int spk_mute_set(struct snd_kcontrol *kcontrol,
 	struct snd_soc_card *soc_card = snd_kcontrol_chip(kcontrol);
 	struct meson_card *priv = snd_soc_card_get_drvdata(soc_card);
 	bool mute = ucontrol->value.integer.value[0];
-	gpiod_set_value(priv->mute, mute);
+	gpiod_set_value_cansleep(priv->mute, mute);
 	dev_dbg(soc_card->dev, "spk_mute_set: mute flag = %d\n", mute);
 	return 0;
 }
@@ -297,7 +297,7 @@ static int spk_mute_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_card *soc_card = snd_kcontrol_chip(kcontrol);
 	struct meson_card *priv = snd_soc_card_get_drvdata(soc_card);
-	bool value = gpiod_get_value(priv->mute);
+	bool value = gpiod_get_value_cansleep(priv->mute);
 	ucontrol->value.integer.value[0] = value;
 	return 0;
 }
@@ -390,7 +390,7 @@ int meson_card_remove(struct platform_device *pdev)
 {
 	struct meson_card *priv = platform_get_drvdata(pdev);
 
-	gpiod_set_value(priv->pdown, 1);
+	gpiod_set_value_cansleep(priv->pdown, 1);
 	meson_card_clean_references(priv);
 
 	return 0;
