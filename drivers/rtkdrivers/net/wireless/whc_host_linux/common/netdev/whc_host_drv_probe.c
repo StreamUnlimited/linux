@@ -301,7 +301,8 @@ static int rtw_dev_remove(struct platform_device *pdev)
 static void rtw_dev_shutdown(struct platform_device *pdev)
 {
 	dev_dbg(global_idev.fullmac_dev, "%s", __func__);
-	rtw_dev_remove(pdev);
+	// Stop the hardware/DMA/IPC. This prevents the hardware from trying to talk to a dying kernel.
+	whc_host_deinit();
 }
 
 static int rtw_dev_suspend(struct platform_device *pdev, pm_message_t state)
