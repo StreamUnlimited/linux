@@ -18,8 +18,9 @@
 #define  SPDIFIN_CTRL0_RST_OUT		BIT(29)
 #define  SPDIFIN_CTRL0_RST_IN		BIT(28)
 #define  SPDIFIN_IRQ_CLEAR		BIT(26)
+#define  SPDIFIN_CTRL0_FINDPAPB_EN	BIT(25)
 #define  SPDIFIN_CTRL0_WIDTH_SEL	BIT(24)
-#define  SPDIFIN_IRQ_EN		BIT(12)
+#define  SPDIFIN_CTRL0_PCM_DET_THRESHOLD	BIT(18)
 #define  SPDIFIN_CTRL0_STATUS_CH_SHIFT	11
 #define  SPDIFIN_CTRL0_STATUS_SEL	GENMASK(10, 8)
 #define  SPDIFIN_CTRL0_SRC_SEL		GENMASK(5, 4)
@@ -120,6 +121,9 @@ static int axg_spdifin_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
 			   SPDIFIN_CTRL0_RST_IN,  SPDIFIN_CTRL0_RST_IN);
 
+	// Force mute on start
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH, SPDIFIN_CTRL0_MUTE_BOTH);
+
 	return 0;
 }
 
@@ -138,9 +142,13 @@ int axg_spdifin_trigger(struct snd_pcm_substream *substream, int cmd, struct snd
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH, SPDIFIN_CTRL0_MUTE_BOTH);
 		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, SPDIFIN_CTRL0_EN);
+		schedule_delayed_work(&priv->unmute_work, 0);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
+		cancel_delayed_work_sync(&priv->unmute_work);
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH, SPDIFIN_CTRL0_MUTE_BOTH);
 		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN, 0);
 		break;
 	default:
@@ -203,14 +211,14 @@ static irqreturn_t axg_spdifin_status_isr_thread(int irq, void *devid)
 {
 	struct axg_spdifin *priv = (struct axg_spdifin *)devid;
 
-	unsigned int rate = axg_spdifin_get_rate(priv);
-	if (!rate) {
-		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH,  SPDIFIN_CTRL0_MUTE_BOTH);
-		cancel_delayed_work(&priv->unmute_work);
-	} else {
-		cancel_delayed_work(&priv->unmute_work);
-		schedule_delayed_work(&priv->unmute_work, msecs_to_jiffies(400));
-	}
+	/*
+	 * Any interrupt means something changed (Rate, Format, or Valid)
+	 * Mute immediately and let the watchdog decide when it's safe to unmute
+	 */
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH, SPDIFIN_CTRL0_MUTE_BOTH);
+
+	cancel_delayed_work(&priv->unmute_work);
+	schedule_delayed_work(&priv->unmute_work, 0); // Run check NOW
 
 	snd_ctl_notify(priv->card->snd_card,
 					SNDRV_CTL_EVENT_MASK_VALUE,
@@ -221,16 +229,25 @@ static irqreturn_t axg_spdifin_status_isr_thread(int irq, void *devid)
 
 static void unmute_work_handler(struct work_struct *work) {
 	struct axg_spdifin *priv = container_of(work, struct axg_spdifin, unmute_work.work);
+	unsigned int rate = axg_spdifin_get_rate(priv);
 	unsigned int stat;
+	bool is_compressed;
 
-	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_STATUS_SEL, FIELD_PREP(SPDIFIN_CTRL0_STATUS_SEL, 0));
-
+	// Select Channel Status Byte 0
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_STATUS_SEL, 0);
 	regmap_read(priv->map, SPDIFIN_STAT1, &stat);
-	if ((stat >> 1) & 1) {
-		schedule_delayed_work(&priv->unmute_work, HZ);
+
+	// Bit 1 is the "Non-Audio" bit (1 = Compressed, 0 = PCM)
+	is_compressed = (stat >> 1) & 1;
+
+	if (is_compressed || !rate) {
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH, SPDIFIN_CTRL0_MUTE_BOTH);
 	} else {
-		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH,  0);
+		// PCM detected: safe to unmute
+		regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_MUTE_BOTH, 0);
 	}
+
+	schedule_delayed_work(&priv->unmute_work, msecs_to_jiffies(1));
 }
 
 static void axg_spdifin_write_mode_param(struct regmap *map, int mode,
@@ -295,9 +312,9 @@ static int axg_spdifin_sample_mode_config(struct snd_soc_dai *dai,
 	 */
 	rate = clk_get_rate(priv->refclk);
 
-	/* Enable IRQ for non-PCM / PCM data change */
+	/* Enable IRQ for non-PCM / PCM data change with a 64 sample timeout. */
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0,
-			   SPDIFIN_IRQ_EN, SPDIFIN_IRQ_EN);
+			   SPDIFIN_CTRL0_PCM_DET_THRESHOLD, SPDIFIN_CTRL0_PCM_DET_THRESHOLD);
 
 	/* HW will update mode every 1ms */
 	regmap_update_bits(priv->map, SPDIFIN_CTRL1,
@@ -372,6 +389,9 @@ static int axg_spdifin_dai_probe(struct snd_soc_dai *dai)
 
 	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_EN,
 			   SPDIFIN_CTRL0_EN);
+
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_CTRL0_FINDPAPB_EN,
+			   SPDIFIN_CTRL0_FINDPAPB_EN);
 
 	/* Enable IRQ */
 	ret = devm_request_threaded_irq(dai->dev, priv->irq,
