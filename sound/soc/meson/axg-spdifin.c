@@ -183,9 +183,9 @@ void axg_spdifin_clr_irq(struct axg_spdifin *priv)
 	unsigned int stat;
 	regmap_read(priv->map, SPDIFIN_STAT0, &stat);
 
-	regmap_update_bits(priv->map, SPDIFIN_CTRL0_EN, SPDIFIN_IRQ_CLEAR,
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_IRQ_CLEAR,
 			SPDIFIN_IRQ_CLEAR);
-	regmap_update_bits(priv->map, SPDIFIN_CTRL0_EN, SPDIFIN_IRQ_CLEAR,
+	regmap_update_bits(priv->map, SPDIFIN_CTRL0, SPDIFIN_IRQ_CLEAR,
 			0);
 }
 
