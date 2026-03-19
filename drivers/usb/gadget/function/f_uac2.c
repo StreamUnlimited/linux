@@ -107,20 +107,20 @@ enum {
 };
 
 static struct usb_string strings_fn[] = {
-	/* [STR_ASSOC].s = DYNAMIC, */
-	[STR_IF_CTRL].s = "Topology Control",
-	[STR_CLKSRC_IN].s = "Input Clock",
-	[STR_CLKSRC_OUT].s = "Output Clock",
-	[STR_USB_IT].s = "USBH Out",
-	[STR_IO_IT].s = "USBD Out",
-	[STR_USB_OT].s = "USBH In",
-	[STR_IO_OT].s = "USBD In",
-	/* [STR_FU_IN].s = DYNAMIC, */
-	/* [STR_FU_OUT].s = DYNAMIC, */
-	[STR_AS_OUT_ALT0].s = "Playback Inactive",
-	[STR_AS_OUT_ALT1].s = "Playback Active",
-	[STR_AS_IN_ALT0].s = "Capture Inactive",
-	[STR_AS_IN_ALT1].s = "Capture Active",
+	[STR_ASSOC].s = NULL, /* DYNAMIC, */
+	[STR_IF_CTRL].s = NULL, /* DYNAMIC, */
+	[STR_CLKSRC_IN].s = NULL, /* DYNAMIC, */
+	[STR_CLKSRC_OUT].s = NULL, /* DYNAMIC, */
+	[STR_USB_IT].s = NULL, /* DYNAMIC, */
+	[STR_IO_IT].s = NULL, /* DYNAMIC, */
+	[STR_USB_OT].s = NULL, /* DYNAMIC, */
+	[STR_IO_OT].s = NULL, /* DYNAMIC, */
+	[STR_FU_IN].s = NULL, /* DYNAMIC, */
+	[STR_FU_OUT].s = NULL, /* DYNAMIC, */
+	[STR_AS_OUT_ALT0].s = NULL, /* DYNAMIC, */
+	[STR_AS_OUT_ALT1].s = NULL, /* DYNAMIC, */
+	[STR_AS_IN_ALT0].s = NULL, /* DYNAMIC, */
+	[STR_AS_IN_ALT1].s = NULL, /* DYNAMIC, */
 	{ },
 };
 
@@ -1048,6 +1048,18 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	strings_fn[STR_ASSOC].s = uac2_opts->function_name;
 	strings_fn[STR_FU_IN].s = uac2_opts->p_volume_name;
 	strings_fn[STR_FU_OUT].s = uac2_opts->c_volume_name;
+
+	strings_fn[STR_IF_CTRL].s = uac2_opts->if_ctrl_name;
+	strings_fn[STR_CLKSRC_IN].s = uac2_opts->clksrc_in_name;
+	strings_fn[STR_CLKSRC_OUT].s = uac2_opts->clksrc_out_name;
+	strings_fn[STR_USB_IT].s = uac2_opts->usb_it_name;
+	strings_fn[STR_IO_IT].s = uac2_opts->io_it_name;
+	strings_fn[STR_USB_OT].s = uac2_opts->usb_ot_name;
+	strings_fn[STR_IO_OT].s = uac2_opts->io_ot_name;
+	strings_fn[STR_AS_OUT_ALT0].s = uac2_opts->as_out_alt0_name;
+	strings_fn[STR_AS_OUT_ALT1].s = uac2_opts->as_out_alt1_name;
+	strings_fn[STR_AS_IN_ALT0].s = uac2_opts->as_in_alt0_name;
+	strings_fn[STR_AS_IN_ALT1].s = uac2_opts->as_in_alt1_name;
 
 	us = usb_gstrings_attach(cdev, fn_strings, ARRAY_SIZE(strings_fn));
 	if (IS_ERR(us))
@@ -2100,6 +2112,18 @@ UAC2_ATTRIBUTE_STRING(c_volume_name);
 UAC2_ATTRIBUTE(u32, fb_max);
 UAC2_ATTRIBUTE_STRING(function_name);
 
+UAC2_ATTRIBUTE_STRING(if_ctrl_name);
+UAC2_ATTRIBUTE_STRING(clksrc_in_name);
+UAC2_ATTRIBUTE_STRING(clksrc_out_name);
+UAC2_ATTRIBUTE_STRING(usb_it_name);
+UAC2_ATTRIBUTE_STRING(io_it_name);
+UAC2_ATTRIBUTE_STRING(usb_ot_name);
+UAC2_ATTRIBUTE_STRING(io_ot_name);
+UAC2_ATTRIBUTE_STRING(as_out_alt0_name);
+UAC2_ATTRIBUTE_STRING(as_out_alt1_name);
+UAC2_ATTRIBUTE_STRING(as_in_alt0_name);
+UAC2_ATTRIBUTE_STRING(as_in_alt1_name);
+
 static struct configfs_attribute *f_uac2_attrs[] = {
 	&f_uac2_opts_attr_p_chmask,
 	&f_uac2_opts_attr_p_srate,
@@ -2128,6 +2152,18 @@ static struct configfs_attribute *f_uac2_attrs[] = {
 	&f_uac2_opts_attr_c_volume_name,
 
 	&f_uac2_opts_attr_function_name,
+
+	&f_uac2_opts_attr_if_ctrl_name,
+	&f_uac2_opts_attr_clksrc_in_name,
+	&f_uac2_opts_attr_clksrc_out_name,
+	&f_uac2_opts_attr_usb_it_name,
+	&f_uac2_opts_attr_io_it_name,
+	&f_uac2_opts_attr_usb_ot_name,
+	&f_uac2_opts_attr_io_ot_name,
+	&f_uac2_opts_attr_as_out_alt0_name,
+	&f_uac2_opts_attr_as_out_alt1_name,
+	&f_uac2_opts_attr_as_in_alt0_name,
+	&f_uac2_opts_attr_as_in_alt1_name,
 
 	NULL,
 };
@@ -2188,6 +2224,18 @@ static struct usb_function_instance *afunc_alloc_inst(void)
 	opts->fb_max = FBACK_FAST_MAX;
 
 	snprintf(opts->function_name, sizeof(opts->function_name), "Source/Sink");
+
+	snprintf(opts->if_ctrl_name, sizeof(opts->if_ctrl_name), "Topology Control");
+	snprintf(opts->clksrc_in_name, sizeof(opts->clksrc_in_name), "Input Clock");
+	snprintf(opts->clksrc_out_name, sizeof(opts->clksrc_out_name), "Output Clock");
+	snprintf(opts->usb_it_name, sizeof(opts->usb_it_name), "USBH Out");
+	snprintf(opts->io_it_name, sizeof(opts->io_it_name), "USBD Out");
+	snprintf(opts->usb_ot_name, sizeof(opts->usb_ot_name), "USBH In");
+	snprintf(opts->io_ot_name, sizeof(opts->io_ot_name), "USBD In");
+	snprintf(opts->as_out_alt0_name, sizeof(opts->as_out_alt0_name), "Playback Inactive");
+	snprintf(opts->as_out_alt1_name, sizeof(opts->as_out_alt1_name), "Playback Active");
+	snprintf(opts->as_in_alt0_name, sizeof(opts->as_in_alt0_name), "Capture Inactive");
+	snprintf(opts->as_in_alt1_name, sizeof(opts->as_in_alt1_name), "Capture Active");
 
 	return &opts->func_inst;
 }

@@ -67,6 +67,18 @@ struct f_uac2_opts {
 
 	char			function_name[32];
 
+	char			if_ctrl_name[32];
+	char			clksrc_in_name[32];
+	char			clksrc_out_name[32];
+	char			usb_it_name[32];
+	char			io_it_name[32];
+	char			usb_ot_name[32];
+	char			io_ot_name[32];
+	char			as_out_alt0_name[32];
+	char			as_out_alt1_name[32];
+	char			as_in_alt0_name[32];
+	char			as_in_alt1_name[32];
+
 	struct mutex			lock;
 	int				refcnt;
 };
