@@ -33,6 +33,7 @@ enum {
 	UAC_MUTE_CTRL,
 	UAC_VOLUME_CTRL,
 	UAC_RATE_CTRL,
+	UAC_DSD_CTRL,
 };
 
 /* Runtime data params for one stream */
@@ -69,6 +70,8 @@ struct uac_rtd_params {
 
   spinlock_t lock; /* lock for control transfers */
 
+	struct snd_ctl_elem_id snd_kctl_dsd_id;
+	bool dsd;
 };
 
 struct snd_uac_chip {
@@ -407,9 +410,14 @@ static int uac_pcm_open(struct snd_pcm_substream *substream)
 		runtime->hw.channels_min = num_channels(p_chmask);
 		prm = &uac->p_prm;
 	} else {
-		runtime->hw.formats = uac_ssize_to_fmt(c_ssize);
-		runtime->hw.channels_min = num_channels(c_chmask);
 		prm = &uac->c_prm;
+
+		if (prm->dsd)
+			runtime->hw.formats = SNDRV_PCM_FMTBIT_DSD_U32_BE;
+		else
+			runtime->hw.formats = uac_ssize_to_fmt(c_ssize);
+
+		runtime->hw.channels_min = num_channels(c_chmask);
 	}
 
 	runtime->hw.period_bytes_min = 2 * prm->max_psize
@@ -583,6 +591,20 @@ int u_audio_get_playback_srate(struct g_audio *audio_dev, u32 *val)
 }
 EXPORT_SYMBOL_GPL(u_audio_get_playback_srate);
 
+void u_audio_set_capture_dsd(struct g_audio *audio_dev, bool dsd)
+{
+	struct uac_rtd_params *prm = &audio_dev->uac->c_prm;
+	unsigned long flags;
+
+	spin_lock_irqsave(&prm->lock, flags);
+	if (prm->dsd != dsd) {
+		prm->dsd = dsd;
+		snd_ctl_notify(prm->uac->card, SNDRV_CTL_EVENT_MASK_VALUE, &prm->snd_kctl_dsd_id);
+	}
+	spin_unlock_irqrestore(&prm->lock, flags);
+}
+EXPORT_SYMBOL_GPL(u_audio_set_capture_dsd);
+
 int u_audio_start_capture(struct g_audio *audio_dev)
 {
 	struct snd_uac_chip *uac = audio_dev->uac;
@@ -595,7 +617,7 @@ int u_audio_start_capture(struct g_audio *audio_dev)
 	int req_len, i, ret;
 
 	prm = &uac->c_prm;
-	dev_dbg(dev, "start capture with rate %d\n", prm->srate);
+	dev_info(dev, "start capture with rate %d, dsd: %d\n", prm->srate, prm->dsd);
 	ep = audio_dev->out_ep;
 	ret = config_ep_by_speed(gadget, &audio_dev->func, ep);
 	if (ret < 0) {
@@ -1123,6 +1145,19 @@ static int u_audio_rate_info(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int u_audio_dsd_get(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
+
+	spin_lock_irqsave(&prm->lock, flags);
+	ucontrol->value.integer.value[0] = prm->dsd;
+	spin_unlock_irqrestore(&prm->lock, flags);
+
+	return 0;
+}
+
 static int u_audio_rate_get(struct snd_kcontrol *kcontrol,
 						 struct snd_ctl_elem_value *ucontrol)
 {
@@ -1174,6 +1209,13 @@ static struct snd_kcontrol_new u_audio_controls[]  = {
 		.access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
 		.info =		u_audio_rate_info,
 		.get =		u_audio_rate_get,
+	},
+	[UAC_DSD_CTRL] = {
+		.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =		"Capture is DSD",
+		.access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
+		.info =		snd_ctl_boolean_mono_info,
+		.get =		u_audio_dsd_get,
 	},
 };
 
@@ -1409,6 +1451,24 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 		if (err < 0)
 			goto snd_fail;
 		prm->snd_kctl_rate_id = kctl->id;
+
+		// Add `Capture is DSD` control
+		if (i == SNDRV_PCM_STREAM_CAPTURE && params->c_dsd) {
+			kctl = snd_ctl_new1(&u_audio_controls[UAC_DSD_CTRL], prm);
+			if (!kctl) {
+				err = -ENOMEM;
+				goto snd_fail;
+			}
+
+			kctl->id.device = pcm->device;
+			kctl->id.subdevice = 0;
+
+			err = snd_ctl_add(card, kctl);
+			if (err < 0)
+				goto snd_fail;
+
+			prm->snd_kctl_dsd_id = kctl->id;
+		}
 	}
 
 	strscpy(card->driver, card_name);
