@@ -51,6 +51,7 @@ struct f_uac2_opts {
 	int				c_ssize;
 	int				c_sync;
 	u8				c_hs_bint;
+	bool				c_dsd;
 
 	bool			p_mute_present;
 	bool			p_volume_present;
