@@ -49,6 +49,7 @@ struct uac_params {
 	int c_chmask;	/* channel mask */
 	int c_srates[UAC_MAX_RATES];	/* available rates in Hz (0 terminated list) */
 	int c_ssize;	/* sample size */
+	bool c_dsd;
 	struct uac_fu_params c_fu;	/* Feature Unit parameters */
 
 	/* rates are dynamic, in uac_rtd_params */
@@ -115,6 +116,7 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 					const char *card_name);
 void g_audio_cleanup(struct g_audio *g_audio);
 
+void u_audio_set_capture_dsd(struct g_audio *g_audio, bool dsd);
 int u_audio_start_capture(struct g_audio *g_audio);
 void u_audio_stop_capture(struct g_audio *g_audio);
 int u_audio_start_playback(struct g_audio *g_audio);

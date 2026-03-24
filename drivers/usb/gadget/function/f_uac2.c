@@ -102,6 +102,7 @@ enum {
 	STR_FU_OUT,
 	STR_AS_OUT_ALT0,
 	STR_AS_OUT_ALT1,
+	STR_AS_OUT_ALT2,
 	STR_AS_IN_ALT0,
 	STR_AS_IN_ALT1,
 };
@@ -119,6 +120,7 @@ static struct usb_string strings_fn[] = {
 	[STR_FU_OUT].s = NULL, /* DYNAMIC, */
 	[STR_AS_OUT_ALT0].s = NULL, /* DYNAMIC, */
 	[STR_AS_OUT_ALT1].s = NULL, /* DYNAMIC, */
+	[STR_AS_OUT_ALT2].s = NULL, /* DYNAMIC, */
 	[STR_AS_IN_ALT0].s = NULL, /* DYNAMIC, */
 	[STR_AS_IN_ALT1].s = NULL, /* DYNAMIC, */
 	{ },
@@ -342,6 +344,31 @@ static struct uac2_format_type_i_descriptor as_out_fmt1_desc = {
 	.bFormatType = UAC_FORMAT_TYPE_I,
 };
 
+// Alt mode 2 audio interface for raw DSD
+static struct usb_interface_descriptor std_as_out_if2_desc = {
+	.bLength = sizeof(std_as_out_if2_desc),
+	.bDescriptorType = USB_DT_INTERFACE,
+
+	.bAlternateSetting = 2,
+	.bNumEndpoints = 1,
+	.bInterfaceClass = USB_CLASS_AUDIO,
+	.bInterfaceSubClass = USB_SUBCLASS_AUDIOSTREAMING,
+	.bInterfaceProtocol = UAC_VERSION_2,
+};
+
+static struct uac2_as_header_descriptor as_out_dsd_hdr_desc = {
+	.bLength = sizeof(as_out_dsd_hdr_desc),
+	.bDescriptorType = USB_DT_CS_INTERFACE,
+
+	.bDescriptorSubtype = UAC_AS_GENERAL,
+	/* .bTerminalLink = DYNAMIC */
+	.bmControls = 0,
+	.bFormatType = UAC_FORMAT_TYPE_I,
+	.bmFormats = cpu_to_le32(UAC2_FORMAT_TYPE_I_RAW_DATA),
+	.iChannelNames = 0,
+};
+
+
 /* STD AS ISO OUT Endpoint */
 static struct usb_endpoint_descriptor fs_epout_desc = {
 	.bLength = USB_DT_ENDPOINT_SIZE,
@@ -551,6 +578,13 @@ static struct usb_descriptor_header *fs_audio_desc[] = {
 	(struct usb_descriptor_header *)&as_iso_out_desc,
 	(struct usb_descriptor_header *)&fs_epin_fback_desc,
 
+	(struct usb_descriptor_header *)&std_as_out_if2_desc,
+	(struct usb_descriptor_header *)&as_out_dsd_hdr_desc,
+	(struct usb_descriptor_header *)&as_out_fmt1_desc,
+	(struct usb_descriptor_header *)&fs_epout_desc,
+	(struct usb_descriptor_header *)&as_iso_out_desc,
+	(struct usb_descriptor_header *)&fs_epin_fback_desc,
+
 	(struct usb_descriptor_header *)&std_as_in_if0_desc,
 	(struct usb_descriptor_header *)&std_as_in_if1_desc,
 
@@ -581,6 +615,13 @@ static struct usb_descriptor_header *hs_audio_desc[] = {
 	(struct usb_descriptor_header *)&std_as_out_if1_desc,
 
 	(struct usb_descriptor_header *)&as_out_hdr_desc,
+	(struct usb_descriptor_header *)&as_out_fmt1_desc,
+	(struct usb_descriptor_header *)&hs_epout_desc,
+	(struct usb_descriptor_header *)&as_iso_out_desc,
+	(struct usb_descriptor_header *)&hs_epin_fback_desc,
+
+	(struct usb_descriptor_header *)&std_as_out_if2_desc,
+	(struct usb_descriptor_header *)&as_out_dsd_hdr_desc,
 	(struct usb_descriptor_header *)&as_out_fmt1_desc,
 	(struct usb_descriptor_header *)&hs_epout_desc,
 	(struct usb_descriptor_header *)&as_iso_out_desc,
@@ -617,6 +658,15 @@ static struct usb_descriptor_header *ss_audio_desc[] = {
 	(struct usb_descriptor_header *)&std_as_out_if1_desc,
 
 	(struct usb_descriptor_header *)&as_out_hdr_desc,
+	(struct usb_descriptor_header *)&as_out_fmt1_desc,
+	(struct usb_descriptor_header *)&ss_epout_desc,
+	(struct usb_descriptor_header *)&ss_epout_desc_comp,
+	(struct usb_descriptor_header *)&as_iso_out_desc,
+	(struct usb_descriptor_header *)&ss_epin_fback_desc,
+	(struct usb_descriptor_header *)&ss_epin_fback_desc_comp,
+
+	(struct usb_descriptor_header *)&std_as_out_if2_desc,
+	(struct usb_descriptor_header *)&as_out_dsd_hdr_desc,
 	(struct usb_descriptor_header *)&as_out_fmt1_desc,
 	(struct usb_descriptor_header *)&ss_epout_desc,
 	(struct usb_descriptor_header *)&ss_epout_desc_comp,
@@ -886,6 +936,24 @@ static void setup_headers(struct f_uac2_opts *opts,
 			if (epin_fback_desc_comp)
 				headers[i++] = USBDHDR(epin_fback_desc_comp);
 		}
+
+		if (opts->c_dsd) {
+			headers[i++] = USBDHDR(&std_as_out_if2_desc);
+			headers[i++] = USBDHDR(&as_out_dsd_hdr_desc);
+			headers[i++] = USBDHDR(&as_out_fmt1_desc);
+			headers[i++] = USBDHDR(epout_desc);
+
+			if (epout_desc_comp)
+				headers[i++] = USBDHDR(epout_desc_comp);
+
+			headers[i++] = USBDHDR(&as_iso_out_desc);
+
+			if (EPOUT_FBACK_IN_EN(opts)) {
+				headers[i++] = USBDHDR(epin_fback_desc);
+				if (epin_fback_desc_comp)
+					headers[i++] = USBDHDR(epin_fback_desc_comp);
+			}
+		}
 	}
 
 	if (EPIN_EN(opts)) {
@@ -945,6 +1013,7 @@ static void setup_descriptor(struct f_uac2_opts *opts)
 	}
 
 	as_out_hdr_desc.bTerminalLink = usb_out_it_desc.bTerminalID;
+	as_out_dsd_hdr_desc.bTerminalLink = usb_out_it_desc.bTerminalID;
 	as_in_hdr_desc.bTerminalLink = usb_in_ot_desc.bTerminalID;
 
 	iad_desc.bInterfaceCount = 1;
@@ -1001,6 +1070,10 @@ static int afunc_validate_opts(struct g_audio *agdev, struct device *dev)
 		msg = "incorrect playback sampling rate";
 	else if (!opts->c_srates[0])
 		msg = "incorrect capture sampling rate";
+	else if (opts->c_dsd && (opts->c_ssize != 4))
+		msg = "DSD requires a capture sample size of 4";
+	else if (opts->c_dsd && !opts->c_chmask)
+		msg = "capture channels required for DSD";
 
 	else if (opts->p_volume_max <= opts->p_volume_min)
 		msg = "incorrect playback volume max/min";
@@ -1058,6 +1131,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	strings_fn[STR_IO_OT].s = uac2_opts->io_ot_name;
 	strings_fn[STR_AS_OUT_ALT0].s = uac2_opts->as_out_alt0_name;
 	strings_fn[STR_AS_OUT_ALT1].s = uac2_opts->as_out_alt1_name;
+	strings_fn[STR_AS_OUT_ALT2].s = uac2_opts->as_out_alt2_name;
 	strings_fn[STR_AS_IN_ALT0].s = uac2_opts->as_in_alt0_name;
 	strings_fn[STR_AS_IN_ALT1].s = uac2_opts->as_in_alt1_name;
 
@@ -1088,6 +1162,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	io_out_ot_desc.iTerminal = us[STR_IO_OT].id;
 	std_as_out_if0_desc.iInterface = us[STR_AS_OUT_ALT0].id;
 	std_as_out_if1_desc.iInterface = us[STR_AS_OUT_ALT1].id;
+	std_as_out_if2_desc.iInterface = us[STR_AS_OUT_ALT2].id;
 	std_as_in_if0_desc.iInterface = us[STR_AS_IN_ALT0].id;
 	std_as_in_if1_desc.iInterface = us[STR_AS_IN_ALT1].id;
 
@@ -1110,6 +1185,8 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	io_in_it_desc.bmChannelConfig = cpu_to_le32(uac2_opts->p_chmask);
 	as_out_hdr_desc.bNrChannels = num_channels(uac2_opts->c_chmask);
 	as_out_hdr_desc.bmChannelConfig = cpu_to_le32(uac2_opts->c_chmask);
+	as_out_dsd_hdr_desc.bNrChannels = num_channels(uac2_opts->c_chmask);
+	as_out_dsd_hdr_desc.bmChannelConfig = cpu_to_le32(uac2_opts->c_chmask);
 	as_in_hdr_desc.bNrChannels = num_channels(uac2_opts->p_chmask);
 	as_in_hdr_desc.bmChannelConfig = cpu_to_le32(uac2_opts->p_chmask);
 	as_out_fmt1_desc.bSubslotSize = uac2_opts->c_ssize;
@@ -1157,6 +1234,8 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 		std_as_out_if0_desc.bInterfaceNumber = ret;
 		std_as_out_if1_desc.bInterfaceNumber = ret;
 		std_as_out_if1_desc.bNumEndpoints = 1;
+		std_as_out_if2_desc.bInterfaceNumber = ret;
+		std_as_out_if2_desc.bNumEndpoints = 1;
 		uac2->as_out_intf = ret;
 		uac2->as_out_alt = 0;
 
@@ -1168,6 +1247,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 			ss_epout_desc.bmAttributes =
 			  USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_ASYNC;
 			std_as_out_if1_desc.bNumEndpoints++;
+			std_as_out_if2_desc.bNumEndpoints++;
 		} else {
 			fs_epout_desc.bmAttributes =
 			  USB_ENDPOINT_XFER_ISOC | USB_ENDPOINT_SYNC_ADAPTIVE;
@@ -1327,6 +1407,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	memcpy(agdev->params.c_srates, uac2_opts->c_srates,
 			sizeof(agdev->params.c_srates));
 	agdev->params.c_ssize = uac2_opts->c_ssize;
+	agdev->params.c_dsd = uac2_opts->c_dsd;
 	if (FUOUT_EN(uac2_opts)) {
 		agdev->params.c_fu.id = USB_OUT_FU_ID;
 		agdev->params.c_fu.mute_present = uac2_opts->c_mute_present;
@@ -1436,13 +1517,8 @@ afunc_set_alt(struct usb_function *fn, unsigned intf, unsigned alt)
 	struct g_audio *agdev = func_to_g_audio(fn);
 	struct usb_gadget *gadget = cdev->gadget;
 	struct device *dev = &gadget->dev;
+	struct f_uac2_opts *opts = g_audio_to_uac2_opts(agdev);
 	int ret = 0;
-
-	/* No i/f has more than 2 alt settings */
-	if (alt > 1) {
-		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
-		return -EINVAL;
-	}
 
 	if (intf == uac2->ac_intf) {
 		/* Control I/f has only 1 AltSetting - 0 */
@@ -1462,13 +1538,27 @@ afunc_set_alt(struct usb_function *fn, unsigned intf, unsigned alt)
 	}
 
 	if (intf == uac2->as_out_intf) {
+		if (alt > (opts->c_dsd ? 2 : 1)) {
+			dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
+			return -EINVAL;
+		}
+
+		// Always stop before (re-)starting just in case the host switches
+		// through Alt settings without going through Alt 0 first.
+		u_audio_stop_capture(&uac2->g_audio);
+
 		uac2->as_out_alt = alt;
 
+		u_audio_set_capture_dsd(&uac2->g_audio, alt == 2);
 		if (alt)
 			ret = u_audio_start_capture(&uac2->g_audio);
-		else
-			u_audio_stop_capture(&uac2->g_audio);
+
 	} else if (intf == uac2->as_in_intf) {
+		if (alt > 1) {
+			dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
+			return -EINVAL;
+		}
+
 		uac2->as_in_alt = alt;
 
 		if (alt)
@@ -1511,6 +1601,7 @@ afunc_disable(struct usb_function *fn)
 	uac2->as_in_alt = 0;
 	uac2->as_out_alt = 0;
 	u_audio_stop_capture(&uac2->g_audio);
+	u_audio_set_capture_dsd(&uac2->g_audio, false);
 	u_audio_stop_playback(&uac2->g_audio);
 	if (uac2->int_ep)
 		usb_ep_disable(uac2->int_ep);
@@ -2093,6 +2184,7 @@ UAC2_RATE_ATTRIBUTE(c_srate);
 UAC2_ATTRIBUTE_SYNC(c_sync);
 UAC2_ATTRIBUTE(u32, c_ssize);
 UAC2_ATTRIBUTE(u8, c_hs_bint);
+UAC2_ATTRIBUTE(bool, c_dsd);
 UAC2_ATTRIBUTE(u32, req_number);
 
 UAC2_ATTRIBUTE(bool, p_mute_present);
@@ -2121,6 +2213,7 @@ UAC2_ATTRIBUTE_STRING(usb_ot_name);
 UAC2_ATTRIBUTE_STRING(io_ot_name);
 UAC2_ATTRIBUTE_STRING(as_out_alt0_name);
 UAC2_ATTRIBUTE_STRING(as_out_alt1_name);
+UAC2_ATTRIBUTE_STRING(as_out_alt2_name);
 UAC2_ATTRIBUTE_STRING(as_in_alt0_name);
 UAC2_ATTRIBUTE_STRING(as_in_alt1_name);
 
@@ -2133,6 +2226,7 @@ static struct configfs_attribute *f_uac2_attrs[] = {
 	&f_uac2_opts_attr_c_srate,
 	&f_uac2_opts_attr_c_ssize,
 	&f_uac2_opts_attr_c_hs_bint,
+	&f_uac2_opts_attr_c_dsd,
 	&f_uac2_opts_attr_c_sync,
 	&f_uac2_opts_attr_req_number,
 	&f_uac2_opts_attr_fb_max,
@@ -2162,6 +2256,7 @@ static struct configfs_attribute *f_uac2_attrs[] = {
 	&f_uac2_opts_attr_io_ot_name,
 	&f_uac2_opts_attr_as_out_alt0_name,
 	&f_uac2_opts_attr_as_out_alt1_name,
+	&f_uac2_opts_attr_as_out_alt2_name,
 	&f_uac2_opts_attr_as_in_alt0_name,
 	&f_uac2_opts_attr_as_in_alt1_name,
 
@@ -2204,6 +2299,7 @@ static struct usb_function_instance *afunc_alloc_inst(void)
 	opts->c_srates[0] = UAC2_DEF_CSRATE;
 	opts->c_ssize = UAC2_DEF_CSSIZE;
 	opts->c_hs_bint = UAC2_DEF_CHSBINT;
+	opts->c_dsd = false;
 	opts->c_sync = UAC2_DEF_CSYNC;
 
 	opts->p_mute_present = UAC2_DEF_MUTE_PRESENT;
@@ -2234,6 +2330,7 @@ static struct usb_function_instance *afunc_alloc_inst(void)
 	snprintf(opts->io_ot_name, sizeof(opts->io_ot_name), "USBD In");
 	snprintf(opts->as_out_alt0_name, sizeof(opts->as_out_alt0_name), "Playback Inactive");
 	snprintf(opts->as_out_alt1_name, sizeof(opts->as_out_alt1_name), "Playback Active");
+	snprintf(opts->as_out_alt2_name, sizeof(opts->as_out_alt2_name), "DSD Playback Active");
 	snprintf(opts->as_in_alt0_name, sizeof(opts->as_in_alt0_name), "Capture Inactive");
 	snprintf(opts->as_in_alt1_name, sizeof(opts->as_in_alt1_name), "Capture Active");
 
