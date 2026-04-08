@@ -12,6 +12,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
+#include <linux/pm_runtime.h>
 #include <sound/simple_card_utils.h>
 #include <linux/gpio/consumer.h>
 #include <linux/workqueue.h>
@@ -30,6 +31,8 @@ struct ameba_priv {
 	struct snd_kcontrol *drift_kcontrol;
 	struct asoc_simple_jack hp_jack;
 	atomic_t hp_jack_inserted;
+
+	bool ignore_suspend;
 
 	bool regulator_is_enabled;
 	struct regulator *enable_regulator;
@@ -177,21 +180,18 @@ static void ameba_mute_work_handler(struct work_struct *work)
 static int ameba_startup(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
-	int ret = 0;
+	struct device *dev = rtd->card->dev;
 
-	ret = set_regulator_enable(priv, true);
-	msleep(50);
-
-	return ret;
+	return pm_runtime_resume_and_get(dev);
 }
 
 static void ameba_shutdown(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+	struct device *dev = rtd->card->dev;
 
-	set_regulator_enable(priv, false);
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_sync_autosuspend(dev);
 }
 
 static int ameba_hw_params(struct snd_pcm_substream *substream,
@@ -310,6 +310,98 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 	},
 };
 
+static ssize_t ameba_ignore_suspend_show(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	struct snd_soc_card *card = dev_get_drvdata(dev);
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", priv->ignore_suspend);
+}
+
+static int ameba_set_ignore_suspend(struct snd_soc_card *card,
+					 bool ignore_suspend)
+{
+	int ret = 0;
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
+	struct device *dev = card->dev;
+	struct snd_soc_component *component;
+
+	if (priv->ignore_suspend == ignore_suspend)
+		return 0;
+
+	priv->ignore_suspend = ignore_suspend;
+
+	dev_info(dev, "%s suspend, runtime %s components\n",
+		 ignore_suspend ? "ignoring" : "not ignoring",
+		 !ignore_suspend ? "releasing" : "acquiring");
+
+	ret = priv->ignore_suspend ? pm_runtime_get_sync(dev) : pm_runtime_put_sync(dev);
+
+	// We achieve the "ignore suspend" behavior by increasing the reference counter of all
+	// components, by using `pm_runtime_get_sync()`. To enable the suspend behavior again
+	// we just decrease the reference counter with `pm_runtime_put_sync()`.
+	for_each_card_components(card, component) {
+		if (!pm_runtime_enabled(component->dev)) {
+			dev_dbg(component->dev, "Runtime power management is disabled for this component, skipping!");
+			continue;
+		}
+		ret = priv->ignore_suspend ? pm_runtime_get_sync(component->dev) : pm_runtime_put_sync(component->dev);
+		if (ret < 0 && ret != -ENOSYS) {
+			dev_err(component->dev, "%s() failed: %d\n", priv->ignore_suspend ? "pm_runtime_get_sync" : "pm_runtime_put_sync", ret);
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static ssize_t ameba_ignore_suspend_store(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t count)
+{
+	struct snd_soc_card *card = dev_get_drvdata(dev);
+	int ret;
+	bool ignore_suspend = true;
+
+	ret = strtobool(buf, &ignore_suspend);
+	if (ret < 0)
+		return ret;
+
+	ret = ameba_set_ignore_suspend(card, ignore_suspend);
+	if (ret < 0) {
+		dev_err(dev, "failed to set ignore_suspend state: %d\n", ret);
+		return ret;
+	}
+
+	return count;
+}
+static DEVICE_ATTR(ignore_suspend, 0644, ameba_ignore_suspend_show,
+		   ameba_ignore_suspend_store);
+
+static int ameba_card_late_probe(struct snd_soc_card *card)
+{
+	int ret = 0;
+
+	// We can only call `ameba_set_ignore_suspend()` in the `late_probe()`
+	// after `devm_snd_soc_register_card()` has pupulated the `component_dev_list`
+	// in the `snd_soc_card` struct.
+	ret = ameba_set_ignore_suspend(card, true);
+	if (ret < 0) {
+		dev_err(card->dev, "failed to set initial ignore_suspend state: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(card->dev, &dev_attr_ignore_suspend);
+	if (ret < 0) {
+		dev_err(card->dev, "failed to create ignore_suspend sysfs file: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
 static int ameba_card_probe(struct snd_soc_card *card)
 {
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
@@ -342,12 +434,46 @@ static int ameba_card_probe(struct snd_soc_card *card)
 	return 0;
 }
 
+static int ameba_runtime_suspend(struct device *dev)
+{
+	struct snd_soc_card *card = dev_get_drvdata(dev);
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
+	return set_regulator_enable(priv, false);
+}
+
+static int ameba_runtime_resume(struct device *dev)
+{
+	struct snd_soc_card *card = dev_get_drvdata(dev);
+	struct ameba_priv *priv = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+	ret = set_regulator_enable(priv, true);
+	msleep(50);
+	return ret;
+}
+
+static const struct dev_pm_ops ameba_pm_ops = {
+	/* ASoC-specific system sleep handlers */
+	.suspend = snd_soc_suspend,
+	.resume = snd_soc_resume,
+	.freeze = snd_soc_suspend,
+	.thaw = snd_soc_resume,
+	.poweroff = snd_soc_poweroff,
+	.restore = snd_soc_resume,
+	/* Custom runtime PM handlers */
+	.runtime_suspend = ameba_runtime_suspend,
+	.runtime_resume = ameba_runtime_resume,
+};
+
+
 static struct snd_soc_card ameba_snd = {
 	.name = "Ameba-snd",
 	.owner = THIS_MODULE,
 	.controls = snd_soc_ameba_controls,
 	.num_controls = ARRAY_SIZE(snd_soc_ameba_controls),
 	.probe = ameba_card_probe,
+	.late_probe = ameba_card_late_probe,
+	.dapm_widgets = ameba_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(ameba_dapm_widgets),
 };
 
 /*
@@ -441,8 +567,15 @@ static int ameba_audio_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* Enable runtime PM for this device */
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	return ret;
+
+	return 0;
 }
 
 static const struct of_device_id ameba_audio_of_match[] = {
@@ -456,7 +589,7 @@ static struct platform_driver ameba_audio_driver = {
 	.driver		= {
 		.name	= "ameba-audio",
 		.of_match_table = of_match_ptr(ameba_audio_of_match),
-		.pm	= &snd_soc_pm_ops,
+		.pm	= &ameba_pm_ops,
 	},
 	.probe		= ameba_audio_probe,
 };
