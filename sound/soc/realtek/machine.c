@@ -259,6 +259,7 @@ static int ameba_card_probe(struct snd_soc_card *card)
 	priv->enable_regulator = devm_regulator_get_exclusive(card->dev, "amp");
 	if (IS_ERR(priv->enable_regulator))
 		return dev_err_probe(card->dev, PTR_ERR(priv->enable_regulator), "Failed to get regulator\n");
+	priv->regulator_is_enabled = regulator_is_enabled(priv->enable_regulator);
 
 	priv->drift_kcontrol = snd_soc_card_get_kcontrol(card, KCONTROL_DRIFT_COMPENSATOR_NAME);
 
