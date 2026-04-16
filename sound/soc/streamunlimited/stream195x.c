@@ -59,6 +59,21 @@ struct stream195x_simple_priv {
 #define PLL_NOMINAL_RATE_48k	(786432000UL)
 #define PLL_NOMINAL_RATE_44k1	(722534400UL)
 
+/*
+ * Supported sample rates: Restricted to 22.05kHz or higher to satisfy AK4458Fs ratio
+ * limits, and capped at 768kHz where MCLK doubling is required to
+ * derive the necessary Bit Clock.
+ */
+static const unsigned int stream195x_playback_rates[] = {
+	22050, 32000, 44100, 48000, 88200, 96000,
+	176400, 192000, 352800, 384000, 705600, 768000
+};
+
+static const struct snd_pcm_hw_constraint_list stream195x_playback_constraints = {
+	.count = ARRAY_SIZE(stream195x_playback_rates),
+	.list  = stream195x_playback_rates,
+};
+
 #define KCONTROL_DRIFT_COMPENSATOR_NAME "Drift compensator"
 
 static int snd_soc_stream195x_ppm_info(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
@@ -147,6 +162,28 @@ static void snd_soc_stream195x_set_all_links_mute(struct stream195x_simple_priv 
 	}
 }
 
+static int snd_soc_stream195x_startup(struct snd_pcm_substream *substream)
+{
+	int ret;
+
+	ret = asoc_simple_startup(substream);
+	if (ret < 0)
+		return ret;
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		ret = snd_pcm_hw_constraint_list(substream->runtime, 0,
+						SNDRV_PCM_HW_PARAM_RATE,
+						&stream195x_playback_constraints);
+	/*
+	 * For capture the dummy codec STUB_RATES (SNDRV_PCM_RATE_8000_384000) are
+	 * used in case of AUX and DABFM.
+	 * If a project adds an ADC with more complex requirements, then
+	 * they should add a new constraints table.
+	 */
+
+	return ret;
+}
+
 static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, struct snd_pcm_hw_params *params)
 {
 	int ret;
@@ -159,6 +196,11 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 
 	unsigned int rate = params_rate(params);
 	unsigned int mclk_rate = (rate % 8000) == 0 ? MCLK_RATE_48k : MCLK_RATE_44k1;
+
+	// Double the MCLK if we are at 705.6kHz or 768kHz
+	// This provides the headroom for the BCLK (Fs * 64)
+	if (rate > 384000)
+		mclk_rate *= 2;
 
 	/*
 	 * We could have done the tdm slot setup only once, and not in every hw_params()
@@ -228,10 +270,11 @@ static struct gpio_desc *devm_dailink_gpiod_get_from_of_node(struct device *dev,
 #define PREFIX	"sue-card,"
 
 static const struct snd_soc_ops simple_ops = {
-	.startup	= asoc_simple_startup,
 	.shutdown	= asoc_simple_shutdown,
 	/* START SUE changes */
+	/* .startup	= asoc_simple_startup */
 	/* .hw_params	= asoc_simple_hw_params, */
+	.startup	= snd_soc_stream195x_startup,
 	.hw_params	= snd_soc_stream195x_hw_params,
 	/* END SUE changes */
 };
