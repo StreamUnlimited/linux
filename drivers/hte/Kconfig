@@ -31,4 +31,12 @@ config HTE_TEGRA194_TEST
 	  The NVIDIA Tegra194 GTE test driver demonstrates how to use HTE
 	  framework to timestamp GPIO and LIC IRQ lines.
 
+config HTE_IMX_GPT
+	tristate "IMX GPT capture driver"
+	depends on ARCH_MXC || COMPILE_TEST
+	help
+	  Use GPT (General Purpose Timer) to generate Hardware timestamps on
+	  certain lines. This driver supports i.MX platforms equipped with
+	  GPT v2 or newer hardware.
+
 endif
