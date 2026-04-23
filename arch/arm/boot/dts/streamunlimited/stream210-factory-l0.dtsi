@@ -201,4 +201,18 @@
 	pinctrl-0 = <&lcd_rst_n_pin>;
 	mipi-gpios = <&gpiob 31 GPIO_ACTIVE_LOW>;
 	status = "okay";
+	display-timings {
+		native-mode = <&timing0>;
+		timing0: timing0 {
+			clock-frequency = <200000000>;
+			hactive = <480>;
+			hfront-porch = <22>;
+			hback-porch = <22>;
+			hsync-len = <20>;
+			vactive = <800>;
+			vfront-porch = <40>;
+			vback-porch = <5>;
+			vsync-len = <40>;
+		};
+	};
 };

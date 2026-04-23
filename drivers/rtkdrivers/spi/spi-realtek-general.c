@@ -70,6 +70,8 @@ void rtk_spi_reg_dump(struct rtk_spi_controller *rtk_spi)
 	dev_dbg(rtk_spi->dev, "SPI_IMR[0x%04X] = 0x%08X\n", SPI_IMR, rtk_spi_readl(rtk_spi->base, SPI_IMR));
 	dev_dbg(rtk_spi->dev, "SPI_ISR[0x%04X] = 0x%08X\n", SPI_ISR, rtk_spi_readl(rtk_spi->base, SPI_ISR));
 	dev_dbg(rtk_spi->dev, "SPI_RISR[0x%04X] = 0x%08X\n", SPI_RISR, rtk_spi_readl(rtk_spi->base, SPI_RISR));
+	dev_dbg(rtk_spi->dev, "SPI_DMATDLR[0x%04X] = 0x%08X\n", SPI_DMATDLR, rtk_spi_readl(rtk_spi->base, SPI_DMATDLR));
+	dev_dbg(rtk_spi->dev, "SPI_DMARDLR[0x%04X] = 0x%08X\n", SPI_DMARDLR, rtk_spi_readl(rtk_spi->base, SPI_DMARDLR));
 #endif // RTK_SPI_REG_DUMP
 }
 
@@ -90,6 +92,56 @@ static void rtk_get_dts_info(
 		dev_dbg(rtk_spi->dev, "Get DTS property %s = %d\n", dts_name, nr_requests);
 		*param_to_set = nr_requests;
 	}
+}
+
+static int rtk_spi_parse_cs_gpios(struct rtk_spi_controller *rtk_spi, struct device_node *np)
+{
+	struct device_node *child;
+	int ret;
+
+	rtk_spi->num_devices = 0;
+
+	for_each_available_child_of_node(np, child) {
+		struct rtk_spi_device *dev = &rtk_spi->cs_devices[rtk_spi->num_devices];
+		u32 cs;
+
+		if (rtk_spi->num_devices >= MAX_SPI_DEVICES) {
+			dev_warn(rtk_spi->dev, "Too many SPI devices\n");
+			break;
+		}
+
+		ret = of_property_read_u32(child, "reg", &cs);
+		if (ret) {
+			dev_err(rtk_spi->dev, "Missing reg in %pOF\n", child);
+			of_node_put(child);
+			return ret;
+		}
+		dev->chip_select = cs;
+
+		dev->cs_gpiod = devm_fwnode_gpiod_get(rtk_spi->dev,
+												of_fwnode_handle(child),
+												"rtk,spi-cs",
+												GPIOD_OUT_HIGH,
+												"spi-cs");
+
+		if (IS_ERR(dev->cs_gpiod)) {
+			ret = PTR_ERR(dev->cs_gpiod);
+			if (ret != -ENOENT) {
+				dev_err(rtk_spi->dev, "Failed to get cs-gpio for %pOF: %d\n", child, ret);
+				of_node_put(child);
+				return ret;
+			}
+			dev->cs_gpiod = NULL;
+		}
+
+		if (dev->cs_gpiod) {
+			printk("parsed gpio:%ld", desc_to_gpio(dev->cs_gpiod));
+		}
+
+		rtk_spi->num_devices++;
+	}
+
+	return 0;
 }
 
 void rtk_spi_struct_init(
@@ -135,20 +187,7 @@ void rtk_spi_struct_init(
 	rtk_spi->spi_manage.dma_params.tx_gdma_status = RTK_SPI_GDMA_UNPREPARED;
 
 	if (!rtk_spi->spi_manage.is_slave) {
-		rtk_spi->spi_manage.spi_cs_pin = of_get_named_gpio(np, "rtk,spi-cs-gpios", 0);
-		ret = gpio_request(rtk_spi->spi_manage.spi_cs_pin, NULL);
-		if (ret != 0) {
-			dev_err(rtk_spi->dev, "Failed to request SPI CS pin\n");
-			goto fail;
-		}
-
-		ret = gpio_direction_output(rtk_spi->spi_manage.spi_cs_pin, 1);
-		if (IS_ERR_VALUE(ret)) {
-			dev_err(rtk_spi->dev, "Failed to set SPI CS to output direction\n");
-			goto fail;
-		}
-
-		gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 1);
+		rtk_spi_parse_cs_gpios(rtk_spi, np);
 	}
 
 	rtk_spi->spi_manage.dma_params.rx_chan = NULL;
@@ -165,8 +204,6 @@ void rtk_spi_struct_init(
 	/* Disable all interrupts */
 	rtk_spi_interrupt_config(rtk_spi, 0xFF, DISABLE);
 
-fail:
-	gpio_free(rtk_spi->spi_manage.spi_cs_pin);
 }
 
 void rtk_spi_enable_cmd(
@@ -650,7 +687,7 @@ static irqreturn_t rtk_spi_interrupt_handler(int irq, void *dev_id)
 	rtk_spi_clean_interrupt(rtk_spi, int_status);
 
 	if (int_status & (SPI_BIT_TXOIS | SPI_BIT_RXUIS | SPI_BIT_RXOIS | SPI_BIT_TXUIS)) {
-		dev_dbg(rtk_spi->dev, "TX and RX warning = 0x%08X\n", int_status);
+		dev_info(rtk_spi->dev, "TX and RX warning = 0x%08X\n", int_status);
 	}
 
 	if (int_status & SPI_BIT_SSRIS) {
@@ -1067,8 +1104,16 @@ int rtk_spi_do_dma_transfer(
 	dma_params->tx_dma_addr = transfer->tx_dma;
 
 	rtk_spi_enable_cmd(rtk_spi, DISABLE);
-	rtk_spi_set_dma_level(rtk_spi, 1, 3);
-	rtk_spi_set_sample_delay(rtk_spi, 1);
+	rtk_spi_set_dma_level(rtk_spi, rtk_spi->spi_param.dma_tx_data_level, rtk_spi->spi_param.dma_rx_data_level);
+
+	if (!rtk_spi->spi_manage.is_slave) {
+		if (MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider >= 50000000) {
+			rtk_spi_set_sample_delay(rtk_spi, 2);
+		} else {
+			rtk_spi_set_sample_delay(rtk_spi, 0);
+		}
+	}
+
 	rtk_spi_set_read_len(rtk_spi, transfer->len);
 	if (!rtk_spi->spi_manage.is_slave) {
 		rtk_spi_reg_update(rtk_spi->base, SPI_CTRLR0, SPI_MASK_TMOD, SPI_TMOD(0));
@@ -1158,6 +1203,10 @@ int rtk_spi_do_dma_transfer(
 		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_TX_MODE);
 		rtk_spi_set_dma_enable(rtk_spi, ENABLE, SPI_RX_MODE);
 	}
+
+	#if DEUG_UNDERRUN_IN_DMA_MODE
+	rtk_spi_interrupt_config(rtk_spi, SPI_BIT_TXUIM, ENABLE);
+	#endif
 
 	if (!rtk_spi->spi_manage.is_slave) {
 		timeout = wait_for_completion_timeout(&dma_params->dma_tx_completion,
@@ -1340,7 +1389,7 @@ int rtk_spi_transfer_one(
 		}
 		dev_dbg(rtk_spi->dev, "Upper level given speed_hz = %d\n", transfer->speed_hz);
 		dev_dbg(rtk_spi->dev, "Clock divider caculated = %d\n", rtk_spi->spi_param.clock_divider);
-		dev_dbg(rtk_spi->dev, "Actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
+		dev_info(rtk_spi->dev, "Actual speed_hz = %d\n", MAX_SSI_CLOCK / rtk_spi->spi_param.clock_divider);
 		rtk_spi_set_baud_div(rtk_spi, rtk_spi->spi_param.clock_divider);
 	}
 
@@ -1434,15 +1483,31 @@ void rtk_spi_set_cs(
 	dev_dbg(rtk_spi->dev, "Set CS %s\n", !enable ? "enable" : "disable");
 	if (spi->chip_select) {
 		dev_warn(rtk_spi->dev, "Set CS id = %d\n", spi->chip_select);
-		dev_warn(rtk_spi->dev, "The hardware slave-select line is dedicated for general SPI. One master supports only one slave actually\n");
 	}
 
-	if (!enable) {
-		rtk_spi_set_slave_enable(rtk_spi, spi->chip_select);
-		gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 0);
+	dev_info(rtk_spi->dev, "chip_select: %d", spi->chip_select);
+
+	struct rtk_spi_device *dev;
+
+	for (int32_t i = 0; i < rtk_spi->num_devices; i++) {
+		if (rtk_spi->cs_devices[i].chip_select == spi->chip_select) {
+			dev = &rtk_spi->cs_devices[i];
+			break;
+		}
+	}
+
+	if (!dev || !dev->cs_gpiod) {
+		dev_dbg(&spi->dev, "No CS GPIO for chip_select=%d\n", spi->chip_select);
+		return;
+	}
+
+	if (enable) {
+		printk("set high:%ld", desc_to_gpio(dev->cs_gpiod));
+		gpiod_set_value(dev->cs_gpiod, 1);
 	} else {
-		/* Disbale CS is not recommended, change CS id directly. */
-		gpio_set_value(rtk_spi->spi_manage.spi_cs_pin, 1);
+		printk("set low:%ld", desc_to_gpio(dev->cs_gpiod));
+		rtk_spi_set_slave_enable(rtk_spi, 0);
+		gpiod_set_value(dev->cs_gpiod, 0);
 	}
 }
 

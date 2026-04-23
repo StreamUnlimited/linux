@@ -5,6 +5,7 @@ config AMEBA_PANEL
 	depends on OF
 	depends on DRM_DSI_RTK_AMEBA
 	select DRM_PANEL
+	select VIDEOMODE_HELPERS
 	default n
 	help
 	  DRM driver for the Ameba Display Panels

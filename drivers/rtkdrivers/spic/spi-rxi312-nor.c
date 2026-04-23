@@ -25,7 +25,7 @@
 #include <linux/spi/flash.h>
 #include "spi-rxi312-nor.h"
 
-
+static const struct spi_nor_controller_ops rts_qspi_controller_ops;
 static char *channels;
 module_param(channels, charp, 0444);
 MODULE_PARM_DESC(channels,
@@ -233,7 +233,7 @@ static int rts_qspi_write_xfer(struct spi_nor *nor,
 	 * push data into FIFO, just ignore it.
 	 */
 	if (cfg->addr_width == 0) {
-		/* nor->write_reg */
+		/* nor->controller_ops->write_reg */
 		rts_writeb(rqspi, REG_DR, cfg->cmd);
 
 		reg = rts_readl(rqspi, REG_USER_LENGTH);
@@ -242,7 +242,7 @@ static int rts_qspi_write_xfer(struct spi_nor *nor,
 		rts_writel(rqspi, REG_USER_LENGTH, reg);
 
 	} else {
-		/* nor->write */
+		/* nor->controller_ops->write */
 		u8 cmd[5];
 		u8 cmd_len;
 
@@ -287,7 +287,7 @@ end:
 	return ret;
 }
 
-static int rts_qspi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
+static int rts_qspi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, size_t len)
 {
 	struct spi_nor_xfer_cfg cfg;
 
@@ -312,7 +312,7 @@ static int rts_qspi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
 	return rts_qspi_read_xfer(nor, &cfg, buf, len);
 }
 
-static int rts_qspi_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
+static int rts_qspi_write_reg(struct spi_nor *nor, u8 opcode, const u8 *buf, size_t len)
 {
 	struct spi_nor_xfer_cfg cfg;
 
@@ -381,7 +381,7 @@ static ssize_t rts_qspi_read(struct spi_nor *nor, loff_t from,
 		mode_pins = 1;
 		break;
 	default:
-		dev_err(nor->dev, "Invalid read opcode\n");
+		dev_err(nor->dev, "Invalid controller_ops->read opcode\n");
 		return -EINVAL;
 	}
 
@@ -389,7 +389,7 @@ static ssize_t rts_qspi_read(struct spi_nor *nor, loff_t from,
 	cfg.cmd = nor->read_opcode;
 	cfg.cmd_pins = cmd_pins;
 	cfg.addr = from;
-	cfg.addr_width = nor->addr_width;
+	cfg.addr_width = nor->addr_nbytes;
 	cfg.addr_pins = addr_pins;
 	cfg.mode = RECEIVE_MODE;
 	cfg.mode_pins = mode_pins;
@@ -411,16 +411,6 @@ static ssize_t rts_qspi_write(struct spi_nor *nor, loff_t to,
 	struct spi_nor_xfer_cfg cfg;
 	int ret;
 	int cmd_pins, addr_pins, mode_pins;
-
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	struct rts_qspi *rqspi = nor->priv;
-	struct completion comp;
-	long timeleft;
-
-	spin_lock_irqsave(&rqspi->__lock, rqspi->__lock_flags);
-	init_completion(&comp);
-	rqspi->comp = &comp;
-#endif
 
 	/* set channel */
 	switch (nor->write_proto) {
@@ -453,7 +443,7 @@ static ssize_t rts_qspi_write(struct spi_nor *nor, loff_t to,
 	cfg.cmd = nor->program_opcode;
 	cfg.cmd_pins = cmd_pins;
 	cfg.addr = to;
-	cfg.addr_width = nor->addr_width;
+	cfg.addr_width = nor->addr_nbytes;
 	cfg.addr_pins = addr_pins;
 	cfg.mode = TRANSMIT_MODE;
 	cfg.mode_pins = mode_pins;
@@ -464,20 +454,6 @@ static ssize_t rts_qspi_write(struct spi_nor *nor, loff_t to,
 	if (ret) {
 		goto FAIL;
 	}
-
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	spin_unlock_irqrestore(&rqspi->__lock, rqspi->__lock_flags);
-	rts_writel(rqspi, REG_TX_NDF, 0);
-	rts_writel(rqspi, REG_USER_LENGTH, 0);
-	rts_writel(rqspi, REG_SSIENR, BIT_SPIC_EN | BIT_ATCK_CMD);
-
-	timeleft = wait_for_completion_interruptible_timeout(
-				   rqspi->comp, msecs_to_jiffies(rqspi->timeout_ms));
-	if (timeleft <= 0) {
-		ret = -ETIMEDOUT;
-		goto FAIL;
-	}
-#endif
 
 	return len;
 
@@ -491,48 +467,16 @@ static int rts_qspi_erase(struct spi_nor *nor, loff_t offs)
 	int ret;
 	u8 cmd_buf[8];
 
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	struct completion comp;
-	long timeleft;
-	struct rts_qspi *rqspi = nor->priv;
-	u32 baudr;
+	cmd_buf[0] = offs >> (nor->addr_nbytes * 8 - 8);
+	cmd_buf[1] = offs >> (nor->addr_nbytes * 8 - 16);
+	cmd_buf[2] = offs >> (nor->addr_nbytes * 8 - 24);
+	cmd_buf[3] = offs >> (nor->addr_nbytes * 8 - 32);
 
-	spin_lock_irqsave(&rqspi->__lock, rqspi->__lock_flags);
-	init_completion(&comp);
-	rqspi->comp = &comp;
-#endif
-
-	cmd_buf[0] = offs >> (nor->addr_width * 8 - 8);
-	cmd_buf[1] = offs >> (nor->addr_width * 8 - 16);
-	cmd_buf[2] = offs >> (nor->addr_width * 8 - 24);
-	cmd_buf[3] = offs >> (nor->addr_width * 8 - 32);
-
-	ret = nor->write_reg(nor, nor->erase_opcode,
-						 cmd_buf, nor->addr_width);
+	ret = nor->controller_ops->write_reg(nor, nor->erase_opcode,
+						 cmd_buf, nor->addr_nbytes);
 	if (ret) {
 		goto FAIL;
 	}
-
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	spin_unlock_irqrestore(&rqspi->__lock, rqspi->__lock_flags);
-	rts_writel(rqspi, REG_TX_NDF, 0);
-	rts_writel(rqspi, REG_USER_LENGTH, 0);
-	baudr = rts_readl(rqspi, REG_BAUDR);
-
-	/* make auto check timeout longer */
-	rts_writel(rqspi, REG_BAUDR, baudr * 20);
-	rts_writel(rqspi, REG_SSIENR, BIT_SPIC_EN | BIT_ATCK_CMD);
-
-	timeleft = wait_for_completion_interruptible_timeout(
-				   rqspi->comp, msecs_to_jiffies(rqspi->timeout_ms));
-	rts_writel(rqspi, REG_SSIENR, 0);
-	rts_writel(rqspi, REG_BAUDR, baudr);
-
-	if (timeleft <= 0) {
-		ret = -ETIMEDOUT;
-		goto FAIL;
-	}
-#endif
 
 	return 0;
 
@@ -545,10 +489,7 @@ static int rts_qspi_setup(struct rts_qspi *rqspi)
 {
 	struct spi_board_info	*bi = rqspi->bi;
 	u32			reg;
-#if 0
-	u32			speed_hz, baudr;
-	struct platform_device	*pdev = rqspi->pdev;
-#endif
+
 	/* User can't program some control register if SSIENR
 	 * is enabled. So disable it before init registers
 	 */
@@ -563,57 +504,19 @@ static int rts_qspi_setup(struct rts_qspi *rqspi)
 		reg |= BIT_SCPH;
 	}
 
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	reg |= CK_MTIMES(0x1f);
-#endif
-
 	/* SPIC stay in BUSY state when there are more than 0x1_0000 cycles between two input data.
 	 * Disable DREIR to avoid that interrupt hanler time is lager than 0x1_0000 SPIC cycles.
 	 */
 	reg |= BIT_SPI_DREIR_R_DIS;
 	rts_writel(rqspi, REG_CTRLR0, reg);
-#if 0
-	/* Set clock ratio
-	 * F(spi_sclk) = F(bus) / (2 * baudr)
-	 */
-	speed_hz = bi->max_speed_hz;
-	if ((speed_hz == 0) || (speed_hz > rqspi->max_speed_hz)) {
-		speed_hz = rqspi->max_speed_hz;
-		dev_warn(&pdev->dev, "request %d Hz, force to set %d Hz\n",
-				 bi->max_speed_hz, rqspi->max_speed_hz);
-	}
 
-	if (speed_hz < rqspi->min_speed_hz) {
-		dev_err(&pdev->dev, "requested speed too low %d Hz\n",
-				bi->max_speed_hz);
-		return -EINVAL;
-	}
-
-	baudr = DIV_ROUND_UP(rqspi->spiclk_hz, speed_hz) / 2;
-	if (baudr > MASK_SCKDV) {
-		dev_err(&pdev->dev, "invalid baud reg: %08X\n", baudr);
-		return -EINVAL;
-	}
-	rts_writel(rqspi, REG_BAUDR, baudr);
-
-	/* disable DUM_EN */
-	reg = rts_readl(rqspi, REG_VALID_CMD);
-	reg &= ~(BIT_DUM_EN);
-	rts_writel(rqspi, REG_VALID_CMD, reg);
-#endif
 	/* Pin route */
 	reg = rts_readl(rqspi, REG_CTRLR2);
 	reg &= ~(BIT_SO_DNUM | BIT_WPN_DNUM);
 	reg |= BIT_SO_DNUM;
 	rts_writel(rqspi, REG_CTRLR2, reg);
 
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	rts_writel(rqspi, REG_IMR, BIT_ACEIM | BIT_ACSIM);	/* Enable ACSIM interrupt */
-	rqspi->timeout_ms = 5000;
-#endif
-#ifdef CONFIG_SPI_RTS_QUADSPI_POLLING
 	rts_writel(rqspi, REG_IMR, 0);	/* Disable all interrupt */
-#endif
 	rts_writel(rqspi, REG_SER, 1);	/* CS actived */
 
 	rts_writel(rqspi, REG_WRITE_SINGLE, 0xBB);
@@ -625,8 +528,8 @@ static void rts_qspi_reset(struct rts_qspi *rqspi)
 {
 	struct spi_nor *nor = &rqspi->nor;
 
-	nor->write_reg(nor, SPINOR_OP_RSTEN, NULL, 0);
-	nor->write_reg(nor, SPINOR_OP_RST, NULL, 0);
+	nor->controller_ops->write_reg(nor, SPINOR_OP_SRSTEN, NULL, 0);
+	nor->controller_ops->write_reg(nor, SPINOR_OP_SRST, NULL, 0);
 }
 
 static int rts_channel_map(char *str, const char *const *map)
@@ -651,57 +554,6 @@ static int rts_channel_map(char *str, const char *const *map)
 
 	return -EINVAL;
 }
-
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-static irqreturn_t rtsx_qspi_isr(int irq, void *dev_id)
-{
-	struct rts_qspi *rqspi = dev_id;
-	u32 int_reg;
-
-	if (!rqspi) {
-		return IRQ_NONE;
-	}
-
-	spin_lock(&(rqspi->__lock));
-
-	int_reg = rts_readl(rqspi, REG_ISR);
-	if (!int_reg) {
-		spin_unlock(&(rqspi->__lock));
-		return IRQ_NONE;
-	}
-	rts_writel(rqspi, REG_ICR, 0); /* clear ICR */
-
-	if (int_reg & (BIT_ACEIS | BIT_ACSIS)) {
-		if (int_reg & BIT_ACEIS) {
-			rqspi->auto_check_status = STATUS_TIMEOUT;
-		} else {
-			rqspi->auto_check_status = STATUS_OK;
-		}
-
-		if (rqspi->comp) {
-			complete(rqspi->comp);
-		}
-	}
-
-	spin_unlock(&(rqspi->__lock));
-
-	return IRQ_HANDLED;
-}
-
-static int rtsx_qspi_acquire_irq(struct rts_qspi *rqspi)
-{
-	int err = 0;
-
-	spin_lock_init(&rqspi->__lock);
-	err = request_irq(rqspi->irq, rtsx_qspi_isr, IRQF_SHARED,
-					  RTSX_QSPI_DRV_NAME, rqspi);
-	if (err)
-		dev_err(&(rqspi->pdev->dev), "Failed to request IRQ %d\n",
-				rqspi->irq);
-
-	return err;
-}
-#endif
 
 static const struct of_device_id rts_qspi_dt_ids[] = {
 	{ .compatible = "realtek,rxi312-nor" },
@@ -838,14 +690,6 @@ static int rts_qspi_probe(struct platform_device *pdev)
 		nor->flags |= SNOR_F_EN_SWP;
 	}
 
-#ifdef CONFIG_SPI_RTS_QUADSPI_IRQ
-	ret = rtsx_qspi_acquire_irq(rqspi);
-	if (ret < 0) {
-		return ret;
-	}
-	synchronize_irq(rqspi->irq);
-#endif
-
 	/* Initialize the hardware */
 	ret = rts_qspi_setup(rqspi);
 	if (ret) {
@@ -853,14 +697,7 @@ static int rts_qspi_probe(struct platform_device *pdev)
 	}
 
 	/* Fill the hooks */
-	nor->read_reg = rts_qspi_read_reg;
-	nor->write_reg = rts_qspi_write_reg;
-	nor->read = rts_qspi_read;
-	nor->write = rts_qspi_write;
-	if (!nor->erase) {
-		nor->erase = rts_qspi_erase;
-	}
-
+	nor->controller_ops = &rts_qspi_controller_ops;
 	spi_nor_set_flash_node(nor, np->child);
 
 	ret = spi_nor_scan(nor, data->type, &hwcaps);
@@ -889,6 +726,14 @@ static int rts_qspi_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
+static const struct spi_nor_controller_ops rts_qspi_controller_ops = {
+    .read_reg = rts_qspi_read_reg,
+    .write_reg = rts_qspi_write_reg,
+    .read = rts_qspi_read,
+    .write = rts_qspi_write,
+    .erase = rts_qspi_erase,
+};
 
 static struct platform_driver rts_qspi_driver = {
 	.driver = {

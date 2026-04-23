@@ -48,7 +48,7 @@
 					reg = <0>;
 					remote-endpoint = <&dsi_out>;
 				};
-			};			
+			};
 		};
 
 		rtkpanel: rtkpanel {

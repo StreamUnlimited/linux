@@ -217,7 +217,7 @@ static void ameba_dsi_mipi_init_pre(struct ameba_hw_dsi *dsi)
 
 	/* reset mipi core */
 	MIPI_StructInit(pdsi_ctx);
-	ameba_dsi_init_config(pdsi_ctx, ameba_struct->display_width, ameba_struct->display_height, ameba_struct->display_framerate, &(dsi->mipi_ckd));
+	ameba_dsi_init_config(pdsi_ctx, ameba_struct, &(dsi->mipi_ckd));
 	MIPI_BG_CMD(bg_ctrl, 1);//bandgap issue
 	MIPI_DPHY_init(pmipi_reg, pdsi_ctx);
 
@@ -359,11 +359,20 @@ static void ameba_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	/* valid mode */
 	if(dsi->ameba_struct)
 	{
-		dsi->ameba_struct->display_height = adj_mode->vdisplay;
-		dsi->ameba_struct->display_width = adj_mode->hdisplay;
-		dsi->ameba_struct->display_framerate
-			  = (adj_mode->clock * 1000)
-			  / (adj_mode->htotal * adj_mode->vtotal);
+		dsi->ameba_struct->display_hdisplay = adj_mode->hdisplay;
+		dsi->ameba_struct->display_hsync = adj_mode->hsync_end - adj_mode->hsync_start;
+		dsi->ameba_struct->display_hfp = adj_mode->hsync_start - adj_mode->hdisplay;
+		dsi->ameba_struct->display_hbp = adj_mode->htotal - adj_mode->hsync_end;
+		dsi->ameba_struct->display_htotal = adj_mode->htotal;
+
+		dsi->ameba_struct->display_vdisplay = adj_mode->vdisplay;
+		dsi->ameba_struct->display_vsync = adj_mode->vsync_end - adj_mode->vsync_start;
+		dsi->ameba_struct->display_vfp = adj_mode->vsync_start - adj_mode->vdisplay;
+		dsi->ameba_struct->display_vbp = adj_mode->vtotal - adj_mode->vsync_end;
+		dsi->ameba_struct->display_vtotal = adj_mode->vtotal;
+
+		/* Clock in dts is used to calculate the real frame rate. */
+		dsi->ameba_struct->display_clock = adj_mode->clock * 1000; // linux kernel level is KHz, we need Hz
 	}
 }
 
@@ -568,10 +577,12 @@ err_encoder:
 
 static void ameba_dsi_unbind(struct device *dev, struct device *master, void *data)
 {
-	(void) dev;
+	struct ameba_hw_dsi         *dsi = dev_get_drvdata(dev);
 	(void) master;
 	(void) data;
 	DRM_INFO("Run MIPI DSI Unbind \n");
+
+	drm_connector_cleanup(&dsi->connector);
 }
 
 static const struct component_ops ameba_dsi_ops = {
@@ -715,6 +726,8 @@ static int ameba_dsi_remove(struct platform_device *pdev)
 		dsi->enable = false ;
 	}
 	iounmap(dsi->sysctrl_reg);
+
+	clk_disable_unprepare(dsi->hepri_clk);
 
 	mipi_dsi_host_unregister(&(dsi->dsi_host));
 	dsi->dsi_host.dev = NULL;

@@ -13,24 +13,7 @@
 #include "panel/ameba_panel_base.h"
 #include "ameba_drm_comm.h"
 
-//should remove this to mode params
-#define MIPI_DSI_RTNI         2//4
-
-#define MIPI_DSI_HSA          4  //hsw mode->hsync_end - mode->hsync_start;
-#define MIPI_DSI_HBP          30 //hbp mode->htotal - mode->hsync_end;
-#define MIPI_DSI_HFP          30 //hfp hsync_start - mode->hdisplay;
-
-#define MIPI_DSI_VSA          5  //vsw mode->vsync_end - mode->vsync_start;
-#define MIPI_DSI_VBP          20 //vbp mode->vtotal - mode->vsync_end;
-#define MIPI_DSI_VFP          15 //vfp mode->vsync_start - mode->vdisplay;
-
 #define Mhz                   1000000UL
-#define T_LPX                 5
-#define T_HS_PREP             6
-#define T_HS_TRAIL            8
-#define T_HS_EXIT             7
-#define T_HS_ZERO             10
-
 #define DUMP_REG(a,b)         b,readl(a + b)
 
 /*
@@ -174,12 +157,20 @@ void ameba_lcdc_reg_dump(void __iomem *address, const char *filename)
 
 void ameba_lcdc_enable(void __iomem *address, u32 NewState)
 {
+	int retry = 0;
+
 	if (0 == NewState) {
 		LCDC_Cmd(address, 0);
 	} else {
 		/*enable the LCDC*/
 		LCDC_Cmd(address, 1);
-		while (!LCDC_CheckLCDCReady(address));
+		while (!LCDC_CheckLCDCReady(address)) {
+			retry++;
+			if (retry > 100) {
+				DRM_WARN("LCDC cannot be ready !!!!");
+				break;
+			}
+		}
 	}
 }
 
@@ -260,12 +251,6 @@ void ameba_lcdc_dma_get_unint_cnt(void __iomem *address, u32 *DmaUnIntCnt)
 	LCDC_GetDmaUnINTCnt(address, DmaUnIntCnt);
 }
 
-//lcdc irq issue
-void ameba_lcdc_irq_enable(void __iomem *address, u32 LCDC_IT, u32 NewState)
-{
-	LCDC_INTConfig(address, LCDC_IT, NewState);
-}
-
 void ameba_lcdc_irq_linepos(void __iomem *address, u32 LineNum)
 {
 	LCDC_LineINTPosConfig(address, LineNum);
@@ -274,6 +259,11 @@ void ameba_lcdc_irq_linepos(void __iomem *address, u32 LineNum)
 void ameba_lcdc_irq_config(void __iomem *address, u32 intType, u32 NewState)
 {
 	LCDC_INTConfig(address, intType, NewState);
+}
+
+void ameba_lcdc_irq_clear_all(void __iomem *address)
+{
+	LCDC_ClearAllINT(address);
 }
 
 ///layer

@@ -11,7 +11,6 @@
 struct ameba_panel_desc {
 	struct device                   *dev;
 	LCM_setting_table_t             *init_table;
-	struct drm_display_mode         *panel_module;
 	void                            *priv;
 	struct drm_panel_funcs          *rtk_panel_funcs;
 	struct drm_panel                panel;

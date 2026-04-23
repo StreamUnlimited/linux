@@ -33,8 +33,8 @@
 					<&rcc RTK_CLK_AP_PLL>,
 					<&clk_np_syspll 0>;
 			clock-names = "cpu","cpu-div","cpu-mux","ap-pll","np-pll";
-			freq_tab = < 330000 440000
-						 660000 1320000>;
+			freq_tab = < 300000 400000
+						 600000 1200000>;
 		};
 
 		cpu@1 {
@@ -50,8 +50,8 @@
 					<&rcc RTK_CLK_AP_PLL>,
 					<&clk_np_syspll 0>;
 			clock-names = "cpu","cpu-div","cpu-mux","ap-pll","np-pll";
-			freq_tab = < 330000 440000
-						 660000 1320000>;
+			freq_tab = < 300000 400000
+						 600000 1200000>;
 		};
 
 	};

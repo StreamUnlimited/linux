@@ -19,9 +19,10 @@
 
 #include <dt-bindings/realtek/dmac/realtek-ameba-dmac.h>
 
-#define RTK_SPI_DEBUG_DETAILS			    0
-#define RTK_SPI_REG_DUMP			        0
+#define RTK_SPI_DEBUG_DETAILS				0
+#define RTK_SPI_REG_DUMP					0
 #define RTK_SPI_HW_CONTROL_FOR_FUTURE_USE	0
+#define DEUG_UNDERRUN_IN_DMA_MODE			0
 
 /**************************************************************************//**
  * @defgroup AMEBA_SPI
@@ -423,6 +424,8 @@
 #define DISABLE				0
 #endif
 
+#define MAX_SPI_DEVICES 4
+
 enum rtk_spi_dir {
 	RTK_SPI_READ,
 	RTK_SPI_WRITE,
@@ -513,6 +516,11 @@ struct rtk_spi_management {
 	struct spi_trans_rx_buf		rx_info;
 };
 
+struct rtk_spi_device {
+	struct gpio_desc *cs_gpiod;
+	u32 chip_select;
+};
+
 struct rtk_spi_controller {
 	struct spi_controller		*controller;
 	struct device			*dev;
@@ -522,4 +530,6 @@ struct rtk_spi_controller {
 	struct spi_board_info 		rtk_spi_chip;
 	struct rtk_spi_hw_params	spi_param;
 	struct rtk_spi_management	spi_manage;
+	struct rtk_spi_device	cs_devices[MAX_SPI_DEVICES];
+	int num_devices;
 };

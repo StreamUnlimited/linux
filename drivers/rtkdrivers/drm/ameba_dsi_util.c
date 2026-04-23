@@ -12,17 +12,10 @@
 
 #include "panel/ameba_panel_base.h"
 #include "ameba_drm_comm.h"
+#include "ameba_drm_drv.h"
 
 //should remove this to mode params
-#define MIPI_DSI_RTNI       2//4
-#define MIPI_DSI_HSA        4
-#define MIPI_DSI_HBP        30
-#define MIPI_DSI_HFP        30
-
-#define MIPI_DSI_VSA        5
-#define MIPI_DSI_VBP        20
-#define MIPI_DSI_VFP        15
-
+#define MIPI_DSI_RTNI       2 //4
 #define Mhz                 1000000UL
 #define T_LPX               5
 #define T_HS_PREP           6
@@ -154,11 +147,9 @@ void ameba_dsi_lcdc_reenable(void __iomem* address)
 }
 
 void ameba_dsi_init_config(
-	MIPI_InitTypeDef *MIPI_InitStruct, u32 width, u32 height, u32 framerate, u32 *mipi_ckd)
+	MIPI_InitTypeDef *MIPI_InitStruct, struct ameba_drm_struct *ameba_struct, u32 *mipi_ckd)
 {
 	u32 vtotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits, total_bits;
-	u32 MIPI_HACT_g = width;
-	u32 MIPI_VACT_g = height;
 	u32 vo_freq, vo_totalx, vo_totaly, mipi_div;
 
 	switch (MIPI_InitStruct->MIPI_VideoDataFormat) {
@@ -175,51 +166,52 @@ void ameba_dsi_init_config(
 		break;
 	}
 
-	MIPI_InitStruct->MIPI_LaneNum = 2;
-	MIPI_InitStruct->MIPI_FrameRate = framerate;
+	MIPI_InitStruct->MIPI_LaneNum = 2; // fixed to 2 now, set in initital sequence.
+	MIPI_InitStruct->MIPI_FrameRate = ameba_struct->display_clock * 2 * MIPI_InitStruct->MIPI_LaneNum / (ameba_struct->display_vtotal * ameba_struct->display_htotal * bit_per_pixel) + 1;
+	DRM_DEBUG_DRIVER("Refresh rate: %d.", MIPI_InitStruct->MIPI_FrameRate);
 
-	MIPI_InitStruct->MIPI_HSA = MIPI_DSI_HSA * bit_per_pixel / 8 ;//- 10; /* here the unit is pixel but not us */
+	MIPI_InitStruct->MIPI_HSA = ameba_struct->display_hsync * bit_per_pixel / 8;  /* here the unit is pixel but not us */
 	if (MIPI_InitStruct->MIPI_VideoModeInterface == MIPI_VIDEO_NON_BURST_MODE_WITH_SYNC_PULSES) {
-		MIPI_InitStruct->MIPI_HBP = MIPI_DSI_HBP * bit_per_pixel / 8 ;//- 10;
+		MIPI_InitStruct->MIPI_HBP = ameba_struct->display_hbp * bit_per_pixel / 8;
 	} else {
-		MIPI_InitStruct->MIPI_HBP = (MIPI_DSI_HSA + MIPI_DSI_HBP) * bit_per_pixel / 8 ;//-10 ;
+		MIPI_InitStruct->MIPI_HBP = (ameba_struct->display_hsync + ameba_struct->display_hbp) * bit_per_pixel / 8;
 	}
 
-	MIPI_InitStruct->MIPI_HACT = MIPI_HACT_g;
-	MIPI_InitStruct->MIPI_HFP = MIPI_DSI_HFP * bit_per_pixel / 8 ;//-12;
+	MIPI_InitStruct->MIPI_HACT = ameba_struct->display_hdisplay;
+	MIPI_InitStruct->MIPI_HFP = ameba_struct->display_hfp * bit_per_pixel / 8;
 
-	MIPI_InitStruct->MIPI_VSA = MIPI_DSI_VSA;
-	MIPI_InitStruct->MIPI_VBP = MIPI_DSI_VBP;
-	MIPI_InitStruct->MIPI_VACT = MIPI_VACT_g;
-	MIPI_InitStruct->MIPI_VFP = MIPI_DSI_VFP;
+	MIPI_InitStruct->MIPI_VSA = ameba_struct->display_vsync;
+	MIPI_InitStruct->MIPI_VBP = ameba_struct->display_vbp;
+	MIPI_InitStruct->MIPI_VACT = ameba_struct->display_vdisplay;
+	MIPI_InitStruct->MIPI_VFP = ameba_struct->display_vfp;
 
-	/*DataLaneFreq * LaneNum = FrameRate * (VSA+VBP+VACT+VFP) * (HSA+HBP+HACT+HFP) * PixelFromat*/
-	vtotal = MIPI_InitStruct->MIPI_VSA + MIPI_InitStruct->MIPI_VBP + MIPI_InitStruct->MIPI_VACT + MIPI_InitStruct->MIPI_VFP;
-	htotal_bits = (MIPI_DSI_HSA + MIPI_DSI_HBP + MIPI_InitStruct->MIPI_HACT + MIPI_DSI_HFP) * bit_per_pixel;
+	vtotal = ameba_struct->display_vtotal;
+	htotal_bits = ameba_struct->display_htotal * bit_per_pixel;
 	overhead_cycles = T_LPX + T_HS_PREP + T_HS_ZERO + T_HS_TRAIL + T_HS_EXIT;
 	overhead_bits = overhead_cycles * MIPI_InitStruct->MIPI_LaneNum * 8;
 	total_bits = htotal_bits + overhead_bits;
 
+	/* DataLaneFreq * LaneNum = FrameRate * (VSA+VBP+VACT+VFP) * (HSA+HBP+HACT+HFP) * PixelFromat */
+	/* Clock = DataLaneFreq / 2 */
 	MIPI_InitStruct->MIPI_VideDataLaneFreq = MIPI_InitStruct->MIPI_FrameRate * total_bits * vtotal / MIPI_InitStruct->MIPI_LaneNum / Mhz + 20;
-
 	MIPI_InitStruct->MIPI_LineTime = (MIPI_InitStruct->MIPI_VideDataLaneFreq * Mhz) / 8 / MIPI_InitStruct->MIPI_FrameRate / vtotal;
-	MIPI_InitStruct->MIPI_BllpLen = MIPI_InitStruct->MIPI_LineTime / MIPI_InitStruct->MIPI_LaneNum ;
+	MIPI_InitStruct->MIPI_BllpLen = MIPI_InitStruct->MIPI_LineTime / MIPI_InitStruct->MIPI_LaneNum;
 
-	if (MIPI_DSI_HSA + MIPI_DSI_HBP + MIPI_HACT_g + MIPI_DSI_HFP < (512 + MIPI_DSI_RTNI * 16)) {
+	if (ameba_struct->display_htotal < (512 + MIPI_DSI_RTNI * 16)) {
 		DRM_ERROR("!!ERROR!!, LCM NOT SUPPORT\n");
 	}
 
 	if (MIPI_InitStruct->MIPI_LineTime * MIPI_InitStruct->MIPI_LaneNum < total_bits / 8) {
-		DRM_ERROR("!!ERROR!!, LINE TIME TOO SHORT! MIPI_InitStruct->MIPI_LineTime = %d, MIPI_InitStruct->MIPI_LaneNum = %d, total_bits / 8 = %d\n", MIPI_InitStruct->MIPI_LineTime, MIPI_InitStruct->MIPI_LaneNum, total_bits / 8);
+		DRM_ERROR("!!ERROR!!, LINE TIME TOO SHORT! MIPI_InitStruct->MIPI_LineTime = %d, MIPI_InitStruct->MIPI_LaneNum = %d, total_bits / 8 = %d\n",
+			  MIPI_InitStruct->MIPI_LineTime, MIPI_InitStruct->MIPI_LaneNum, total_bits / 8);
 	}
 
 	//vo frequency , //output format is RGB888
-	vo_totalx = MIPI_DSI_HSA + MIPI_DSI_HBP + MIPI_DSI_HFP + width;
-	vo_totaly = MIPI_DSI_VSA + MIPI_DSI_VBP + MIPI_DSI_VFP + height;
-	vo_freq = vo_totalx * vo_totaly * MIPI_InitStruct->MIPI_FrameRate * 24 / 24 / Mhz + 4;
+	vo_totalx = ameba_struct->display_htotal;
+	vo_totaly = ameba_struct->display_vtotal;
+	vo_freq = vo_totalx * vo_totaly * MIPI_InitStruct->MIPI_FrameRate / Mhz + 4;
 	//assert_param(vo_freq < 67);
 
-	//vo_freq = 80;
 	mipi_div = 1000 / vo_freq - 1;//shall get NPPLL frequency
 	if(mipi_ckd)
 	{
@@ -245,6 +237,13 @@ void ameba_dsi_do_init(void __iomem *MIPIx, MIPI_InitTypeDef *MIPI_InitStruct, u
 	//enable ir ,get the cmd send finish issue
 	MIPI_DSI_INT_Config(MIPIx, 0, 1, 0);
 	MIPI_DSI_init(MIPIx, MIPI_InitStruct);
+
+	/*
+	 * From observing the operation of the GH panel,
+	 * if there is no 2ms delay here,
+	 * the initial sequence's first frame might not transmit correctly.
+	*/
+	mdelay(2);
 
 	while (1) {
 		if (*tx_done) {

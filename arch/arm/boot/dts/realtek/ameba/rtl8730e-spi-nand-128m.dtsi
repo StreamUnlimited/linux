@@ -58,22 +58,22 @@
 					};
 					partition@6 {
 						label = "Kernel Image A";
-						reg = <0x7E0000 0xA00000>;
+						reg = <0x7E0000 0xF00000>;
 						read-only;
 					};
 					partition@7 {
 						label = "Kernel Image B";
-						reg = <0x11E0000 0xA00000>;
+						reg = <0x16E0000 0xF00000>;
 						read-only;
 					};
 					partition@8 {
 						label = "Rootfs Image A";
-						reg = <0x1BE0000 0x2800000>;
+						reg = <0x25E0000 0x3C00000>;
 						read-only;
 					};
 					partition@9 {
 						label = "Userdata Area";
-						reg = <0x43E0000 0x3C20000>;
+						reg = <0x61E0000 0x1E20000>;
 					};
 				};
 			};

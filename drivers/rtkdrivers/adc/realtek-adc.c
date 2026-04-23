@@ -276,11 +276,14 @@ static int realtek_adc_vref_init(struct iio_dev *indio_dev)
 		return (int)PTR_ERR(cell);
 	}
 
+	/* step1: read EFuse */
 	EfuseBuf = nvmem_cell_read(cell, &len);
 	nvmem_cell_put(cell);
 
+	/* [2:0]: Vref Selection */
 	vref_sel = EfuseBuf[0] & 0x7;
 
+	/* step2: update vref sel para */
 	value = readl(adc->captouch_vref_base);
 	value &= ~(0x7 << 8);
 	if (vref_sel == 0x3) {
@@ -686,6 +689,8 @@ static void realtek_adc_hw_init(struct iio_dev *indio_dev)
 	u32 path_reg;
 
 	realtek_adc_cmd(adc, false);
+	// init vref
+	realtek_adc_vref_init(indio_dev);
 	// disable interrupt, clear all interrupts
 	writel(0, adc->base + RTK_ADC_INTR_CTRL);
 	writel(0x3FFFF, adc->base + RTK_ADC_INTR_STS);

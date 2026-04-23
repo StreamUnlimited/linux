@@ -2,7 +2,7 @@
 /*
 * Realtek Panel support
 *
-* MIPI-DSI jd9165a panel driver. This is a 1024 * 600
+* MIPI-DSI jd9165ba panel driver. This is a 1024 * 600
 *
 * Copyright (C) 2023, Realtek Corporation. All rights reserved.
 */
@@ -18,32 +18,60 @@
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/of_device.h>
-#include <linux/i2c.h>
 
 #include "ameba_panel_base.h"
 #include "ameba_panel_priv.h"
 
-struct jd9165a {
+/*
+ * Driver IC: jd9165ba
+ * Screen: hj7001-01
+
+ RGB Output Timing Diagram
+ Horizontal Timing:
+  |<-----Hsync----->|<------HBP------>|<-------------HAdr-------------->|<------HFP------>|
+  |        10       |       60        |              1024               |        60       |
+
+ Vertical Timing:
+  +------Vsync------+
+  |        2        |
+  +------VBP--------+
+  |       21        |
+  +------VAdr-------+
+  |      600        |
+  +------VFP--------+
+  |       12        |
+
+ Example:
+	&rtkpanel {
+		compatible = "realtek,jd9165ba";
+		pinctrl-names="default";
+		pinctrl-0 = <&drm_disable_swd_pins>;
+		mipi-gpios = <&gpioa 14 0>;
+		status = "okay";
+
+		display-timings {
+			native-mode = <&timing0>;
+			timing0: timing0 {
+				// 1024x600 @ 60Hz 2-lanes RGB888-24bits (typical)
+				clock-frequency = <263804400>; // (frame-rate * htotal * vtotal * rgb-bpp) / (2 * lane-num)
+				hactive = <1024>;
+				hfront-porch = <60>;
+				hback-porch = <60>;
+				hsync-len = <10>;
+				vactive = <600>;
+				vfront-porch = <12>;
+				vback-porch = <21>;
+				vsync-len = <2>;
+			};
+		};
+	};
+*/
+
+struct jd9165ba {
 	int gpio;
 };
 
-/*
- * The timings are not very helpful as the display is used in
- * command mode.
- */
-static struct drm_display_mode jd9165a_mode = {
-	.clock = 43465,
-	.hdisplay = 1024,
-	.hsync_start = 1184,
-	.hsync_end = 1208,
-	.htotal = 1344,
-	.vdisplay = 600,
-	.vsync_start = 612,
-	.vsync_end = 614,
-	.vtotal = 635,
-};
-
-static LCM_setting_table_t jd9165a_initialization[] = {/* DCS Write Long */
+static LCM_setting_table_t jd9165ba_initialization[] = {/* DCS Write Long */
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x30, 0x00}},
 	{MIPI_DSI_GENERIC_LONG_WRITE, 5, {0xF7, 0x49, 0x61, 0x02, 0x00}},
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0x30, 0x01}},
@@ -97,7 +125,7 @@ static LCM_setting_table_t jd9165a_initialization[] = {/* DCS Write Long */
 	{REGFLAG_DELAY, 20, {}},
 
 	{REGFLAG_END_OF_TABLE, 0x00, {}},
-} ;
+};
 
 static int dsi_gpio_reset(int iod)
 {
@@ -125,119 +153,64 @@ static int dsi_gpio_reset(int iod)
 	gpio_set_value(iod,1);
 	gpio_free(gpio_index);
 	mdelay(120);
-	return  0 ;
+
+	return 0;
 }
 
-static int set_power_by_i2c(void)
-{
-    struct i2c_adapter *adapter = i2c_get_adapter(2);
-    struct i2c_msg power_msgs[5];
-    struct i2c_client *client;
-    int ret = -1;
-    int retries = 0;
-    u8 buf1[] = {0x00, 0x32}; // AVDD=11V
-    u8 buf2[] = {0x02, 0x4D}; // VGH=20V
-    u8 buf3[] = {0x03, 0x9A}; // VGL=-7V
-    u8 buf4[] = {0x05, 0x5C}; // VCOM=3.6V
-    u8 buf5[] = {0xFF, 0x80}; // Write to MTP
-
-    struct i2c_board_info info = {
-        I2C_BOARD_INFO("panel-power", 0x23)
-    };
-
-    if (!adapter) {
-        printk(KERN_ERR "Failed to get i2c adapter\n");
-        return -ENODEV;
-    }
-
-    client = i2c_new_client_device(adapter, &info);
-    if (!client) {
-        printk(KERN_ERR "Failed to create i2c client\n");
-        i2c_put_adapter(adapter);
-        return -ENOMEM;
-    }
-
-    power_msgs[0].addr = 0x23; power_msgs[0].flags = 0; power_msgs[0].len = 2; power_msgs[0].buf = buf1;
-    power_msgs[1].addr = 0x23; power_msgs[1].flags = 0; power_msgs[1].len = 2; power_msgs[1].buf = buf2;
-    power_msgs[2].addr = 0x23; power_msgs[2].flags = 0; power_msgs[2].len = 2; power_msgs[2].buf = buf3;
-    power_msgs[3].addr = 0x23; power_msgs[3].flags = 0; power_msgs[3].len = 2; power_msgs[3].buf = buf4;
-    power_msgs[4].addr = 0x23; power_msgs[4].flags = 0; power_msgs[4].len = 2; power_msgs[4].buf = buf5;
-
-    while (retries < 2) {
-        ret = i2c_transfer(client->adapter, power_msgs, 5);
-        if (ret == 5) {
-            break;
-        }
-        printk(KERN_WARNING "I2C transfer failed, retrying... (%d)\n", retries + 1);
-        retries++;
-    }
-
-    if (ret != 5) {
-        printk(KERN_ERR "I2C messages sent failed.\n");
-        ret = -EIO;
-    }
-
-    i2c_unregister_device(client);
-    i2c_put_adapter(adapter);
-
-    return ret;
-}
-
-static int jd9165a_enable(struct drm_panel *panel)
+static int jd9165ba_enable(struct drm_panel *panel)
 {
 	struct ameba_panel_desc  *desc = panel_to_desc(panel);
-	struct jd9165a           *handle = desc->priv;
-	struct device            *dev = desc->dev;
+	struct jd9165ba          *handle = desc->priv;
 	int                      ret;
-
-	/* set power before reset. */
-	set_power_by_i2c();
 
 	ret = dsi_gpio_reset(handle->gpio);
 	if (ret) {
 		DRM_ERROR("Fail to set dis spio\n");
-		return ret ;
+		return ret;
 	}
 	return 0;
 }
 
-static int jd9165a_disable(struct drm_panel *panel)
+static int jd9165ba_disable(struct drm_panel *panel)
 {
 	(void)panel;
 	return 0;
 }
 
-static int jd9165a_get_modes(struct drm_panel *panel, struct drm_connector *connector)
+static int jd9165ba_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
-	struct drm_display_mode *mode;
+	struct drm_display_mode	*mode = drm_mode_create(connector->dev);
+	struct device_node		*np = panel->dev->of_node;
+	int						ret;
 
-	mode = drm_mode_duplicate(connector->dev, &jd9165a_mode);
-	if (!mode) {
-		DRM_ERROR("Bad mode or fail to add mode\n");
-		return -EINVAL;
+	if (!mode)
+		return 0;
+
+	ret = of_get_drm_display_mode(np, mode, 0, 0); // no bus_flags, pannel timing index = 0.
+	if (ret) {
+		drm_mode_destroy(connector->dev, mode);
+		return 0;
 	}
-	drm_mode_set_name(mode);
-	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-	connector->display_info.width_mm = mode->width_mm;
-	connector->display_info.height_mm = mode->height_mm;
 
+	mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
+
 	return 1; /* Number of modes */
 }
 
-static int jd9165a_probe(struct device *dev,struct ameba_panel_desc *priv_data)
+static int jd9165ba_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 {
 	struct device_node              *np = dev->of_node;
-	struct jd9165a                  *jd9165a_data;
+	struct jd9165ba                   *jd9165ba_data;
 
-	jd9165a_data = devm_kzalloc(dev, sizeof(struct jd9165a), GFP_KERNEL);
-	if (!jd9165a_data)
+	jd9165ba_data = devm_kzalloc(dev, sizeof(struct jd9165ba), GFP_KERNEL);
+	if (!jd9165ba_data)
 		return -ENOMEM;
 
-	priv_data->priv = jd9165a_data ;
+	priv_data->priv = jd9165ba_data ;
 
-	jd9165a_data->gpio = of_get_named_gpio(np, "mipi-gpios", 0);
-	if (!gpio_is_valid(jd9165a_data->gpio)) {
+	jd9165ba_data->gpio = of_get_named_gpio(np, "mipi-gpios", 0);
+	if (!gpio_is_valid(jd9165ba_data->gpio)) {
 		DRM_ERROR("Panel fail to get mipi-gpios\n");
 		return -ENODEV;
 	}
@@ -245,31 +218,28 @@ static int jd9165a_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	return 0;
 }
 
-static int jd9165a_remove(struct device *dev,struct ameba_panel_desc *priv_data)
+static int jd9165ba_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 {
-	struct jd9165a      *handle = priv_data->priv;
+	struct jd9165ba      *handle = priv_data->priv;
 	AMEBA_DRM_DEBUG();
 
 	gpio_free(handle->gpio);
 	return 0;
 }
 
-static struct drm_panel_funcs jd9165a_panel_funcs = {
-	.disable   = jd9165a_disable,
-	.enable    = jd9165a_enable,
-	.get_modes = jd9165a_get_modes,
+static struct drm_panel_funcs jd9165ba_panel_funcs = {
+	.disable   = jd9165ba_disable,
+	.enable    = jd9165ba_enable,
+	.get_modes = jd9165ba_get_modes,
 };
 
-struct ameba_panel_desc panel_jd9165a_desc = {
-	.dev          = NULL,
-	.priv         = NULL,
-	.init_table   = jd9165a_initialization,
-	.panel_module = &jd9165a_mode,
-	.rtk_panel_funcs  = &jd9165a_panel_funcs,
+struct ameba_panel_desc panel_jd9165ba_desc = {
+	.dev             = NULL,
+	.priv            = NULL,
+	.init_table      = jd9165ba_initialization,
+	.rtk_panel_funcs = &jd9165ba_panel_funcs,
 
-	.init   = jd9165a_probe,
-	.deinit = jd9165a_remove,
+	.init   = jd9165ba_probe,
+	.deinit = jd9165ba_remove,
 };
-EXPORT_SYMBOL(panel_jd9165a_desc);
-
-
+EXPORT_SYMBOL(panel_jd9165ba_desc);

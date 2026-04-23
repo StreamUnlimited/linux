@@ -23,14 +23,6 @@
 				};
 			};
 
-			wifi_ant_sel: ant_sel@0 {
-				pins {
-					pinmux = <REALTEK_PINMUX('A', 15, GPIO)>,
-						 <REALTEK_PINMUX('A', 16, GPIO)>;
-					bbias-disable;
-				};
-			};
-
 			captouch_pins: captouch@0 {
 				pins {
 					pinmux = <REALTEK_PINMUX('A', 0, CAPTOUCH_AUX_ADC)>, // TOUCH0_ADC0
@@ -223,6 +215,20 @@
 				};
 			};
 
+			sdioh_pins_ext: sdioh_ext@0 {
+				pins {
+					pinmux = <REALTEK_PINMUX('B', 14, SDIO_EXTRA)>, // SD_D2
+						 <REALTEK_PINMUX('B', 15, SDIO_EXTRA)>,     // SD_D3
+						 <REALTEK_PINMUX('B', 16, SDIO_EXTRA)>,      // SD_CMD
+						 <REALTEK_PINMUX('B', 17, SDIO_EXTRA)>,     // SD_CLK
+						 <REALTEK_PINMUX('B', 18, SDIO_EXTRA)>,     // SD_D0
+						 <REALTEK_PINMUX('B', 19, SDIO_EXTRA)>;     // SD_D1
+					bias-pull-up;
+					slew-rate = <0>;
+					drive-strength = <0>;
+				};
+			};
+
 			spi0_pins: spi0@0 {
 				pins {
 					pinmux = <REALTEK_PINMUX('B', 18, SPI)>,   // SPI0_CLK
@@ -230,7 +236,7 @@
 							<REALTEK_PINMUX('B', 20, SPI)>;   // SPI0_MISO
 					bias-pull-up;
 					slew-rate = <0>;
-					drive-strength = <0>;
+					drive-strength = <1>;
 				};
 			};
 
@@ -242,7 +248,7 @@
 							<REALTEK_PINMUX('A', 5, SPI)>;  // SPI1_MOSI
 					bias-pull-up;
 					slew-rate = <0>;
-					drive-strength = <0>;
+					drive-strength = <1>;
 				};
 			};
 

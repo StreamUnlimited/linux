@@ -89,8 +89,6 @@ struct sport_dai {
 
 	/* bit0: play in use, bit1: record in use*/
 	u8 play_record_in_use;
-	/* guard play_record_in_use */
-	spinlock_t state_lock;
 
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pins_state;
@@ -223,13 +221,11 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 
-		spin_lock(&sport->state_lock);
 		if (is_playback) {
 			sport->play_record_in_use |= PLAY_IN_USE;
 		} else {
 			sport->play_record_in_use |= RECORD_IN_USE;
 		}
-		spin_unlock(&sport->state_lock);
 
 		audio_sp_dma_cmd(sport->addr, true);
 
@@ -275,13 +271,11 @@ static int sport_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		spin_lock(&sport->state_lock);
 		if (is_playback) {
 			sport->play_record_in_use &= ~PLAY_IN_USE;
 		} else {
 			sport->play_record_in_use &= ~RECORD_IN_USE;
 		}
-		spin_unlock(&sport->state_lock);
 
 		if ((sport->play_record_in_use & (PLAY_IN_USE | RECORD_IN_USE)) == 0)
 			audio_sp_dma_cmd(sport->addr, false);
@@ -993,6 +987,8 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
                 .channels_min = 2,
                 .channels_max = 8,
                 .rates = SNDRV_PCM_RATE_8000_384000,
+                .rate_min = 8000,
+                .rate_max = 384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -1006,6 +1002,8 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
                 .channels_min = 2,
                 .channels_max = 8,
                 .rates = SNDRV_PCM_RATE_8000_384000,
+                .rate_min = 8000,
+                .rate_max = 384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -1024,6 +1022,8 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
                 .channels_min = 2,
                 .channels_max = 8,
                 .rates = SNDRV_PCM_RATE_8000_384000,
+                .rate_min = 8000,
+                .rate_max = 384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -1037,6 +1037,8 @@ static struct snd_soc_dai_driver ameba_sport_dai_drv[] = {
                 .channels_min = 2,
                 .channels_max = 8,
                 .rates = SNDRV_PCM_RATE_8000_384000,
+                .rate_min = 8000,
+                .rate_max = 384000,
                 .formats = SNDRV_PCM_FMTBIT_S16_LE |
 							SNDRV_PCM_FORMAT_U16_LE |
 							SNDRV_PCM_FORMAT_S20_LE |
@@ -1273,7 +1275,6 @@ static int ameba_sport_probe(struct platform_device *pdev)
 	sport->fifo_num = 0;
 	sport->clock_enabled = 0;
 	sport->play_record_in_use = 0x00;
-	spin_lock_init(&sport->state_lock);
 
 	spin_lock_init(&sport->lock);
 

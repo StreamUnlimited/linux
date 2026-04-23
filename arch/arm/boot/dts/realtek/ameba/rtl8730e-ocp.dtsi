@@ -26,7 +26,7 @@
 			reg = <0x42012000 0x100>,
 				<0x42012800 0x100>,
 				<0x420082F8 0x4>,//Control digital path input for ADC and CTC pad
-				<0x42010400 0x1>; // Vref control register
+				<0x42010400 0x1>;// Vref control register
 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&rcc RTK_CKE_CTC>, <&rcc RTK_CKE_ADC>;
 			clock-names = "rtk_ctc_clk", "rtk_adc_clk";
@@ -71,8 +71,6 @@
 				<GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0x40000000 0x80000>, // wifi register base address and length
 				<0x60000020 0x15B000>; // km4 ram base address and length in amebasmart_layout.ld
-			pinctrl-names = "default";
-			pinctrl-0 = <&wifi_ant_sel>;
 		};
 
 		dma: dma@400E0000 {
@@ -125,6 +123,7 @@
 			rtk,i2c-clk = <100000>;
 			rtk,wait-timeout = <0x7D0>;
 			rtk,i2c-reg-slave-num = <0>;
+			rtk,i2c-sda-hold-time = <2>;
 			status = "disabled";
 		};
 
@@ -138,6 +137,7 @@
 			rtk,i2c-clk = <100000>;
 			rtk,wait-timeout = <0x7D0>;
 			rtk,i2c-reg-slave-num = <0>;
+			rtk,i2c-sda-hold-time = <2>;
 			status = "disabled";
 		};
 
@@ -151,6 +151,7 @@
 			rtk,i2c-clk = <100000>;
 			rtk,wait-timeout = <0x7D0>;
 			rtk,i2c-reg-slave-num = <0>;
+			rtk,i2c-sda-hold-time = <2>;
 			status = "disabled";
 		};
 
@@ -290,9 +291,7 @@
 			dma-names = "spi0-tx","spi0-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
-			rtk,max-cs-num = <2>;
-			//only master mode set SPI_CS to GPIO, so spi0_pins only set SPI0_CLK, SPI0_MOSI and SPI0_MISO.
-			rtk,spi-cs-gpios = <&gpiob 17 0>;
+			rtk,max-cs-num = <3>;
 			status = "disabled";
 		};
 
@@ -312,9 +311,15 @@
 			dma-names = "spi1-tx","spi1-rx";
 			rtk,spi-master-poll-mode = <0>;
 			rtk,spi-default-cs = <0>;
-			rtk,max-cs-num = <2>;
+			rtk,max-cs-num = <3>;
 			//rtk,spi-cs-gpios = <&gpioa 2 0>;//only master mode set SPI_CS to GPIO.
 			status = "disabled";
+		};
+
+		trng: rng@41009000 {
+			compatible = "rtk,ameba-trng";
+			reg = <0x41009000 0x100>;
+			status = "okay";
 		};
 
 		thermal: thermal@42013000 {
@@ -486,7 +491,7 @@
 				<0x01 0xE0 0x00>,
 				<0x01 0xE0 0x04>;
 			rtk,usb-phandle = <&usb>;
-			rtk,usb-force-role-en = <0>;
+			rtk,usb-force-role-en = <1>;
 			status = "okay";
 		};
 

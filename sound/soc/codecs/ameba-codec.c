@@ -1146,6 +1146,8 @@ static int ameba_codec_hw_params(struct snd_soc_component *component,
 			/* disable low pass filter for ADC inputs */
 			audio_codec_enable_adc_lpf(false, adc_channel, codec_priv->digital_addr);
 
+			audio_codec_set_adc_hpf(adc_channel, 3, true, codec_priv->digital_addr);
+
 			audio_codec_mute_amic_in(false, codec_priv->tdm_amic_numbers[adc_channel], codec_priv->analog_addr);
 
 			audio_codec_set_adc_mute(adc_channel, false, codec_priv->digital_addr);

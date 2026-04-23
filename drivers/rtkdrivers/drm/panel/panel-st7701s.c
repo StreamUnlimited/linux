@@ -19,31 +19,55 @@
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 #include <linux/of_device.h>
-//#include <linux/module.h>
 
 #include "ameba_panel_base.h"
 #include "ameba_panel_priv.h"
 
+/*
+ RGB Output Timing Diagram
+ Horizontal Timing:
+  |<----Hsync---->|<----HBP---->|<------------HAdr------------>|<----HFP---->|
+  |      4        |     30      |              480             |     30      |
+
+ Vertical Timing:
+  +------Vsync-----+
+  |       5        |
+  +------VBP-------+
+  |      20        |
+  +-----VAdr-------+
+  |     800        |
+  +------VFP-------+
+  |      15        |
+
+ Example:
+	&rtkpanel {
+		compatible = "realtek,st7701s";
+		pinctrl-names="default";
+		pinctrl-0 = <&drm_disable_swd_pins>;
+		mipi-gpios = <&gpioa 14 0>;
+		status = "okay";
+
+		display-timings {
+			native-mode = <&timing0>;
+			timing0: timing0 {
+				// 480x800 @ 60Hz 2-lanes RGB888-24bits (typical)
+				clock-frequency = <164505600>; // (frame-rate * htotal * vtotal * rgb-bpp) / (2 * lane-num)
+				hactive = <480>;
+				hfront-porch = <30>;
+				hback-porch = <30>;
+				hsync-len = <4>;
+				vactive = <800>;
+				vfront-porch = <15>;
+				vback-porch = <20>;
+				vsync-len = <5>;
+			};
+		};
+	};
+*/
+
 struct st7701s {
 	int                     gpio;
 	struct backlight_device *backlight;
-};
-
-/*
- * The timings are not very helpful as the display is used in
- * command mode.
- */
-static struct drm_display_mode st7701s_mode = {
-	/* HS clock, (htotal*vtotal*vrefresh)/1000 */
-	.clock = 30720,
-	.hdisplay = 480,
-	.hsync_start = 481,
-	.hsync_end = 484,
-	.htotal = 500,
-	.vdisplay = 800,
-	.vsync_start = 824,
-	.vsync_end = 896,
-	.vtotal = 1024,
 };
 
 static LCM_setting_table_t st7701s_initialization[] = {/* DCS Write Long */
@@ -110,26 +134,6 @@ static LCM_setting_table_t st7701s_initialization[] = {/* DCS Write Long */
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 1, {0x29, 0x00}},
 	{REGFLAG_END_OF_TABLE, 0x00, {}},
 } ;
-
-// Kingtech PV04005TD25E
-static struct drm_display_mode kt_pv04005td25e_mode = {
-	.clock		= 20000,
-
-	.hdisplay	= 480,
-	.hsync_start	= 480 + 22,
-	.hsync_end	= 480 + 22 + 20,
-	.htotal		= 480 + 22 + 20 + 22,
-
-	.vdisplay	= 800,
-	.vsync_start	= 800 + 40,
-	.vsync_end	= 800 + 40 + 5,
-	.vtotal		= 800 + 40 + 5 + 40,
-
-	.width_mm	= 52,
-	.height_mm	= 86,
-
-	.type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
-};
 
 static LCM_setting_table_t kt_pv04005td25e_init[] = {
 	{MIPI_DSI_DCS_SHORT_WRITE, 1, {0x11, 0x00}},
@@ -252,19 +256,20 @@ static int st7701s_disable(struct drm_panel *panel)
 
 static int st7701s_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
-	struct ameba_panel_desc *desc = panel_to_desc(panel);
-	struct drm_display_mode *mode;
+	struct drm_display_mode	*mode = drm_mode_create(connector->dev);
+	struct device_node		*np = panel->dev->of_node;
+	int						ret;
 
-	mode = drm_mode_duplicate(connector->dev, desc->panel_module);
-	if (!mode) {
-		DRM_ERROR("Bad mode or fail to add mode\n");
-		return -EINVAL;
+	if (!mode)
+		return 0;
+
+	ret = of_get_drm_display_mode(np, mode, 0, 0); // no bus_flags, pannel timing index = 0.
+	if (ret) {
+		drm_mode_destroy(connector->dev, mode);
+		return 0;
 	}
-	drm_mode_set_name(mode);
-	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-	connector->display_info.width_mm = mode->width_mm;
-	connector->display_info.height_mm = mode->height_mm;
 
+	mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
 	return 1; /* Number of modes */
@@ -280,7 +285,7 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	if (!st7701s_data)
 		return -ENOMEM;
 
-	priv_data->priv = st7701s_data ;
+	priv_data->priv = st7701s_data;
 
 	//gpio
 	st7701s_data->gpio = of_get_named_gpio(np, "mipi-gpios", 0);
@@ -301,9 +306,9 @@ static int st7701s_probe(struct device *dev,struct ameba_panel_desc *priv_data)
 	return 0;
 }
 
-static int st7701s_remove(struct device *dev,struct ameba_panel_desc *priv_data)
+static int st7701s_remove(struct device *dev, struct ameba_panel_desc *priv_data)
 {
-	struct st7701s      *handle = priv_data->priv;
+	struct st7701s          *handle = priv_data->priv;
 	AMEBA_DRM_DEBUG();
 
 	//disable gpio
@@ -311,6 +316,7 @@ static int st7701s_remove(struct device *dev,struct ameba_panel_desc *priv_data)
 	// disable backlight
 	if (handle->backlight)
 		put_device(&handle->backlight->dev);
+
 	//devm_kfree
 	return 0;
 }
@@ -322,11 +328,10 @@ static struct drm_panel_funcs st7701s_panel_funcs = {
 };
 
 struct ameba_panel_desc panel_st7701s_desc = {
-	.dev          = NULL,
-	.priv         = NULL,
-	.init_table   = st7701s_initialization,
-	.panel_module = &st7701s_mode,
-	.rtk_panel_funcs  = &st7701s_panel_funcs,
+	.dev             = NULL,
+	.priv            = NULL,
+	.init_table      = st7701s_initialization,
+	.rtk_panel_funcs = &st7701s_panel_funcs,
 
 	.init   = st7701s_probe,
 	.deinit = st7701s_remove,
@@ -336,7 +341,6 @@ EXPORT_SYMBOL(panel_st7701s_desc);
 struct ameba_panel_desc panel_kt_pv04005td25e_desc = {
 	.dev = NULL,
 	.init_table = kt_pv04005td25e_init,
-	.panel_module = &kt_pv04005td25e_mode,
 	.priv = NULL,
 	.rtk_panel_funcs = &st7701s_panel_funcs,
 

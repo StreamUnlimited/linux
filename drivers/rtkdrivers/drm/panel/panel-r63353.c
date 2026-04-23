@@ -23,28 +23,53 @@
 #include "ameba_panel_base.h"
 #include "ameba_panel_priv.h"
 
+/*
+ RGB Output Timing Diagram
+ Horizontal Timing:
+  |<-----Hsync---->|<-------HBP------>|<-------------HAdr------------->|<------HFP----->|
+  |        2       |       150        |              720               |       35       |
+
+ Vertical Timing:
+  +------Vsync------+
+  |        4        |
+  +------VBP--------+
+  |        0        |
+  +------VAdr-------+
+  |       1280      |
+  +------VFP--------+
+  |        2        |
+
+ Example:
+	&rtkpanel {
+		compatible = "realtek,r63353";
+		pinctrl-names="default";
+		pinctrl-0 = <&drm_disable_swd_pins>;
+		mipi-gpios = <&gpioa 14 0>; // ????
+		status = "okay";
+
+		display-timings {
+			native-mode = <&timing0>;
+			timing0: timing0 {
+				// 720x1280 @ 60Hz 2-lanes RGB888-24bits (typical)
+				clock-frequency = <419904720>; // (frame-rate * htotal * vtotal * rgb-bpp) / (2 * lane-num)
+				hactive = <720>;
+				hfront-porch = <35>;
+				hback-porch = <150>;
+				hsync-len = <2>;
+				vactive = <1280>;
+				vfront-porch = <2>;
+				vback-porch = <0>;
+				vsync-len = <4>;
+			};
+		};
+	};
+*/
+
 struct r63353 {
 	int                     gpio_reset; //pa 14
 	int                     gpio_v01;   //v01 pb 25
 	int                     gpio_v02;   //v02 pb 26
 	int                     gpio_pwm;   //v03 pa 13
-};
-
-/*
- * The timings are not very helpful as the display is used in
- * command mode.
- */
-static struct drm_display_mode r63353_mode = {
-	/* HS clock, (htotal*vtotal*vrefresh)/1000 */
-	.clock = 70000,
-	.hdisplay = 720,
-	.hsync_start = 720 + 35,
-	.hsync_end = 720 + 35 + 2,
-	.htotal = 720 + 35 + 2 + 150,
-	.vdisplay = 1280,
-	.vsync_start = 1280 + 2,
-	.vsync_end = 1280 + 2 + 4,
-	.vtotal = 1280 + 2 + 4 + 0,
 };
 
 static LCM_setting_table_t r63353_initialization[] = {/* DCS Write Long */
@@ -255,18 +280,20 @@ static int r63353_disable(struct drm_panel *panel)
 
 static int r63353_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
-	struct drm_display_mode	*mode;
+	struct drm_display_mode	*mode = drm_mode_create(connector->dev);
+	struct device_node		*np = panel->dev->of_node;
+	int						ret;
 
-	mode = drm_mode_duplicate(connector->dev, &r63353_mode);
-	if (!mode) {
-		DRM_ERROR("Bad mode or fail to add mode\n");
-		return -EINVAL;
+	if (!mode)
+		return 0;
+
+	ret = of_get_drm_display_mode(np, mode, 0, 0); // no bus_flags, pannel timing index = 0.
+	if (ret) {
+		drm_mode_destroy(connector->dev, mode);
+		return 0;
 	}
-	drm_mode_set_name(mode);
-	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-	connector->display_info.width_mm = mode->width_mm;
-	connector->display_info.height_mm = mode->height_mm;
 
+	mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
 	return 1; /* Number of modes */
@@ -335,7 +362,6 @@ struct ameba_panel_desc panel_r63353_desc = {
 	.dev          = NULL,
 	.priv         = NULL,
 	.init_table   = r63353_initialization,
-	.panel_module = &r63353_mode,
 	.rtk_panel_funcs  = &r63353_panel_funcs,
 
 	.init   = r63353_probe,

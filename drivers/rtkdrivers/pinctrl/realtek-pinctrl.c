@@ -38,7 +38,10 @@ static const char *const realtek_gpio_functions[] = {
 	"usb", "rf_ctrl", "ext_zigbee",
 	"bt_uart", "bt_gpio", "bt_rf",
 	"dbg_btcoex_gnt", "hs_timer_trig", "debug_port",
-	"wakeup",
+	"wakeup", "unknown",
+	"swd_extra", "sdio_extra",
+	"i2s2_extra1", "i2s2_extra2", "i2s2_dout_extra",
+	"i2s3_extra", "i2s3_dout_extra", "i2s3_din_xtra",
 };
 
 struct realtek_pinctrl_group {
