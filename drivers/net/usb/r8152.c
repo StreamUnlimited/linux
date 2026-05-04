@@ -1824,13 +1824,15 @@ static int set_ethernet_addr(struct r8152 *tp, bool in_resume)
 	struct sockaddr sa;
 	int ret;
 
-	/* We don't want to set eth address after wakeup from suspend
-	 * as we don't have stored eth address in the chip otp
-	 * but in const partition. Without this below function detects empty
-	 * eth address after wakeup and sets a random eth address.
+	/* During suspend, the hardware loses its internal MAC register state.
+	 * We don't want to re-determine the MAC from the OTP/const partition
+	 * on wakeup, Instead, we explicitly restore the known, existing
+	 * MAC address to the hardware so it can successfully receive packets.
 	 */
-	if (in_resume)
-		return 0;
+	if (in_resume) {
+		ether_addr_copy(sa.sa_data, dev->dev_addr);
+		return __rtl8152_set_mac_address(dev, &sa, in_resume);
+	}
 
 	ret = determine_ethernet_addr(tp, &sa);
 	if (ret < 0)
