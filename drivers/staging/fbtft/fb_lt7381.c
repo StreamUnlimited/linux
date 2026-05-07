@@ -700,7 +700,7 @@ static int lt7381_init_display(struct fbtft_par *par)
 	int retry_count = 0;
 	int ret = 0;
 	struct device_node *np = par->info->device->of_node;
-	struct display_timings *disp_timings;
+	struct display_timings *disp_timings = NULL;
 	struct display_timing *dt;
 	struct lt7381_ctrl *ltc;
 
@@ -710,13 +710,16 @@ static int lt7381_init_display(struct fbtft_par *par)
 	/* extra entry can be used as long as the SPI is not 9-bits */
 	par->extra = ltc;
 
-	mutex_init(&ltc->spi_lock);
+	ret = devm_mutex_init(par->info->device, &ltc->spi_lock);
+	if (ret) {
+		dev_err(par->info->device, "failed to init mutex\n");
+		return ret;
+	}
 
 	disp_timings = of_get_display_timings(np);
 	if (!disp_timings) {
 		dev_err(par->info->device, "failed to find display phandle\n");
-		ret = -ENOENT;
-		goto err_init_display;
+		return -ENOENT;
 	}
 
 	par->fbtftops.reset(par);
@@ -725,7 +728,7 @@ static int lt7381_init_display(struct fbtft_par *par)
 		if (++retry_count >= STARTUP_TIMEOUT_RETRIES) {
 			dev_err(par->info->device, "Could not read OK status\n");
 			ret = -EIO;
-			goto err_init_display;
+			goto out;
 		}
 		msleep(STARTUP_TIMEOUT);
 	}
@@ -736,14 +739,14 @@ static int lt7381_init_display(struct fbtft_par *par)
 	if ((ret = lt7381_setup_clocks(par, dt)) < 0)
 	{
 		dev_err(par->info->device, "Could not setup clocks\n");
-		goto err_init_display;
+		goto out;
 	}
 	lt7381_setup_timing(par, dt);
 	lt7381_setup_line_polarity(par, dt);
 
 	if ((ret = lt7381_setup_sdram(par)) < 0) {
 		dev_err(par->info->device, "Could not setup SDRAM\n");
-		goto err_init_display;
+		goto out;
 	}
 
 	lt7381_setup_pixel(par, dt);
@@ -766,12 +769,10 @@ static int lt7381_init_display(struct fbtft_par *par)
 				LT7381_DPCR_DISPLAY_TSTBAR_EN);
 
 	dev_dbg(par->info->device, "init ok\n");
+	ret = 0;
 
-	return 0;
-
-err_init_display:
-	mutex_destroy(&ltc->spi_lock);
-	devm_kfree(par->info->device, ltc);
+out:
+	display_timings_release(disp_timings);
 	return ret;
 }
 
