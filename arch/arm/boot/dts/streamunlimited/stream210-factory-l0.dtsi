@@ -204,15 +204,15 @@
 	display-timings {
 		native-mode = <&timing0>;
 		timing0: timing0 {
-			clock-frequency = <200000000>;
+			clock-frequency = <120000000>;
 			hactive = <480>;
 			hfront-porch = <22>;
 			hback-porch = <22>;
 			hsync-len = <20>;
 			vactive = <800>;
 			vfront-porch = <40>;
-			vback-porch = <5>;
-			vsync-len = <40>;
+			vback-porch = <40>;
+			vsync-len = <5>;
 		};
 	};
 };
