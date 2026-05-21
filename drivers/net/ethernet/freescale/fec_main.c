@@ -4468,6 +4468,9 @@ fec_probe(struct platform_device *pdev)
 	    !of_property_read_bool(np, "fsl,err006687-workaround-present"))
 		fep->quirks |= FEC_QUIRK_ERR006687;
 
+	if (of_property_read_bool(np, "fsl,eee-broken"))
+		fep->quirks &= ~FEC_QUIRK_HAS_EEE;
+
 	ret = fec_enet_ipc_handle_init(fep);
 	if (ret)
 		goto failed_ipc_init;
