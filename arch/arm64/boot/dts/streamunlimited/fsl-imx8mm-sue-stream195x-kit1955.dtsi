@@ -85,6 +85,8 @@
 	phy-reset-duration = <5>;
 	phy-reset-post-delay = <5>;
 
+	fsl,eee-broken;
+
 	mdio {
 		#address-cells = <1>;
 		#size-cells = <0>;

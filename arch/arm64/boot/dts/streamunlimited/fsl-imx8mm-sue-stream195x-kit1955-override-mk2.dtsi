@@ -27,6 +27,8 @@
 	phy-handle = <&rtl8211f>;
 	status = "okay";
 
+	/delete-property/ fsl,eee-broken;
+
 	phy-reset-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
 	mdio {
 		#address-cells = <1>;
