@@ -173,6 +173,11 @@ properties:
       If present indicates that the system has the hardware workaround for
       ERR006687 applied and does not need a software workaround.
 
+  fsl,eee-broken:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      If present, indicates that the hardware has broken EEE (Energy Efficient Ethernet).
+
   fsl,stop-mode:
     $ref: /schemas/types.yaml#/definitions/phandle-array
     items:
