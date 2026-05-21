@@ -1,0 +1,117 @@
+/dts-v1/;
+
+#include "fsl-imx8mm-sue-stream195x-internal.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-override-mk2.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit-lcd.dtsi"
+#include "fsl-imx8mm-sue-stream195x-kit1955-touchscreen.dtsi"
+
+/ {
+	clk_aud_ext_mclk_44k1: clk_aud_ext_mclk_44k1 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <22579200>;
+	};
+
+	clk_aud_ext_mclk_48k: clk_aud_ext_mclk_48k {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24576000>;
+	};
+
+	clk_aud_ext_mclk_sel: clk_aud_ext_mclk_sel {
+		compatible = "gpio-mux-clock";
+		#clock-cells = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_ext_mclk_sel>;
+
+		clocks = <&clk_aud_ext_mclk_44k1 &clk_aud_ext_mclk_48k>;
+		select-gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
+
+		// Configure the initial external clock to be the one for
+		// 48 kHz.
+		assigned-clocks = <&clk_aud_ext_mclk_sel>;
+		assigned-clock-parents = <&clk_aud_ext_mclk_48k>;
+	};
+
+	// NOTE: The name of the node must be `clk_clkin1` matching the entry
+	//       in the `clk_pad_sels[]` list in `clk-imx8mm.c`.
+	clk_clkin1: clk_clkin1 {
+		compatible = "gpio-gate-clock";
+		#clock-cells = <0>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_ext_mclk_en>;
+
+		clocks = <&clk_aud_ext_mclk_sel>;
+		enable-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>;
+	};
+
+	sound-pcm {
+		// Changes:
+		// 1. Remove `pll11k` clock: We ony use PLL1 (pll8k) which uses CLKIN1 as source and
+		//    CLKIN1 will switch between the two frequencies of `clk_aud_ext_mclk_sel`. So
+		//    there is no point in using two PLLs here.
+		// 2. Add `ext_mlck` clock: The sound-card driver will set this clock to the desired
+		//    rate from the `ext-mclk-rates` list.
+		// 3. Add `pll_bypass` and `pll_bypass_parent` clocks which will configure the PLL
+		//    for bypass mode.
+		clocks = <&clk IMX8MM_AUDIO_PLL1_OUT>,<&clk_aud_ext_mclk_sel>,
+				<&clk IMX8MM_AUDIO_PLL1_BYPASS>, <&clk IMX8MM_AUDIO_PLL1_REF_SEL>;
+		clock-names = "pll8k", "ext_mclk",
+				"pll_bypass", "pll_bypass_parent";
+		ext-mclk-rates = <22579200 24576000>;
+
+		// This sets the parent of the PLL1 to the clk_clkin1 clock.
+		assigned-clocks = <&clk IMX8MM_AUDIO_PLL1_PAD_SEL>, <&clk IMX8MM_AUDIO_PLL1_REF_SEL>;
+		assigned-clock-parents = <&clk_clkin1>, <&clk IMX8MM_AUDIO_PLL1_PAD_SEL>;
+	};
+};
+
+&clk {
+	// The PLL parameters for both frequencies are the same because the
+	// external clock will switch between 24.576 MHz and 22.5972 MHz
+	// based on the GPIO configured for `clk_aud_ext_mclk_sel`.
+	audio-pll1-table = <722534400 320 5 1 0>,	// For 44.1 kHz
+			   <786432000 320 5 1 0>;	// For 48 kHz
+
+	// TODO: Also populate the PLL2 table so that we don't get an
+	// spurious error message during the boot.
+	audio-pll2-table = <722534400 320 5 1 0>,	// For 44.1 kHz
+			   <786432000 320 5 1 0>;	// For 48 kHz
+};
+
+&iomuxc {
+	imx8mm-s195x-extclk {
+		pinctrl_ext_mclk_sel: extmclksel {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI5_RXFS_GPIO3_IO19	(PAD_CTL_PE_DOWN)
+			>;
+		};
+
+		pinctrl_ext_mclk_en: extmclken {
+			fsl,pins = <
+				MX8MM_IOMUXC_SAI1_RXD7_GPIO4_IO9	(PAD_CTL_PE_DOWN)
+			>;
+		};
+	};
+};
+
+&sai1 {
+	// This removes the `pll11k` entry from the list, so the SAI driver
+	// will not reparent to a different PLL and all rates will be using
+	// PLL1.
+	clocks = <&clk IMX8MM_CLK_SAI1_IPG>, <&clk IMX8MM_CLK_DUMMY>,
+		 <&clk IMX8MM_CLK_SAI1_ROOT>,
+		 <&clk IMX8MM_CLK_DUMMY>, <&clk IMX8MM_CLK_DUMMY>,
+		 <&clk IMX8MM_AUDIO_PLL1_OUT>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3",
+		      "pll8k";
+};
+
+// Disable the SAI5 to not have a pin conflict with `MX8MM_IOMUXC_SAI5_RXFS_GPIO3_IO19`, the
+// SAI5 is used for a microphone input which we do not use in this configuration.
+&sai5 {
+	status = "disabled";
+};
