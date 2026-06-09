@@ -28,6 +28,12 @@ struct snd_soc_stream195x_dai_link_data {
 	struct gpio_desc *mute_gpio;
 };
 
+enum mclk_rate_idx {
+	MCLK_IDX_44K1 = 0,
+	MCLK_IDX_48K,
+	MCLK_IDX_MAX
+};
+
 /* All instances of asoc_simple_priv have been replcaed with stream195x_simple_priv */
 /* Stolen from asoc_simple_priv struct */
 struct stream195x_simple_priv {
@@ -47,11 +53,13 @@ struct stream195x_simple_priv {
 	/* START SUE addition 2 */
 	struct clk *pll8k_clk;
 	struct clk *pll11k_clk;
+	struct clk *ext_mclk_clk;
 	int cur_ppm;
 	struct gpio_desc *powerdown_gpio;
 	struct snd_soc_stream195x_dai_link_data *dai_link_data;
 	bool ignore_suspend;
 	u32 current_tx_rate;
+	u32 ext_mclk_rates[MCLK_IDX_MAX];
 	/* END SUE addition 2 */
 };
 
@@ -197,6 +205,7 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	int ret;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+	struct device *dev = simple_priv_to_dev(priv);
 	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
 	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	struct simple_dai_props *dai_props = runtime_simple_priv_to_props(priv, rtd);
@@ -204,15 +213,18 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 
 	unsigned int rate = params_rate(params);
 	unsigned int pll_rate, mclk_rate;
+	unsigned int ext_mclk_rate;
 	struct clk *pll;
 
 	if ((rate % 8000) == 0) {
 		pll_rate = PLL_NOMINAL_RATE_48k;
 		mclk_rate = MCLK_RATE_48k;
+		ext_mclk_rate = priv->ext_mclk_rates[MCLK_IDX_48K];
 		pll = priv->pll8k_clk;
 	} else {
 		pll_rate = PLL_NOMINAL_RATE_44k1;
 		mclk_rate = MCLK_RATE_44k1;
+		ext_mclk_rate = priv->ext_mclk_rates[MCLK_IDX_44K1];
 
 		/*
 		 * If a pll11k was specified we use it, otherwise we use the pll8k even
@@ -241,6 +253,12 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0, 0, dai_props->cpu_dai->slots, dai_props->cpu_dai->slot_width);
 	if (ret && ret != -ENOTSUPP)
 		return ret;
+
+	if (priv->ext_mclk_clk) {
+		ret = clk_set_rate(priv->ext_mclk_clk, ext_mclk_rate);
+		if (ret)
+			dev_warn(dev, "failed to set ext_mclk rate to %u: %d\n", ext_mclk_rate, ret);
+	}
 
 	/*
 	 * Reset the PLL to the nominal value, otherwise when the PLL is
@@ -1223,6 +1241,20 @@ static int simple_probe(struct platform_device *pdev)
 	priv->pll11k_clk = devm_clk_get(dev, "pll11k");
 	if (IS_ERR(priv->pll11k_clk))
 		priv->pll11k_clk = NULL;
+
+	priv->ext_mclk_clk = devm_clk_get(dev, "ext_mclk");
+	if (IS_ERR(priv->ext_mclk_clk)) {
+		priv->ext_mclk_clk = NULL;
+	}
+
+	ret = of_property_read_u32_index(np, "ext-mclk-rates", MCLK_IDX_44K1, &priv->ext_mclk_rates[MCLK_IDX_44K1]);
+	ret |= of_property_read_u32_index(np, "ext-mclk-rates", MCLK_IDX_48K, &priv->ext_mclk_rates[MCLK_IDX_48K]);
+	if (ret) {
+		dev_info(dev, "no valid ext-mclk-rates entry, will use defaults");
+		priv->ext_mclk_rates[MCLK_IDX_44K1] = MCLK_RATE_44k1;
+		priv->ext_mclk_rates[MCLK_IDX_48K] = MCLK_RATE_48k;
+	}
+
 
 	priv->powerdown_gpio = devm_gpiod_get_optional(dev, "powerdown", GPIOD_OUT_HIGH);
 

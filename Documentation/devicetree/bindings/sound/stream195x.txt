@@ -11,11 +11,16 @@ Required properties:
 - sue-card,name				: User specified sound card name, one string
 - clocks				: Must contain clock entries that match up with the "clock-names"
 					  property.
-- clock-names				: Must contain at least "pll8k" and can contain "pll11k".
-					  If both entries are specified the I²S clock source will be chosen
-					  based on the requested sample rate. E.g. for 48 kHz, the pll8k
-					  clock will be used and for 44.1 kHz the pll11k one will be used.
-
+- clock-names				: Must contain at least "pll8k" and can contain "pll11k" and "ext_mclk
+					  If both "pll8k" and "pll11k" are specified then the I²S clock source
+					  will be chosen based on the requested sample rate. E.g. for 48 kHz,
+					  the pll8k clock will be used and for 44.1 kHz the pll11k one will
+					  be used.
+					  An optional "ext_mclk" clock can be specified, whose rate will be set
+					  based on the "ext-clk-rates" property below before playback.
+- ext-mclk-rates			: A list of two rates that will be used to set the "ext_mclk" clock.
+					  The first rate corresponds to the 44.1 kHz sample-rate family and
+					  the second entry to the 48 kHz family.
 - sue-card,dai-link			: Container for dai-link level properties and the CPU and CODEC
 					  sub-nodes.
 
