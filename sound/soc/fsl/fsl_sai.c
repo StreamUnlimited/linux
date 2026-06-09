@@ -1557,10 +1557,18 @@ static int fsl_sai_probe(struct platform_device *pdev)
 	fsl_asoc_get_pll_clocks(&pdev->dev, &sai->pll8k_clk,
 				&sai->pll11k_clk);
 
-	fsl_asoc_constrain_rates(&sai->constraint_rates,
-				 &fsl_sai_rate_constraints,
-				 sai->pll8k_clk, sai->pll11k_clk, NULL,
-				 sai->constraint_rates_list);
+	// Only try to do rate constraints if both PLLs are specified, otherwise
+	// we cannot know if the PLL table has the correct entries for switching
+	// the frequency, so do not do any further constraining and just allow
+	// all the default rates from `fsl_sai_rate_constraints`.
+	if (sai->pll8k_clk && sai->pll11k_clk) {
+		fsl_asoc_constrain_rates(&sai->constraint_rates,
+					 &fsl_sai_rate_constraints,
+					 sai->pll8k_clk, sai->pll11k_clk, NULL,
+					 sai->constraint_rates_list);
+	} else {
+		sai->constraint_rates = fsl_sai_rate_constraints;
+	}
 
 	/* Use Multi FIFO mode depending on the support from SDMA script */
 	ret = of_property_read_u32_array(np, "dmas", dmas, 4);
