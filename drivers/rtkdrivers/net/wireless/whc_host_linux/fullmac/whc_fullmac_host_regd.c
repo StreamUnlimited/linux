@@ -1421,7 +1421,15 @@ void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request)
 	case NL80211_REGDOM_SET_BY_USER:
 	case NL80211_REGDOM_SET_BY_DRIVER:
 	case NL80211_REGDOM_SET_BY_CORE:
+		wiphy_lock(wiphy);
+		_rtl_reg_set_country_code(wiphy, request->alpha2);
+		wiphy_unlock(wiphy);
+		break;
 	case NL80211_REGDOM_SET_BY_COUNTRY_IE:
+		if (!global_idev.wifi_user_config.rtw_802_11d_en) {
+			dev_dbg(global_idev.fullmac_dev, "%s: rtw_802_11d_en is disabled. Dropping AP Country IE hint.\n", __func__);
+			break;
+		}
 		wiphy_lock(wiphy);
 		_rtl_reg_set_country_code(wiphy, request->alpha2);
 		wiphy_unlock(wiphy);
@@ -1465,7 +1473,18 @@ int rtw_regd_init(void)
 	wiphy->regulatory_flags &= ~REGULATORY_CUSTOM_REG;
 	wiphy->regulatory_flags &= ~REGULATORY_STRICT_REG;
 	wiphy->regulatory_flags &= ~REGULATORY_COUNTRY_IE_FOLLOW_POWER;
-	wiphy->regulatory_flags &= ~REGULATORY_COUNTRY_IE_IGNORE;
+
+	if (global_idev.wifi_user_config.rtw_802_11d_en) {
+		wiphy->regulatory_flags &= ~REGULATORY_COUNTRY_IE_IGNORE;
+	} else {
+		wiphy->regulatory_flags |= REGULATORY_COUNTRY_IE_IGNORE;
+	}
+
+	if (global_idev.wifi_user_config.beacon_hints_ignore) {
+		wiphy->regulatory_flags |= REGULATORY_DISABLE_BEACON_HINTS;
+	} else {
+		wiphy->regulatory_flags &= ~REGULATORY_DISABLE_BEACON_HINTS;
+	}
 
 	rtnl_lock();
 	wiphy_lock(wiphy);

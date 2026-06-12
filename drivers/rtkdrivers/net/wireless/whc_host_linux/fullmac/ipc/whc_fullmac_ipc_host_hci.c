@@ -37,6 +37,8 @@ CREATE_WIFI_CFG_MOD_PARAM(wowlan_rx_bcmc_dis, 0);
 CREATE_WIFI_CFG_MOD_PARAM(uapsd_max_sp_len, 0);
 CREATE_WIFI_CFG_MOD_PARAM(uapsd_ac_enable, 0);
 
+CREATE_WIFI_CFG_MOD_PARAM(beacon_hints_ignore, 0);
+
 struct whc_device global_idev;
 
 extern struct aipc_ch_ops whc_fullmac_ipc_host_recv_ops;
@@ -184,6 +186,8 @@ int whc_host_init(void)
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, wowlan_rx_bcmc_dis);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, uapsd_max_sp_len);
 	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, uapsd_ac_enable);
+
+	SET_WIFI_CFG_FROM_MOD_PARAM(wifi_user_config, beacon_hints_ignore);
 
 	memcpy(&global_idev.wifi_user_config, &wifi_user_config, sizeof(struct wifi_user_conf));
 	ret = whc_fullmac_host_set_user_config(&global_idev.wifi_user_config);

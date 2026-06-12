@@ -264,6 +264,9 @@ struct wifi_user_conf {
 
 	/*! Max node number in R-mesh network, this is used for decide each node's beacon window.*/
 	u16 wtn_max_node_num;
+
+	/*! 0: Follow beacon hints from AP, 1: Ignore beacon hints from AP.*/
+	u8 beacon_hints_ignore;
 };
 
 /** @} End of WIFI_Exported_Structure_Types group*/
