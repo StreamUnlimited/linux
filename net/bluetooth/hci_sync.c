@@ -2900,10 +2900,12 @@ static u8 hci_update_accept_list_sync(struct hci_dev *hdev)
 done:
 	filter_policy = err ? 0x00 : 0x01;
 
-	/* Enable address resolution when LL Privacy is enabled. */
-	err = hci_le_set_addr_resolution_enable_sync(hdev, 0x01);
-	if (err)
-		bt_dev_err(hdev, "Unable to enable LL privacy: %d", err);
+	/* Enable address resolution when LL Privacy is enabled, but not for PA sync. */
+	if (!hci_dev_test_flag(hdev, HCI_PA_SYNC)) {
+		err = hci_le_set_addr_resolution_enable_sync(hdev, 0x01);
+		if (err)
+			bt_dev_err(hdev, "Unable to enable LL privacy: %d", err);
+	}
 
 	/* Resume advertising if it was paused */
 	if (ll_privacy_capable(hdev))
@@ -3112,9 +3114,13 @@ static int hci_passive_scan_sync(struct hci_dev *hdev)
 	 * So instead of using filter polices 0x00 (no acceptlist)
 	 * and 0x01 (acceptlist enabled) use the new filter policies
 	 * 0x02 (no acceptlist) and 0x03 (acceptlist enabled).
+	 *
+	 * However when doing PA sync, we need to treat resolvable address
+	 * as non-resolvabe (there is no pairing, so we can't resolve it).
 	 */
 	if (hci_dev_test_flag(hdev, HCI_PRIVACY) &&
-	    (hdev->le_features[0] & HCI_LE_EXT_SCAN_POLICY))
+	    (hdev->le_features[0] & HCI_LE_EXT_SCAN_POLICY)
+		&& !hci_dev_test_flag(hdev, HCI_PA_SYNC))
 		filter_policy |= 0x02;
 
 	if (hdev->suspended) {
