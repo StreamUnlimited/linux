@@ -18,6 +18,9 @@ Required properties:
 					  be used.
 					  An optional "ext_mclk" clock can be specified, whose rate will be set
 					  based on the "ext-clk-rates" property below before playback.
+					  An optional pair of "pll_bypass" and "pll_bypass_parent" can be provided,
+					  the "pll_bypass" clock will be enabled and then re-parented to the
+					  "pll_bypass_parent" on probe.
 - ext-mclk-rates			: A list of two rates that will be used to set the "ext_mclk" clock.
 					  The first rate corresponds to the 44.1 kHz sample-rate family and
 					  the second entry to the 48 kHz family.

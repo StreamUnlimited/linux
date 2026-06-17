@@ -60,6 +60,10 @@ struct stream195x_simple_priv {
 	bool ignore_suspend;
 	u32 current_tx_rate;
 	u32 ext_mclk_rates[MCLK_IDX_MAX];
+
+	bool pll_bypass_mode_active;
+	struct clk *pll_bypass_clk;
+	struct clk *pll_bypass_parent_clk;
 	/* END SUE addition 2 */
 };
 
@@ -271,10 +275,12 @@ static int snd_soc_stream195x_hw_params(struct snd_pcm_substream *substream, str
 	if (ret)
 		return ret;
 
-	// Notify userspace that the ppm value was reset to 0
-	kcontrol = snd_soc_card_get_kcontrol(rtd->card, KCONTROL_DRIFT_COMPENSATOR_NAME);
-	if (kcontrol) {
-		snd_ctl_notify(rtd->card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &kcontrol->id);
+	if (!priv->pll_bypass_mode_active) {
+		// Notify userspace that the ppm value was reset to 0
+		kcontrol = snd_soc_card_get_kcontrol(rtd->card, KCONTROL_DRIFT_COMPENSATOR_NAME);
+		if (kcontrol) {
+			snd_ctl_notify(rtd->card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &kcontrol->id);
+		}
 	}
 
 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk_rate, SND_SOC_CLOCK_IN);
@@ -1125,6 +1131,49 @@ static int simple_soc_remove(struct snd_soc_card *card)
 	device_remove_file(card->dev, &dev_attr_ignore_suspend);
 	return 0;
 }
+
+static int stream195x_setup_pll_bypass(struct snd_soc_card *card)
+{
+	int ret = 0;
+	struct device *dev = card->dev;
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(card);
+
+	priv->pll_bypass_clk = devm_clk_get(dev, "pll_bypass");
+	if (IS_ERR(priv->pll_bypass_clk)) {
+		priv->pll_bypass_clk = NULL;
+	}
+
+	priv->pll_bypass_parent_clk = devm_clk_get(dev, "pll_bypass_parent");
+	if (IS_ERR(priv->pll_bypass_parent_clk)) {
+		priv->pll_bypass_parent_clk = NULL;
+	}
+
+	if (priv->pll_bypass_clk && priv->pll_bypass_parent_clk) {
+		ret = clk_prepare_enable(priv->pll_bypass_clk);
+		if (ret) {
+			dev_err(dev, "Failed to enable PLL bypass clk: %d\n", ret);
+			return ret;
+		}
+
+		// If we reparent too quickly after enabling the bypass clock then the system
+		// will hang, 1 ms seems to work, but just to be on the safe side, double it
+		// to 2 ms.
+		msleep(2);
+
+		ret = clk_set_parent(priv->pll_bypass_clk, priv->pll_bypass_parent_clk);
+		if (ret) {
+			dev_err(dev, "Failed to reparent PLL bypass clk: %d\n", ret);
+			clk_disable_unprepare(priv->pll_bypass_clk);
+			return ret;
+		}
+
+		dev_info(dev, "Running in PLL bypass mode\n");
+		priv->pll_bypass_mode_active = true;
+	}
+
+	return 0;
+}
+
 /* END SUE addition */
 
 static int simple_probe(struct platform_device *pdev)
@@ -1258,8 +1307,16 @@ static int simple_probe(struct platform_device *pdev)
 
 	priv->powerdown_gpio = devm_gpiod_get_optional(dev, "powerdown", GPIOD_OUT_HIGH);
 
-	card->controls = snd_soc_stream195x_controls;
-	card->num_controls = ARRAY_SIZE(snd_soc_stream195x_controls);
+	ret = stream195x_setup_pll_bypass(card);
+	if (ret)
+		dev_warn(dev, "Failed to setup PLL bypass mode\n");
+
+	// Do not create the "Drift compensator" when we are in PLL bypass mode as it makes no
+	// sense in that case.
+	if (!priv->pll_bypass_mode_active) {
+		card->controls = snd_soc_stream195x_controls;
+		card->num_controls = ARRAY_SIZE(snd_soc_stream195x_controls);
+	}
 
 	/*
 	 * Power up the card before calling register. There might be cases
