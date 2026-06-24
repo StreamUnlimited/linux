@@ -164,6 +164,25 @@
 	};
 };
 
+&rcc {
+	// Change all SPORT clocks to be under the audio PLL instead of RTK_CKSL_AC
+	// This makes sure the clocks can change and are able to be drift-compensated
+	assigned-clocks =
+		<&rcc RTK_CKSL_AC>,
+		<&rcc RTK_CKSL_SPORT0>,
+		<&rcc RTK_CKSL_SPORT1>,
+		<&rcc RTK_CKSL_SPORT2>,
+		<&rcc RTK_CKSL_SPORT3>,
+		<&rcc RTK_CKSL_TIM9>;
+	assigned-clock-parents =
+		<&rcc RTK_CKE_XTAL_GRP1>,
+		<&rcc RTK_CKD_SPORT0>,
+		<&rcc RTK_CKD_SPORT1>,
+		<&rcc RTK_CKD_SPORT2>,
+		<&rcc RTK_CKD_SPORT3>,
+		<&clk_i2s_pll2>;
+};
+
 &codec {
 	status = "okay";
 	pinctrl-names = "default";

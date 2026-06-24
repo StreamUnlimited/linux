@@ -131,9 +131,8 @@
 };
 
 &sport {
-	// Setting this parameter will force the SPORT0 interface to use
-	// the audio PLLs as the clock sources. The SPORT0 is internally
-	// connected to the internal DAC and does not need any MCLK actually.
+	// The SPORT0 is internally connected to the internal DAC
+	// and does not need any MCLK actually.
 	rtk,sport-mclk-multiplier = <256>;
 };
 
