@@ -26,7 +26,9 @@ struct ameba_priv {
 	struct gpio_desc *amp_mute_gpio;
 	struct gpio_desc *hp_mute_gpio;
 	struct work_struct mute_work;
-	atomic_t playing;
+
+	unsigned long playing_mask;
+	unsigned int mute_dai_mask;
 
 	struct snd_kcontrol *drift_kcontrol;
 	struct asoc_simple_jack hp_jack;
@@ -162,12 +164,14 @@ static const struct snd_soc_dapm_widget ameba_dapm_widgets[] = {
 static void ameba_mute_work_handler(struct work_struct *work)
 {
 	struct ameba_priv *priv = container_of(work, struct ameba_priv, mute_work);
+	int playing = !!(priv->playing_mask & priv->mute_dai_mask);;
+	int jack = atomic_read(&priv->hp_jack_inserted);
 
-	if (!atomic_read(&priv->playing)) {
+	if (!playing) {
 		set_amp_mute(priv, true);
 		set_hp_mute(priv, true);
 	} else {
-		if (atomic_read(&priv->hp_jack_inserted)) {
+		if (jack) {
 			set_amp_mute(priv, true);
 			set_hp_mute(priv, false);
 		} else {
@@ -215,6 +219,7 @@ static int ameba_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct ameba_priv *priv = snd_soc_card_get_drvdata(rtd->card);
+	int id = rtd->dai_link->id;
 
 	// nothing to do on capture for now
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -224,18 +229,20 @@ static int ameba_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		atomic_set(&priv->playing, true);
+		set_bit(id, &priv->playing_mask);
 		break;
 
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		atomic_set(&priv->playing, false);
+		clear_bit(id, &priv->playing_mask);
 		break;
 	}
 
 	// This is an atomic context, and since the gpio is managed through IPC, we need to do this async
-	schedule_work(&priv->mute_work);
+	if (priv->mute_dai_mask & BIT(id))
+		schedule_work(&priv->mute_work);
+
 	return 0;
 }
 
@@ -267,6 +274,7 @@ static struct snd_soc_dai_link ameba_dai[] = {
 		.name = "codec AIF1",
 		.stream_name = "Pri_Dai",
 		.ops = &ameba_ops,
+		.id = 0,
 		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif1),
 	},
@@ -274,6 +282,7 @@ static struct snd_soc_dai_link ameba_dai[] = {
 		.name = "codec AIF2",
 		.stream_name = "Sec_Dai",
 		.ops = &ameba_ops,
+		.id = 1,
 		.dai_fmt = SND_SOC_DAI_FORMAT_LEFT_J,
 		SND_SOC_DAILINK_REG(aif2),
 	},
@@ -281,6 +290,7 @@ static struct snd_soc_dai_link ameba_dai[] = {
 		.name = "codec AIF3",
 		.stream_name = "SPORT2_I2S_Dai",
 		.ops = &ameba_ops,
+		.id = 2,
 		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif3),
 	},
@@ -288,6 +298,7 @@ static struct snd_soc_dai_link ameba_dai[] = {
 		.name = "codec AIF4",
 		.stream_name = "SPORT3_I2S_Dai",
 		.ops = &ameba_ops,
+		.id = 3,
 		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif4),
 	},
@@ -298,6 +309,7 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 		.name = "codec AIF3",
 		.stream_name = "SPORT2_I2S_Dai",
 		.ops = &ameba_ops,
+		.id = 2,
 		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif3),
 	},
@@ -305,6 +317,7 @@ static struct snd_soc_dai_link ameba_dai_digital_only[] = {
 		.name = "codec AIF4",
 		.stream_name = "SPORT3_I2S_Dai",
 		.ops = &ameba_ops,
+		.id = 3,
 		.dai_fmt = SND_SOC_DAI_FORMAT_I2S,
 		SND_SOC_DAILINK_REG(aif4),
 	},
@@ -550,6 +563,11 @@ static int ameba_audio_probe(struct platform_device *pdev)
 	snd_soc_card_set_drvdata(card, priv);
 
 	disable_analog_links = of_property_read_bool(np, "sue,disable-analog-links");
+
+	if (of_property_read_u32(np, "sue,mute-dai-mask", &priv->mute_dai_mask)) {
+		/* Default to all interfaces (AIF1-AIF4) if not specified */
+		priv->mute_dai_mask = GENMASK(3,0);
+	}
 
 	card->dev = &pdev->dev;
 
