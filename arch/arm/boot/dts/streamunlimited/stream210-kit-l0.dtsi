@@ -194,6 +194,11 @@
 &sound {
 	amp-supply = <&amp_regulator>;
 	mute-gpio = <&gpio_hsmp 0 GPIO_ACTIVE_LOW>;	// AMP mute
+	/* Bit 0 = AIF1, Bit 1 = AIF2, Bit 2 = AIF3, Bit 3 = AIF4
+	 * Binary 0001 -> 0x1 (Only AIF1 will control muting logic)
+	 */
+	sue,mute-dai-mask = <0x1>;
+
 	hp_mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
 	hp-det-gpio = <&gpiob 20 GPIO_ACTIVE_LOW>;
 };

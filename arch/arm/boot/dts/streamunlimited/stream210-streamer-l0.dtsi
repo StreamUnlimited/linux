@@ -311,6 +311,10 @@
 &sound {
 	amp-supply = <&reg_aud_enable>;
 	mute-gpio = <&gpio_hsmp 1 GPIO_ACTIVE_LOW>;
+	/* Bit 0 = AIF1, Bit 1 = AIF2, Bit 2 = AIF3, Bit 3 = AIF4
+	 * Binary 0001 -> 0x1 (Only AIF1 will control muting logic)
+	 */
+	sue,mute-dai-mask = <0x1>;
 
 	// SPORT2 I2S -> 0: pcm9211-main-hifi
 	// SPORT3 I2S -> 2: pcm9211-dit-hifi
