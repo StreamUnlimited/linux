@@ -88,3 +88,27 @@
 &sai5 {
 	status = "disabled";
 };
+
+&spdif1 {
+	// Changes:
+	// 1. Remove the `pll8k` and `pll11k` clocks: This ensures that the driver will
+	//    not try to reparent the `spdif1` clock to a different PLL and instead the
+	//    `spdif1` clock will always be under the `pll1` clock.
+	// 2. Set all `rxtx<n>` clocks to the dummy clock except `rxtx1`. Togehter with
+	//    the `fsl,strict-rate` flag below, the driver will only allow playback if
+	//    requested sample-rate can be cleanly derived from the `pll1` to the `spdif1`
+	//    clock.
+	clocks = <&clk IMX8MM_CLK_AUDIO_AHB>, <&clk IMX8MM_CLK_DUMMY>,
+		<&clk IMX8MM_CLK_SPDIF1>, <&clk IMX8MM_CLK_DUMMY>,
+		<&clk IMX8MM_CLK_DUMMY>, <&clk IMX8MM_CLK_DUMMY>,
+		<&clk IMX8MM_CLK_DUMMY>, <&clk IMX8MM_CLK_DUMMY>,
+		<&clk IMX8MM_CLK_DUMMY>, <&clk IMX8MM_CLK_DUMMY>;
+
+	clock-names = "core", "rxtx0", "rxtx1", "rxtx2", "rxtx3",
+		"rxtx4", "rxtx5", "rxtx6", "rxtx7", "spba";
+
+	// Setting this flag prevents playback if internally the desired playback rate
+	// cannot be cleanly divided from the provided clocks (in our case only the `spdif1`
+	// clock is available).
+	fsl,strict-rate;
+};
