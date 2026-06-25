@@ -99,6 +99,12 @@ properties:
   power-domains:
     maxItems: 1
 
+  fsl,strict-rate:
+    type: boolean
+    description: |
+      Enforce strict Tx rate division, playback will fail if the required SPDIF
+      rate cannot be cleanly divided down from any of the provided clocks.
+
 required:
   - compatible
   - reg

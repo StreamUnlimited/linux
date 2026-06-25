@@ -146,6 +146,8 @@ struct spdif_mixer_control {
  * @bypass: status of bypass input to output
  * @pll8k_clk: PLL clock for the rate of multiply of 8kHz
  * @pll11k_clk: PLL clock for the rate of multiply of 11kHz
+ * @strict_rate_check: Only allow playback when the SPDIF Tx clock
+ *		       can be cleanly divided down from the parent
  */
 struct fsl_spdif_priv {
 	const struct fsl_spdif_soc_data *soc;
@@ -174,6 +176,7 @@ struct fsl_spdif_priv {
 	bool bypass;
 	struct clk *pll8k_clk;
 	struct clk *pll11k_clk;
+	bool strict_rate_check;
 };
 
 /* Function prototypes */
@@ -1623,8 +1626,16 @@ static int fsl_spdif_probe_txclk(struct fsl_spdif_priv *spdif_priv,
 		spdif_priv->txclk_src[index] = i;
 
 		/* To quick catch a divisor, we allow a 0.1% deviation */
-		if (savesub < 100)
+		if (!spdif_priv->strict_rate_check && savesub < 100)
 			break;
+	}
+
+	if (spdif_priv->strict_rate_check && savesub != 0) {
+		struct clk *clk = spdif_priv->txclk[spdif_priv->txclk_src[index]];
+		struct clk *clk_parent = clk_get_parent(clk);
+		dev_err(dev, "Cannot derive exact clk rate for %d Hz, closest clk: %pC (%lu), parent: %pC (%lu)\n",
+			rate[index], clk, clk_get_rate(clk), clk_parent, clk_get_rate(clk_parent));
+		return -EINVAL;
 	}
 
 	dev_dbg(dev, "use rxtx%d as tx clock source for %dHz sample rate\n",
@@ -1724,6 +1735,8 @@ static int fsl_spdif_probe(struct platform_device *pdev)
 
 	fsl_asoc_get_pll_clocks(&pdev->dev, &spdif_priv->pll8k_clk,
 				&spdif_priv->pll11k_clk);
+
+	spdif_priv->strict_rate_check = device_property_read_bool(&pdev->dev, "fsl,strict-rate");
 
 	/* Initial spinlock for control data */
 	ctrl = &spdif_priv->fsl_spdif_control;
