@@ -34,6 +34,16 @@ enum mclk_rate_idx {
 	MCLK_IDX_MAX
 };
 
+/*
+ * Supported sample rates: Restricted to 22.05kHz or higher to satisfy AK4458Fs ratio
+ * limits, and capped at 768kHz where MCLK doubling is required to
+ * derive the necessary Bit Clock.
+ */
+static const unsigned int stream195x_default_playback_rates[] = {
+	22050, 32000, 44100, 48000, 88200, 96000,
+	176400, 192000, 352800, 384000, 705600, 768000
+};
+
 /* All instances of asoc_simple_priv have been replcaed with stream195x_simple_priv */
 /* Stolen from asoc_simple_priv struct */
 struct stream195x_simple_priv {
@@ -64,6 +74,9 @@ struct stream195x_simple_priv {
 	bool pll_bypass_mode_active;
 	struct clk *pll_bypass_clk;
 	struct clk *pll_bypass_parent_clk;
+
+	struct snd_pcm_hw_constraint_list playback_rate_constraint;
+	unsigned int playback_rates[ARRAY_SIZE(stream195x_default_playback_rates)];
 	/* END SUE addition 2 */
 };
 
@@ -72,21 +85,6 @@ struct stream195x_simple_priv {
 
 #define PLL_NOMINAL_RATE_48k	(786432000UL)
 #define PLL_NOMINAL_RATE_44k1	(722534400UL)
-
-/*
- * Supported sample rates: Restricted to 22.05kHz or higher to satisfy AK4458Fs ratio
- * limits, and capped at 768kHz where MCLK doubling is required to
- * derive the necessary Bit Clock.
- */
-static const unsigned int stream195x_playback_rates[] = {
-	22050, 32000, 44100, 48000, 88200, 96000,
-	176400, 192000, 352800, 384000, 705600, 768000
-};
-
-static const struct snd_pcm_hw_constraint_list stream195x_playback_constraints = {
-	.count = ARRAY_SIZE(stream195x_playback_rates),
-	.list  = stream195x_playback_rates,
-};
 
 #define KCONTROL_DRIFT_COMPENSATOR_NAME "Drift compensator"
 
@@ -185,6 +183,8 @@ static void snd_soc_stream195x_set_all_links_mute(struct stream195x_simple_priv 
 static int snd_soc_stream195x_startup(struct snd_pcm_substream *substream)
 {
 	int ret;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct stream195x_simple_priv *priv = snd_soc_card_get_drvdata(rtd->card);
 
 	ret = simple_util_startup(substream);
 	if (ret < 0)
@@ -193,7 +193,7 @@ static int snd_soc_stream195x_startup(struct snd_pcm_substream *substream)
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		ret = snd_pcm_hw_constraint_list(substream->runtime, 0,
 						SNDRV_PCM_HW_PARAM_RATE,
-						&stream195x_playback_constraints);
+						&priv->playback_rate_constraint);
 	/*
 	 * For capture the dummy codec STUB_RATES (SNDRV_PCM_RATE_8000_384000) are
 	 * used in case of AUX and DABFM.
@@ -1310,6 +1310,31 @@ static int simple_probe(struct platform_device *pdev)
 	ret = stream195x_setup_pll_bypass(card);
 	if (ret)
 		dev_warn(dev, "Failed to setup PLL bypass mode\n");
+
+	// If we run in PLL bypass mode together with an external MCLK then we can already constrain the available
+	// rates correctly here based on the rates of the external MCLK clocks.
+	if (priv->pll_bypass_mode_active && priv->ext_mclk_clk) {
+		priv->playback_rate_constraint.list = priv->playback_rates;
+
+		for (int i = 0; i < ARRAY_SIZE(stream195x_default_playback_rates); i++) {
+			unsigned int rate = stream195x_default_playback_rates[i];
+			unsigned int ext_mclk_rate = (rate % 8000) == 0 ? priv->ext_mclk_rates[MCLK_IDX_48K] : priv->ext_mclk_rates[MCLK_IDX_44K1];
+			// The external MCLK rate needs to be **at least** 64 * Fs
+			unsigned int required_mclk_rate = rate * 64;
+
+			if (required_mclk_rate <= ext_mclk_rate) {
+				priv->playback_rates[priv->playback_rate_constraint.count] = rate;
+				priv->playback_rate_constraint.count++;
+			} else {
+				dev_warn(dev, "Not supporting rate %u in PLL bypass mode with ext MCLK rate %u\n", rate, ext_mclk_rate);
+			}
+		}
+	} else {
+		// Otherwise just use the default list of supported rates, the SAI driver might do some additional rate constraining
+		// if it has the neccecary information.
+		priv->playback_rate_constraint.list = stream195x_default_playback_rates;
+		priv->playback_rate_constraint.count = ARRAY_SIZE(stream195x_default_playback_rates);
+	}
 
 	// Do not create the "Drift compensator" when we are in PLL bypass mode as it makes no
 	// sense in that case.
