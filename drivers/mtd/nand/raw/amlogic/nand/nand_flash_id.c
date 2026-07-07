@@ -14,6 +14,9 @@ struct nand_flash_dev aml_nand_flash_ids[] = {
 	{"GD9FU4G8F4DLGI 4G 3.3V 8-bit",
 		{ .id = {0xc8, 0xdc, 0x80, 0xa6, 0x63} },
 		  SZ_4K, SZ_512, SZ_256K, 0, 5, 256, NAND_ECC_INFO(8, SZ_512) },
+	{"F59L4G81XB 4G 3.3V 8-bit",
+		{ .id = {0x2c, 0xdc, 0x80, 0xa6, 0x62} },
+		  SZ_4K, SZ_512, SZ_256K, 0, 5, 256, NAND_ECC_INFO(8, SZ_512) },
 
 	{NULL,}
 };
