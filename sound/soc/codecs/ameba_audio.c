@@ -1965,6 +1965,11 @@ void audio_codec_set_dac_asrc_rate(int rate, void __iomem *audio_base_addr)
 	}
 
 	tmp = readl(audio_base_addr + CODEC_ASRC_CONTROL_0);
+	tmp &= ~AUD_BIT_ASRC_AUTO_ADJUST_TX; // disable HW auto adjust of convergence rate
+
+	tmp &= ~AUD_MASK_ASRC_GAIN_SEL_TX;
+	tmp |= AUD_ASRC_GAIN_SEL_TX(0); // set ASRC convergence rate to slowest to eliminate audio glitches
+
 	tmp &= ~AUD_MASK_ASRC_RATE_SEL_TX;
 	tmp |= AUD_ASRC_RATE_SEL_TX(sel);
 	writel(tmp, audio_base_addr + CODEC_ASRC_CONTROL_0);
