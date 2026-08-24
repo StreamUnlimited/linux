@@ -278,15 +278,16 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
 	seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 
+	if (cpumask_next(cpu, cpu_online_mask) >= nr_cpu_ids) {
 #ifdef CONFIG_AMLOGIC_CPU_INFO
-	cpuinfo_get_chipid(chipid, CHIPID_LEN);
-	seq_puts(m, "Serial\t\t: ");
-	for (j = 0; j < CHIPID_LEN; j++)
-		seq_printf(m, "%02x", chipid[j]);
-	seq_puts(m, "\n");
+		cpuinfo_get_chipid(chipid, CHIPID_LEN);
+		seq_puts(m, "Serial\t\t: ");
+		for (j = 0; j < CHIPID_LEN; j++)
+			seq_printf(m, "%02x", chipid[j]);
+		seq_puts(m, "\n");
 #endif
-	seq_printf(m, "Hardware\t: %s\n\n", "Amlogic");
-
+		seq_printf(m, "Hardware\t: %s\n\n", "Amlogic");
+	}
 	return 0;
 }
 
