@@ -34,11 +34,11 @@
 		#size-cells = <1>;
 		ranges;
 
-		ramoops@64600000 {
+		ramoops@6F000000 {
 			compatible = "ramoops";
 
 			// 128 KiB buffer
-			reg = <0x64600000 0x20000>;
+			reg = <0x6F000000 0x20000>;
 
 			// We only care about a single crash/entry from the last boot,
 			// so make `record-size` equal to the total size
