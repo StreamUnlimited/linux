@@ -6501,9 +6501,6 @@ static void hci_le_per_adv_report_evt(struct hci_dev *hdev, void *data,
 	    !test_and_set_bit(HCI_CONN_PA_SYNC, &pa_sync->flags)) {
 		/* Notify iso layer */
 		hci_connect_cfm(pa_sync, 0);
-
-		/* Notify MGMT layer */
-		mgmt_device_connected(hdev, pa_sync, NULL, 0);
 	}
 
 unlock:
