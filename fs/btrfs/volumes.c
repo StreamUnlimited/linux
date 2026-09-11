@@ -1839,8 +1839,8 @@ static int find_free_dev_extent(struct btrfs_device *device, u64 num_bytes,
 	}
 
 	path->reada = READA_FORWARD;
-	path->search_commit_root = 1;
-	path->skip_locking = 1;
+	path->search_commit_root = true;
+	path->skip_locking = true;
 
 	key.objectid = device->devid;
 	key.type = BTRFS_DEV_EXTENT_KEY;
@@ -4205,7 +4205,7 @@ static int __btrfs_balance(struct btrfs_fs_info *fs_info)
 	struct btrfs_root *chunk_root = fs_info->chunk_root;
 	u64 chunk_type;
 	struct btrfs_chunk *chunk;
-	struct btrfs_path *path = NULL;
+	BTRFS_PATH_AUTO_FREE(path);
 	struct btrfs_key key;
 	struct btrfs_key found_key;
 	struct extent_buffer *leaf;
@@ -4382,7 +4382,6 @@ loop:
 		goto again;
 	}
 error:
-	btrfs_free_path(path);
 	if (enospc_errors) {
 		btrfs_info(fs_info, "%d enospc errors during balance",
 			   enospc_errors);
@@ -7628,7 +7627,7 @@ int btrfs_read_chunk_tree(struct btrfs_fs_info *fs_info)
 	 * chunk tree, to keep it simple, just skip locking on the chunk tree.
 	 */
 	ASSERT(!test_bit(BTRFS_FS_OPEN, &fs_info->flags));
-	path->skip_locking = 1;
+	path->skip_locking = true;
 
 	/*
 	 * Read all device items, and then all the chunk items. All

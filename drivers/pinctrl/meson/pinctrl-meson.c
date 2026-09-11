@@ -675,7 +675,7 @@ static int meson_gpiolib_register(struct meson_pinctrl *pc)
 	of_property_read_u32(to_of_node(pc->fwnode), "sysfs-base", &pc->chip.base);
 	pc->chip.to_irq = meson_gpio_to_irq;
 	pc->chip.ngpio = pc->data->num_pins;
-	pc->chip.can_sleep = true;
+	pc->chip.can_sleep = false;
 	pc->chip.of_gpio_n_cells = 2;
 
 	ret = gpiochip_add_data(&pc->chip, pc);
