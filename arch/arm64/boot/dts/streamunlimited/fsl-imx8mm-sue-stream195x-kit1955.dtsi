@@ -429,4 +429,8 @@
 	status = "okay";
 	vbus-supply = <&reg_usb1_drvvbus>;
 	usb-role-switch;
+	// Setting these seem to improve AXI bus contention when high freq usb audio is played
+	ahb-burst-config = <0x0>;
+	tx-burst-size-dword = <0x10>;
+	rx-burst-size-dword = <0x10>;
 };
