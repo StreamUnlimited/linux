@@ -173,7 +173,7 @@ static uint32_t cal_bit_shift(uint32_t Mask)
 	return (i);
 }
 
-static void set_reg_value(uint32_t reg_address, uint32_t Mask, uint32_t val)
+static void set_reg_value(void __iomem *reg_address, uint32_t Mask, uint32_t val)
 {
 	uint32_t shift = 0;
 	uint32_t data = 0;
