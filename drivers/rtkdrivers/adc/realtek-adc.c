@@ -812,7 +812,7 @@ static int realtek_adc_init_channel(struct iio_dev *indio_dev)
 
 	ret = of_property_read_u32(node, "rtk,adc-timer-period", &nr_requests);
 	if (ret) {
-		dev_warn(&indio_dev->dev, "Can't get DTS property rtk,adc-timer-period, set it to default value %d\n", realtek_adc_cfg.period);
+		dev_warn(&indio_dev->dev, "Can't get DTS property rtk,adc-timer-period, set it to default value %llu\n", realtek_adc_cfg.period);
 	} else {
 		dev_dbg(&indio_dev->dev, "Get DTS property rtk,adc-timer-period = %d\n", nr_requests);
 		realtek_adc_cfg.period = nr_requests;
