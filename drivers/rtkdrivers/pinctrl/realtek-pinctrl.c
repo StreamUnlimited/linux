@@ -162,8 +162,7 @@ static int realtek_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 
 	pins = of_find_property(node, "pinmux", NULL);
 	if (!pins) {
-		dev_err(pctl->dev, "No pinmux property in DTS\n",
-				node);
+		dev_err(pctl->dev, "No pinmux property in DTS\n");
 		return -EINVAL;
 	}
 
