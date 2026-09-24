@@ -364,7 +364,7 @@ static void whc_fullmac_host_event_promisc_pkt_hdl(struct event_priv_t *event_pr
 	}
 
 	ppktinfo = llhw_ipc_fw_phy_to_virt(p_ipc_msg->param_buf[0]);
-	buf = llhw_ipc_fw_phy_to_virt(ppktinfo->buf);
+	buf = llhw_ipc_fw_phy_to_virt((phys_addr_t)ppktinfo->buf);
 
 	ppktinfo->buf = buf;
 	rtw_promisc_rx(ppktinfo);
