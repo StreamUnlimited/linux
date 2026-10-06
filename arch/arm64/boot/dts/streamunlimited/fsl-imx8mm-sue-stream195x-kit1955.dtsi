@@ -53,15 +53,18 @@
 				dai-tdm-slot-width = <32>;
 			};
 		};
+
+		sue-card,dai-link@1 {
+			cpu {
+				sound-dai = <&spdif1>;
+			};
+
+			codec {
+				 use-dummy-codec;
+			};
+		};
 	};
 
-	sound-spdif {
-		compatible = "fsl,imx-audio-spdif";
-		model = "CarrierBoardSpd";
-		spdif-controller = <&spdif1>;
-		spdif-out;
-		spdif-in;
-	};
 };
 
 &clk {
@@ -396,6 +399,7 @@
 };
 
 &spdif1 {
+	#sound-dai-cells = <0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spdif1>;
 	assigned-clocks = <&clk IMX8MM_CLK_SPDIF1>;
