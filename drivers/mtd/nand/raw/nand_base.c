@@ -5053,6 +5053,28 @@ nand_manufacturer_name(const struct nand_manufacturer_desc *manufacturer_desc)
 	return manufacturer_desc ? manufacturer_desc->name : "Unknown";
 }
 
+static char *nand_build_model_name(struct nand_chip *chip)
+{
+	const char *manuf = nand_manufacturer_name(chip->manufacturer.desc);
+	const char *model = chip->parameters.model;
+	size_t mlen;
+
+	if (!model || !*model)
+		return kstrdup(manuf, GFP_KERNEL);
+
+	mlen = strlen(manuf);
+
+	/*
+	 * Skip prepending manufacturer if the model string already starts
+	 * with it followed by a delimiter or end of string.
+	 */
+	if (!strncasecmp(model, manuf, mlen) &&
+	    (model[mlen] == ' ' || model[mlen] == '-' || model[mlen] == '\0'))
+		return kstrdup(model, GFP_KERNEL);
+
+	return kasprintf(GFP_KERNEL, "%s %s", manuf, model);
+}
+
 static void rawnand_check_data_only_read_support(struct nand_chip *chip)
 {
 	/* Use an arbitrary size for the check */
@@ -5292,6 +5314,8 @@ ident_done:
 		chip->options |= NAND_ROW_ADDR_3;
 
 	chip->badblockbits = 8;
+
+	mtd->model = nand_build_model_name(chip);
 
 	nand_legacy_adjust_cmdfunc(chip);
 
@@ -6568,6 +6592,7 @@ EXPORT_SYMBOL(nand_scan_with_ids);
  */
 void nand_cleanup(struct nand_chip *chip)
 {
+	struct mtd_info *mtd = nand_to_mtd(chip);
 	if (chip->ecc.engine_type == NAND_ECC_ENGINE_TYPE_SOFT) {
 		if (chip->ecc.algo == NAND_ECC_ALGO_HAMMING)
 			rawnand_sw_hamming_cleanup(chip);
@@ -6593,6 +6618,9 @@ void nand_cleanup(struct nand_chip *chip)
 
 	/* Free the data interface */
 	kfree(chip->best_interface_config);
+
+	/* Free model */
+	kfree(mtd->model);
 
 	/* Free manufacturer priv data. */
 	nand_manufacturer_cleanup(chip);

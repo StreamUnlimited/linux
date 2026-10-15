@@ -263,6 +263,19 @@ static ssize_t mtd_name_show(struct device *dev,
 }
 MTD_DEVICE_ATTR_RO(name);
 
+static ssize_t mtd_model_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mtd_info *mtd = dev_get_drvdata(dev);
+	struct mtd_info *master = mtd_get_master(mtd);
+
+	if (!master->model)
+		return sysfs_emit(buf, "unknown\n");
+
+	return sysfs_emit(buf, "%s\n", master->model);
+}
+MTD_DEVICE_ATTR_RO(model);
+
 static ssize_t mtd_ecc_strength_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
@@ -359,6 +372,7 @@ static struct attribute *mtd_attrs[] = {
 	&dev_attr_oobavail.attr,
 	&dev_attr_numeraseregions.attr,
 	&dev_attr_name.attr,
+	&dev_attr_model.attr,
 	&dev_attr_ecc_strength.attr,
 	&dev_attr_ecc_step_size.attr,
 	&dev_attr_corrected_bits.attr,

@@ -287,6 +287,8 @@ struct mtd_info {
 	 */
 	unsigned int bitflip_threshold;
 
+	const char* model;
+
 	/* Kernel-only stuff starts here. */
 	const char *name;
 	int index;
