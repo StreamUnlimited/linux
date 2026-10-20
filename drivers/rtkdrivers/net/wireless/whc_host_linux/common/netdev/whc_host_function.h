@@ -102,6 +102,7 @@ int whc_fullmac_host_update_custom_ie(u8 *ie, int ie_index, u8 type);
 int whc_fullmac_host_set_edcca_mode(u8 edcca_mode);
 int whc_fullmac_host_get_edcca_mode(u8 *edcca_mode);
 int whc_fullmac_host_get_ant_info(u8 *antdiv_mode, u8 *curr_ant);
+int whc_fullmac_host_get_rate_txpwr(u8 rate, dma_addr_t txpwr_phy);
 int whc_fullmac_host_set_country_code(char *cc);
 int whc_fullmac_host_get_country_code(struct rtw_country_code_table *table);
 int whc_fullmac_host_dev_driver_is_mp(void);

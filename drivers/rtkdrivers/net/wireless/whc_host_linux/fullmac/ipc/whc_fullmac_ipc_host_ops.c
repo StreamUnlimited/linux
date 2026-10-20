@@ -1162,6 +1162,13 @@ func_exit:
 	return ret;
 }
 
+int whc_fullmac_host_get_rate_txpwr(u8 rate, dma_addr_t txpwr_phy)
+{
+	u32 param_buf[2] = { rate, txpwr_phy };
+
+	return whc_fullmac_ipc_host_send_msg(WHC_API_WIFI_GET_TX_POWER, param_buf, 2);
+}
+
 int whc_fullmac_host_set_country_code(char *cc)
 {
 	int ret = 0;

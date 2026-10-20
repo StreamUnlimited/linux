@@ -235,6 +235,98 @@ static int proc_read_mp_fw(struct seq_file *m, void *v)
 
 	return 0;
 }
+
+struct whc_rate_name {
+	u8 rate;
+	const char *name;
+};
+
+#define WHC_RATE(r)	{ RTW_RATE_##r, #r }
+
+/* enum rtw_rate without RTW_RATE_UNKNOWN */
+static const struct whc_rate_name whc_cck_rates[] = {
+	WHC_RATE(1M), WHC_RATE(2M), WHC_RATE(5_5M), WHC_RATE(11M),
+};
+
+static const struct whc_rate_name whc_ofdm_mcs_rates[] = {
+	WHC_RATE(6M), WHC_RATE(9M), WHC_RATE(12M), WHC_RATE(18M),
+	WHC_RATE(24M), WHC_RATE(36M), WHC_RATE(48M), WHC_RATE(54M),
+	WHC_RATE(MCS32), WHC_RATE(MCS0), WHC_RATE(MCS1), WHC_RATE(MCS2),
+	WHC_RATE(MCS3), WHC_RATE(MCS4), WHC_RATE(MCS5), WHC_RATE(MCS6),
+	WHC_RATE(MCS7),
+	WHC_RATE(VHT1SS_MCS0), WHC_RATE(VHT1SS_MCS1), WHC_RATE(VHT1SS_MCS2),
+	WHC_RATE(VHT1SS_MCS3), WHC_RATE(VHT1SS_MCS4), WHC_RATE(VHT1SS_MCS5),
+	WHC_RATE(VHT1SS_MCS6), WHC_RATE(VHT1SS_MCS7), WHC_RATE(VHT1SS_MCS8),
+	WHC_RATE(VHT1SS_MCS9),
+	WHC_RATE(HE1SS_MCS0), WHC_RATE(HE1SS_MCS1), WHC_RATE(HE1SS_MCS2),
+	WHC_RATE(HE1SS_MCS3), WHC_RATE(HE1SS_MCS4), WHC_RATE(HE1SS_MCS5),
+	WHC_RATE(HE1SS_MCS6), WHC_RATE(HE1SS_MCS7), WHC_RATE(HE1SS_MCS8),
+	WHC_RATE(HE1SS_MCS9), WHC_RATE(HE1SS_MCS10), WHC_RATE(HE1SS_MCS11),
+};
+
+static_assert(ARRAY_SIZE(whc_cck_rates) + ARRAY_SIZE(whc_ofdm_mcs_rates) + 1 == RTW_RATE_NUM);
+
+static int proc_print_tx_power(struct seq_file *m, const struct whc_rate_name *rates, int num,
+			       s8 *pwr, dma_addr_t pwr_phy)
+{
+	int i, ret;
+
+	for (i = 0; i < num; i++) {
+		ret = whc_fullmac_host_get_rate_txpwr(rates[i].rate, pwr_phy);
+		if (ret)
+			return ret;
+		/* 0.25 dBm steps */
+		seq_printf(m, "%-12s %s%d.%02d dBm\n", rates[i].name, *pwr < 0 ? "-" : "",
+			   abs(*pwr) / 4, abs(*pwr) % 4 * 25);
+	}
+
+	return 0;
+}
+
+static int proc_read_tx_power(struct seq_file *m, void *v)
+{
+	struct rtw_country_code_table table;
+	struct rtw_wifi_setting *setting_vir;
+	dma_addr_t setting_phy, pwr_phy;
+	s8 *pwr;
+	u8 ch;
+	int ret;
+
+	ret = whc_fullmac_host_get_country_code(&table);
+	if (ret)
+		return ret;
+
+	/* pwr_lmt is enum rtw_txpwr_lmt */
+	seq_printf(m, "country %.2s, channel plan 0x%02x, power limit %u\n",
+		   table.char2, table.channel_plan, table.pwr_lmt);
+
+	setting_vir = rtw_malloc(sizeof(struct rtw_wifi_setting), &setting_phy);
+	if (!setting_vir)
+		return -ENOMEM;
+
+	ret = whc_fullmac_host_get_setting(STA_WLAN_INDEX, setting_phy);
+	ch = setting_vir->channel;
+	rtw_mfree(sizeof(struct rtw_wifi_setting), setting_vir, setting_phy);
+	if (ret)
+		return ret;
+
+	pwr = rtw_malloc(sizeof(s8), &pwr_phy);
+	if (!pwr)
+		return -ENOMEM;
+
+	seq_printf(m, "channel %u\n", ch);
+	/* The NP does not check the band, CCK is 2.4 GHz only */
+	if (ch <= 14)
+		ret = proc_print_tx_power(m, whc_cck_rates, ARRAY_SIZE(whc_cck_rates),
+					  pwr, pwr_phy);
+	if (!ret)
+		ret = proc_print_tx_power(m, whc_ofdm_mcs_rates, ARRAY_SIZE(whc_ofdm_mcs_rates),
+					  pwr, pwr_phy);
+
+	rtw_mfree(sizeof(s8), pwr, pwr_phy);
+	return ret;
+}
+
 /*
 * rtw_ndev_ap_proc
 */
@@ -412,6 +504,7 @@ const struct rtw_proc_hdl ndev_sta_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("antdiv_mode", proc_read_antdiv_mode, NULL),
 	RTW_PROC_HDL_SSEQ("current_ant", proc_read_curr_ant, NULL),
 	RTW_PROC_HDL_SSEQ("mp_fw", proc_read_mp_fw, NULL),
+	RTW_PROC_HDL_SSEQ("tx_power", proc_read_tx_power, NULL),
 
 #if !defined(CONFIG_WHC_BRIDGE)
 #ifdef CONFIG_FULLMAC_HCI_SDIO

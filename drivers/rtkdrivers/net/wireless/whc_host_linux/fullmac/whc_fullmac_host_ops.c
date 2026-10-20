@@ -877,12 +877,40 @@ static int whc_fullmac_host_set_txpower(struct wiphy *wiphy, struct wireless_dev
 	return -EPERM;
 }
 
+/* Report the power of the rate the last data frame was sent with */
 static int whc_fullmac_host_get_txpower(struct wiphy *wiphy, struct wireless_dev *wdev, int *dbm)
 {
-	dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s", __func__);
+	union rtw_traffic_stats *stats_vir;
+	dma_addr_t stats_phy, pwr_phy;
+	s8 *pwr;
+	u8 rate;
+	int ret;
 
-	/* Operation not permitted */
-	return -EPERM;
+	if (!wdev->netdev || rtw_netdev_idx(wdev->netdev) != WHC_STA_PORT ||
+	    whc_fullmac_host_wifi_get_join_status() != RTW_JOINSTATUS_SUCCESS)
+		return -ENOTCONN;
+
+	stats_vir = rtw_malloc(sizeof(union rtw_traffic_stats), &stats_phy);
+	if (!stats_vir)
+		return -ENOMEM;
+
+	ret = whc_fullmac_host_get_traffic_stats(STA_WLAN_INDEX, stats_phy);
+	rate = stats_vir->sta.cur_tx_data_rate;
+	rtw_mfree(sizeof(union rtw_traffic_stats), stats_vir, stats_phy);
+	if (ret)
+		return ret;
+
+	pwr = rtw_malloc(sizeof(s8), &pwr_phy);
+	if (!pwr)
+		return -ENOMEM;
+
+	ret = whc_fullmac_host_get_rate_txpwr(rate, pwr_phy);
+	/* 0.25 dBm steps, round up to not under-report */
+	if (!ret)
+		*dbm = DIV_ROUND_UP(*pwr, 4);
+
+	rtw_mfree(sizeof(s8), pwr, pwr_phy);
+	return ret;
 }
 
 static int whc_fullmac_host_set_power_mgmt(struct wiphy *wiphy, struct net_device *ndev, bool enabled, int timeout)

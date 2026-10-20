@@ -303,6 +303,8 @@ enum rtw_rate {
 	RTW_RATE_UNKNOWN = 0xff  /**< 0xff */
 };
 
+#define RTW_RATE_NUM	44
+
 /**
   * @brief CSI triggering management frame subtypes (size: u16).
   */
