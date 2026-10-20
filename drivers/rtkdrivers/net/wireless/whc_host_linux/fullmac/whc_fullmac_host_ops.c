@@ -967,14 +967,15 @@ static int whc_fullmac_host_get_channel_ops(struct wiphy *wiphy,
 
 	if (ret < 0) {
 		dev_dbg(global_idev.fullmac_dev, "[fullmac]: %s, get channel failed(%d).", __func__, ret);
-		return ret;
+		goto free_setting;
 	}
 
 	freq = rtw_ch2freq(setting_vir->channel);
 	chan = ieee80211_get_channel(wiphy, freq);
 	if (!chan) {
 		dev_err(global_idev.fullmac_dev, "[fullmac]: %s, ieee80211_get_channel failed.", __func__);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto free_setting;
 	}
 
 	memset(chandef, 0, sizeof(struct cfg80211_chan_def));
@@ -982,6 +983,7 @@ static int whc_fullmac_host_get_channel_ops(struct wiphy *wiphy,
 	chandef->center_freq1 = freq;
 	chandef->chan = chan;
 
+free_setting:
 	rtw_mfree(sizeof(struct rtw_wifi_setting), setting_vir, setting_phy);
 	return ret;
 }
