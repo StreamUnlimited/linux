@@ -143,7 +143,7 @@ static LCM_setting_table_t kt_pv04005td25e_init[] = {
 	/* Display Control setting */
 	{MIPI_DSI_DCS_LONG_WRITE, 6, {0xFF, 0x77, 0x01, 0x00, 0x00, 0x10}},
 	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC0, 0x63, 0x00}},
-	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC1, 0x0C, 0x02}},
+	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC1, 0x11, 0x02}},
 	{MIPI_DSI_DCS_LONG_WRITE, 3, {0xC2, 0x31, 0x08}},
 	{MIPI_DSI_DCS_SHORT_WRITE_PARAM, 2, {0xCC, 0x10}},
 
